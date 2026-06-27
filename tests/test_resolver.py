@@ -1,4 +1,9 @@
-from atlas_core.domain import Equipment, EquipmentCategory
+from atlas_core.domain import (
+    Equipment,
+    EquipmentCategory,
+    IntegratedSystem,
+    SystemCategory,
+)
 from atlas_core.rules import ResolutionAction, Resolver
 
 
@@ -8,6 +13,8 @@ def test_speaker_without_amplifier_creates_amplifier_placeholder_resolution():
         description="Ceiling Speaker",
         category=EquipmentCategory.SPEAKER,
         system_id="sys-001",
+        room_id="room-001",
+        building_id="building-001",
     )
 
     resolutions = Resolver().resolve([speaker])
@@ -17,6 +24,9 @@ def test_speaker_without_amplifier_creates_amplifier_placeholder_resolution():
     assert resolutions[0].action is ResolutionAction.ADD_PLACEHOLDER
     assert resolutions[0].target_id == "eq-speaker"
     assert resolutions[0].suggested_category == "amplifier"
+    assert resolutions[0].source_system_id == "sys-001"
+    assert resolutions[0].source_room_id == "room-001"
+    assert resolutions[0].source_building_id == "building-001"
 
 
 def test_speaker_with_amplifier_in_same_system_does_not_create_placeholder():
@@ -34,6 +44,28 @@ def test_speaker_with_amplifier_in_same_system_does_not_create_placeholder():
     )
 
     assert Resolver().resolve([speaker, amplifier]) == []
+
+
+def test_resolution_source_context_can_fall_back_to_system_context():
+    speaker = Equipment(
+        equipment_id="eq-speaker",
+        description="Ceiling Speaker",
+        category=EquipmentCategory.SPEAKER,
+        system_id="sys-001",
+    )
+    system = IntegratedSystem(
+        system_id="sys-001",
+        name="Performance Audio",
+        category=SystemCategory.AUDIO,
+        room_id="room-001",
+        building_id="building-001",
+    )
+
+    resolutions = Resolver().resolve([speaker], systems=[system])
+
+    assert resolutions[0].source_system_id == "sys-001"
+    assert resolutions[0].source_room_id == "room-001"
+    assert resolutions[0].source_building_id == "building-001"
 
 
 def test_speaker_without_system_id_does_not_create_placeholder():

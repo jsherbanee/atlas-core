@@ -13,6 +13,9 @@ def test_creating_placeholder_equipment_from_add_placeholder_resolution():
         suggested_category="amplifier",
         suggested_manufacturer="QSC",
         suggested_model="CX-Q",
+        source_system_id="sys-001",
+        source_room_id="room-001",
+        source_building_id="building-001",
     )
 
     equipment = ResolutionService().create_placeholder_equipment([resolution])
@@ -23,6 +26,9 @@ def test_creating_placeholder_equipment_from_add_placeholder_resolution():
     assert equipment[0].category is EquipmentCategory.AMPLIFIER
     assert equipment[0].manufacturer == "QSC"
     assert equipment[0].model == "CX-Q"
+    assert equipment[0].system_id == "sys-001"
+    assert equipment[0].room_id == "room-001"
+    assert equipment[0].building_id == "building-001"
     assert equipment[0].status is EquipmentStatus.PLACEHOLDER
     assert equipment[0].quantity == 1
     assert equipment[0].confidence == 0.82

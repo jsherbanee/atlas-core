@@ -58,3 +58,27 @@ def test_seed_data_creates_resolver_placeholders_in_estimate_workflow():
 
     assert result.placeholder_equipment_count >= 1
     assert any(row.equipment_category == "amplifier" for row in result.rows)
+
+
+def test_seed_placeholder_rows_keep_source_context():
+    seed = build_maw_seed_data()
+
+    result = EstimateWorkflowService().build_equipment_matrix_with_resolutions(
+        buildings=seed["buildings"],
+        rooms=seed["rooms"],
+        spaces=seed["spaces"],
+        scenes=seed["scenes"],
+        systems=seed["systems"],
+        equipment=seed["equipment"],
+    )
+    placeholder_rows = [
+        row for row in result.rows if row.status == "placeholder"
+    ]
+
+    assert placeholder_rows
+    assert all(row.system_id for row in placeholder_rows)
+    assert all(row.room_id for row in placeholder_rows)
+    assert all(
+        row.building_name == "MAW Music Education Center"
+        for row in placeholder_rows
+    )

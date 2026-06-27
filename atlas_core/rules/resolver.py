@@ -24,11 +24,23 @@ class Resolution:
     suggested_description: str | None = None
     suggested_manufacturer: str | None = None
     suggested_model: str | None = None
+    source_system_id: str | None = None
+    source_room_id: str | None = None
+    source_building_id: str | None = None
 
     def __post_init__(self) -> None:
         self.rule_id = self._normalize_required_text("rule_id", self.rule_id)
         self.target_id = self._normalize_required_text("target_id", self.target_id)
         self.message = self._normalize_required_text("message", self.message)
+        self.source_system_id = self._normalize_optional_text(
+            self.source_system_id
+        )
+        self.source_room_id = self._normalize_optional_text(
+            self.source_room_id
+        )
+        self.source_building_id = self._normalize_optional_text(
+            self.source_building_id
+        )
 
         if not isinstance(self.action, ResolutionAction):
             self.action = ResolutionAction(self.action)
@@ -49,6 +61,17 @@ class Resolution:
         cls._validate_required_text(field_name, value)
         return value.strip()
 
+    @staticmethod
+    def _normalize_optional_text(value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        if not isinstance(value, str):
+            return None
+
+        normalized = value.strip()
+        return normalized or None
+
 
 class Resolver:
     def resolve(
@@ -56,16 +79,20 @@ class Resolver:
         equipment: list[Any],
         systems: list[Any] | None = None,
     ) -> list[Resolution]:
-        del systems
-
         resolutions: list[Resolution] = []
         emitted: set[tuple[str, str]] = set()
+        systems_by_id = self._systems_by_id(systems or [])
 
         for index, item in enumerate(equipment):
             target_id = self._target_id(item, index)
             category = self._value(item, "category")
             system_id = self._value(item, "system_id")
-            room_id = self._value(item, "room_id")
+            system = systems_by_id.get(system_id)
+            room_id = self._value(item, "room_id") or self._value(system, "room_id")
+            building_id = (
+                self._value(item, "building_id")
+                or self._value(system, "building_id")
+            )
 
             if category == "speaker" and system_id and not self._has_category_in_scope(
                 equipment, "amplifier", "system_id", system_id
@@ -81,6 +108,9 @@ class Resolver:
                         "No amplifier was detected in this system."
                     ),
                     suggested_category="amplifier",
+                    source_system_id=system_id,
+                    source_room_id=room_id,
+                    source_building_id=building_id,
                 )
 
             if category == "display" and room_id and not self._has_category_in_scope(
@@ -98,6 +128,9 @@ class Resolver:
                     ),
                     suggested_category="mount",
                     suggested_manufacturer="Chief",
+                    source_system_id=system_id,
+                    source_room_id=room_id,
+                    source_building_id=building_id,
                 )
 
             if category == "projector" and room_id and not self._has_category_in_scope(
@@ -115,6 +148,9 @@ class Resolver:
                     ),
                     suggested_category="mount",
                     suggested_manufacturer="Chief",
+                    source_system_id=system_id,
+                    source_room_id=room_id,
+                    source_building_id=building_id,
                 )
 
             if category == "drapery":
@@ -128,6 +164,9 @@ class Resolver:
                         "Drapery scope requires review of track, hardware, "
                         "infrastructure, support, and site conditions."
                     ),
+                    source_system_id=system_id,
+                    source_room_id=room_id,
+                    source_building_id=building_id,
                 )
 
             confidence = self._numeric_value(item, "confidence")
@@ -142,6 +181,9 @@ class Resolver:
                         "Equipment confidence is below threshold and requires "
                         "estimator review."
                     ),
+                    source_system_id=system_id,
+                    source_room_id=room_id,
+                    source_building_id=building_id,
                 )
 
         return resolutions
@@ -158,6 +200,9 @@ class Resolver:
         message: str,
         suggested_category: str | None = None,
         suggested_manufacturer: str | None = None,
+        source_system_id: str | None = None,
+        source_room_id: str | None = None,
+        source_building_id: str | None = None,
     ) -> None:
         key = (rule_id, target_id)
         if key in emitted:
@@ -172,6 +217,9 @@ class Resolver:
                 message=message,
                 suggested_category=suggested_category,
                 suggested_manufacturer=suggested_manufacturer,
+                source_system_id=source_system_id,
+                source_room_id=source_room_id,
+                source_building_id=source_building_id,
             )
         )
 
@@ -188,6 +236,17 @@ class Resolver:
             and cls._value(item, scope_field) == scope_value
             for item in equipment
         )
+
+    @classmethod
+    def _systems_by_id(cls, systems: list[Any]) -> dict[str, Any]:
+        indexed = {}
+
+        for system in systems:
+            system_id = cls._value(system, "system_id")
+            if system_id != "":
+                indexed[str(system_id)] = system
+
+        return indexed
 
     @staticmethod
     def _as_dict(item: Any) -> dict[str, Any]:
