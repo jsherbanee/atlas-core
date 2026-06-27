@@ -6,13 +6,13 @@ from atlas_core.services.equipment_matrix_service import (
 )
 from atlas_core.services.csv_export_service import CsvExportService
 from atlas_core.services.resolution_service import ResolutionService
-from atlas_core.services.estimate_workflow_service import (
-    EstimateWorkflowResult,
-    EstimateWorkflowService,
-)
 from atlas_core.services.manufacturer_review_service import (
     ManufacturerReviewIssue,
     ManufacturerReviewService,
+)
+from atlas_core.services.estimate_workflow_service import (
+    EstimateWorkflowResult,
+    EstimateWorkflowService,
 )
 
 __all__ = [
