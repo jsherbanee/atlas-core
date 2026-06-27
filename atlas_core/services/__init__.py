@@ -17,6 +17,11 @@ from atlas_core.services.document_classifier_service import (
 )
 from atlas_core.services.drawing_indexer_service import DrawingIndexerService
 from atlas_core.services.resolution_service import ResolutionService
+from atlas_core.services.scope_gap_service import (
+    ScopeGap,
+    ScopeGapService,
+    ScopeGapSeverity,
+)
 from atlas_core.services.specification_indexer_service import (
     SpecificationIndexerService,
 )
@@ -75,5 +80,8 @@ __all__ = [
     "ReviewReportItem",
     "ReviewReportService",
     "ResolutionService",
+    "ScopeGap",
+    "ScopeGapService",
+    "ScopeGapSeverity",
     "SpecificationIndexerService",
 ]
