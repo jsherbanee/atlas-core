@@ -32,11 +32,18 @@ class MarkdownExportService:
             f"Issue count: {brief.issue_count}",
             f"Placeholder count: {brief.placeholder_count}",
             f"Review required count: {brief.review_required_count}",
-            f"Confidence: {self._confidence_percentage(brief.confidence)}",
-            "",
-            "## Review Items",
-            "",
         ]
+        if hasattr(brief, "cross_reference_count"):
+            lines.append(f"Cross reference count: {brief.cross_reference_count}")
+
+        lines.extend(
+            [
+                f"Confidence: {self._confidence_percentage(brief.confidence)}",
+                "",
+                "## Review Items",
+                "",
+            ]
+        )
 
         if not result.review.review_report:
             lines.append("No review items found.")
@@ -44,6 +51,17 @@ class MarkdownExportService:
             for item in result.review.review_report:
                 lines.append(
                     f"- [{item.source}] {item.target_id}: {item.message}"
+                )
+
+        lines.extend(["", "## Cross References", ""])
+
+        if not result.review.cross_references:
+            lines.append("No cross references found.")
+        else:
+            for item in result.review.cross_references:
+                lines.append(
+                    f"- [{item.reference_type.value}] "
+                    f"{item.source_id} -> {item.target_id}: {item.message}"
                 )
 
         return "\n".join(lines) + "\n"

@@ -68,6 +68,7 @@ def make_result() -> PlanReviewWorkflowResult:
             issue_count=1,
             placeholder_count=0,
             review_required_count=1,
+            cross_reference_count=0,
             confidence=0.75,
         ),
     )
