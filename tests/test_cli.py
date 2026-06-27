@@ -126,6 +126,94 @@ def test_demo_maw_with_output_dir_creates_review_report_csv(tmp_path):
     assert records[0]["rule_id"] == "RULE-001"
 
 
+def test_demo_maw_plan_review_requires_output_dir():
+    result = run_cli("demo-maw-plan-review")
+
+    assert result.returncode != 0
+    assert "--output-dir" in result.stderr
+
+
+def test_demo_maw_plan_review_creates_estimator_brief_csv(tmp_path):
+    result = run_cli("demo-maw-plan-review", "--output-dir", str(tmp_path))
+    output_path = tmp_path / "maw_estimator_brief.csv"
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "estimator brief summary:" in result.stdout
+    assert f"estimator brief csv export: {output_path}" in result.stdout
+    assert output_path.exists()
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert len(records) == 1
+    assert records[0]["review_id"] == "maw-plan-review"
+
+
+def test_demo_maw_plan_review_creates_drawing_index_csv(tmp_path):
+    result = run_cli("demo-maw-plan-review", "--output-dir", str(tmp_path))
+    output_path = tmp_path / "maw_drawing_index.csv"
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert f"drawing index csv export: {output_path}" in result.stdout
+    assert output_path.exists()
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert len(records) == 6
+    assert records[0]["sheet_number"] == "AV-101"
+
+
+def test_demo_maw_plan_review_creates_specification_index_csv(tmp_path):
+    result = run_cli("demo-maw-plan-review", "--output-dir", str(tmp_path))
+    output_path = tmp_path / "maw_specification_index.csv"
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert f"specification index csv export: {output_path}" in result.stdout
+    assert output_path.exists()
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert len(records) == 4
+    assert records[0]["section_number"] == "27 41 16"
+
+
+def test_demo_maw_plan_review_creates_equipment_matrix_csv(tmp_path):
+    result = run_cli("demo-maw-plan-review", "--output-dir", str(tmp_path))
+    output_path = tmp_path / "maw_equipment_matrix.csv"
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert f"equipment matrix csv export: {output_path}" in result.stdout
+    assert output_path.exists()
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert len(records) == 10
+    assert records[0]["building_name"] == "MAW Music Education Center"
+
+
+def test_demo_maw_plan_review_creates_review_report_csv(tmp_path):
+    result = run_cli("demo-maw-plan-review", "--output-dir", str(tmp_path))
+    output_path = tmp_path / "maw_review_report.csv"
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert f"review report csv export: {output_path}" in result.stdout
+    assert output_path.exists()
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert len(records) == 5
+    assert records[0]["source"] == "resolver"
+
+
 def test_unknown_command_prints_help():
     result = run_cli("not-a-command")
 
