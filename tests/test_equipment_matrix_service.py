@@ -6,7 +6,7 @@ from atlas_core.domain import (
     Room,
     SystemCategory,
 )
-from atlas_core.services import EquipmentMatrixService
+from atlas_core.services import EquipmentMatrixRow, EquipmentMatrixService
 
 
 def test_creating_one_equipment_matrix_row_from_linked_records():
@@ -48,35 +48,36 @@ def test_creating_one_equipment_matrix_row_from_linked_records():
     ).build_rows()
 
     assert rows == [
-        {
-            "project_building_id": "bldg-001",
-            "building_name": "Main Building",
-            "room_id": "room-001",
-            "room_name": "Classroom 101",
-            "space_id": "",
-            "space_name": "",
-            "scene_id": "",
-            "scene_name": "",
-            "system_id": "sys-001",
-            "system_name": "Classroom Audio",
-            "system_category": "audio",
-            "equipment_id": "eq-001",
-            "description": "Ceiling Speaker",
-            "equipment_category": "speaker",
-            "manufacturer": "QSC",
-            "model": "AD-C6T",
-            "quantity": 1,
-            "status": "priced",
-            "budget_cost": 100.0,
-            "sell_price": 150.0,
-            "labor_template": "speaker-ceiling",
-            "drawing_reference": "A701",
-            "specification_reference": "27 41 16",
-            "confidence": 0.84,
-            "review_required": False,
-            "assumptions": "",
-        }
+        EquipmentMatrixRow(
+            project_building_id="bldg-001",
+            building_name="Main Building",
+            room_id="room-001",
+            room_name="Classroom 101",
+            space_id="",
+            space_name="",
+            scene_id="",
+            scene_name="",
+            system_id="sys-001",
+            system_name="Classroom Audio",
+            system_category="audio",
+            equipment_id="eq-001",
+            description="Ceiling Speaker",
+            equipment_category="speaker",
+            manufacturer="QSC",
+            model="AD-C6T",
+            quantity=1,
+            status="priced",
+            budget_cost=100.0,
+            sell_price=150.0,
+            labor_template="speaker-ceiling",
+            drawing_reference="A701",
+            specification_reference="27 41 16",
+            confidence=0.84,
+            review_required=False,
+            assumptions="",
+        )
     ]
+    assert rows[0].to_dict()["equipment_id"] == "eq-001"
 
 
 def test_handling_missing_related_records_without_error():
@@ -89,10 +90,10 @@ def test_handling_missing_related_records_without_error():
 
     rows = EquipmentMatrixService(equipment=[equipment]).build_rows()
 
-    assert rows[0]["system_id"] == "missing-system"
-    assert rows[0]["system_name"] == ""
-    assert rows[0]["room_id"] == ""
-    assert rows[0]["building_name"] == ""
+    assert rows[0].system_id == "missing-system"
+    assert rows[0].system_name == ""
+    assert rows[0].room_id == ""
+    assert rows[0].building_name == ""
 
 
 def test_joining_assumptions():
@@ -106,7 +107,7 @@ def test_joining_assumptions():
 
     rows = EquipmentMatrixService(equipment=[equipment]).build_rows()
 
-    assert rows[0]["assumptions"] == (
+    assert rows[0].assumptions == (
         "Existing cabling can be reused.; Verify ceiling type."
     )
 
