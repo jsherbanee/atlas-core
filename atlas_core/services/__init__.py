@@ -24,12 +24,18 @@ from atlas_core.services.estimate_workflow_service import (
 )
 from atlas_core.services.baseline_service import BaselineService
 from atlas_core.services.bid_package_review_service import BidPackageReviewService
+from atlas_core.services.estimator_brief_service import (
+    EstimatorBrief,
+    EstimatorBriefService,
+)
 
 __all__ = [
     "BaselineService",
     "BidPackageReviewService",
     "CsvExportService",
     "DrawingIndexerService",
+    "EstimatorBrief",
+    "EstimatorBriefService",
     "EquipmentMatrixRow",
     "EquipmentMatrixService",
     "EstimateWorkflowResult",
