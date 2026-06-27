@@ -10,6 +10,10 @@ from atlas_core.services.estimate_workflow_service import (
     EstimateWorkflowResult,
     EstimateWorkflowService,
 )
+from atlas_core.services.manufacturer_review_service import (
+    ManufacturerReviewIssue,
+    ManufacturerReviewService,
+)
 
 __all__ = [
     "CsvExportService",
@@ -17,5 +21,7 @@ __all__ = [
     "EquipmentMatrixService",
     "EstimateWorkflowResult",
     "EstimateWorkflowService",
+    "ManufacturerReviewIssue",
+    "ManufacturerReviewService",
     "ResolutionService",
 ]
