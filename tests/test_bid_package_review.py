@@ -14,6 +14,7 @@ from atlas_core.domain import (
 from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import (
     CrossReference,
+    EstimatorRisk,
     ManufacturerReviewIssue,
     ReviewReportItem,
     ScopeGap,
@@ -77,6 +78,15 @@ def make_scope_gap() -> ScopeGap:
         gap_id="display_missing_mount",
         target_id="eq-001",
         message="Display is missing a mount.",
+    )
+
+
+def make_estimator_risk() -> EstimatorRisk:
+    return EstimatorRisk(
+        risk_id="scope_gaps_detected",
+        message="Scope gaps were detected and require estimator review.",
+        risk_level="high",
+        category="scope",
     )
 
 
@@ -201,9 +211,10 @@ def test_issue_count():
             )
         ],
         scope_gaps=[make_scope_gap()],
+        estimator_risks=[make_estimator_risk()],
     )
 
-    assert review.issue_count() == 4
+    assert review.issue_count() == 5
 
 
 def test_cross_reference_count():
@@ -228,6 +239,17 @@ def test_scope_gap_count():
     assert review.scope_gap_count() == 1
 
 
+def test_estimator_risk_count():
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        estimator_risks=[make_estimator_risk()],
+    )
+
+    assert review.estimator_risk_count() == 1
+
+
 def test_to_dict_output():
     drawing_sheet = make_drawing_sheet()
     specification_section = make_specification_section()
@@ -246,6 +268,7 @@ def test_to_dict_output():
     )
     cross_reference = make_cross_reference()
     scope_gap = make_scope_gap()
+    estimator_risk = make_estimator_risk()
     review = BidPackageReview(
         review_id="review-001",
         project_id="project-001",
@@ -259,6 +282,7 @@ def test_to_dict_output():
         review_report=[review_report_item],
         cross_references=[cross_reference],
         scope_gaps=[scope_gap],
+        estimator_risks=[estimator_risk],
         notes=["Confirm scope."],
         confidence=0.85,
     )
@@ -291,6 +315,7 @@ def test_to_dict_output():
         "review_report": [review_report_item.to_dict()],
         "cross_references": [cross_reference.to_dict()],
         "scope_gaps": [scope_gap.to_dict()],
+        "estimator_risks": [estimator_risk.to_dict()],
         "notes": ["Confirm scope."],
         "confidence": 0.85,
     }

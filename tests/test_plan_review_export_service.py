@@ -79,6 +79,7 @@ def make_result() -> PlanReviewWorkflowResult:
             review_required_count=1,
             cross_reference_count=0,
             scope_gap_count=1,
+            estimator_risk_count=0,
             confidence=0.75,
         ),
     )

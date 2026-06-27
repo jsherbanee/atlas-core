@@ -17,6 +17,7 @@ from atlas_core.rules import Resolution
 if TYPE_CHECKING:
     from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
     from atlas_core.services.cross_reference_service import CrossReference
+    from atlas_core.services.estimator_risk_service import EstimatorRisk
     from atlas_core.services.scope_gap_service import ScopeGap
 
 
@@ -36,6 +37,7 @@ class BidPackageReview:
     review_report: list[ReviewReportItem] = field(default_factory=list)
     cross_references: list[CrossReference] = field(default_factory=list)
     scope_gaps: list[ScopeGap] = field(default_factory=list)
+    estimator_risks: list[EstimatorRisk] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     confidence: float = 0.75
 
@@ -70,12 +72,16 @@ class BidPackageReview:
     def scope_gap_count(self) -> int:
         return len(self.scope_gaps)
 
+    def estimator_risk_count(self) -> int:
+        return len(self.estimator_risks)
+
     def issue_count(self) -> int:
         return (
             len(self.resolutions)
             + len(self.manufacturer_review_issues)
             + len(self.review_report)
             + len(self.scope_gaps)
+            + len(self.estimator_risks)
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -96,6 +102,7 @@ class BidPackageReview:
             "review_report": self._serialize_items(self.review_report),
             "cross_references": self._serialize_items(self.cross_references),
             "scope_gaps": self._serialize_items(self.scope_gaps),
+            "estimator_risks": self._serialize_items(self.estimator_risks),
             "notes": list(self.notes),
             "confidence": self.confidence,
         }

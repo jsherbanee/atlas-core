@@ -36,6 +36,7 @@ def make_result(
             review_required_count=2,
             cross_reference_count=len(cross_references or []),
             scope_gap_count=len(scope_gaps or []),
+            estimator_risk_count=0,
             confidence=0.75,
         ),
     )

@@ -196,6 +196,7 @@ def test_exports_estimator_brief_csv(tmp_path):
         review_required_count=2,
         cross_reference_count=3,
         scope_gap_count=4,
+        estimator_risk_count=5,
         confidence=0.75,
     )
 
@@ -209,6 +210,7 @@ def test_exports_estimator_brief_csv(tmp_path):
     assert records[0]["drawing_count"] == "2"
     assert records[0]["cross_reference_count"] == "3"
     assert records[0]["scope_gap_count"] == "4"
+    assert records[0]["estimator_risk_count"] == "5"
     assert records[0]["confidence"] == "0.75"
 
 

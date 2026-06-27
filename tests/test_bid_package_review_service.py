@@ -168,6 +168,25 @@ def test_includes_scope_gaps_for_missing_projector_mount():
     assert review.scope_gaps[0].target_id == "eq-projector"
 
 
+def test_includes_estimator_risks_when_scope_gaps_exist():
+    equipment = [
+        Equipment(
+            equipment_id="eq-projector",
+            description="Projector",
+            category=EquipmentCategory.PROJECTOR,
+            room_id="room-001",
+        )
+    ]
+
+    review = build_review(equipment=equipment)
+
+    assert any(
+        risk.risk_id == "scope_gaps_detected"
+        and risk.category == "scope"
+        for risk in review.estimator_risks
+    )
+
+
 def test_works_with_empty_inputs():
     review = build_review()
 
@@ -180,3 +199,4 @@ def test_works_with_empty_inputs():
     assert review.review_report == []
     assert review.cross_references == []
     assert review.scope_gaps == []
+    assert review.estimator_risks == []

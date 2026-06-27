@@ -12,6 +12,7 @@ from atlas_core.services import (
     CrossReference,
     EstimatorBrief,
     EstimatorBriefService,
+    EstimatorRisk,
     ManufacturerReviewIssue,
     ReviewReportItem,
     ScopeGap,
@@ -95,6 +96,14 @@ def make_review() -> BidPackageReview:
                 message="Display is missing a mount.",
             )
         ],
+        estimator_risks=[
+            EstimatorRisk(
+                risk_id="scope_gaps_detected",
+                message="Scope gaps were detected and require estimator review.",
+                risk_level="high",
+                category="scope",
+            )
+        ],
         confidence=0.82,
     )
 
@@ -135,7 +144,7 @@ def test_counts_equipment():
 def test_counts_issues():
     brief = EstimatorBriefService().build_brief(make_review())
 
-    assert brief.issue_count == 4
+    assert brief.issue_count == 5
 
 
 def test_counts_placeholder_equipment():
@@ -162,6 +171,12 @@ def test_counts_scope_gaps():
     assert brief.scope_gap_count == 1
 
 
+def test_counts_estimator_risks():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.estimator_risk_count == 1
+
+
 def test_to_dict_output():
     brief = EstimatorBrief(
         review_id="review-001",
@@ -171,11 +186,12 @@ def test_to_dict_output():
         specification_count=1,
         system_count=1,
         equipment_count=2,
-        issue_count=4,
+        issue_count=5,
         placeholder_count=1,
         review_required_count=2,
         cross_reference_count=1,
         scope_gap_count=1,
+        estimator_risk_count=1,
         confidence=0.82,
     )
 
@@ -187,10 +203,11 @@ def test_to_dict_output():
         "specification_count": 1,
         "system_count": 1,
         "equipment_count": 2,
-        "issue_count": 4,
+        "issue_count": 5,
         "placeholder_count": 1,
         "review_required_count": 2,
         "cross_reference_count": 1,
         "scope_gap_count": 1,
+        "estimator_risk_count": 1,
         "confidence": 0.82,
     }

@@ -70,7 +70,10 @@ def test_includes_resolver_issues_in_review_when_equipment_needs_placeholders():
     assert len(result.review.resolutions) == 1
     assert result.review.resolutions[0].rule_id == "RULE-001"
     assert len(result.review.review_report) == 1
-    assert result.brief.issue_count == 2
+    assert result.review.scope_gap_count() == 1
+    assert result.review.estimator_risk_count() == 2
+    assert result.brief.issue_count == 5
+    assert result.brief.estimator_risk_count == 2
 
 
 def test_to_dict_output():
