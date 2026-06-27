@@ -1,5 +1,5 @@
-"""Domain modeling utilities for Atlas Core."""
+"""Domain models for Atlas Core."""
 
-from .models import BaseModel
+from atlas_core.domain.project import Project, ProjectStatus
 
-__all__ = ["BaseModel"]
+__all__ = ["Project", "ProjectStatus"]
