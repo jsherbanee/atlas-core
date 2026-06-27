@@ -22,11 +22,17 @@ from atlas_core.domain.vendor_relationship import (
     VendorRelationship,
     VendorRelationshipType,
 )
+from atlas_core.domain.estimate_baseline import (
+    EstimateBaseline,
+    EstimateBaselineStatus,
+)
 
 __all__ = [
     "Project",
     "ProjectStatus",
     "ProjectLifecycleEvent",
+    "EstimateBaseline",
+    "EstimateBaselineStatus",
     "IntegratedSystem",
     "SystemCategory",
     "SystemComplexity",
