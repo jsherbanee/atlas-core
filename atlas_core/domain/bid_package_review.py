@@ -1,8 +1,10 @@
 """Bid package review domain model for Atlas Core."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from atlas_core.domain import (
     DrawingSheet,
@@ -11,7 +13,9 @@ from atlas_core.domain import (
     SpecificationSection,
 )
 from atlas_core.rules import Resolution
-from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
+
+if TYPE_CHECKING:
+    from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
 
 
 @dataclass
