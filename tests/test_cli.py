@@ -216,7 +216,7 @@ def test_demo_maw_plan_review_creates_review_report_csv(tmp_path):
 
 def test_demo_maw_plan_review_creates_markdown_summary(tmp_path):
     result = run_cli("demo-maw-plan-review", "--output-dir", str(tmp_path))
-    output_path = tmp_path / "maw_plan_review_summary.md"
+    output_path = tmp_path / "maw_summary.md"
 
     assert result.returncode == 0
     assert result.stderr == ""
@@ -226,7 +226,7 @@ def test_demo_maw_plan_review_creates_markdown_summary(tmp_path):
 
 def test_demo_maw_plan_review_markdown_summary_includes_name(tmp_path):
     result = run_cli("demo-maw-plan-review", "--output-dir", str(tmp_path))
-    output_path = tmp_path / "maw_plan_review_summary.md"
+    output_path = tmp_path / "maw_summary.md"
 
     assert result.returncode == 0
     assert result.stderr == ""

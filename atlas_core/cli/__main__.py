@@ -171,9 +171,8 @@ def _demo_maw(
 def _demo_maw_plan_review(output_dir: Path) -> int:
     from atlas_core.sample_data import build_maw_seed_data
     from atlas_core.services import (
-        CsvExportService,
         EstimateWorkflowService,
-        MarkdownExportService,
+        PlanReviewExportService,
         PlanReviewWorkflowService,
     )
 
@@ -181,7 +180,7 @@ def _demo_maw_plan_review(output_dir: Path) -> int:
     raw_sheets = _maw_plan_review_raw_sheets()
     raw_sections = _maw_plan_review_raw_sections()
 
-    plan_review_result = PlanReviewWorkflowService().run_review(
+    result = PlanReviewWorkflowService().run_review(
         review_id="maw-plan-review",
         project_id="maw-demo",
         name="MAW Music Education Center Plan Review",
@@ -202,51 +201,28 @@ def _demo_maw_plan_review(output_dir: Path) -> int:
         systems=seed["systems"],
         equipment=seed["equipment"],
     )
+    result.rows = estimate_result.rows
 
-    csv_export_service = CsvExportService()
-    estimator_brief_path = output_dir / "maw_estimator_brief.csv"
-    drawing_index_path = output_dir / "maw_drawing_index.csv"
-    specification_index_path = output_dir / "maw_specification_index.csv"
-    equipment_matrix_path = output_dir / "maw_equipment_matrix.csv"
-    review_report_path = output_dir / "maw_review_report.csv"
-    plan_review_summary_path = output_dir / "maw_plan_review_summary.md"
+    export_result = PlanReviewExportService().export_plan_review(
+        result,
+        output_dir=output_dir,
+        prefix="maw",
+    )
+    export_paths = export_result.to_dict()
 
-    written_estimator_brief_path = csv_export_service.export_estimator_brief(
-        plan_review_result.brief,
-        estimator_brief_path,
+    _print_estimator_brief_summary(result.brief)
+    print(f"estimator brief csv export: {export_paths['estimator_brief_path']}")
+    print(f"drawing index csv export: {export_paths['drawing_index_path']}")
+    print(
+        "specification index csv export: "
+        f"{export_paths['specification_index_path']}"
     )
-    written_drawing_index_path = csv_export_service.export_drawing_index(
-        plan_review_result.review.drawing_sheets,
-        drawing_index_path,
+    print(f"equipment matrix csv export: {export_paths['equipment_matrix_path']}")
+    print(f"review report csv export: {export_paths['review_report_path']}")
+    print(
+        "plan review summary markdown export: "
+        f"{export_paths['markdown_summary_path']}"
     )
-    written_specification_index_path = (
-        csv_export_service.export_specification_index(
-            plan_review_result.review.specification_sections,
-            specification_index_path,
-        )
-    )
-    written_equipment_matrix_path = csv_export_service.export_equipment_matrix(
-        estimate_result.rows,
-        equipment_matrix_path,
-    )
-    written_review_report_path = csv_export_service.export_review_report(
-        plan_review_result.review.review_report,
-        review_report_path,
-    )
-    written_plan_review_summary_path = (
-        MarkdownExportService().export_plan_review_summary(
-            plan_review_result,
-            plan_review_summary_path,
-        )
-    )
-
-    _print_estimator_brief_summary(plan_review_result.brief)
-    print(f"estimator brief csv export: {written_estimator_brief_path}")
-    print(f"drawing index csv export: {written_drawing_index_path}")
-    print(f"specification index csv export: {written_specification_index_path}")
-    print(f"equipment matrix csv export: {written_equipment_matrix_path}")
-    print(f"review report csv export: {written_review_report_path}")
-    print(f"plan review summary markdown export: {written_plan_review_summary_path}")
     return 0
 
 
