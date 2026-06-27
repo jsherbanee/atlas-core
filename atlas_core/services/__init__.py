@@ -1,5 +1,5 @@
 """Service layer for Atlas Core."""
 
-from .example import ExampleService
+from atlas_core.services.equipment_matrix_service import EquipmentMatrixService
 
-__all__ = ["ExampleService"]
+__all__ = ["EquipmentMatrixService"]
