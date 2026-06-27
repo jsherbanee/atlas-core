@@ -6,6 +6,11 @@ from atlas_core.domain.integrated_system import (
     SystemCategory,
     SystemComplexity,
 )
+from atlas_core.domain.manufacturer import (
+    Manufacturer,
+    ManufacturerDiscipline,
+    ManufacturerTier,
+)
 from atlas_core.domain.project import Project, ProjectStatus
 
 __all__ = [
@@ -17,4 +22,7 @@ __all__ = [
     "Equipment",
     "EquipmentCategory",
     "EquipmentStatus",
+    "Manufacturer",
+    "ManufacturerDiscipline",
+    "ManufacturerTier",
 ]
