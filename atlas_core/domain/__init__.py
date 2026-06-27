@@ -14,6 +14,7 @@ from atlas_core.domain.manufacturer import (
 )
 from atlas_core.domain.project import Project, ProjectStatus
 from atlas_core.domain.room import Room, RoomType
+from atlas_core.domain.space import Space, SpaceType
 
 __all__ = [
     "Project",
@@ -31,4 +32,6 @@ __all__ = [
     "BuildingType",
     "Room",
     "RoomType",
+    "Space",
+    "SpaceType",
 ]
