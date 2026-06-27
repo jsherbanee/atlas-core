@@ -1,8 +1,10 @@
 import csv
 
+from atlas_core.domain import DrawingSheet, SpecificationSection
 from atlas_core.services import (
     CsvExportService,
     EquipmentMatrixRow,
+    EstimatorBrief,
     ReviewReportItem,
 )
 
@@ -137,3 +139,105 @@ def test_handles_empty_review_report(tmp_path):
         records = list(csv.DictReader(file))
 
     assert records == []
+
+
+def test_exports_drawing_index_csv(tmp_path):
+    output_path = tmp_path / "plan_review" / "drawings.csv"
+    sheet = DrawingSheet(
+        sheet_id="a-101",
+        sheet_number="A-101",
+        title="Floor Plan",
+    )
+
+    written_path = CsvExportService().export_drawing_index([sheet], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert written_path == output_path
+    assert records[0]["sheet_number"] == "A-101"
+    assert records[0]["title"] == "Floor Plan"
+
+
+def test_exports_specification_index_csv(tmp_path):
+    output_path = tmp_path / "plan_review" / "specifications.csv"
+    section = SpecificationSection(
+        section_id="27-4100",
+        section_number="27 41 00",
+        title="Audiovisual Systems",
+    )
+
+    written_path = CsvExportService().export_specification_index(
+        [section],
+        output_path,
+    )
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert written_path == output_path
+    assert records[0]["section_number"] == "27 41 00"
+    assert records[0]["title"] == "Audiovisual Systems"
+
+
+def test_exports_estimator_brief_csv(tmp_path):
+    output_path = tmp_path / "plan_review" / "brief.csv"
+    brief = EstimatorBrief(
+        review_id="review-001",
+        project_id="project-001",
+        name="Plan Review",
+        drawing_count=2,
+        specification_count=1,
+        system_count=3,
+        equipment_count=4,
+        issue_count=5,
+        placeholder_count=1,
+        review_required_count=2,
+        confidence=0.75,
+    )
+
+    written_path = CsvExportService().export_estimator_brief(brief, output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert written_path == output_path
+    assert records[0]["review_id"] == "review-001"
+    assert records[0]["drawing_count"] == "2"
+    assert records[0]["confidence"] == "0.75"
+
+
+def test_empty_drawing_index_writes_headers(tmp_path):
+    output_path = tmp_path / "drawings.csv"
+
+    CsvExportService().export_drawing_index([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+
+    assert headers == list(
+        DrawingSheet(
+            sheet_id="sheet",
+            sheet_number="SHEET",
+            title="Sheet",
+        ).to_dict().keys()
+    )
+
+
+def test_empty_specification_index_writes_headers(tmp_path):
+    output_path = tmp_path / "specifications.csv"
+
+    CsvExportService().export_specification_index([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+
+    assert headers == list(
+        SpecificationSection(
+            section_id="section",
+            section_number="SECTION",
+            title="Section",
+        ).to_dict().keys()
+    )
