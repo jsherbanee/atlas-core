@@ -6,6 +6,7 @@ from atlas_core.domain import (
     Manufacturer,
     ManufacturerDiscipline,
     ManufacturerTier,
+    VendorRelationshipType,
 )
 
 
@@ -103,23 +104,26 @@ class ManufacturerRegistry:
         if manufacturer is None:
             return PurchasingPath.UNKNOWN
 
+        primary_relationship = manufacturer.primary_vendor_relationship()
+        if primary_relationship is not None:
+            return self._purchasing_path_for_relationship_type(
+                primary_relationship.relationship_type
+            )
+
         preferred_vendor = self._preferred_vendor(manufacturer)
         if preferred_vendor is None:
             return PurchasingPath.UNKNOWN
 
-        normalized_vendor = preferred_vendor.casefold()
-        if normalized_vendor == "direct":
-            return PurchasingPath.DIRECT
-
-        if "direct" in normalized_vendor and "distributor" in normalized_vendor:
-            return PurchasingPath.BOTH
-
-        return PurchasingPath.DISTRIBUTOR
+        return self._purchasing_path_for_preferred_vendor(preferred_vendor)
 
     def preferred_vendor_for(self, name: str) -> str | None:
         manufacturer = self.get_by_name(name)
         if manufacturer is None:
             return None
+
+        primary_relationship = manufacturer.primary_vendor_relationship()
+        if primary_relationship is not None:
+            return primary_relationship.vendor_name
 
         return manufacturer.preferred_vendor
 
@@ -155,3 +159,32 @@ class ManufacturerRegistry:
             return None
 
         return preferred_vendor.strip()
+
+    @staticmethod
+    def _purchasing_path_for_relationship_type(
+        relationship_type: VendorRelationshipType,
+    ) -> PurchasingPath:
+        if relationship_type is VendorRelationshipType.DIRECT:
+            return PurchasingPath.DIRECT
+
+        if relationship_type in {
+            VendorRelationshipType.DISTRIBUTOR,
+            VendorRelationshipType.DEALER,
+            VendorRelationshipType.REP,
+        }:
+            return PurchasingPath.DISTRIBUTOR
+
+        return PurchasingPath.UNKNOWN
+
+    @staticmethod
+    def _purchasing_path_for_preferred_vendor(
+        preferred_vendor: str,
+    ) -> PurchasingPath:
+        normalized_vendor = preferred_vendor.casefold()
+        if normalized_vendor == "direct":
+            return PurchasingPath.DIRECT
+
+        if "direct" in normalized_vendor and "distributor" in normalized_vendor:
+            return PurchasingPath.BOTH
+
+        return PurchasingPath.DISTRIBUTOR

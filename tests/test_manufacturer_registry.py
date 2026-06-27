@@ -2,6 +2,8 @@ from atlas_core.domain import (
     Manufacturer,
     ManufacturerDiscipline,
     ManufacturerTier,
+    VendorRelationship,
+    VendorRelationshipType,
 )
 from atlas_core.registry import ManufacturerRegistry, PurchasingPath
 
@@ -12,6 +14,7 @@ def make_manufacturer(
     discipline: ManufacturerDiscipline = ManufacturerDiscipline.AUDIO,
     tier: ManufacturerTier = ManufacturerTier.APPROVED,
     preferred_vendor: str | None = None,
+    vendor_relationships: list[VendorRelationship] | None = None,
     active: bool = True,
 ) -> Manufacturer:
     return Manufacturer(
@@ -20,6 +23,7 @@ def make_manufacturer(
         discipline=discipline,
         tier=tier,
         preferred_vendor=preferred_vendor,
+        vendor_relationships=vendor_relationships or [],
         active=active,
     )
 
@@ -138,8 +142,38 @@ def test_purchasing_path_returns_direct_when_preferred_vendor_is_direct():
     assert registry.purchasing_path("Q-SYS") is PurchasingPath.DIRECT
 
 
+def test_purchasing_path_uses_direct_vendor_relationship():
+    manufacturer = make_manufacturer(
+        preferred_vendor="Acme AV Supply",
+        vendor_relationships=[
+            VendorRelationship(
+                vendor_name="QSC Direct",
+                relationship_type=VendorRelationshipType.DIRECT,
+            )
+        ],
+    )
+    registry = ManufacturerRegistry([manufacturer])
+
+    assert registry.purchasing_path("Q-SYS") is PurchasingPath.DIRECT
+
+
 def test_purchasing_path_returns_distributor_when_vendor_is_distributor_name():
     manufacturer = make_manufacturer(preferred_vendor="Acme AV Supply")
+    registry = ManufacturerRegistry([manufacturer])
+
+    assert registry.purchasing_path("Q-SYS") is PurchasingPath.DISTRIBUTOR
+
+
+def test_purchasing_path_uses_distributor_vendor_relationship():
+    manufacturer = make_manufacturer(
+        preferred_vendor="DIRECT",
+        vendor_relationships=[
+            VendorRelationship(
+                vendor_name="Starin",
+                relationship_type=VendorRelationshipType.DISTRIBUTOR,
+            )
+        ],
+    )
     registry = ManufacturerRegistry([manufacturer])
 
     assert registry.purchasing_path("Q-SYS") is PurchasingPath.DISTRIBUTOR
@@ -166,6 +200,51 @@ def test_preferred_vendor_for_returns_vendor_name():
 
     assert registry.preferred_vendor_for("Q-SYS") == "Acme AV Supply"
     assert registry.preferred_vendor_for("Unknown") is None
+
+
+def test_preferred_vendor_for_uses_primary_vendor_relationship():
+    manufacturer = make_manufacturer(
+        preferred_vendor="Legacy Vendor",
+        vendor_relationships=[
+            VendorRelationship(
+                vendor_name="Secondary Vendor",
+                relationship_type=VendorRelationshipType.DISTRIBUTOR,
+                priority=2,
+            ),
+            VendorRelationship(
+                vendor_name="Primary Vendor",
+                relationship_type=VendorRelationshipType.DEALER,
+                priority=1,
+            ),
+        ],
+    )
+    registry = ManufacturerRegistry([manufacturer])
+
+    assert registry.preferred_vendor_for("Q-SYS") == "Primary Vendor"
+
+
+def test_preferred_vendor_for_falls_back_to_preferred_vendor():
+    manufacturer = make_manufacturer(preferred_vendor="Acme AV Supply")
+    registry = ManufacturerRegistry([manufacturer])
+
+    assert registry.preferred_vendor_for("Q-SYS") == "Acme AV Supply"
+
+
+def test_inactive_vendor_relationships_are_ignored():
+    manufacturer = make_manufacturer(
+        preferred_vendor="Acme AV Supply",
+        vendor_relationships=[
+            VendorRelationship(
+                vendor_name="QSC Direct",
+                relationship_type=VendorRelationshipType.DIRECT,
+                active=False,
+            )
+        ],
+    )
+    registry = ManufacturerRegistry([manufacturer])
+
+    assert registry.purchasing_path("Q-SYS") is PurchasingPath.DISTRIBUTOR
+    assert registry.preferred_vendor_for("Q-SYS") == "Acme AV Supply"
 
 
 def test_invalid_discipline_returns_empty_list():
