@@ -43,9 +43,31 @@ def test_demo_estimate_output_includes_rule_001():
     assert "RULE-001" in result.stdout
 
 
+def test_demo_maw_runs_successfully():
+    result = run_cli("demo-maw")
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "equipment matrix rows: 10" in result.stdout
+    assert "resolver resolutions: 5" in result.stdout
+    assert "placeholder equipment items: 4" in result.stdout
+
+
+def test_demo_maw_output_includes_seed_data_and_placeholders():
+    result = run_cli("demo-maw")
+
+    assert result.returncode == 0
+    assert "MAW Music Education Center" in result.stdout
+    assert '"equipment_category": "amplifier"' in result.stdout
+    assert '"equipment_category": "mount"' in result.stdout
+    assert "RULE-001" in result.stdout
+    assert "RULE-004" in result.stdout
+
+
 def test_unknown_command_prints_help():
     result = run_cli("not-a-command")
 
     assert result.returncode == 1
     assert "usage: atlas-core" in result.stdout
     assert "demo-estimate" in result.stdout
+    assert "demo-maw" in result.stdout
