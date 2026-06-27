@@ -1,5 +1,6 @@
 """Domain models for Atlas Core."""
 
+from atlas_core.domain.building import Building, BuildingType
 from atlas_core.domain.equipment import Equipment, EquipmentCategory, EquipmentStatus
 from atlas_core.domain.integrated_system import (
     IntegratedSystem,
@@ -25,4 +26,6 @@ __all__ = [
     "Manufacturer",
     "ManufacturerDiscipline",
     "ManufacturerTier",
+    "Building",
+    "BuildingType",
 ]
