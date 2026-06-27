@@ -10,6 +10,10 @@ from atlas_core.services.manufacturer_review_service import (
     ManufacturerReviewIssue,
     ManufacturerReviewService,
 )
+from atlas_core.services.review_report_service import (
+    ReviewReportItem,
+    ReviewReportService,
+)
 from atlas_core.services.estimate_workflow_service import (
     EstimateWorkflowResult,
     EstimateWorkflowService,
@@ -23,5 +27,7 @@ __all__ = [
     "EstimateWorkflowService",
     "ManufacturerReviewIssue",
     "ManufacturerReviewService",
+    "ReviewReportItem",
+    "ReviewReportService",
     "ResolutionService",
 ]
