@@ -4,6 +4,11 @@ from atlas_core.services.equipment_matrix_service import (
     EquipmentMatrixRow,
     EquipmentMatrixService,
 )
+from atlas_core.services.cross_reference_service import (
+    CrossReference,
+    CrossReferenceService,
+    CrossReferenceType,
+)
 from atlas_core.services.csv_export_service import CsvExportService
 from atlas_core.services.document_classifier_service import (
     DocumentClassifierService,
@@ -46,6 +51,9 @@ from atlas_core.services.plan_review_export_service import (
 __all__ = [
     "BaselineService",
     "BidPackageReviewService",
+    "CrossReference",
+    "CrossReferenceService",
+    "CrossReferenceType",
     "CsvExportService",
     "DocumentClassifierService",
     "DocumentSection",
