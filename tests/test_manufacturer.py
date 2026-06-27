@@ -4,6 +4,8 @@ from atlas_core.domain import (
     Manufacturer,
     ManufacturerDiscipline,
     ManufacturerTier,
+    VendorRelationship,
+    VendorRelationshipType,
 )
 
 
@@ -154,7 +156,98 @@ def test_to_dict_output():
         "tier": "preferred",
         "product_families": ["Core"],
         "preferred_vendor": "Acme AV Supply",
+        "vendor_relationships": [],
         "notes": ["Preferred for conference rooms."],
         "active": True,
         "confidence": 0.9,
     }
+
+
+def test_adding_vendor_relationship():
+    manufacturer = Manufacturer(
+        manufacturer_id="qsc",
+        name="Q-SYS",
+        discipline=ManufacturerDiscipline.AUDIO,
+    )
+    relationship = VendorRelationship(
+        vendor_name="Starin",
+        relationship_type=VendorRelationshipType.DISTRIBUTOR,
+    )
+
+    manufacturer.add_vendor_relationship(relationship)
+
+    assert manufacturer.vendor_relationships == [relationship]
+
+
+def test_primary_vendor_relationship_uses_lowest_priority():
+    direct = VendorRelationship(
+        vendor_name="QSC Direct",
+        relationship_type=VendorRelationshipType.DIRECT,
+        priority=2,
+    )
+    distributor = VendorRelationship(
+        vendor_name="Starin",
+        relationship_type=VendorRelationshipType.DISTRIBUTOR,
+        priority=1,
+    )
+    manufacturer = Manufacturer(
+        manufacturer_id="qsc",
+        name="Q-SYS",
+        discipline=ManufacturerDiscipline.AUDIO,
+        vendor_relationships=[direct, distributor],
+    )
+
+    assert manufacturer.primary_vendor_relationship() is distributor
+
+
+def test_primary_vendor_relationship_ignores_inactive_relationships():
+    inactive = VendorRelationship(
+        vendor_name="QSC Direct",
+        relationship_type=VendorRelationshipType.DIRECT,
+        priority=1,
+        active=False,
+    )
+    active = VendorRelationship(
+        vendor_name="Starin",
+        relationship_type=VendorRelationshipType.DISTRIBUTOR,
+        priority=2,
+    )
+    manufacturer = Manufacturer(
+        manufacturer_id="qsc",
+        name="Q-SYS",
+        discipline=ManufacturerDiscipline.AUDIO,
+        vendor_relationships=[inactive, active],
+    )
+
+    assert manufacturer.primary_vendor_relationship() is active
+
+
+def test_primary_vendor_relationship_returns_none_without_active_relationships():
+    manufacturer = Manufacturer(
+        manufacturer_id="qsc",
+        name="Q-SYS",
+        discipline=ManufacturerDiscipline.AUDIO,
+        vendor_relationships=[
+            VendorRelationship(vendor_name="QSC Direct", active=False)
+        ],
+    )
+
+    assert manufacturer.primary_vendor_relationship() is None
+
+
+def test_to_dict_includes_vendor_relationships():
+    relationship = VendorRelationship(
+        vendor_name="Starin",
+        relationship_type=VendorRelationshipType.DISTRIBUTOR,
+        priority=2,
+    )
+    manufacturer = Manufacturer(
+        manufacturer_id="qsc",
+        name="Q-SYS",
+        discipline=ManufacturerDiscipline.AUDIO,
+        vendor_relationships=[relationship],
+    )
+
+    assert manufacturer.to_dict()["vendor_relationships"] == [
+        relationship.to_dict()
+    ]

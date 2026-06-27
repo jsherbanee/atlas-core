@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from atlas_core.domain.vendor_relationship import VendorRelationship
+
 
 class ManufacturerTier(str, Enum):
     """Preference tier for an Atlas manufacturer."""
@@ -41,6 +43,7 @@ class Manufacturer:
     tier: ManufacturerTier = ManufacturerTier.APPROVED
     product_families: list[str] = field(default_factory=list)
     preferred_vendor: str | None = None
+    vendor_relationships: list[VendorRelationship] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     active: bool = True
     confidence: float = 0.75
@@ -67,6 +70,10 @@ class Manufacturer:
             self._normalize_required_text("product_family", product_family)
             for product_family in self.product_families
         ]
+        self.vendor_relationships = [
+            self._validate_vendor_relationship(relationship)
+            for relationship in self.vendor_relationships
+        ]
         self.notes = [
             self._normalize_required_text("note", note)
             for note in self.notes
@@ -79,6 +86,27 @@ class Manufacturer:
 
     def add_note(self, note: str) -> None:
         self.notes.append(self._normalize_required_text("note", note))
+
+    def add_vendor_relationship(
+        self, relationship: VendorRelationship
+    ) -> None:
+        self.vendor_relationships.append(
+            self._validate_vendor_relationship(relationship)
+        )
+
+    def primary_vendor_relationship(self) -> VendorRelationship | None:
+        active_relationships = [
+            relationship
+            for relationship in self.vendor_relationships
+            if relationship.active
+        ]
+        if not active_relationships:
+            return None
+
+        return min(
+            active_relationships,
+            key=lambda relationship: relationship.priority,
+        )
 
     def mark_review_required(self, reason: str | None = None) -> None:
         self.tier = ManufacturerTier.REVIEW_REQUIRED
@@ -100,6 +128,10 @@ class Manufacturer:
             "tier": self.tier.value,
             "product_families": list(self.product_families),
             "preferred_vendor": self.preferred_vendor,
+            "vendor_relationships": [
+                relationship.to_dict()
+                for relationship in self.vendor_relationships
+            ],
             "notes": list(self.notes),
             "active": self.active,
             "confidence": self.confidence,
@@ -114,3 +146,12 @@ class Manufacturer:
     def _normalize_required_text(cls, field_name: str, value: str) -> str:
         cls._validate_required_text(field_name, value)
         return value.strip()
+
+    @staticmethod
+    def _validate_vendor_relationship(
+        relationship: VendorRelationship,
+    ) -> VendorRelationship:
+        if not isinstance(relationship, VendorRelationship):
+            raise ValueError("vendor_relationships must be VendorRelationship objects")
+
+        return relationship
