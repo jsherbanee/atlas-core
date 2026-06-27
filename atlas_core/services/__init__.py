@@ -28,6 +28,10 @@ from atlas_core.services.estimator_brief_service import (
     EstimatorBrief,
     EstimatorBriefService,
 )
+from atlas_core.services.plan_review_workflow_service import (
+    PlanReviewWorkflowResult,
+    PlanReviewWorkflowService,
+)
 
 __all__ = [
     "BaselineService",
@@ -42,6 +46,8 @@ __all__ = [
     "EstimateWorkflowService",
     "ManufacturerReviewIssue",
     "ManufacturerReviewService",
+    "PlanReviewWorkflowResult",
+    "PlanReviewWorkflowService",
     "ReviewReportItem",
     "ReviewReportService",
     "ResolutionService",
