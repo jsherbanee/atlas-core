@@ -13,6 +13,7 @@ from atlas_core.domain.manufacturer import (
     ManufacturerTier,
 )
 from atlas_core.domain.project import Project, ProjectStatus
+from atlas_core.domain.room import Room, RoomType
 
 __all__ = [
     "Project",
@@ -28,4 +29,6 @@ __all__ = [
     "ManufacturerTier",
     "Building",
     "BuildingType",
+    "Room",
+    "RoomType",
 ]
