@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
         return _demo_estimate()
 
     if args.command == "demo-maw":
-        return _demo_maw(args.csv)
+        return _demo_maw(args.csv, args.output_dir)
 
     parser.print_help()
     return 0
@@ -50,6 +50,11 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="csv",
         type=Path,
         help="Write the MAW equipment matrix rows to a CSV file",
+    )
+    maw_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Write MAW equipment matrix and review report CSV files",
     )
 
     return parser
@@ -100,7 +105,10 @@ def _demo_estimate() -> int:
     return 0
 
 
-def _demo_maw(csv_path: Path | None = None) -> int:
+def _demo_maw(
+    csv_path: Path | None = None,
+    output_dir: Path | None = None,
+) -> int:
     from atlas_core.sample_data import build_maw_seed_data
     from atlas_core.services import CsvExportService, EstimateWorkflowService
 
@@ -114,10 +122,31 @@ def _demo_maw(csv_path: Path | None = None) -> int:
         equipment=seed["equipment"],
     )
 
+    csv_export_service = CsvExportService()
+
+    if output_dir is not None:
+        equipment_matrix_path = output_dir / "maw_equipment_matrix.csv"
+        review_report_path = output_dir / "maw_review_report.csv"
+
+        written_equipment_matrix_path = (
+            csv_export_service.export_equipment_matrix(
+                result.rows,
+                equipment_matrix_path,
+            )
+        )
+        written_review_report_path = csv_export_service.export_review_report(
+            result.review_report,
+            review_report_path,
+        )
+
+        print(f"equipment matrix csv export: {written_equipment_matrix_path}")
+        print(f"review report csv export: {written_review_report_path}")
+        return 0
+
     _print_workflow_result(result)
 
     if csv_path is not None:
-        written_path = CsvExportService().export_equipment_matrix(
+        written_path = csv_export_service.export_equipment_matrix(
             result.rows,
             csv_path,
         )

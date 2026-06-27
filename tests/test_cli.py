@@ -93,6 +93,39 @@ def test_demo_maw_exports_csv(tmp_path):
     )
 
 
+def test_demo_maw_with_output_dir_creates_equipment_matrix_csv(tmp_path):
+    result = run_cli("demo-maw", "--output-dir", str(tmp_path))
+    output_path = tmp_path / "maw_equipment_matrix.csv"
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert f"equipment matrix csv export: {output_path}" in result.stdout
+    assert output_path.exists()
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert len(records) == 10
+    assert records[0]["building_name"] == "MAW Music Education Center"
+
+
+def test_demo_maw_with_output_dir_creates_review_report_csv(tmp_path):
+    result = run_cli("demo-maw", "--output-dir", str(tmp_path))
+    output_path = tmp_path / "maw_review_report.csv"
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert f"review report csv export: {output_path}" in result.stdout
+    assert output_path.exists()
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert len(records) == 5
+    assert records[0]["source"] == "resolver"
+    assert records[0]["rule_id"] == "RULE-001"
+
+
 def test_unknown_command_prints_help():
     result = run_cli("not-a-command")
 
