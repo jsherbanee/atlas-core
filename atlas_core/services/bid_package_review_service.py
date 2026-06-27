@@ -9,6 +9,7 @@ from atlas_core.services import (
     CrossReferenceService,
     DrawingIndexerService,
     EstimateWorkflowService,
+    ScopeGapService,
     SpecificationIndexerService,
 )
 
@@ -23,6 +24,7 @@ class BidPackageReviewService:
         specification_indexer: SpecificationIndexerService | None = None,
         estimate_workflow_service: EstimateWorkflowService | None = None,
         cross_reference_service: CrossReferenceService | None = None,
+        scope_gap_service: ScopeGapService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
     ) -> None:
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
@@ -33,6 +35,7 @@ class BidPackageReviewService:
         self.cross_reference_service = (
             cross_reference_service or CrossReferenceService()
         )
+        self.scope_gap_service = scope_gap_service or ScopeGapService()
 
         if self.estimate_workflow_service is None:
             self.estimate_workflow_service = EstimateWorkflowService(
@@ -84,6 +87,10 @@ class BidPackageReviewService:
             systems=system_items,
             equipment=equipment_items,
         )
+        scope_gaps = self.scope_gap_service.detect_gaps(
+            equipment=equipment_items,
+            cross_references=cross_references,
+        )
 
         return BidPackageReview(
             review_id=review_id,
@@ -97,5 +104,6 @@ class BidPackageReviewService:
             manufacturer_review_issues=workflow_result.manufacturer_review_issues,
             review_report=workflow_result.review_report,
             cross_references=cross_references,
+            scope_gaps=scope_gaps,
             confidence=0.75,
         )

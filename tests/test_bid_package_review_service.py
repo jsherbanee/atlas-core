@@ -151,6 +151,23 @@ def test_includes_cross_references_when_equipment_references_drawing_and_spec():
     )
 
 
+def test_includes_scope_gaps_for_missing_projector_mount():
+    equipment = [
+        Equipment(
+            equipment_id="eq-projector",
+            description="Projector",
+            category=EquipmentCategory.PROJECTOR,
+            room_id="room-001",
+        )
+    ]
+
+    review = build_review(equipment=equipment)
+
+    assert len(review.scope_gaps) == 1
+    assert review.scope_gaps[0].gap_id == "projector_missing_mount"
+    assert review.scope_gaps[0].target_id == "eq-projector"
+
+
 def test_works_with_empty_inputs():
     review = build_review()
 
@@ -162,3 +179,4 @@ def test_works_with_empty_inputs():
     assert review.manufacturer_review_issues == []
     assert review.review_report == []
     assert review.cross_references == []
+    assert review.scope_gaps == []

@@ -36,6 +36,9 @@ class MarkdownExportService:
         if hasattr(brief, "cross_reference_count"):
             lines.append(f"Cross reference count: {brief.cross_reference_count}")
 
+        if hasattr(brief, "scope_gap_count"):
+            lines.append(f"Scope gap count: {brief.scope_gap_count}")
+
         lines.extend(
             [
                 f"Confidence: {self._confidence_percentage(brief.confidence)}",

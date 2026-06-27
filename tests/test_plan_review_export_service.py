@@ -69,6 +69,7 @@ def make_result() -> PlanReviewWorkflowResult:
             placeholder_count=0,
             review_required_count=1,
             cross_reference_count=0,
+            scope_gap_count=0,
             confidence=0.75,
         ),
     )

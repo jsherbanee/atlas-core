@@ -16,6 +16,7 @@ from atlas_core.services import (
     CrossReference,
     ManufacturerReviewIssue,
     ReviewReportItem,
+    ScopeGap,
 )
 
 
@@ -68,6 +69,14 @@ def make_cross_reference() -> CrossReference:
         source_id="eq-001",
         target_id="av101",
         message="Equipment references drawing.",
+    )
+
+
+def make_scope_gap() -> ScopeGap:
+    return ScopeGap(
+        gap_id="display_missing_mount",
+        target_id="eq-001",
+        message="Display is missing a mount.",
     )
 
 
@@ -191,9 +200,10 @@ def test_issue_count():
                 message="Review required.",
             )
         ],
+        scope_gaps=[make_scope_gap()],
     )
 
-    assert review.issue_count() == 3
+    assert review.issue_count() == 4
 
 
 def test_cross_reference_count():
@@ -205,6 +215,17 @@ def test_cross_reference_count():
     )
 
     assert review.cross_reference_count() == 1
+
+
+def test_scope_gap_count():
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        scope_gaps=[make_scope_gap()],
+    )
+
+    assert review.scope_gap_count() == 1
 
 
 def test_to_dict_output():
@@ -224,6 +245,7 @@ def test_to_dict_output():
         message="Review required.",
     )
     cross_reference = make_cross_reference()
+    scope_gap = make_scope_gap()
     review = BidPackageReview(
         review_id="review-001",
         project_id="project-001",
@@ -236,6 +258,7 @@ def test_to_dict_output():
         manufacturer_review_issues=[manufacturer_issue],
         review_report=[review_report_item],
         cross_references=[cross_reference],
+        scope_gaps=[scope_gap],
         notes=["Confirm scope."],
         confidence=0.85,
     )
@@ -267,6 +290,7 @@ def test_to_dict_output():
         "manufacturer_review_issues": [manufacturer_issue.to_dict()],
         "review_report": [review_report_item.to_dict()],
         "cross_references": [cross_reference.to_dict()],
+        "scope_gaps": [scope_gap.to_dict()],
         "notes": ["Confirm scope."],
         "confidence": 0.85,
     }

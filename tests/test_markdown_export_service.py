@@ -32,6 +32,7 @@ def make_result(
             placeholder_count=1,
             review_required_count=2,
             cross_reference_count=len(cross_references or []),
+            scope_gap_count=0,
             confidence=0.75,
         ),
     )
@@ -90,6 +91,7 @@ def test_includes_brief_counts(tmp_path):
     assert "Placeholder count: 1" in content
     assert "Review required count: 2" in content
     assert "Cross reference count: 0" in content
+    assert "Scope gap count: 0" in content
     assert "Confidence: 75%" in content
 
 
