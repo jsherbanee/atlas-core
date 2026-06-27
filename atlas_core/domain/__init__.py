@@ -16,6 +16,7 @@ from atlas_core.domain.project import Project, ProjectStatus
 from atlas_core.domain.room import Room, RoomType
 from atlas_core.domain.scene import Scene, SceneType
 from atlas_core.domain.space import Space, SpaceType
+from atlas_core.domain.vendor import Vendor, VendorStatus, VendorType
 from atlas_core.domain.vendor_relationship import (
     VendorRelationship,
     VendorRelationshipType,
@@ -41,6 +42,9 @@ __all__ = [
     "SpaceType",
     "Scene",
     "SceneType",
+    "Vendor",
+    "VendorStatus",
+    "VendorType",
     "VendorRelationship",
     "VendorRelationshipType",
 ]
