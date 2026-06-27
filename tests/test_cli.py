@@ -214,6 +214,28 @@ def test_demo_maw_plan_review_creates_review_report_csv(tmp_path):
     assert records[0]["source"] == "resolver"
 
 
+def test_demo_maw_plan_review_creates_markdown_summary(tmp_path):
+    result = run_cli("demo-maw-plan-review", "--output-dir", str(tmp_path))
+    output_path = tmp_path / "maw_plan_review_summary.md"
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert f"plan review summary markdown export: {output_path}" in result.stdout
+    assert output_path.exists()
+
+
+def test_demo_maw_plan_review_markdown_summary_includes_name(tmp_path):
+    result = run_cli("demo-maw-plan-review", "--output-dir", str(tmp_path))
+    output_path = tmp_path / "maw_plan_review_summary.md"
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert (
+        "MAW Music Education Center Plan Review"
+        in output_path.read_text(encoding="utf-8")
+    )
+
+
 def test_unknown_command_prints_help():
     result = run_cli("not-a-command")
 

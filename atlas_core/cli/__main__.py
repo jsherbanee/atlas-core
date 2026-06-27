@@ -173,6 +173,7 @@ def _demo_maw_plan_review(output_dir: Path) -> int:
     from atlas_core.services import (
         CsvExportService,
         EstimateWorkflowService,
+        MarkdownExportService,
         PlanReviewWorkflowService,
     )
 
@@ -208,6 +209,7 @@ def _demo_maw_plan_review(output_dir: Path) -> int:
     specification_index_path = output_dir / "maw_specification_index.csv"
     equipment_matrix_path = output_dir / "maw_equipment_matrix.csv"
     review_report_path = output_dir / "maw_review_report.csv"
+    plan_review_summary_path = output_dir / "maw_plan_review_summary.md"
 
     written_estimator_brief_path = csv_export_service.export_estimator_brief(
         plan_review_result.brief,
@@ -231,6 +233,12 @@ def _demo_maw_plan_review(output_dir: Path) -> int:
         plan_review_result.review.review_report,
         review_report_path,
     )
+    written_plan_review_summary_path = (
+        MarkdownExportService().export_plan_review_summary(
+            plan_review_result,
+            plan_review_summary_path,
+        )
+    )
 
     _print_estimator_brief_summary(plan_review_result.brief)
     print(f"estimator brief csv export: {written_estimator_brief_path}")
@@ -238,6 +246,7 @@ def _demo_maw_plan_review(output_dir: Path) -> int:
     print(f"specification index csv export: {written_specification_index_path}")
     print(f"equipment matrix csv export: {written_equipment_matrix_path}")
     print(f"review report csv export: {written_review_report_path}")
+    print(f"plan review summary markdown export: {written_plan_review_summary_path}")
     return 0
 
 
