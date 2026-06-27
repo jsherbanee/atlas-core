@@ -33,11 +33,11 @@ from atlas_core.domain.vendor_relationship import (
     VendorRelationship,
     VendorRelationshipType,
 )
+from atlas_core.domain.bid_package_review import BidPackageReview
 from atlas_core.domain.estimate_baseline import (
     EstimateBaseline,
     EstimateBaselineStatus,
 )
-from atlas_core.domain.bid_package_review import BidPackageReview
 
 __all__ = [
     "BidPackageReview",

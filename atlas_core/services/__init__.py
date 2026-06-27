@@ -43,6 +43,11 @@ from atlas_core.services.estimator_brief_service import (
     EstimatorBrief,
     EstimatorBriefService,
 )
+from atlas_core.services.estimator_risk_service import (
+    EstimatorRisk,
+    EstimatorRiskService,
+    RiskLevel,
+)
 from atlas_core.services.plan_review_workflow_service import (
     PlanReviewWorkflowResult,
     PlanReviewWorkflowService,
@@ -66,6 +71,8 @@ __all__ = [
     "DrawingIndexerService",
     "EstimatorBrief",
     "EstimatorBriefService",
+    "EstimatorRisk",
+    "EstimatorRiskService",
     "EquipmentMatrixRow",
     "EquipmentMatrixService",
     "EstimateWorkflowResult",
@@ -80,6 +87,7 @@ __all__ = [
     "ReviewReportItem",
     "ReviewReportService",
     "ResolutionService",
+    "RiskLevel",
     "ScopeGap",
     "ScopeGapService",
     "ScopeGapSeverity",
