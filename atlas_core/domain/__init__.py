@@ -37,8 +37,10 @@ from atlas_core.domain.estimate_baseline import (
     EstimateBaseline,
     EstimateBaselineStatus,
 )
+from atlas_core.domain.bid_package_review import BidPackageReview
 
 __all__ = [
+    "BidPackageReview",
     "Project",
     "ProjectStatus",
     "ProjectLifecycleEvent",
