@@ -7,6 +7,9 @@ from atlas_core.services.equipment_matrix_service import (
 from atlas_core.services.csv_export_service import CsvExportService
 from atlas_core.services.drawing_indexer_service import DrawingIndexerService
 from atlas_core.services.resolution_service import ResolutionService
+from atlas_core.services.specification_indexer_service import (
+    SpecificationIndexerService,
+)
 from atlas_core.services.manufacturer_review_service import (
     ManufacturerReviewIssue,
     ManufacturerReviewService,
@@ -34,4 +37,5 @@ __all__ = [
     "ReviewReportItem",
     "ReviewReportService",
     "ResolutionService",
+    "SpecificationIndexerService",
 ]
