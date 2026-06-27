@@ -8,9 +8,9 @@ from atlas_core.domain.integrated_system import (
 from atlas_core.domain.project import Project, ProjectStatus
 
 __all__ = [
-    "IntegratedSystem",
     "Project",
     "ProjectStatus",
+    "IntegratedSystem",
     "SystemCategory",
     "SystemComplexity",
 ]
