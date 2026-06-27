@@ -33,6 +33,10 @@ from atlas_core.services.plan_review_workflow_service import (
     PlanReviewWorkflowService,
 )
 from atlas_core.services.markdown_export_service import MarkdownExportService
+from atlas_core.services.plan_review_export_service import (
+    PlanReviewExportResult,
+    PlanReviewExportService,
+)
 
 __all__ = [
     "BaselineService",
@@ -48,6 +52,8 @@ __all__ = [
     "ManufacturerReviewIssue",
     "ManufacturerReviewService",
     "MarkdownExportService",
+    "PlanReviewExportResult",
+    "PlanReviewExportService",
     "PlanReviewWorkflowResult",
     "PlanReviewWorkflowService",
     "ReviewReportItem",
