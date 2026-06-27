@@ -13,6 +13,7 @@ from atlas_core.domain.manufacturer import (
     ManufacturerTier,
 )
 from atlas_core.domain.project import Project, ProjectStatus
+from atlas_core.domain.project_lifecycle import ProjectLifecycleEvent
 from atlas_core.domain.room import Room, RoomType
 from atlas_core.domain.scene import Scene, SceneType
 from atlas_core.domain.space import Space, SpaceType
@@ -25,6 +26,7 @@ from atlas_core.domain.vendor_relationship import (
 __all__ = [
     "Project",
     "ProjectStatus",
+    "ProjectLifecycleEvent",
     "IntegratedSystem",
     "SystemCategory",
     "SystemComplexity",
