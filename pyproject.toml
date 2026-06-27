@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atlas-core"
+version = "0.1.0"
+description = "Atlas Core estimating and project intelligence engine"
+requires-python = ">=3.12"
+authors = [
+  { name = "Atlas Core" }
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9.0"
+]
+
+[project.scripts]
+atlas = "atlas_core.cli.__main__:main"
+atlas-core = "atlas_core.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["atlas_core*"]
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
