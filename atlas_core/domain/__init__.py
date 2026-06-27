@@ -24,6 +24,10 @@ from atlas_core.domain.purchase_order import (
 from atlas_core.domain.room import Room, RoomType
 from atlas_core.domain.scene import Scene, SceneType
 from atlas_core.domain.space import Space, SpaceType
+from atlas_core.domain.specification import (
+    SpecificationDiscipline,
+    SpecificationSection,
+)
 from atlas_core.domain.vendor import Vendor, VendorStatus, VendorType
 from atlas_core.domain.vendor_relationship import (
     VendorRelationship,
@@ -42,6 +46,8 @@ __all__ = [
     "EstimateBaselineStatus",
     "DrawingDiscipline",
     "DrawingSheet",
+    "SpecificationDiscipline",
+    "SpecificationSection",
     "Invoice",
     "InvoiceLine",
     "InvoiceStatus",
