@@ -6,6 +6,7 @@ from atlas_core.services import (
     EquipmentMatrixRow,
     EstimatorBrief,
     ReviewReportItem,
+    ScopeGap,
 )
 
 
@@ -245,3 +246,74 @@ def test_empty_specification_index_writes_headers(tmp_path):
             title="Section",
         ).to_dict().keys()
     )
+
+
+def test_exports_scope_gaps_csv(tmp_path):
+    output_path = tmp_path / "scope" / "gaps.csv"
+
+    written_path = CsvExportService().export_scope_gaps(
+        [ScopeGap(gap_id="gap-001", target_id="eq-001", message="Review mount.")],
+        output_path,
+    )
+
+    assert written_path == output_path
+    assert output_path.exists()
+
+
+def test_writes_scope_gap_headers(tmp_path):
+    output_path = tmp_path / "scope_gaps.csv"
+
+    CsvExportService().export_scope_gaps([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+
+    assert headers == list(
+        ScopeGap(
+            gap_id="gap",
+            target_id="target",
+            message="Message.",
+        ).to_dict().keys()
+    )
+
+
+def test_writes_scope_gap_values(tmp_path):
+    output_path = tmp_path / "scope_gaps.csv"
+    gap = ScopeGap(
+        gap_id="projector_missing_mount",
+        target_id="projector-001",
+        message=(
+            "Projector is present, but no mount or mounting allowance was detected "
+            "in the same room."
+        ),
+        severity="high",
+        confidence=0.9,
+        suggested_action="Add projector mount.",
+    )
+
+    CsvExportService().export_scope_gaps([gap], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["gap_id"] == "projector_missing_mount"
+    assert records[0]["target_id"] == "projector-001"
+    assert records[0]["message"] == (
+        "Projector is present, but no mount or mounting allowance was detected "
+        "in the same room."
+    )
+    assert records[0]["severity"] == "high"
+    assert records[0]["confidence"] == "0.9"
+    assert records[0]["suggested_action"] == "Add projector mount."
+
+
+def test_handles_empty_scope_gaps(tmp_path):
+    output_path = tmp_path / "scope_gaps.csv"
+
+    CsvExportService().export_scope_gaps([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records == []

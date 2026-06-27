@@ -5,12 +5,14 @@ from atlas_core.services import (
     MarkdownExportService,
     PlanReviewWorkflowResult,
     ReviewReportItem,
+    ScopeGap,
 )
 
 
 def make_result(
     review_report: list[ReviewReportItem] | None = None,
     cross_references: list[CrossReference] | None = None,
+    scope_gaps: list[ScopeGap] | None = None,
 ) -> PlanReviewWorkflowResult:
     return PlanReviewWorkflowResult(
         review=BidPackageReview(
@@ -19,6 +21,7 @@ def make_result(
             name="Plan Review",
             review_report=list(review_report or []),
             cross_references=list(cross_references or []),
+            scope_gaps=list(scope_gaps or []),
         ),
         brief=EstimatorBrief(
             review_id="review-001",
@@ -32,7 +35,7 @@ def make_result(
             placeholder_count=1,
             review_required_count=2,
             cross_reference_count=len(cross_references or []),
-            scope_gap_count=0,
+            scope_gap_count=len(scope_gaps or []),
             confidence=0.75,
         ),
     )
@@ -188,3 +191,48 @@ def test_includes_cross_reference_count_when_present(tmp_path):
     assert "Cross reference count: 1" in output_path.read_text(
         encoding="utf-8"
     )
+
+
+def test_includes_scope_gaps_section(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Scope Gaps" in content
+
+
+def test_includes_scope_gap_items(tmp_path):
+    output_path = tmp_path / "summary.md"
+    gap = ScopeGap(
+        gap_id="projector_missing_mount",
+        target_id="projector-001",
+        message="Projector is missing a mount.",
+        severity="high",
+        suggested_action="Add projector mount allowance.",
+    )
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(scope_gaps=[gap]),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "- [high] projector-001: Projector is missing a mount." in content
+    assert "  Suggested action: Add projector mount allowance." in content
+    assert "Scope gap count: 1" in content
+
+
+def test_handles_no_scope_gaps(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "No scope gaps found." in content

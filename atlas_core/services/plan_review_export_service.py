@@ -18,6 +18,7 @@ class PlanReviewExportResult:
     specification_index_path: Path
     equipment_matrix_path: Path
     review_report_path: Path
+    scope_gaps_path: Path
     markdown_summary_path: Path
 
     def to_dict(self) -> dict[str, str]:
@@ -27,6 +28,7 @@ class PlanReviewExportResult:
             "specification_index_path": str(self.specification_index_path),
             "equipment_matrix_path": str(self.equipment_matrix_path),
             "review_report_path": str(self.review_report_path),
+            "scope_gaps_path": str(self.scope_gaps_path),
             "markdown_summary_path": str(self.markdown_summary_path),
         }
 
@@ -73,6 +75,10 @@ class PlanReviewExportService:
             result.review.review_report,
             output_path / f"{prefix}_review_report.csv",
         )
+        scope_gaps_path = self.csv_export_service.export_scope_gaps(
+            result.review.scope_gaps,
+            output_path / f"{prefix}_scope_gaps.csv",
+        )
         markdown_summary_path = (
             self.markdown_export_service.export_plan_review_summary(
                 result,
@@ -86,6 +92,7 @@ class PlanReviewExportService:
             specification_index_path=specification_index_path,
             equipment_matrix_path=equipment_matrix_path,
             review_report_path=review_report_path,
+            scope_gaps_path=scope_gaps_path,
             markdown_summary_path=markdown_summary_path,
         )
 

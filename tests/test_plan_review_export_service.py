@@ -12,6 +12,7 @@ from atlas_core.services import (
     PlanReviewExportService,
     PlanReviewWorkflowResult,
     ReviewReportItem,
+    ScopeGap,
 )
 
 
@@ -56,6 +57,14 @@ def make_result() -> PlanReviewWorkflowResult:
                     message="Review item.",
                 )
             ],
+            scope_gaps=[
+                ScopeGap(
+                    gap_id="speaker_missing_amplifier",
+                    target_id=equipment.equipment_id,
+                    message="Speaker equipment is missing an amplifier.",
+                    severity="high",
+                )
+            ],
         ),
         brief=EstimatorBrief(
             review_id="review-001",
@@ -69,7 +78,7 @@ def make_result() -> PlanReviewWorkflowResult:
             placeholder_count=0,
             review_required_count=1,
             cross_reference_count=0,
-            scope_gap_count=0,
+            scope_gap_count=1,
             confidence=0.75,
         ),
     )
@@ -83,6 +92,7 @@ def test_exports_all_plan_review_files(tmp_path):
     assert result.specification_index_path.exists()
     assert result.equipment_matrix_path.exists()
     assert result.review_report_path.exists()
+    assert result.scope_gaps_path.exists()
     assert result.markdown_summary_path.exists()
 
 
@@ -109,6 +119,7 @@ def test_supports_custom_prefix(tmp_path):
     )
     assert result.equipment_matrix_path == tmp_path / "maw_equipment_matrix.csv"
     assert result.review_report_path == tmp_path / "maw_review_report.csv"
+    assert result.scope_gaps_path == tmp_path / "maw_scope_gaps.csv"
     assert result.markdown_summary_path == tmp_path / "maw_summary.md"
 
 
@@ -121,6 +132,14 @@ def test_to_dict_returns_string_paths(tmp_path):
         "specification_index_path": str(result.specification_index_path),
         "equipment_matrix_path": str(result.equipment_matrix_path),
         "review_report_path": str(result.review_report_path),
+        "scope_gaps_path": str(result.scope_gaps_path),
         "markdown_summary_path": str(result.markdown_summary_path),
     }
     assert all(isinstance(value, str) for value in result.to_dict().values())
+
+
+def test_exports_scope_gaps_csv(tmp_path):
+    result = PlanReviewExportService().export_plan_review(make_result(), tmp_path)
+
+    assert result.scope_gaps_path.exists()
+    assert result.scope_gaps_path.name == "plan_review_scope_gaps.csv"

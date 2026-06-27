@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from atlas_core.services.equipment_matrix_service import EquipmentMatrixRow
 from atlas_core.services.review_report_service import ReviewReportItem
+from atlas_core.services.scope_gap_service import ScopeGap
 
 if TYPE_CHECKING:
     from atlas_core.domain import DrawingSheet, SpecificationSection
@@ -132,3 +133,20 @@ class CsvExportService:
                 writer.writerow(item.to_dict())
 
         return path
+
+    def export_scope_gaps(
+        self,
+        gaps: list[ScopeGap],
+        output_path: str | Path,
+    ) -> Path:
+        return self._write_csv(
+            headers=list(
+                ScopeGap(
+                    gap_id="gap",
+                    target_id="target",
+                    message="Message.",
+                ).to_dict().keys()
+            ),
+            rows=[gap.to_dict() for gap in gaps],
+            output_path=output_path,
+        )

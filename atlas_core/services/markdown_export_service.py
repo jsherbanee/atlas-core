@@ -67,6 +67,18 @@ class MarkdownExportService:
                     f"{item.source_id} -> {item.target_id}: {item.message}"
                 )
 
+        lines.extend(["", "## Scope Gaps", ""])
+
+        if not result.review.scope_gaps:
+            lines.append("No scope gaps found.")
+        else:
+            for gap in result.review.scope_gaps:
+                lines.append(
+                    f"- [{gap.severity.value}] {gap.target_id}: {gap.message}"
+                )
+                if gap.suggested_action:
+                    lines.append(f"  Suggested action: {gap.suggested_action}")
+
         return "\n".join(lines) + "\n"
 
     @staticmethod
