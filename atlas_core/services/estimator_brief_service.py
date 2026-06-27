@@ -21,6 +21,7 @@ class EstimatorBrief:
     issue_count: int
     placeholder_count: int
     review_required_count: int
+    cross_reference_count: int
     confidence: float
 
     def to_dict(self) -> dict[str, Any]:
@@ -40,6 +41,7 @@ class EstimatorBriefService:
             issue_count=review.issue_count(),
             placeholder_count=self._placeholder_count(review),
             review_required_count=self._review_required_count(review),
+            cross_reference_count=review.cross_reference_count(),
             confidence=review.confidence,
         )
 

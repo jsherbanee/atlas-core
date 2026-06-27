@@ -12,7 +12,11 @@ from atlas_core.domain import (
     SystemCategory,
 )
 from atlas_core.rules import Resolution, ResolutionAction
-from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
+from atlas_core.services import (
+    CrossReference,
+    ManufacturerReviewIssue,
+    ReviewReportItem,
+)
 
 
 def make_drawing_sheet() -> DrawingSheet:
@@ -55,6 +59,15 @@ def make_resolution() -> Resolution:
         action=ResolutionAction.MARK_FOR_REVIEW,
         target_id="eq-001",
         message="Review required.",
+    )
+
+
+def make_cross_reference() -> CrossReference:
+    return CrossReference(
+        reference_type="equipment_to_drawing",
+        source_id="eq-001",
+        target_id="av101",
+        message="Equipment references drawing.",
     )
 
 
@@ -183,6 +196,17 @@ def test_issue_count():
     assert review.issue_count() == 3
 
 
+def test_cross_reference_count():
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        cross_references=[make_cross_reference()],
+    )
+
+    assert review.cross_reference_count() == 1
+
+
 def test_to_dict_output():
     drawing_sheet = make_drawing_sheet()
     specification_section = make_specification_section()
@@ -199,6 +223,7 @@ def test_to_dict_output():
         target_id="eq-001",
         message="Review required.",
     )
+    cross_reference = make_cross_reference()
     review = BidPackageReview(
         review_id="review-001",
         project_id="project-001",
@@ -210,6 +235,7 @@ def test_to_dict_output():
         resolutions=[resolution],
         manufacturer_review_issues=[manufacturer_issue],
         review_report=[review_report_item],
+        cross_references=[cross_reference],
         notes=["Confirm scope."],
         confidence=0.85,
     )
@@ -240,6 +266,7 @@ def test_to_dict_output():
         ],
         "manufacturer_review_issues": [manufacturer_issue.to_dict()],
         "review_report": [review_report_item.to_dict()],
+        "cross_references": [cross_reference.to_dict()],
         "notes": ["Confirm scope."],
         "confidence": 0.85,
     }

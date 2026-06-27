@@ -16,6 +16,7 @@ from atlas_core.rules import Resolution
 
 if TYPE_CHECKING:
     from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
+    from atlas_core.services.cross_reference_service import CrossReference
 
 
 @dataclass
@@ -32,6 +33,7 @@ class BidPackageReview:
         default_factory=list
     )
     review_report: list[ReviewReportItem] = field(default_factory=list)
+    cross_references: list[CrossReference] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     confidence: float = 0.75
 
@@ -60,6 +62,9 @@ class BidPackageReview:
     def equipment_count(self) -> int:
         return len(self.equipment)
 
+    def cross_reference_count(self) -> int:
+        return len(self.cross_references)
+
     def issue_count(self) -> int:
         return (
             len(self.resolutions)
@@ -83,6 +88,7 @@ class BidPackageReview:
                 self.manufacturer_review_issues
             ),
             "review_report": self._serialize_items(self.review_report),
+            "cross_references": self._serialize_items(self.cross_references),
             "notes": list(self.notes),
             "confidence": self.confidence,
         }

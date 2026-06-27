@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.services import (
+    CrossReferenceService,
     DrawingIndexerService,
     EstimateWorkflowService,
     SpecificationIndexerService,
@@ -21,6 +22,7 @@ class BidPackageReviewService:
         drawing_indexer: DrawingIndexerService | None = None,
         specification_indexer: SpecificationIndexerService | None = None,
         estimate_workflow_service: EstimateWorkflowService | None = None,
+        cross_reference_service: CrossReferenceService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
     ) -> None:
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
@@ -28,6 +30,9 @@ class BidPackageReviewService:
             specification_indexer or SpecificationIndexerService()
         )
         self.estimate_workflow_service = estimate_workflow_service
+        self.cross_reference_service = (
+            cross_reference_service or CrossReferenceService()
+        )
 
         if self.estimate_workflow_service is None:
             self.estimate_workflow_service = EstimateWorkflowService(
@@ -73,6 +78,12 @@ class BidPackageReviewService:
                 equipment=equipment_items,
             )
         )
+        cross_references = self.cross_reference_service.build_references(
+            drawings=drawing_sheets,
+            specifications=specification_sections,
+            systems=system_items,
+            equipment=equipment_items,
+        )
 
         return BidPackageReview(
             review_id=review_id,
@@ -85,5 +96,6 @@ class BidPackageReviewService:
             resolutions=workflow_result.resolutions,
             manufacturer_review_issues=workflow_result.manufacturer_review_issues,
             review_report=workflow_result.review_report,
+            cross_references=cross_references,
             confidence=0.75,
         )

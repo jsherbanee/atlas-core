@@ -9,6 +9,7 @@ from atlas_core.domain import (
 )
 from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import (
+    CrossReference,
     EstimatorBrief,
     EstimatorBriefService,
     ManufacturerReviewIssue,
@@ -78,6 +79,14 @@ def make_review() -> BidPackageReview:
                 message="Review required.",
             )
         ],
+        cross_references=[
+            CrossReference(
+                reference_type="equipment_to_drawing",
+                source_id="eq-display",
+                target_id="av101",
+                message="Equipment references drawing.",
+            )
+        ],
         confidence=0.82,
     )
 
@@ -133,6 +142,12 @@ def test_counts_review_required_equipment_and_report_items():
     assert brief.review_required_count == 2
 
 
+def test_counts_cross_references():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.cross_reference_count == 1
+
+
 def test_to_dict_output():
     brief = EstimatorBrief(
         review_id="review-001",
@@ -145,6 +160,7 @@ def test_to_dict_output():
         issue_count=3,
         placeholder_count=1,
         review_required_count=2,
+        cross_reference_count=1,
         confidence=0.82,
     )
 
@@ -159,5 +175,6 @@ def test_to_dict_output():
         "issue_count": 3,
         "placeholder_count": 1,
         "review_required_count": 2,
+        "cross_reference_count": 1,
         "confidence": 0.82,
     }

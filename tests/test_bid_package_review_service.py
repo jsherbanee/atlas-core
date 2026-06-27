@@ -1,5 +1,5 @@
 from atlas_core.domain import Equipment, EquipmentCategory
-from atlas_core.services import BidPackageReviewService
+from atlas_core.services import BidPackageReviewService, CrossReferenceType
 
 
 def build_review(**kwargs):
@@ -110,6 +110,47 @@ def test_includes_review_report():
     assert review.review_report[0].target_id == "eq-drapery"
 
 
+def test_includes_cross_references_when_equipment_references_drawing_and_spec():
+    equipment = [
+        Equipment(
+            equipment_id="eq-speaker",
+            description="Main loudspeaker",
+            category=EquipmentCategory.SPEAKER,
+            drawing_reference="AV1.01",
+            specification_reference="27 41 16",
+        )
+    ]
+
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+            }
+        ],
+        raw_sections=[
+            {
+                "section_number": "27 41 16",
+                "title": "Integrated Audio-Video Systems",
+            }
+        ],
+        equipment=equipment,
+    )
+
+    assert any(
+        reference.reference_type is CrossReferenceType.EQUIPMENT_TO_DRAWING
+        and reference.source_id == "eq-speaker"
+        and reference.target_id == "av1.01"
+        for reference in review.cross_references
+    )
+    assert any(
+        reference.reference_type is CrossReferenceType.EQUIPMENT_TO_SPEC
+        and reference.source_id == "eq-speaker"
+        and reference.target_id == "27-41-16"
+        for reference in review.cross_references
+    )
+
+
 def test_works_with_empty_inputs():
     review = build_review()
 
@@ -120,3 +161,4 @@ def test_works_with_empty_inputs():
     assert review.resolutions == []
     assert review.manufacturer_review_issues == []
     assert review.review_report == []
+    assert review.cross_references == []
