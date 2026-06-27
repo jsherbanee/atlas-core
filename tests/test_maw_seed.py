@@ -82,3 +82,24 @@ def test_seed_placeholder_rows_keep_source_context():
         row.building_name == "MAW Music Education Center"
         for row in placeholder_rows
     )
+
+
+def test_seed_direct_room_equipment_keeps_source_context():
+    seed = build_maw_seed_data()
+
+    result = EstimateWorkflowService().build_equipment_matrix_with_resolutions(
+        buildings=seed["buildings"],
+        rooms=seed["rooms"],
+        spaces=seed["spaces"],
+        scenes=seed["scenes"],
+        systems=seed["systems"],
+        equipment=seed["equipment"],
+    )
+    drapery_row = next(
+        row for row in result.rows if row.equipment_id == "maw-recital-drapery"
+    )
+
+    assert drapery_row.building_name == "MAW Music Education Center"
+    assert drapery_row.room_id == "maw-recital-hall"
+    assert drapery_row.room_name == "Recital Hall"
+    assert drapery_row.review_required is True

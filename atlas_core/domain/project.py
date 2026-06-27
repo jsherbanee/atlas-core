@@ -37,10 +37,7 @@ class Project:
         self._validate_required_text("name", self.name)
         self._validate_required_text("client", self.client)
 
-        if (
-            not isinstance(self.target_margin, (int, float))
-            or not 0 <= self.target_margin <= 1
-        ):
+        if not isinstance(self.target_margin, (int, float)) or not 0 <= self.target_margin <= 1:
             raise ValueError("target_margin must be between 0 and 1")
 
         if not isinstance(self.status, ProjectStatus):
@@ -48,11 +45,11 @@ class Project:
 
     def add_building(self, name: str) -> None:
         self._validate_required_text("building name", name)
-        self.buildings.append(name)
+        self.buildings.append(name.strip())
 
     def add_note(self, note: str) -> None:
         self._validate_required_text("note", note)
-        self.notes.append(note)
+        self.notes.append(note.strip())
 
     def is_ready_for_estimate(self) -> bool:
         return all(

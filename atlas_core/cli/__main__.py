@@ -1,6 +1,7 @@
 import argparse
 import json
 import sys
+from pathlib import Path
 from typing import Any
 
 from atlas_core import __version__
@@ -25,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
         return _demo_estimate()
 
     if args.command == "demo-maw":
-        return _demo_maw()
+        return _demo_maw(args.csv)
 
     parser.print_help()
     return 0
@@ -39,9 +40,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "demo-estimate",
         help="Run a sample estimate workflow",
     )
-    subparsers.add_parser(
+    maw_parser = subparsers.add_parser(
         "demo-maw",
         help="Run the MAW seed estimate workflow",
+    )
+    maw_parser.add_argument(
+        "--csv",
+        "--export-csv",
+        dest="csv",
+        type=Path,
+        help="Write the MAW equipment matrix rows to a CSV file",
     )
 
     return parser
@@ -92,9 +100,9 @@ def _demo_estimate() -> int:
     return 0
 
 
-def _demo_maw() -> int:
+def _demo_maw(csv_path: Path | None = None) -> int:
     from atlas_core.sample_data import build_maw_seed_data
-    from atlas_core.services import EstimateWorkflowService
+    from atlas_core.services import CsvExportService, EstimateWorkflowService
 
     seed = build_maw_seed_data()
     result = EstimateWorkflowService().build_equipment_matrix_with_resolutions(
@@ -107,6 +115,14 @@ def _demo_maw() -> int:
     )
 
     _print_workflow_result(result)
+
+    if csv_path is not None:
+        written_path = CsvExportService().export_equipment_matrix(
+            result.rows,
+            csv_path,
+        )
+        print(f"csv export: {written_path}")
+
     return 0
 
 

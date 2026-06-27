@@ -72,11 +72,18 @@ class EquipmentMatrixService:
         equipment_system_id = self._value(equipment, "system_id")
         system = self._systems_by_id.get(equipment_system_id)
 
+        equipment_room_id = self._value(equipment, "room_id")
         system_room_id = self._value(system, "room_id")
-        room = self._rooms_by_id.get(system_room_id)
+        room_id = system_room_id or equipment_room_id
+        room = self._rooms_by_id.get(room_id)
 
         room_building_id = self._value(room, "building_id")
-        building = self._buildings_by_id.get(room_building_id)
+        system_building_id = self._value(system, "building_id")
+        equipment_building_id = self._value(equipment, "building_id")
+        building_id = (
+            room_building_id or system_building_id or equipment_building_id
+        )
+        building = self._buildings_by_id.get(building_id)
 
         equipment_space_id = getattr(equipment, "space_id", None)
         space = self._spaces_by_id.get(equipment_space_id)
@@ -85,11 +92,9 @@ class EquipmentMatrixService:
         scene = self._scenes_by_id.get(equipment_scene_id)
 
         return EquipmentMatrixRow(
-            project_building_id=self._value(
-                building, "building_id", room_building_id
-            ),
+            project_building_id=self._value(building, "building_id", building_id),
             building_name=self._value(building, "name"),
-            room_id=self._value(room, "room_id", system_room_id),
+            room_id=self._value(room, "room_id", room_id),
             room_name=self._value(room, "name"),
             space_id=self._value(space, "space_id", equipment_space_id or ""),
             space_name=self._value(space, "name"),

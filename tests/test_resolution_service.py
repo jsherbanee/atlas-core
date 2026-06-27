@@ -1,4 +1,4 @@
-from atlas_core.domain import EquipmentCategory, EquipmentStatus
+from atlas_core.domain import Equipment, EquipmentCategory, EquipmentStatus
 from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import ResolutionService
 
@@ -45,6 +45,26 @@ def test_ignoring_mark_for_review_resolutions():
     )
 
     assert ResolutionService().create_placeholder_equipment([resolution]) == []
+
+
+def test_applying_mark_for_review_resolutions_to_existing_equipment():
+    equipment = Equipment(
+        equipment_id="eq-low-confidence",
+        description="Unverified display",
+        category=EquipmentCategory.DISPLAY,
+    )
+    resolution = Resolution(
+        rule_id="RULE-005",
+        action=ResolutionAction.MARK_FOR_REVIEW,
+        target_id=equipment.equipment_id,
+        message="Equipment confidence is below threshold.",
+    )
+
+    ResolutionService().apply_review_resolutions([equipment], [resolution])
+    ResolutionService().apply_review_resolutions([equipment], [resolution])
+
+    assert equipment.review_required is True
+    assert equipment.assumptions == ["Equipment confidence is below threshold."]
 
 
 def test_using_suggested_description_when_present():

@@ -1,10 +1,36 @@
 """Apply resolver outputs to Atlas domain objects."""
 
+from typing import Any
+
 from atlas_core.domain import Equipment, EquipmentCategory, EquipmentStatus
 from atlas_core.rules import Resolution, ResolutionAction
 
 
 class ResolutionService:
+    def apply_review_resolutions(
+        self,
+        equipment: list[Any],
+        resolutions: list[Resolution],
+    ) -> None:
+        equipment_by_id = {}
+        for item in equipment:
+            equipment_id = self._equipment_id(item)
+            if equipment_id != "":
+                equipment_by_id[equipment_id] = item
+
+        for resolution in resolutions:
+            if resolution.action is not ResolutionAction.MARK_FOR_REVIEW:
+                continue
+
+            item = equipment_by_id.get(resolution.target_id)
+            if item is None:
+                continue
+
+            if hasattr(item, "mark_for_review"):
+                self._mark_for_review(item, resolution.message)
+            elif hasattr(item, "review_required"):
+                item.review_required = True
+
     def create_placeholder_equipment(
         self, resolutions: list[Resolution]
     ) -> list[Equipment]:
@@ -64,3 +90,28 @@ class ResolutionService:
             return EquipmentCategory(suggested_category)
         except ValueError:
             return EquipmentCategory.UNKNOWN
+
+    @staticmethod
+    def _equipment_id(item: Any) -> str:
+        if item is None:
+            return ""
+
+        if hasattr(item, "to_dict"):
+            value = item.to_dict().get("equipment_id")
+        else:
+            value = getattr(item, "equipment_id", "")
+
+        if not isinstance(value, str):
+            return ""
+
+        return value.strip()
+
+    @staticmethod
+    def _mark_for_review(item: Any, message: str) -> None:
+        assumptions = getattr(item, "assumptions", None)
+        if isinstance(assumptions, list) and message in assumptions:
+            if hasattr(item, "review_required"):
+                item.review_required = True
+            return
+
+        item.mark_for_review(message)

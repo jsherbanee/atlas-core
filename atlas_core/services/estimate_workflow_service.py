@@ -68,6 +68,10 @@ class EstimateWorkflowService:
             equipment_items,
             systems=system_items,
         )
+        self.resolution_service.apply_review_resolutions(
+            equipment_items,
+            resolutions,
+        )
         placeholder_equipment = (
             self.resolution_service.create_placeholder_equipment(resolutions)
         )

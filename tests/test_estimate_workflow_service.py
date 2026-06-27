@@ -77,6 +77,11 @@ def test_returns_resolver_resolutions():
     assert len(result.resolutions) == 1
     assert result.resolutions[0].rule_id == "RULE-004"
     assert result.resolutions[0].action is ResolutionAction.MARK_FOR_REVIEW
+    assert result.rows[0].review_required is True
+    assert result.rows[0].assumptions == (
+        "Drapery scope requires review of track, hardware, infrastructure, "
+        "support, and site conditions."
+    )
 
 
 def test_to_dict_serializes_rows_and_resolutions_cleanly():

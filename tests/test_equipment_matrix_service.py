@@ -96,6 +96,36 @@ def test_handling_missing_related_records_without_error():
     assert rows[0].building_name == ""
 
 
+def test_using_direct_room_context_when_equipment_has_no_system():
+    building = Building(
+        building_id="bldg-001",
+        name="Main Building",
+        project_id="project-001",
+    )
+    room = Room(
+        room_id="room-001",
+        name="Recital Hall",
+        building_id="bldg-001",
+    )
+    equipment = Equipment(
+        equipment_id="eq-001",
+        description="Acoustic drapery allowance",
+        category=EquipmentCategory.DRAPERY,
+        room_id="room-001",
+    )
+
+    rows = EquipmentMatrixService(
+        buildings=[building],
+        rooms=[room],
+        equipment=[equipment],
+    ).build_rows()
+
+    assert rows[0].project_building_id == "bldg-001"
+    assert rows[0].building_name == "Main Building"
+    assert rows[0].room_id == "room-001"
+    assert rows[0].room_name == "Recital Hall"
+
+
 def test_joining_assumptions():
     equipment = Equipment(
         equipment_id="eq-001",

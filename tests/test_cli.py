@@ -1,3 +1,4 @@
+import csv
 import os
 import subprocess
 import sys
@@ -62,6 +63,34 @@ def test_demo_maw_output_includes_seed_data_and_placeholders():
     assert '"equipment_category": "mount"' in result.stdout
     assert "RULE-001" in result.stdout
     assert "RULE-004" in result.stdout
+
+
+def test_demo_maw_exports_csv(tmp_path):
+    output_path = tmp_path / "maw-equipment-matrix.csv"
+
+    result = run_cli("demo-maw", "--csv", str(output_path))
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert f"csv export: {output_path}" in result.stdout
+    assert output_path.exists()
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert len(records) == 10
+    assert records[0]["building_name"] == "MAW Music Education Center"
+    drapery_record = next(
+        record
+        for record in records
+        if record["equipment_id"] == "maw-recital-drapery"
+    )
+
+    assert drapery_record["review_required"] == "True"
+    assert any(
+        record["equipment_id"] == "placeholder-rule-001-maw-recital-speakers"
+        for record in records
+    )
 
 
 def test_unknown_command_prints_help():
