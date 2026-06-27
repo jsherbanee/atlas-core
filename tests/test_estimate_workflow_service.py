@@ -30,6 +30,7 @@ def test_returns_rows_for_original_equipment():
     assert result.rows[0].description == "Display"
     assert result.placeholder_equipment_count == 0
     assert result.manufacturer_review_issues == []
+    assert result.review_report == []
 
 
 def test_creates_placeholder_equipment_for_speaker_without_amplifier():
@@ -127,6 +128,9 @@ def test_to_dict_serializes_rows_and_resolutions_cleanly():
     assert data["resolutions"][0]["rule_id"] == "RULE-001"
     assert data["placeholder_equipment_count"] == 1
     assert data["manufacturer_review_issues"] == []
+    assert data["review_report"][0]["source"] == "resolver"
+    assert data["review_report"][0]["target_id"] == "eq-speaker"
+    assert data["review_report"][0]["rule_id"] == "RULE-001"
 
 
 def test_workflow_still_works_without_manufacturer_registry():
@@ -218,3 +222,38 @@ def test_workflow_reviews_placeholder_equipment_manufacturer():
         "placeholder-rule-003-eq-projector"
     )
     assert result.manufacturer_review_issues[0].manufacturer == "Chief"
+
+
+def test_workflow_includes_review_report_items_for_resolver_resolutions():
+    drapery = Equipment(
+        equipment_id="eq-drapery",
+        description="Motorized Drapery",
+        category=EquipmentCategory.DRAPERY,
+    )
+
+    result = EstimateWorkflowService().build_equipment_matrix_with_resolutions(
+        equipment=[drapery],
+    )
+
+    assert len(result.review_report) == 1
+    assert result.review_report[0].source == "resolver"
+    assert result.review_report[0].target_id == "eq-drapery"
+    assert result.review_report[0].rule_id == "RULE-004"
+
+
+def test_workflow_includes_manufacturer_review_issues_in_review_report():
+    equipment = Equipment(
+        equipment_id="eq-display",
+        description="Display",
+        category=EquipmentCategory.DISPLAY,
+        manufacturer="Unknown",
+    )
+
+    result = EstimateWorkflowService(
+        manufacturer_registry=ManufacturerRegistry()
+    ).build_equipment_matrix_with_resolutions(equipment=[equipment])
+
+    assert len(result.review_report) == 1
+    assert result.review_report[0].source == "manufacturer_registry"
+    assert result.review_report[0].target_id == "eq-display"
+    assert result.review_report[0].manufacturer == "Unknown"

@@ -12,6 +12,8 @@ from atlas_core.services import (
     ManufacturerReviewIssue,
     ManufacturerReviewService,
     ResolutionService,
+    ReviewReportItem,
+    ReviewReportService,
 )
 
 
@@ -23,6 +25,7 @@ class EstimateWorkflowResult:
     manufacturer_review_issues: list[ManufacturerReviewIssue] = field(
         default_factory=list
     )
+    review_report: list[ReviewReportItem] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -35,6 +38,10 @@ class EstimateWorkflowResult:
             "manufacturer_review_issues": [
                 issue.to_dict()
                 for issue in self.manufacturer_review_issues
+            ],
+            "review_report": [
+                item.to_dict()
+                for item in self.review_report
             ],
         }
 
@@ -56,10 +63,12 @@ class EstimateWorkflowService:
         resolution_service: ResolutionService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
         manufacturer_review_service: ManufacturerReviewService | None = None,
+        review_report_service: ReviewReportService | None = None,
     ) -> None:
         self.resolver = resolver or Resolver()
         self.resolution_service = resolution_service or ResolutionService()
         self.manufacturer_review_service = manufacturer_review_service
+        self.review_report_service = review_report_service or ReviewReportService()
 
         if (
             self.manufacturer_review_service is None
@@ -105,6 +114,11 @@ class EstimateWorkflowService:
                 )
             )
 
+        review_report = self.review_report_service.build_report(
+            resolutions,
+            manufacturer_review_issues,
+        )
+
         rows = EquipmentMatrixService(
             buildings=building_items,
             rooms=room_items,
@@ -119,4 +133,5 @@ class EstimateWorkflowService:
             resolutions=resolutions,
             placeholder_equipment_count=len(placeholder_equipment),
             manufacturer_review_issues=manufacturer_review_issues,
+            review_report=review_report,
         )
