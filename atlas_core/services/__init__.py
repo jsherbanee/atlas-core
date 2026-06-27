@@ -18,8 +18,10 @@ from atlas_core.services.estimate_workflow_service import (
     EstimateWorkflowResult,
     EstimateWorkflowService,
 )
+from atlas_core.services.baseline_service import BaselineService
 
 __all__ = [
+    "BaselineService",
     "CsvExportService",
     "EquipmentMatrixRow",
     "EquipmentMatrixService",
