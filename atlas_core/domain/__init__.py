@@ -7,6 +7,7 @@ from atlas_core.domain.integrated_system import (
     SystemCategory,
     SystemComplexity,
 )
+from atlas_core.domain.invoice import Invoice, InvoiceLine, InvoiceStatus
 from atlas_core.domain.manufacturer import (
     Manufacturer,
     ManufacturerDiscipline,
@@ -38,6 +39,9 @@ __all__ = [
     "ProjectLifecycleEvent",
     "EstimateBaseline",
     "EstimateBaselineStatus",
+    "Invoice",
+    "InvoiceLine",
+    "InvoiceStatus",
     "PurchaseOrder",
     "PurchaseOrderLine",
     "PurchaseOrderStatus",
