@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.services import (
+    ConfidenceScoringService,
     CrossReferenceService,
     DrawingIndexerService,
     EquipmentDetectionService,
@@ -31,6 +32,7 @@ class BidPackageReviewService:
         estimator_risk_service: EstimatorRiskService | None = None,
         system_detection_service: SystemDetectionService | None = None,
         equipment_detection_service: EquipmentDetectionService | None = None,
+        confidence_scoring_service: ConfidenceScoringService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
     ) -> None:
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
@@ -50,6 +52,9 @@ class BidPackageReviewService:
         )
         self.equipment_detection_service = (
             equipment_detection_service or EquipmentDetectionService()
+        )
+        self.confidence_scoring_service = (
+            confidence_scoring_service or ConfidenceScoringService()
         )
 
         if self.estimate_workflow_service is None:
@@ -136,6 +141,7 @@ class BidPackageReviewService:
             confidence=0.75,
         )
         review.estimator_risks = self.estimator_risk_service.assess(review)
+        review.confidence = self.confidence_scoring_service.score_review(review)
         return review
 
     @staticmethod

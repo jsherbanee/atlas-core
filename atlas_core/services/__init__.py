@@ -9,6 +9,7 @@ from atlas_core.services.cross_reference_service import (
     CrossReferenceService,
     CrossReferenceType,
 )
+from atlas_core.services.confidence_scoring_service import ConfidenceScoringService
 from atlas_core.services.csv_export_service import CsvExportService
 from atlas_core.services.document_classifier_service import (
     DocumentClassifierService,
@@ -63,6 +64,7 @@ from atlas_core.services.plan_review_export_service import (
 __all__ = [
     "BaselineService",
     "BidPackageReviewService",
+    "ConfidenceScoringService",
     "CrossReference",
     "CrossReferenceService",
     "CrossReferenceType",

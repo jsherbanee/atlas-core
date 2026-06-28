@@ -4,7 +4,11 @@ from atlas_core.domain import (
     IntegratedSystem,
     SystemCategory,
 )
-from atlas_core.services import BidPackageReviewService, CrossReferenceType
+from atlas_core.services import (
+    BidPackageReviewService,
+    ConfidenceScoringService,
+    CrossReferenceType,
+)
 
 
 def build_review(**kwargs):
@@ -299,6 +303,21 @@ def test_includes_estimator_risks_when_scope_gaps_exist():
         and risk.category == "scope"
         for risk in review.estimator_risks
     )
+
+
+def test_scores_review_confidence_after_content_is_populated():
+    equipment = [
+        Equipment(
+            equipment_id="eq-projector",
+            description="Projector",
+            category=EquipmentCategory.PROJECTOR,
+            room_id="room-001",
+        )
+    ]
+
+    review = build_review(equipment=equipment)
+
+    assert review.confidence == ConfidenceScoringService().score_review(review)
 
 
 def test_works_with_empty_inputs():
