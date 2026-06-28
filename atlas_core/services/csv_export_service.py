@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from atlas_core.services.equipment_matrix_service import EquipmentMatrixRow
+from atlas_core.services.estimator_risk_service import EstimatorRisk
 from atlas_core.services.review_report_service import ReviewReportItem
 from atlas_core.services.scope_gap_service import ScopeGap
 
@@ -148,5 +149,21 @@ class CsvExportService:
                 ).to_dict().keys()
             ),
             rows=[gap.to_dict() for gap in gaps],
+            output_path=output_path,
+        )
+
+    def export_estimator_risks(
+        self,
+        risks: list[EstimatorRisk],
+        output_path: str | Path,
+    ) -> Path:
+        return self._write_csv(
+            headers=list(
+                EstimatorRisk(
+                    risk_id="risk",
+                    message="Message.",
+                ).to_dict().keys()
+            ),
+            rows=[risk.to_dict() for risk in risks],
             output_path=output_path,
         )

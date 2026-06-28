@@ -79,6 +79,17 @@ class MarkdownExportService:
                 if gap.suggested_action:
                     lines.append(f"  Suggested action: {gap.suggested_action}")
 
+        lines.extend(["", "## Estimator Risks", ""])
+
+        if not result.review.estimator_risks:
+            lines.append("No estimator risks found.")
+        else:
+            for risk in result.review.estimator_risks:
+                lines.append(
+                    f"- [{risk.risk_level.value}] "
+                    f"{risk.category}: {risk.message}"
+                )
+
         return "\n".join(lines) + "\n"
 
     @staticmethod

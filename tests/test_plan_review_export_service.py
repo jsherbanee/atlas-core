@@ -9,6 +9,7 @@ from atlas_core.domain import (
 )
 from atlas_core.services import (
     EstimatorBrief,
+    EstimatorRisk,
     PlanReviewExportService,
     PlanReviewWorkflowResult,
     ReviewReportItem,
@@ -65,6 +66,14 @@ def make_result() -> PlanReviewWorkflowResult:
                     severity="high",
                 )
             ],
+            estimator_risks=[
+                EstimatorRisk(
+                    risk_id="scope_gaps_detected",
+                    message="Scope gaps were detected.",
+                    risk_level="high",
+                    category="scope",
+                )
+            ],
         ),
         brief=EstimatorBrief(
             review_id="review-001",
@@ -79,7 +88,7 @@ def make_result() -> PlanReviewWorkflowResult:
             review_required_count=1,
             cross_reference_count=0,
             scope_gap_count=1,
-            estimator_risk_count=0,
+            estimator_risk_count=1,
             confidence=0.75,
         ),
     )
@@ -94,6 +103,7 @@ def test_exports_all_plan_review_files(tmp_path):
     assert result.equipment_matrix_path.exists()
     assert result.review_report_path.exists()
     assert result.scope_gaps_path.exists()
+    assert result.estimator_risks_path.exists()
     assert result.markdown_summary_path.exists()
 
 
@@ -121,6 +131,7 @@ def test_supports_custom_prefix(tmp_path):
     assert result.equipment_matrix_path == tmp_path / "maw_equipment_matrix.csv"
     assert result.review_report_path == tmp_path / "maw_review_report.csv"
     assert result.scope_gaps_path == tmp_path / "maw_scope_gaps.csv"
+    assert result.estimator_risks_path == tmp_path / "maw_estimator_risks.csv"
     assert result.markdown_summary_path == tmp_path / "maw_summary.md"
 
 
@@ -134,6 +145,7 @@ def test_to_dict_returns_string_paths(tmp_path):
         "equipment_matrix_path": str(result.equipment_matrix_path),
         "review_report_path": str(result.review_report_path),
         "scope_gaps_path": str(result.scope_gaps_path),
+        "estimator_risks_path": str(result.estimator_risks_path),
         "markdown_summary_path": str(result.markdown_summary_path),
     }
     assert all(isinstance(value, str) for value in result.to_dict().values())
@@ -144,3 +156,10 @@ def test_exports_scope_gaps_csv(tmp_path):
 
     assert result.scope_gaps_path.exists()
     assert result.scope_gaps_path.name == "plan_review_scope_gaps.csv"
+
+
+def test_exports_estimator_risks_csv(tmp_path):
+    result = PlanReviewExportService().export_plan_review(make_result(), tmp_path)
+
+    assert result.estimator_risks_path.exists()
+    assert result.estimator_risks_path.name == "plan_review_estimator_risks.csv"

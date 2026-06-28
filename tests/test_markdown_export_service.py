@@ -2,6 +2,7 @@ from atlas_core.domain import BidPackageReview
 from atlas_core.services import (
     CrossReference,
     EstimatorBrief,
+    EstimatorRisk,
     MarkdownExportService,
     PlanReviewWorkflowResult,
     ReviewReportItem,
@@ -13,6 +14,7 @@ def make_result(
     review_report: list[ReviewReportItem] | None = None,
     cross_references: list[CrossReference] | None = None,
     scope_gaps: list[ScopeGap] | None = None,
+    estimator_risks: list[EstimatorRisk] | None = None,
 ) -> PlanReviewWorkflowResult:
     return PlanReviewWorkflowResult(
         review=BidPackageReview(
@@ -22,6 +24,7 @@ def make_result(
             review_report=list(review_report or []),
             cross_references=list(cross_references or []),
             scope_gaps=list(scope_gaps or []),
+            estimator_risks=list(estimator_risks or []),
         ),
         brief=EstimatorBrief(
             review_id="review-001",
@@ -36,7 +39,7 @@ def make_result(
             review_required_count=2,
             cross_reference_count=len(cross_references or []),
             scope_gap_count=len(scope_gaps or []),
-            estimator_risk_count=0,
+            estimator_risk_count=len(estimator_risks or []),
             confidence=0.75,
         ),
     )
@@ -237,3 +240,47 @@ def test_handles_no_scope_gaps(tmp_path):
 
     content = output_path.read_text(encoding="utf-8")
     assert "No scope gaps found." in content
+
+
+def test_includes_estimator_risks_section(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Estimator Risks" in content
+
+
+def test_includes_estimator_risk_items(tmp_path):
+    output_path = tmp_path / "summary.md"
+    risk = EstimatorRisk(
+        risk_id="scope_gaps_detected",
+        message="Scope gaps were detected and require estimator review.",
+        risk_level="high",
+        category="scope",
+    )
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(estimator_risks=[risk]),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert (
+        "- [high] scope: Scope gaps were detected and require estimator review."
+    ) in content
+
+
+def test_handles_no_estimator_risks(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "No estimator risks found." in content

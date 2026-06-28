@@ -5,6 +5,7 @@ from atlas_core.services import (
     CsvExportService,
     EquipmentMatrixRow,
     EstimatorBrief,
+    EstimatorRisk,
     ReviewReportItem,
     ScopeGap,
 )
@@ -314,6 +315,75 @@ def test_handles_empty_scope_gaps(tmp_path):
     output_path = tmp_path / "scope_gaps.csv"
 
     CsvExportService().export_scope_gaps([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records == []
+
+
+def test_exports_estimator_risks_csv(tmp_path):
+    output_path = tmp_path / "risks" / "estimator_risks.csv"
+
+    written_path = CsvExportService().export_estimator_risks(
+        [
+            EstimatorRisk(
+                risk_id="scope_gaps_detected",
+                message="Scope gaps were detected.",
+            )
+        ],
+        output_path,
+    )
+
+    assert written_path == output_path
+    assert output_path.exists()
+
+
+def test_writes_estimator_risk_headers(tmp_path):
+    output_path = tmp_path / "estimator_risks.csv"
+
+    CsvExportService().export_estimator_risks([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+
+    assert headers == list(
+        EstimatorRisk(
+            risk_id="risk",
+            message="Message.",
+        ).to_dict().keys()
+    )
+
+
+def test_writes_estimator_risk_values(tmp_path):
+    output_path = tmp_path / "estimator_risks.csv"
+    risk = EstimatorRisk(
+        risk_id="scope_gaps_detected",
+        message="Scope gaps were detected and require estimator review.",
+        risk_level="high",
+        category="scope",
+        confidence=0.9,
+    )
+
+    CsvExportService().export_estimator_risks([risk], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["risk_id"] == "scope_gaps_detected"
+    assert records[0]["message"] == (
+        "Scope gaps were detected and require estimator review."
+    )
+    assert records[0]["risk_level"] == "high"
+    assert records[0]["category"] == "scope"
+    assert records[0]["confidence"] == "0.9"
+
+
+def test_handles_empty_estimator_risks(tmp_path):
+    output_path = tmp_path / "estimator_risks.csv"
+
+    CsvExportService().export_estimator_risks([], output_path)
 
     with output_path.open(encoding="utf-8", newline="") as file:
         records = list(csv.DictReader(file))
