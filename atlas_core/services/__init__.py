@@ -16,6 +16,7 @@ from atlas_core.services.document_classifier_service import (
     DocumentType,
 )
 from atlas_core.services.drawing_indexer_service import DrawingIndexerService
+from atlas_core.services.equipment_detection_service import EquipmentDetectionService
 from atlas_core.services.resolution_service import ResolutionService
 from atlas_core.services.scope_gap_service import (
     ScopeGap,
@@ -70,6 +71,7 @@ __all__ = [
     "DocumentSection",
     "DocumentType",
     "DrawingIndexerService",
+    "EquipmentDetectionService",
     "EstimatorBrief",
     "EstimatorBriefService",
     "EstimatorRisk",
