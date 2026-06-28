@@ -1,4 +1,9 @@
-from atlas_core.domain import Equipment, EquipmentCategory
+from atlas_core.domain import (
+    Equipment,
+    EquipmentCategory,
+    IntegratedSystem,
+    SystemCategory,
+)
 from atlas_core.services import BidPackageReviewService, CrossReferenceType
 
 
@@ -149,6 +154,41 @@ def test_includes_cross_references_when_equipment_references_drawing_and_spec():
         and reference.target_id == "27-41-16"
         for reference in review.cross_references
     )
+
+
+def test_detects_systems_when_no_systems_are_supplied():
+    review = build_review(
+        raw_sections=[
+            {
+                "section_number": "27 41 16",
+                "title": "Integrated Audio Systems",
+            }
+        ],
+    )
+
+    assert len(review.systems) == 1
+    assert review.systems[0].system_id == "detected-audio"
+    assert review.systems[0].category is SystemCategory.AUDIO
+
+
+def test_does_not_replace_supplied_systems():
+    supplied_system = IntegratedSystem(
+        system_id="sys-custom",
+        name="Custom System",
+        category=SystemCategory.CONTROL,
+    )
+
+    review = build_review(
+        raw_sections=[
+            {
+                "section_number": "27 41 16",
+                "title": "Integrated Audio Systems",
+            }
+        ],
+        systems=[supplied_system],
+    )
+
+    assert review.systems == [supplied_system]
 
 
 def test_includes_scope_gaps_for_missing_projector_mount():

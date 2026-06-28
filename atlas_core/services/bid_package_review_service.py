@@ -12,6 +12,7 @@ from atlas_core.services import (
     EstimatorRiskService,
     ScopeGapService,
     SpecificationIndexerService,
+    SystemDetectionService,
 )
 
 if TYPE_CHECKING:
@@ -27,6 +28,7 @@ class BidPackageReviewService:
         cross_reference_service: CrossReferenceService | None = None,
         scope_gap_service: ScopeGapService | None = None,
         estimator_risk_service: EstimatorRiskService | None = None,
+        system_detection_service: SystemDetectionService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
     ) -> None:
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
@@ -40,6 +42,9 @@ class BidPackageReviewService:
         self.scope_gap_service = scope_gap_service or ScopeGapService()
         self.estimator_risk_service = (
             estimator_risk_service or EstimatorRiskService()
+        )
+        self.system_detection_service = (
+            system_detection_service or SystemDetectionService()
         )
 
         if self.estimate_workflow_service is None:
@@ -76,6 +81,12 @@ class BidPackageReviewService:
         specification_sections = self.specification_indexer.index_sections(
             section_items
         )
+        if not system_items:
+            system_items = self.system_detection_service.detect_systems(
+                drawings=drawing_sheets,
+                specifications=specification_sections,
+            )
+
         workflow_result = (
             self.estimate_workflow_service.build_equipment_matrix_with_resolutions(
                 buildings=building_items,
