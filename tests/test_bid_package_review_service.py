@@ -84,6 +84,80 @@ def test_includes_equipment():
     assert review.equipment_count() == 1
 
 
+def test_detects_equipment_when_no_equipment_is_supplied():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "Main Loudspeaker Plan",
+            }
+        ],
+    )
+
+    assert len(review.equipment) == 1
+    assert review.equipment[0].equipment_id == "detected-speaker"
+    assert review.equipment[0].category is EquipmentCategory.SPEAKER
+
+
+def test_does_not_replace_supplied_equipment():
+    supplied_equipment = Equipment(
+        equipment_id="eq-custom",
+        description="Custom display",
+        category=EquipmentCategory.DISPLAY,
+    )
+
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "Main Loudspeaker Plan",
+            }
+        ],
+        equipment=[supplied_equipment],
+    )
+
+    assert review.equipment == [supplied_equipment]
+
+
+def test_detected_equipment_flows_into_review_equipment():
+    review = build_review(
+        raw_sections=[
+            {
+                "section_number": "27 41 26",
+                "title": "Q-SYS Control System",
+            }
+        ],
+    )
+
+    assert any(
+        item.equipment_id == "detected-control-processor"
+        and item.category is EquipmentCategory.CONTROL_PROCESSOR
+        for item in review.equipment
+    )
+
+
+def test_detected_equipment_creates_resolver_and_scope_gap_issues():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "Main Loudspeaker Plan",
+            }
+        ],
+    )
+
+    assert any(
+        resolution.rule_id == "RULE-001"
+        and resolution.target_id == "detected-speaker"
+        for resolution in review.resolutions
+    )
+    assert any(
+        gap.gap_id == "speaker_missing_amplifier"
+        and gap.target_id == "detected-speaker"
+        for gap in review.scope_gaps
+    )
+
+
 def test_includes_resolver_resolutions():
     equipment = [
         Equipment(

@@ -8,6 +8,7 @@ from atlas_core.registry import ManufacturerRegistry
 from atlas_core.services import (
     CrossReferenceService,
     DrawingIndexerService,
+    EquipmentDetectionService,
     EstimateWorkflowService,
     EstimatorRiskService,
     ScopeGapService,
@@ -29,6 +30,7 @@ class BidPackageReviewService:
         scope_gap_service: ScopeGapService | None = None,
         estimator_risk_service: EstimatorRiskService | None = None,
         system_detection_service: SystemDetectionService | None = None,
+        equipment_detection_service: EquipmentDetectionService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
     ) -> None:
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
@@ -45,6 +47,9 @@ class BidPackageReviewService:
         )
         self.system_detection_service = (
             system_detection_service or SystemDetectionService()
+        )
+        self.equipment_detection_service = (
+            equipment_detection_service or EquipmentDetectionService()
         )
 
         if self.estimate_workflow_service is None:
@@ -87,6 +92,13 @@ class BidPackageReviewService:
                 specifications=specification_sections,
             )
 
+        if not equipment_items:
+            equipment_items = self.equipment_detection_service.detect_equipment(
+                drawings=drawing_sheets,
+                specifications=specification_sections,
+                system_id=self._first_system_id(system_items),
+            )
+
         workflow_result = (
             self.estimate_workflow_service.build_equipment_matrix_with_resolutions(
                 buildings=building_items,
@@ -125,3 +137,10 @@ class BidPackageReviewService:
         )
         review.estimator_risks = self.estimator_risk_service.assess(review)
         return review
+
+    @staticmethod
+    def _first_system_id(systems: list) -> str | None:
+        if not systems:
+            return None
+
+        return getattr(systems[0], "system_id", None)
