@@ -22,6 +22,7 @@ from atlas_core.services.scope_gap_service import (
     ScopeGapService,
     ScopeGapSeverity,
 )
+from atlas_core.services.system_detection_service import SystemDetectionService
 from atlas_core.services.specification_indexer_service import (
     SpecificationIndexerService,
 )
@@ -92,4 +93,5 @@ __all__ = [
     "ScopeGapService",
     "ScopeGapSeverity",
     "SpecificationIndexerService",
+    "SystemDetectionService",
 ]
