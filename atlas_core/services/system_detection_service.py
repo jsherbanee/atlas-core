@@ -1,5 +1,7 @@
 """System detection helpers for Atlas Core plan review."""
 
+from dataclasses import dataclass
+
 from atlas_core.domain import (
     DrawingSheet,
     IntegratedSystem,
@@ -7,6 +9,12 @@ from atlas_core.domain import (
     SystemCategory,
     SystemComplexity,
 )
+
+
+@dataclass(frozen=True)
+class _SourceText:
+    text: str
+    assumption: str
 
 
 class SystemDetectionService:
@@ -17,12 +25,13 @@ class SystemDetectionService:
         room_id: str | None = None,
         building_id: str | None = None,
     ) -> list[IntegratedSystem]:
-        texts = self._source_texts(drawings or [], specifications or [])
+        sources = self._source_texts(drawings or [], specifications or [])
         systems: list[IntegratedSystem] = []
         emitted: set[str] = set()
 
         for definition in self._definitions():
-            if not any(definition["matches"](text) for text in texts):
+            source = self._first_matching_source(definition["matches"], sources)
+            if source is None:
                 continue
 
             self._add_system(
@@ -32,6 +41,7 @@ class SystemDetectionService:
                 name=definition["name"],
                 category=definition["category"],
                 complexity=definition["complexity"],
+                source=source,
                 room_id=room_id,
                 building_id=building_id,
             )
@@ -43,26 +53,49 @@ class SystemDetectionService:
         cls,
         drawings: list[DrawingSheet],
         specifications: list[SpecificationSection],
-    ) -> list[str]:
-        texts: list[str] = []
+    ) -> list[_SourceText]:
+        sources: list[_SourceText] = []
         for drawing in drawings:
-            texts.append(
-                cls._normalize_text(drawing.sheet_number, drawing.title)
-            )
-
-        for specification in specifications:
-            texts.append(
-                cls._normalize_text(
-                    specification.section_number,
-                    specification.title,
+            sources.append(
+                _SourceText(
+                    text=cls._normalize_text(drawing.sheet_number, drawing.title),
+                    assumption=(
+                        f"Detected from drawing {drawing.sheet_number}: "
+                        f"{drawing.title}"
+                    ),
                 )
             )
 
-        return texts
+        for specification in specifications:
+            sources.append(
+                _SourceText(
+                    text=cls._normalize_text(
+                        specification.section_number,
+                        specification.title,
+                    ),
+                    assumption=(
+                        "Detected from specification "
+                        f"{specification.section_number}: {specification.title}"
+                    ),
+                )
+            )
+
+        return sources
 
     @staticmethod
     def _normalize_text(*parts: str | None) -> str:
         return " ".join(part or "" for part in parts).casefold()
+
+    @staticmethod
+    def _first_matching_source(
+        matches,
+        sources: list[_SourceText],
+    ) -> _SourceText | None:
+        for source in sources:
+            if matches(source.text):
+                return source
+
+        return None
 
     @classmethod
     def _definitions(cls) -> list[dict]:
@@ -223,6 +256,7 @@ class SystemDetectionService:
         name: str,
         category: SystemCategory,
         complexity: SystemComplexity,
+        source: _SourceText,
         room_id: str | None,
         building_id: str | None,
     ) -> None:
@@ -238,5 +272,6 @@ class SystemDetectionService:
                 complexity=complexity,
                 room_id=room_id,
                 building_id=building_id,
+                assumptions=[source.assumption],
             )
         )

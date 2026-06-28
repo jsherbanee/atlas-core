@@ -14,6 +14,7 @@ from atlas_core.domain import (
 @dataclass(frozen=True)
 class _SourceText:
     text: str
+    assumption: str
     drawing_reference: str | None = None
     specification_reference: str | None = None
 
@@ -62,6 +63,10 @@ class EquipmentDetectionService:
             sources.append(
                 _SourceText(
                     text=cls._normalize_text(drawing.sheet_number, drawing.title),
+                    assumption=(
+                        f"Detected from drawing {drawing.sheet_number}: "
+                        f"{drawing.title}"
+                    ),
                     drawing_reference=drawing.sheet_number,
                 )
             )
@@ -72,6 +77,10 @@ class EquipmentDetectionService:
                     text=cls._normalize_text(
                         specification.section_number,
                         specification.title,
+                    ),
+                    assumption=(
+                        "Detected from specification "
+                        f"{specification.section_number}: {specification.title}"
                     ),
                     specification_reference=specification.section_number,
                 )
@@ -291,5 +300,6 @@ class EquipmentDetectionService:
                 drawing_reference=source.drawing_reference,
                 specification_reference=source.specification_reference,
                 confidence=0.65,
+                assumptions=[source.assumption],
             )
         )

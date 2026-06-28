@@ -40,6 +40,9 @@ def test_detects_speaker_from_loudspeaker_title():
     assert equipment[0].status.value == "detected"
     assert equipment[0].confidence == 0.65
     assert equipment[0].drawing_reference == "AV-101"
+    assert equipment[0].assumptions == [
+        "Detected from drawing AV-101: Main Loudspeaker Plan"
+    ]
 
 
 def test_detects_amplifier():
@@ -49,6 +52,30 @@ def test_detects_amplifier():
 
     assert "detected-amplifier" in equipment_ids(equipment)
     assert equipment[0].specification_reference == "27 41 16"
+    assert equipment[0].assumptions == [
+        "Detected from specification 27 41 16: Amplifier Schedule"
+    ]
+
+
+def test_detected_equipment_includes_drawing_reference_when_from_drawing():
+    equipment = EquipmentDetectionService().detect_equipment(
+        drawings=[make_drawing("Projection Plan", "AV-402")]
+    )
+
+    assert equipment[0].drawing_reference == "AV-402"
+
+
+def test_detected_equipment_includes_specification_reference_when_from_specification():
+    equipment = EquipmentDetectionService().detect_equipment(
+        specifications=[
+            make_specification(
+                "Assisted Listening System",
+                section_number="27 41 43",
+            )
+        ]
+    )
+
+    assert equipment[0].specification_reference == "27 41 43"
 
 
 def test_detects_projector():

@@ -39,6 +39,9 @@ def test_detects_audio_from_spec_title():
     assert systems[0].name == "Audio System"
     assert systems[0].category is SystemCategory.AUDIO
     assert systems[0].complexity is SystemComplexity.MEDIUM
+    assert systems[0].assumptions == [
+        "Detected from specification 27 41 16: Integrated Audio Systems"
+    ]
 
 
 def test_detects_projection_from_drawing_title():
@@ -47,6 +50,16 @@ def test_detects_projection_from_drawing_title():
     )
 
     assert "detected-projection" in system_ids(systems)
+
+
+def test_detected_system_includes_drawing_source_assumption():
+    systems = SystemDetectionService().detect_systems(
+        drawings=[make_drawing("Recital Hall Projection Plan", "AV-402")]
+    )
+
+    assert systems[0].assumptions == [
+        "Detected from drawing AV-402: Recital Hall Projection Plan"
+    ]
 
 
 def test_detects_display_from_digital_signage_title():
