@@ -36,6 +36,11 @@ from atlas_core.services.review_report_service import (
     ReviewReportItem,
     ReviewReportService,
 )
+from atlas_core.services.recommendation_service import (
+    Recommendation,
+    RecommendationPriority,
+    RecommendationService,
+)
 from atlas_core.services.estimate_workflow_service import (
     EstimateWorkflowResult,
     EstimateWorkflowService,
@@ -89,6 +94,9 @@ __all__ = [
     "PlanReviewExportService",
     "PlanReviewWorkflowResult",
     "PlanReviewWorkflowService",
+    "Recommendation",
+    "RecommendationPriority",
+    "RecommendationService",
     "ReviewReportItem",
     "ReviewReportService",
     "ResolutionService",
