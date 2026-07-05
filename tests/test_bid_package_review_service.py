@@ -20,6 +20,11 @@ def build_review(**kwargs):
     )
 
 
+class LowConfidenceScoringService:
+    def score_review(self, review):
+        return 0.6
+
+
 def test_builds_review_from_raw_sheets_and_raw_sections():
     review = build_review(
         raw_sheets=[
@@ -318,6 +323,44 @@ def test_scores_review_confidence_after_content_is_populated():
     review = build_review(equipment=equipment)
 
     assert review.confidence == ConfidenceScoringService().score_review(review)
+
+
+def test_includes_recommendations_when_confidence_is_low():
+    review = BidPackageReviewService(
+        confidence_scoring_service=LowConfidenceScoringService()
+    ).build_review(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+    )
+
+    assert review.confidence == 0.6
+    assert any(
+        recommendation.recommendation_id == "review-low-confidence"
+        and recommendation.category == "confidence"
+        for recommendation in review.recommendations
+    )
+
+
+def test_includes_recommendations_when_scope_gaps_exist():
+    equipment = [
+        Equipment(
+            equipment_id="eq-projector",
+            description="Projector",
+            category=EquipmentCategory.PROJECTOR,
+            room_id="room-001",
+        )
+    ]
+
+    review = build_review(equipment=equipment)
+
+    assert any(
+        recommendation.recommendation_id
+        == "scope-gap-projector_missing_mount-eq-projector"
+        and recommendation.category == "scope_gap"
+        and recommendation.target_id == "eq-projector"
+        for recommendation in review.recommendations
+    )
 
 
 def test_works_with_empty_inputs():

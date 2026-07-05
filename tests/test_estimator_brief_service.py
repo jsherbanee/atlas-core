@@ -14,6 +14,7 @@ from atlas_core.services import (
     EstimatorBriefService,
     EstimatorRisk,
     ManufacturerReviewIssue,
+    Recommendation,
     ReviewReportItem,
     ScopeGap,
 )
@@ -104,6 +105,17 @@ def make_review() -> BidPackageReview:
                 category="scope",
             )
         ],
+        recommendations=[
+            Recommendation(
+                recommendation_id="review-low-confidence",
+                message=(
+                    "Review confidence is below target threshold; estimator "
+                    "review is required."
+                ),
+                priority="high",
+                category="confidence",
+            )
+        ],
         confidence=0.82,
     )
 
@@ -177,6 +189,12 @@ def test_counts_estimator_risks():
     assert brief.estimator_risk_count == 1
 
 
+def test_counts_recommendations():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.recommendation_count == 1
+
+
 def test_to_dict_output():
     brief = EstimatorBrief(
         review_id="review-001",
@@ -192,6 +210,7 @@ def test_to_dict_output():
         cross_reference_count=1,
         scope_gap_count=1,
         estimator_risk_count=1,
+        recommendation_count=1,
         confidence=0.82,
     )
 
@@ -209,5 +228,6 @@ def test_to_dict_output():
         "cross_reference_count": 1,
         "scope_gap_count": 1,
         "estimator_risk_count": 1,
+        "recommendation_count": 1,
         "confidence": 0.82,
     }

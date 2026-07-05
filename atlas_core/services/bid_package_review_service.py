@@ -12,6 +12,7 @@ from atlas_core.services import (
     EquipmentDetectionService,
     EstimateWorkflowService,
     EstimatorRiskService,
+    RecommendationService,
     ScopeGapService,
     SpecificationIndexerService,
     SystemDetectionService,
@@ -33,6 +34,7 @@ class BidPackageReviewService:
         system_detection_service: SystemDetectionService | None = None,
         equipment_detection_service: EquipmentDetectionService | None = None,
         confidence_scoring_service: ConfidenceScoringService | None = None,
+        recommendation_service: RecommendationService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
     ) -> None:
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
@@ -56,6 +58,7 @@ class BidPackageReviewService:
         self.confidence_scoring_service = (
             confidence_scoring_service or ConfidenceScoringService()
         )
+        self.recommendation_service = recommendation_service or RecommendationService()
 
         if self.estimate_workflow_service is None:
             self.estimate_workflow_service = EstimateWorkflowService(
@@ -142,6 +145,9 @@ class BidPackageReviewService:
         )
         review.estimator_risks = self.estimator_risk_service.assess(review)
         review.confidence = self.confidence_scoring_service.score_review(review)
+        review.recommendations = self.recommendation_service.build_recommendations(
+            review
+        )
         return review
 
     @staticmethod

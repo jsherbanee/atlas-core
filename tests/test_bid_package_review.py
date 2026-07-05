@@ -16,6 +16,7 @@ from atlas_core.services import (
     CrossReference,
     EstimatorRisk,
     ManufacturerReviewIssue,
+    Recommendation,
     ReviewReportItem,
     ScopeGap,
 )
@@ -87,6 +88,15 @@ def make_estimator_risk() -> EstimatorRisk:
         message="Scope gaps were detected and require estimator review.",
         risk_level="high",
         category="scope",
+    )
+
+
+def make_recommendation() -> Recommendation:
+    return Recommendation(
+        recommendation_id="review-low-confidence",
+        message="Review confidence before pricing.",
+        priority="high",
+        category="confidence",
     )
 
 
@@ -250,6 +260,17 @@ def test_estimator_risk_count():
     assert review.estimator_risk_count() == 1
 
 
+def test_recommendation_count():
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        recommendations=[make_recommendation()],
+    )
+
+    assert review.recommendation_count() == 1
+
+
 def test_to_dict_output():
     drawing_sheet = make_drawing_sheet()
     specification_section = make_specification_section()
@@ -269,6 +290,7 @@ def test_to_dict_output():
     cross_reference = make_cross_reference()
     scope_gap = make_scope_gap()
     estimator_risk = make_estimator_risk()
+    recommendation = make_recommendation()
     review = BidPackageReview(
         review_id="review-001",
         project_id="project-001",
@@ -283,6 +305,7 @@ def test_to_dict_output():
         cross_references=[cross_reference],
         scope_gaps=[scope_gap],
         estimator_risks=[estimator_risk],
+        recommendations=[recommendation],
         notes=["Confirm scope."],
         confidence=0.85,
     )
@@ -316,6 +339,7 @@ def test_to_dict_output():
         "cross_references": [cross_reference.to_dict()],
         "scope_gaps": [scope_gap.to_dict()],
         "estimator_risks": [estimator_risk.to_dict()],
+        "recommendations": [recommendation.to_dict()],
         "notes": ["Confirm scope."],
         "confidence": 0.85,
     }

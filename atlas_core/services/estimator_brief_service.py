@@ -24,6 +24,7 @@ class EstimatorBrief:
     cross_reference_count: int
     scope_gap_count: int
     estimator_risk_count: int
+    recommendation_count: int
     confidence: float
 
     def to_dict(self) -> dict[str, Any]:
@@ -46,6 +47,7 @@ class EstimatorBriefService:
             cross_reference_count=review.cross_reference_count(),
             scope_gap_count=review.scope_gap_count(),
             estimator_risk_count=review.estimator_risk_count(),
+            recommendation_count=review.recommendation_count(),
             confidence=review.confidence,
         )
 
