@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from atlas_core.domain import (
@@ -13,6 +12,7 @@ from atlas_core.domain import (
     SpecificationSection,
 )
 from atlas_core.rules import Resolution
+from atlas_core.utils.refactoring import serialize_item, serialize_items
 
 if TYPE_CHECKING:
     from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
@@ -115,26 +115,11 @@ class BidPackageReview:
 
     @classmethod
     def _serialize_items(cls, items: list[Any]) -> list[Any]:
-        return [cls._serialize_item(item) for item in items]
+        return serialize_items(items)
 
     @classmethod
     def _serialize_item(cls, item: Any) -> Any:
-        if hasattr(item, "to_dict"):
-            return item.to_dict()
-
-        if hasattr(item, "__dict__"):
-            return {
-                key: cls._serialize_value(value) for key, value in item.__dict__.items()
-            }
-
-        return item
-
-    @staticmethod
-    def _serialize_value(value: Any) -> Any:
-        if isinstance(value, Enum):
-            return value.value
-
-        return value
+        return serialize_item(item)
 
     @classmethod
     def _normalize_note(cls, note: str) -> str:

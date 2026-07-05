@@ -4,6 +4,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from atlas_core.utils.refactoring import (
+    coerce_enum,
+    enum_value,
+    normalize_required_text,
+)
+
 
 class EquipmentStatus(str, Enum):
     """Lifecycle status for an Atlas equipment item."""
@@ -49,7 +55,7 @@ class EquipmentCategory(str, Enum):
 class Equipment:
     equipment_id: str
     description: str
-    category: EquipmentCategory
+    category: EquipmentCategory | str
     quantity: float = 1
     manufacturer: str | None = None
     model: str | None = None
@@ -67,18 +73,14 @@ class Equipment:
     review_required: bool = False
 
     def __post_init__(self) -> None:
-        self.equipment_id = self._normalize_required_text(
-            "equipment_id", self.equipment_id
-        )
-        self.description = self._normalize_required_text(
-            "description", self.description
-        )
+        self.equipment_id = normalize_required_text("equipment_id", self.equipment_id)
+        self.description = normalize_required_text("description", self.description)
 
         if not isinstance(self.category, EquipmentCategory):
-            self.category = EquipmentCategory(self.category)
+            self.category = coerce_enum(self.category, EquipmentCategory)
 
         if not isinstance(self.status, EquipmentStatus):
-            self.status = EquipmentStatus(self.status)
+            self.status = coerce_enum(self.status, EquipmentStatus)
 
         if not isinstance(self.quantity, (int, float)) or self.quantity <= 0:
             raise ValueError("quantity must be greater than 0")
@@ -124,22 +126,14 @@ class Equipment:
         return {
             "equipment_id": self.equipment_id,
             "description": self.description,
-            "category": (
-                self.category.value
-                if isinstance(self.category, EquipmentCategory)
-                else self.category
-            ),
+            "category": enum_value(self.category),
             "quantity": self.quantity,
             "manufacturer": self.manufacturer,
             "model": self.model,
             "system_id": self.system_id,
             "room_id": self.room_id,
             "building_id": self.building_id,
-            "status": (
-                self.status.value
-                if isinstance(self.status, EquipmentStatus)
-                else self.status
-            ),
+            "status": enum_value(self.status),
             "budget_cost": self.budget_cost,
             "sell_price": self.sell_price,
             "labor_template": self.labor_template,
@@ -152,13 +146,11 @@ class Equipment:
 
     @staticmethod
     def _validate_required_text(field_name: str, value: str) -> None:
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"{field_name} cannot be blank")
+        normalize_required_text(field_name, value)
 
     @classmethod
     def _normalize_required_text(cls, field_name: str, value: str) -> str:
-        cls._validate_required_text(field_name, value)
-        return value.strip()
+        return normalize_required_text(field_name, value)
 
     @staticmethod
     def _validate_non_negative_price(field_name: str, value: float | None) -> None:

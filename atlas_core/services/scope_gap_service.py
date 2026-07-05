@@ -6,6 +6,7 @@ from typing import Any
 
 from atlas_core.domain import Equipment, EquipmentCategory
 from atlas_core.services.cross_reference_service import CrossReference
+from atlas_core.utils.refactoring import enum_value
 
 
 class ScopeGapSeverity(str, Enum):
@@ -39,7 +40,7 @@ class ScopeGap:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        data["severity"] = getattr(self.severity, "value", self.severity)
+        data["severity"] = enum_value(self.severity)
         return data
 
     @staticmethod
@@ -207,4 +208,4 @@ class ScopeGapService:
 
     @staticmethod
     def _value(value: Any) -> Any:
-        return getattr(value, "value", value)
+        return enum_value(value)

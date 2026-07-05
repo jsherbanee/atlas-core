@@ -4,6 +4,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from atlas_core.utils.refactoring import (
+    coerce_enum,
+    enum_value,
+    normalize_optional_text,
+    normalize_required_text,
+)
+
 
 class SpecificationDiscipline(str, Enum):
     AUDIOVISUAL = "audiovisual"
@@ -32,18 +39,15 @@ class SpecificationSection:
     confidence: float = 0.75
 
     def __post_init__(self) -> None:
-        self.section_id = self._normalize_required_text(
-            "section_id",
-            self.section_id,
-        )
-        self.section_number = self._normalize_required_text(
+        self.section_id = normalize_required_text("section_id", self.section_id)
+        self.section_number = normalize_required_text(
             "section_number",
             self.section_number,
         )
-        self.title = self._normalize_required_text("title", self.title)
+        self.title = normalize_required_text("title", self.title)
 
         if not isinstance(self.discipline, SpecificationDiscipline):
-            self.discipline = SpecificationDiscipline(self.discipline)
+            self.discipline = coerce_enum(self.discipline, SpecificationDiscipline)
 
         if (
             not isinstance(self.confidence, (int, float))
@@ -64,7 +68,7 @@ class SpecificationSection:
         ):
             raise ValueError("page_end cannot be less than page_start")
 
-        self.source_file = self._normalize_optional_text(self.source_file)
+        self.source_file = normalize_optional_text(self.source_file)
         self.manufacturers = [
             self._normalize_manufacturer(manufacturer)
             for manufacturer in self.manufacturers
@@ -82,11 +86,7 @@ class SpecificationSection:
             "section_id": self.section_id,
             "section_number": self.section_number,
             "title": self.title,
-            "discipline": (
-                self.discipline.value
-                if isinstance(self.discipline, SpecificationDiscipline)
-                else self.discipline
-            ),
+            "discipline": enum_value(self.discipline),
             "source_file": self.source_file,
             "page_start": self.page_start,
             "page_end": self.page_end,
@@ -105,15 +105,8 @@ class SpecificationSection:
 
     @staticmethod
     def _normalize_optional_text(value: str | None) -> str | None:
-        if value is None:
-            return None
-
-        normalized = value.strip()
-        return normalized or None
+        return normalize_optional_text(value)
 
     @staticmethod
     def _normalize_required_text(field_name: str, value: str) -> str:
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"{field_name} cannot be blank")
-
-        return value.strip()
+        return normalize_required_text(field_name, value)

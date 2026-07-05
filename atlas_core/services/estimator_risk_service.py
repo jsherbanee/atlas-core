@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Any
 
 from atlas_core.domain import BidPackageReview
+from atlas_core.utils.refactoring import enum_value
 
 
 class RiskLevel(str, Enum):
@@ -37,7 +38,7 @@ class EstimatorRisk:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        data["risk_level"] = getattr(self.risk_level, "value", self.risk_level)
+        data["risk_level"] = enum_value(self.risk_level)
         return data
 
     @staticmethod
@@ -132,4 +133,4 @@ class EstimatorRiskService:
 
     @staticmethod
     def _value(value: Any) -> Any:
-        return getattr(value, "value", value)
+        return enum_value(value)

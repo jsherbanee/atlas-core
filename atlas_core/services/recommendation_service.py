@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Any
 
 from atlas_core.domain import BidPackageReview
+from atlas_core.utils.refactoring import enum_value
 
 
 class RecommendationPriority(str, Enum):
@@ -36,7 +37,7 @@ class Recommendation:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        data["priority"] = getattr(self.priority, "value", self.priority)
+        data["priority"] = enum_value(self.priority)
         return data
 
     @staticmethod
@@ -172,4 +173,4 @@ class RecommendationService:
 
     @staticmethod
     def _value(value: Any) -> Any:
-        return getattr(value, "value", value)
+        return enum_value(value)
