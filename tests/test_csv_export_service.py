@@ -4,6 +4,9 @@ from atlas_core.domain import (
     DeviceSchedule,
     DeviceScheduleItem,
     DrawingSheet,
+    Keynote,
+    Legend,
+    LegendItem,
     SpecificationSection,
 )
 from atlas_core.services import (
@@ -224,6 +227,186 @@ def test_exports_estimator_brief_csv(tmp_path):
     assert records[0]["scope_gap_count"] == "4"
     assert records[0]["estimator_risk_count"] == "5"
     assert records[0]["confidence"] == "0.75"
+
+
+def test_exports_keynotes_csv(tmp_path):
+    output_path = tmp_path / "plan_review" / "keynotes.csv"
+
+    written_path = CsvExportService().export_keynotes(
+        [
+            Keynote(
+                keynote_id="kn-001",
+                number="1",
+                description="Provide ceiling speaker.",
+            )
+        ],
+        output_path,
+    )
+
+    assert written_path == output_path
+    assert output_path.exists()
+
+
+def test_writes_keynote_headers(tmp_path):
+    output_path = tmp_path / "keynotes.csv"
+
+    CsvExportService().export_keynotes([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+
+    assert headers == list(
+        Keynote(
+            keynote_id="keynote",
+            number="1",
+            description="Keynote",
+        )
+        .to_dict()
+        .keys()
+    )
+
+
+def test_writes_keynote_values(tmp_path):
+    output_path = tmp_path / "keynotes.csv"
+    keynote = Keynote(
+        keynote_id="kn-001",
+        number="K1",
+        description="Provide amplifier.",
+        source_sheet_number="AV1.01",
+        equipment_category="electronics",
+        system_category="audio",
+        notes=["Coordinate with rack layout"],
+        confidence=0.9,
+    )
+
+    CsvExportService().export_keynotes([keynote], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["keynote_id"] == "kn-001"
+    assert records[0]["number"] == "K1"
+    assert records[0]["description"] == "Provide amplifier."
+    assert records[0]["source_sheet_number"] == "AV1.01"
+    assert records[0]["equipment_category"] == "electronics"
+    assert records[0]["system_category"] == "audio"
+    assert records[0]["notes"] == "['Coordinate with rack layout']"
+    assert records[0]["confidence"] == "0.9"
+
+
+def test_handles_empty_keynotes(tmp_path):
+    output_path = tmp_path / "keynotes.csv"
+
+    CsvExportService().export_keynotes([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records == []
+
+
+def test_exports_legends_csv(tmp_path):
+    output_path = tmp_path / "plan_review" / "legends.csv"
+    legend = Legend(
+        legend_id="legend-001",
+        title="AV Symbols",
+        items=[
+            LegendItem(
+                legend_item_id="li-001",
+                symbol="SPK",
+                description="Ceiling Speaker",
+            )
+        ],
+    )
+
+    written_path = CsvExportService().export_legends([legend], output_path)
+
+    assert written_path == output_path
+    assert output_path.exists()
+
+
+def test_writes_legend_item_values(tmp_path):
+    output_path = tmp_path / "legends.csv"
+    legend = Legend(
+        legend_id="legend-001",
+        title="AV Symbols",
+        items=[
+            LegendItem(
+                legend_item_id="li-001",
+                symbol="DSP",
+                description="Digital signal processor",
+                equipment_category="electronics",
+                system_category="audio",
+                source_sheet_number="AV1.01",
+                notes=["Coordinate with controls"],
+                confidence=0.95,
+            )
+        ],
+    )
+
+    CsvExportService().export_legends([legend], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["legend_item_id"] == "li-001"
+    assert records[0]["symbol"] == "DSP"
+    assert records[0]["description"] == "Digital signal processor"
+    assert records[0]["equipment_category"] == "electronics"
+    assert records[0]["system_category"] == "audio"
+    assert records[0]["source_sheet_number"] == "AV1.01"
+    assert records[0]["notes"] == "['Coordinate with controls']"
+    assert records[0]["confidence"] == "0.95"
+
+
+def test_writes_legend_id_and_legend_title(tmp_path):
+    output_path = tmp_path / "legends.csv"
+    legend = Legend(
+        legend_id="legend-001",
+        title="AV Symbols",
+        items=[
+            LegendItem(
+                legend_item_id="li-001",
+                symbol="SPK",
+                description="Ceiling Speaker",
+            )
+        ],
+    )
+
+    CsvExportService().export_legends([legend], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["legend_id"] == "legend-001"
+    assert records[0]["legend_title"] == "AV Symbols"
+
+
+def test_handles_empty_legends(tmp_path):
+    output_path = tmp_path / "legends.csv"
+
+    CsvExportService().export_legends([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+        rows = list(reader)
+
+    assert headers == [
+        "legend_id",
+        "legend_title",
+        *list(
+            LegendItem(
+                legend_item_id="legend-item",
+                symbol="SYM",
+                description="Legend item",
+            )
+            .to_dict()
+            .keys()
+        ),
+    ]
+    assert rows == []
 
 
 def test_empty_drawing_index_writes_headers(tmp_path):

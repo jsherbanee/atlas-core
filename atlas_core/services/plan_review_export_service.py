@@ -17,6 +17,8 @@ class PlanReviewExportResult:
     drawing_index_path: Path
     specification_index_path: Path
     device_schedules_path: Path
+    keynotes_path: Path
+    legends_path: Path
     equipment_matrix_path: Path
     review_report_path: Path
     scope_gaps_path: Path
@@ -30,6 +32,8 @@ class PlanReviewExportResult:
             "drawing_index_path": str(self.drawing_index_path),
             "specification_index_path": str(self.specification_index_path),
             "device_schedules_path": str(self.device_schedules_path),
+            "keynotes_path": str(self.keynotes_path),
+            "legends_path": str(self.legends_path),
             "equipment_matrix_path": str(self.equipment_matrix_path),
             "review_report_path": str(self.review_report_path),
             "scope_gaps_path": str(self.scope_gaps_path),
@@ -75,6 +79,14 @@ class PlanReviewExportService:
             result.review.device_schedules,
             output_path / f"{prefix}_device_schedules.csv",
         )
+        keynotes_path = self.csv_export_service.export_keynotes(
+            result.review.keynotes,
+            output_path / f"{prefix}_keynotes.csv",
+        )
+        legends_path = self.csv_export_service.export_legends(
+            result.review.legends,
+            output_path / f"{prefix}_legends.csv",
+        )
         equipment_matrix_path = self.csv_export_service.export_equipment_matrix(
             self._equipment_matrix_rows(result),
             output_path / f"{prefix}_equipment_matrix.csv",
@@ -105,6 +117,8 @@ class PlanReviewExportService:
             drawing_index_path=drawing_index_path,
             specification_index_path=specification_index_path,
             device_schedules_path=device_schedules_path,
+            keynotes_path=keynotes_path,
+            legends_path=legends_path,
             equipment_matrix_path=equipment_matrix_path,
             review_report_path=review_report_path,
             scope_gaps_path=scope_gaps_path,

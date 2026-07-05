@@ -17,6 +17,8 @@ if TYPE_CHECKING:
         DeviceSchedule,
         DeviceScheduleItem,
         DrawingSheet,
+        Keynote,
+        Legend,
         SpecificationSection,
     )
     from atlas_core.services.estimator_brief_service import EstimatorBrief
@@ -83,6 +85,32 @@ class CsvExportService:
         return self._write_csv(
             headers=self._specification_index_headers(),
             rows=[section.to_dict() for section in sections],
+            output_path=output_path,
+        )
+
+    def export_keynotes(
+        self,
+        keynotes: list[Keynote],
+        output_path: str | Path,
+    ) -> Path:
+        return self._write_csv(
+            headers=self._keynote_headers(),
+            rows=[keynote.to_dict() for keynote in keynotes],
+            output_path=output_path,
+        )
+
+    def export_legends(
+        self,
+        legends: list[Legend],
+        output_path: str | Path,
+    ) -> Path:
+        rows: list[dict] = []
+        for legend in legends:
+            rows.extend(self._legend_rows(legend))
+
+        return self._write_csv(
+            headers=self._legend_headers(),
+            rows=rows,
             output_path=output_path,
         )
 
@@ -159,6 +187,53 @@ class CsvExportService:
             .to_dict()
             .keys()
         )
+
+    @staticmethod
+    def _keynote_headers() -> list[str]:
+        from atlas_core.domain import Keynote
+
+        return list(
+            Keynote(
+                keynote_id="keynote",
+                number="1",
+                description="Keynote",
+            )
+            .to_dict()
+            .keys()
+        )
+
+    @staticmethod
+    def _legend_headers() -> list[str]:
+        from atlas_core.domain import LegendItem
+
+        return [
+            "legend_id",
+            "legend_title",
+            *list(
+                LegendItem(
+                    legend_item_id="legend-item",
+                    symbol="SYM",
+                    description="Legend item",
+                )
+                .to_dict()
+                .keys()
+            ),
+        ]
+
+    @staticmethod
+    def _legend_rows(legend: Legend) -> list[dict]:
+        rows: list[dict] = []
+        for item in legend.items:
+            rows.append(CsvExportService._legend_row(legend, item.to_dict()))
+
+        return rows
+
+    @staticmethod
+    def _legend_row(legend: Legend, item: dict) -> dict:
+        row = item.copy()
+        row["legend_id"] = legend.legend_id
+        row["legend_title"] = legend.title
+        return row
 
     @staticmethod
     def _device_schedule_headers() -> list[str]:

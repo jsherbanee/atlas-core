@@ -6,6 +6,9 @@ from atlas_core.domain import (
     Equipment,
     EquipmentCategory,
     IntegratedSystem,
+    Keynote,
+    Legend,
+    LegendItem,
     SpecificationSection,
     SystemCategory,
 )
@@ -66,6 +69,26 @@ def make_result() -> PlanReviewWorkflowResult:
                     ],
                 )
             ],
+            keynotes=[
+                Keynote(
+                    keynote_id="kn-001",
+                    number="1",
+                    description="Provide ceiling speaker.",
+                )
+            ],
+            legends=[
+                Legend(
+                    legend_id="legend-001",
+                    title="AV Symbols",
+                    items=[
+                        LegendItem(
+                            legend_item_id="li-001",
+                            symbol="SPK",
+                            description="Ceiling Speaker",
+                        )
+                    ],
+                )
+            ],
             systems=[system],
             equipment=[equipment],
             review_report=[
@@ -121,10 +144,13 @@ def test_exports_all_plan_review_files(tmp_path):
     assert result.drawing_index_path.exists()
     assert result.specification_index_path.exists()
     assert result.device_schedules_path.exists()
+    assert result.keynotes_path.exists()
+    assert result.legends_path.exists()
     assert result.equipment_matrix_path.exists()
     assert result.review_report_path.exists()
     assert result.scope_gaps_path.exists()
     assert result.estimator_risks_path.exists()
+    assert result.recommendations_path.exists()
     assert result.markdown_summary_path.exists()
 
 
@@ -147,6 +173,8 @@ def test_supports_custom_prefix(tmp_path):
     assert result.drawing_index_path == tmp_path / "maw_drawing_index.csv"
     assert result.specification_index_path == tmp_path / "maw_specification_index.csv"
     assert result.device_schedules_path == tmp_path / "maw_device_schedules.csv"
+    assert result.keynotes_path == tmp_path / "maw_keynotes.csv"
+    assert result.legends_path == tmp_path / "maw_legends.csv"
     assert result.equipment_matrix_path == tmp_path / "maw_equipment_matrix.csv"
     assert result.review_report_path == tmp_path / "maw_review_report.csv"
     assert result.scope_gaps_path == tmp_path / "maw_scope_gaps.csv"
@@ -163,6 +191,8 @@ def test_to_dict_returns_string_paths(tmp_path):
         "drawing_index_path": str(result.drawing_index_path),
         "specification_index_path": str(result.specification_index_path),
         "device_schedules_path": str(result.device_schedules_path),
+        "keynotes_path": str(result.keynotes_path),
+        "legends_path": str(result.legends_path),
         "equipment_matrix_path": str(result.equipment_matrix_path),
         "review_report_path": str(result.review_report_path),
         "scope_gaps_path": str(result.scope_gaps_path),
@@ -194,3 +224,12 @@ def test_exports_device_schedules_csv(tmp_path):
 
     assert result.device_schedules_path.exists()
     assert result.device_schedules_path.name == "plan_review_device_schedules.csv"
+
+
+def test_exports_keynotes_and_legends_csv(tmp_path):
+    result = PlanReviewExportService().export_plan_review(make_result(), tmp_path)
+
+    assert result.keynotes_path.exists()
+    assert result.keynotes_path.name == "plan_review_keynotes.csv"
+    assert result.legends_path.exists()
+    assert result.legends_path.name == "plan_review_legends.csv"
