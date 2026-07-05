@@ -384,6 +384,26 @@ def test_includes_bid_completeness():
     assert review.bid_completeness is not None
 
 
+def test_includes_readiness():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+            }
+        ],
+        raw_sections=[
+            {
+                "section_number": "27 41 16",
+                "title": "Integrated Audio-Video Systems",
+            }
+        ],
+    )
+
+    assert review.readiness is not None
+    assert review.readiness.message
+
+
 def test_bid_completeness_is_incomplete_when_drawings_and_specs_are_missing():
     review = build_review(
         raw_sheets=[],

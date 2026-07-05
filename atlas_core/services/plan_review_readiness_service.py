@@ -95,11 +95,23 @@ class PlanReviewReadinessService:
         if not review.equipment:
             blockers.append("No equipment was detected.")
 
+        bid_completeness = getattr(review, "bid_completeness", None)
+        status = PlanReviewReadinessService._value(
+            getattr(bid_completeness, "status", None)
+        )
+        if status == "incomplete":
+            blockers.extend(list(getattr(bid_completeness, "missing_items", [])))
+
         return blockers
 
     @classmethod
     def _warnings(cls, review: BidPackageReview) -> list[str]:
         warnings: list[str] = []
+
+        bid_completeness = getattr(review, "bid_completeness", None)
+        status = cls._value(getattr(bid_completeness, "status", None))
+        if status == "partial":
+            warnings.extend(list(getattr(bid_completeness, "missing_items", [])))
 
         if review.scope_gaps:
             warnings.append("Scope gaps require estimator review.")

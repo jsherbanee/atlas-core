@@ -31,6 +31,8 @@ class EstimatorBrief:
     confidence: float
     bid_completeness_score: float | None = None
     bid_completeness_status: str | None = None
+    readiness_status: str | None = None
+    readiness_message: str | None = None
     recommendation_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
@@ -61,6 +63,8 @@ class EstimatorBriefService:
             confidence=review.confidence,
             bid_completeness_score=self._bid_completeness_score(review),
             bid_completeness_status=self._bid_completeness_status(review),
+            readiness_status=self._readiness_status(review),
+            readiness_message=self._readiness_message(review),
         )
 
     @classmethod
@@ -78,6 +82,22 @@ class EstimatorBriefService:
             return None
 
         return str(getattr(bid_completeness.status, "value", bid_completeness.status))
+
+    @classmethod
+    def _readiness_status(cls, review: BidPackageReview) -> str | None:
+        readiness = getattr(review, "readiness", None)
+        if readiness is None:
+            return None
+
+        return str(getattr(readiness.status, "value", readiness.status))
+
+    @classmethod
+    def _readiness_message(cls, review: BidPackageReview) -> str | None:
+        readiness = getattr(review, "readiness", None)
+        if readiness is None:
+            return None
+
+        return str(readiness.message)
 
     @classmethod
     def _placeholder_count(cls, review: BidPackageReview) -> int:

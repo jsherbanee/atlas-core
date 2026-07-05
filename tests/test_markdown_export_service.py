@@ -18,6 +18,8 @@ from atlas_core.services import (
     ReviewReportItem,
     ScopeGap,
     CrossReferenceType,
+    PlanReviewReadiness,
+    ReadinessStatus,
 )
 
 
@@ -352,6 +354,51 @@ def test_includes_bid_completeness_details(tmp_path):
     assert "- Schedule completeness: 50%" in content
     assert "- Missing items:" in content
     assert "  - Missing system detection." in content
+
+
+def test_includes_pricing_readiness_section(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Pricing Readiness" in content
+
+
+def test_handles_missing_pricing_readiness(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "No readiness assessment available." in content
+
+
+def test_includes_pricing_readiness_details(tmp_path):
+    output_path = tmp_path / "summary.md"
+    result = make_result()
+    result.review.readiness = PlanReviewReadiness(
+        status=ReadinessStatus.NEEDS_REVIEW,
+        message="Plan review needs estimator review before pricing.",
+        blockers=["No systems were detected."],
+        warnings=["Review confidence is below 0.75."],
+    )
+
+    MarkdownExportService().export_plan_review_summary(result, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "- Status: needs_review" in content
+    assert "- Message: Plan review needs estimator review before pricing." in content
+    assert "- Blockers:" in content
+    assert "  - No systems were detected." in content
+    assert "- Warnings:" in content
+    assert "  - Review confidence is below 0.75." in content
 
 
 def test_includes_estimator_risks_section(tmp_path):

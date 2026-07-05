@@ -12,6 +12,8 @@ from atlas_core.domain import (
     SystemCategory,
 )
 from atlas_core.services import (
+    BidCompleteness,
+    CompletenessStatus,
     EstimatorRisk,
     PlanReviewReadiness,
     PlanReviewReadinessService,
@@ -109,6 +111,86 @@ def test_missing_equipment_returns_not_ready():
 
     assert readiness.status is ReadinessStatus.NOT_READY
     assert "No equipment was detected." in readiness.blockers
+
+
+def test_incomplete_bid_completeness_returns_not_ready():
+    readiness = assess(
+        make_review(
+            bid_completeness=BidCompleteness(
+                status=CompletenessStatus.INCOMPLETE,
+                score=0.3,
+                drawing_completeness=0.0,
+                specification_completeness=0.0,
+                system_completeness=1.0,
+                equipment_completeness=1.0,
+                schedule_completeness=0.5,
+                missing_items=["Missing drawing index."],
+            )
+        )
+    )
+
+    assert readiness.status is ReadinessStatus.NOT_READY
+
+
+def test_partial_bid_completeness_returns_needs_review():
+    readiness = assess(
+        make_review(
+            bid_completeness=BidCompleteness(
+                status=CompletenessStatus.PARTIAL,
+                score=0.7,
+                drawing_completeness=1.0,
+                specification_completeness=1.0,
+                system_completeness=0.0,
+                equipment_completeness=1.0,
+                schedule_completeness=0.5,
+                missing_items=["Missing system detection."],
+            )
+        )
+    )
+
+    assert readiness.status is ReadinessStatus.NEEDS_REVIEW
+
+
+def test_incomplete_bid_completeness_missing_items_are_included_in_blockers():
+    readiness = assess(
+        make_review(
+            bid_completeness=BidCompleteness(
+                status=CompletenessStatus.INCOMPLETE,
+                score=0.4,
+                drawing_completeness=0.0,
+                specification_completeness=1.0,
+                system_completeness=1.0,
+                equipment_completeness=1.0,
+                schedule_completeness=0.0,
+                missing_items=[
+                    "Missing drawing index.",
+                    "Missing device schedule, keynotes, or legend data.",
+                ],
+            )
+        )
+    )
+
+    assert "Missing drawing index." in readiness.blockers
+    assert "Missing device schedule, keynotes, or legend data." in readiness.blockers
+
+
+def test_partial_bid_completeness_missing_items_are_included_in_warnings():
+    readiness = assess(
+        make_review(
+            bid_completeness=BidCompleteness(
+                status=CompletenessStatus.PARTIAL,
+                score=0.7,
+                drawing_completeness=1.0,
+                specification_completeness=1.0,
+                system_completeness=0.0,
+                equipment_completeness=1.0,
+                schedule_completeness=0.5,
+                missing_items=["Missing system detection."],
+            )
+        )
+    )
+
+    assert "Missing system detection." in readiness.warnings
 
 
 def test_scope_gaps_return_needs_review():

@@ -33,6 +33,7 @@ if TYPE_CHECKING:
         BidCompletenessService,
         KeynoteExtractionService,
         LegendExtractionService,
+        PlanReviewReadinessService,
         ScopeReconciliationService,
     )
 
@@ -51,6 +52,7 @@ class BidPackageReviewService:
         confidence_scoring_service: ConfidenceScoringService | None = None,
         recommendation_service: RecommendationService | None = None,
         bid_completeness_service: BidCompletenessService | None = None,
+        plan_review_readiness_service: PlanReviewReadinessService | None = None,
         scope_reconciliation_service: ScopeReconciliationService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
         drawing_metadata_service: DrawingMetadataService | None = None,
@@ -65,6 +67,7 @@ class BidPackageReviewService:
             BidCompletenessService,
             KeynoteExtractionService,
             LegendExtractionService,
+            PlanReviewReadinessService,
             ScopeReconciliationService,
         )
 
@@ -89,6 +92,9 @@ class BidPackageReviewService:
         self.recommendation_service = recommendation_service or RecommendationService()
         self.bid_completeness_service = (
             bid_completeness_service or BidCompletenessService()
+        )
+        self.plan_review_readiness_service = (
+            plan_review_readiness_service or PlanReviewReadinessService()
         )
         self.scope_reconciliation_service = (
             scope_reconciliation_service or ScopeReconciliationService()
@@ -233,6 +239,7 @@ class BidPackageReviewService:
         review.recommendations = self.recommendation_service.build_recommendations(
             review
         )
+        review.readiness = self.plan_review_readiness_service.assess(review)
         return review
 
     def _prepare_inputs(

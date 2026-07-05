@@ -27,7 +27,9 @@ from atlas_core.services import (
     ReconciliationSeverity,
     Recommendation,
     RecommendationPriority,
+    PlanReviewReadiness,
     ReviewReportItem,
+    ReadinessStatus,
     RiskLevel,
     ScopeGap,
 )
@@ -426,6 +428,7 @@ def test_to_dict_output():
         "estimator_risks": [estimator_risk.to_dict()],
         "recommendations": [recommendation.to_dict()],
         "bid_completeness": bid_completeness.to_dict(),
+        "readiness": None,
         "drawing_metadata": [
             DrawingMetadata(sheet_number="AV1.01", title="AV Plan").to_dict()
         ],
@@ -445,6 +448,23 @@ def test_to_dict_output_includes_none_bid_completeness_when_missing():
     )
 
     assert review.to_dict()["bid_completeness"] is None
+
+
+def test_to_dict_output_includes_readiness_when_present():
+    readiness = PlanReviewReadiness(
+        status=ReadinessStatus.NEEDS_REVIEW,
+        message="Plan review needs estimator review before pricing.",
+        blockers=[],
+        warnings=["Scope gaps require estimator review."],
+    )
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        readiness=readiness,
+    )
+
+    assert review.to_dict()["readiness"] == readiness.to_dict()
 
 
 def test_drawing_metadata_count():

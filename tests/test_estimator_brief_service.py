@@ -23,6 +23,8 @@ from atlas_core.services import (
     ReconciliationIssue,
     Recommendation,
     RecommendationPriority,
+    PlanReviewReadiness,
+    ReadinessStatus,
     ReviewReportItem,
     RiskLevel,
     ScopeGap,
@@ -171,6 +173,11 @@ def make_review() -> BidPackageReview:
             schedule_completeness=0.5,
             missing_items=["Missing system detection."],
         ),
+        readiness=PlanReviewReadiness(
+            status=ReadinessStatus.NEEDS_REVIEW,
+            message="Plan review needs estimator review before pricing.",
+            warnings=["Scope gaps require estimator review."],
+        ),
         confidence=0.82,
     )
 
@@ -281,6 +288,15 @@ def test_includes_bid_completeness_fields_when_present():
     assert brief.bid_completeness_status == "partial"
 
 
+def test_includes_readiness_fields_when_present():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.readiness_status == "needs_review"
+    assert (
+        brief.readiness_message == "Plan review needs estimator review before pricing."
+    )
+
+
 def test_to_dict_output():
     brief = EstimatorBrief(
         review_id="review-001",
@@ -304,6 +320,8 @@ def test_to_dict_output():
         confidence=0.82,
         bid_completeness_score=0.7,
         bid_completeness_status="partial",
+        readiness_status="needs_review",
+        readiness_message="Plan review needs estimator review before pricing.",
     )
 
     assert brief.to_dict() == {
@@ -328,6 +346,8 @@ def test_to_dict_output():
         "confidence": 0.82,
         "bid_completeness_score": 0.7,
         "bid_completeness_status": "partial",
+        "readiness_status": "needs_review",
+        "readiness_message": "Plan review needs estimator review before pricing.",
     }
 
 
@@ -339,3 +359,13 @@ def test_bid_completeness_fields_are_none_when_missing():
 
     assert brief.bid_completeness_score is None
     assert brief.bid_completeness_status is None
+
+
+def test_readiness_fields_are_none_when_missing():
+    review = make_review()
+    review.readiness = None
+
+    brief = EstimatorBriefService().build_brief(review)
+
+    assert brief.readiness_status is None
+    assert brief.readiness_message is None

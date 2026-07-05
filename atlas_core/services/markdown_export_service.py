@@ -131,6 +131,31 @@ class MarkdownExportService:
             else:
                 lines.append("  - None")
 
+        lines.extend(["", "## Pricing Readiness", ""])
+
+        readiness = getattr(result.review, "readiness", None)
+        if readiness is None:
+            lines.append("No readiness assessment available.")
+        else:
+            lines.append(
+                f"- Status: {getattr(readiness.status, 'value', readiness.status)}"
+            )
+            lines.append(f"- Message: {readiness.message}")
+
+            lines.append("- Blockers:")
+            if getattr(readiness, "blockers", None):
+                for blocker in readiness.blockers:
+                    lines.append(f"  - {blocker}")
+            else:
+                lines.append("  - None")
+
+            lines.append("- Warnings:")
+            if getattr(readiness, "warnings", None):
+                for warning in readiness.warnings:
+                    lines.append(f"  - {warning}")
+            else:
+                lines.append("  - None")
+
         lines.extend(["", "## Estimator Risks", ""])
 
         if not result.review.estimator_risks:
