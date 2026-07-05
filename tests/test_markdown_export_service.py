@@ -282,3 +282,54 @@ def test_handles_no_estimator_risks(tmp_path):
 
     content = output_path.read_text(encoding="utf-8")
     assert "No estimator risks found." in content
+
+
+def test_includes_drawing_metadata_section(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Drawing Metadata" in content
+
+
+def test_includes_drawing_metadata_items(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    # create a BidPackageReview with drawing metadata included
+    md_item = {
+        "sheet_number": "AV1.01",
+        "title": "AV Plan",
+        "referenced_sheet_numbers": ["A-701"],
+        "referenced_specification_sections": ["27 41 16"],
+        "room_names": ["Main Lobby"],
+    }
+
+    # construct PlanReviewWorkflowResult manually
+    result = make_result()
+    # attach drawing metadata dicts directly to review.drawing_metadata
+    result.review.drawing_metadata = [
+        # use the domain/data class to serialize in export implementation
+        __import__(
+            "atlas_core.services.drawing_metadata_service", fromlist=["DrawingMetadata"]
+        ).DrawingMetadata(
+            sheet_number=md_item["sheet_number"],
+            title=md_item["title"],
+            referenced_sheet_numbers=md_item["referenced_sheet_numbers"],
+            referenced_specification_sections=md_item[
+                "referenced_specification_sections"
+            ],
+            room_names=md_item["room_names"],
+        )
+    ]
+
+    MarkdownExportService().export_plan_review_summary(result, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "AV1.01 - AV Plan" in content
+    assert "Referenced sheets: A-701" in content
+    assert "Referenced specifications: 27 41 16" in content
+    assert "Rooms: Main Lobby" in content

@@ -99,6 +99,28 @@ class MarkdownExportService:
                     f"{recommendation.category}: {recommendation.message}"
                 )
 
+        # Drawing metadata
+        lines.extend(["", "## Drawing Metadata", ""])
+
+        if not getattr(result.review, "drawing_metadata", None):
+            lines.append("No drawing metadata extracted.")
+        else:
+            for md in result.review.drawing_metadata:
+                # md is expected to have sheet_number, title, referenced_sheet_numbers,
+                # referenced_specification_sections, and room_names attributes.
+                lines.append(f"- {md.sheet_number} - {md.title}")
+                if getattr(md, "referenced_sheet_numbers", None):
+                    lines.append(
+                        "  Referenced sheets: " + ", ".join(md.referenced_sheet_numbers)
+                    )
+                if getattr(md, "referenced_specification_sections", None):
+                    lines.append(
+                        "  Referenced specifications: "
+                        + ", ".join(md.referenced_specification_sections)
+                    )
+                if getattr(md, "room_names", None):
+                    lines.append("  Rooms: " + ", ".join(md.room_names))
+
         return "\n".join(lines) + "\n"
 
     @staticmethod
