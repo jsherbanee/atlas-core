@@ -25,6 +25,11 @@ class LowConfidenceScoringService:
         return 0.6
 
 
+class EmptyScheduleEquipmentService:
+    def equipment_from_schedule(self, schedule):
+        return []
+
+
 def test_builds_review_from_raw_sheets_and_raw_sections():
     review = build_review(
         raw_sheets=[
@@ -539,3 +544,57 @@ def test_includes_legends_in_review():
 
     assert len(review.legends) == 1
     assert review.legends[0].legend_id == "av1.01-legend"
+
+
+def test_includes_reconciliation_issues_when_keynote_references_missing_equipment():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+                "notes": ["1: Projector"],
+            }
+        ],
+        equipment=[
+            Equipment(
+                equipment_id="eq-speaker",
+                description="Speaker",
+                category=EquipmentCategory.SPEAKER,
+            )
+        ],
+    )
+
+    assert any(
+        issue.issue_id == "keynote_missing_equipment_category:projector"
+        and issue.target_id == "av1.01-keynote-1"
+        for issue in review.reconciliation_issues
+    )
+
+
+def test_includes_reconciliation_issues_when_device_schedule_item_is_not_represented_in_equipment_matrix():
+    review = BidPackageReviewService(
+        device_schedule_equipment_service=EmptyScheduleEquipmentService()
+    ).build_review(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        raw_device_schedules=[
+            {
+                "schedule_id": "sched-1",
+                "rows": [
+                    {
+                        "tag": "DSP-1",
+                        "description": "Control processor",
+                        "manufacturer": "Acme",
+                        "model": "X100",
+                    }
+                ],
+            }
+        ],
+    )
+
+    assert any(
+        issue.issue_id == "device_schedule_item_missing_equipment:sched-1-dsp-1"
+        and issue.target_id == "sched-1-dsp-1"
+        for issue in review.reconciliation_issues
+    )

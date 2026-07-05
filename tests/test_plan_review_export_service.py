@@ -127,6 +127,7 @@ def make_result() -> PlanReviewWorkflowResult:
             placeholder_count=0,
             review_required_count=1,
             cross_reference_count=0,
+            reconciliation_issue_count=0,
             scope_gap_count=1,
             estimator_risk_count=1,
             keynote_count=0,

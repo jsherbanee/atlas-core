@@ -12,6 +12,7 @@ from atlas_core.services import (
     EstimatorRisk,
     MarkdownExportService,
     PlanReviewWorkflowResult,
+    ReconciliationIssue,
     ReviewReportItem,
     ScopeGap,
     CrossReferenceType,
@@ -46,6 +47,7 @@ def make_result(
             placeholder_count=1,
             review_required_count=2,
             cross_reference_count=len(cross_references or []),
+            reconciliation_issue_count=0,
             scope_gap_count=len(scope_gaps or []),
             estimator_risk_count=len(estimator_risks or []),
             keynote_count=0,
@@ -248,6 +250,54 @@ def test_handles_no_scope_gaps(tmp_path):
 
     content = output_path.read_text(encoding="utf-8")
     assert "No scope gaps found." in content
+
+
+def test_includes_scope_reconciliation_section(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Scope Reconciliation" in content
+
+
+def test_handles_no_scope_reconciliation_issues(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "No scope reconciliation issues found." in content
+
+
+def test_includes_scope_reconciliation_issue_items(tmp_path):
+    output_path = tmp_path / "summary.md"
+    issue = ReconciliationIssue(
+        issue_id="device_schedule_item_missing_equipment:sched-1-dsp-1",
+        message="Device schedule item is not represented in equipment matrix.",
+        severity="high",
+        target_id="sched-1-dsp-1",
+        suggested_action="Add missing equipment.",
+    )
+
+    result = make_result()
+    result.review.reconciliation_issues = [issue]
+
+    MarkdownExportService().export_plan_review_summary(result, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert (
+        "- [high] Device schedule item is not represented in equipment matrix."
+        in content
+    )
+    assert "  Target ID: sched-1-dsp-1" in content
+    assert "  Suggested action: Add missing equipment." in content
 
 
 def test_includes_estimator_risks_section(tmp_path):

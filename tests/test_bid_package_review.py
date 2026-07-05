@@ -21,6 +21,8 @@ from atlas_core.services import (
     CrossReferenceType,
     EstimatorRisk,
     ManufacturerReviewIssue,
+    ReconciliationIssue,
+    ReconciliationSeverity,
     Recommendation,
     RecommendationPriority,
     ReviewReportItem,
@@ -105,6 +107,15 @@ def make_recommendation() -> Recommendation:
         message="Review confidence before pricing.",
         priority=RecommendationPriority.HIGH,
         category="confidence",
+    )
+
+
+def make_reconciliation_issue() -> ReconciliationIssue:
+    return ReconciliationIssue(
+        issue_id="device_schedule_item_missing_equipment:sched-001-item-1",
+        message="Device schedule item is not represented in equipment matrix.",
+        severity=ReconciliationSeverity.HIGH,
+        target_id="sched-001-item-1",
     )
 
 
@@ -255,11 +266,23 @@ def test_issue_count():
                 message="Review required.",
             )
         ],
+        reconciliation_issues=[make_reconciliation_issue()],
         scope_gaps=[make_scope_gap()],
         estimator_risks=[make_estimator_risk()],
     )
 
-    assert review.issue_count() == 5
+    assert review.issue_count() == 6
+
+
+def test_reconciliation_issue_count():
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        reconciliation_issues=[make_reconciliation_issue()],
+    )
+
+    assert review.reconciliation_issue_count() == 1
 
 
 def test_cross_reference_count():
@@ -326,6 +349,7 @@ def test_to_dict_output():
     scope_gap = make_scope_gap()
     estimator_risk = make_estimator_risk()
     recommendation = make_recommendation()
+    reconciliation_issue = make_reconciliation_issue()
     device_schedule = make_device_schedule()
     keynote = make_keynote()
     legend = make_legend()
@@ -341,6 +365,7 @@ def test_to_dict_output():
         manufacturer_review_issues=[manufacturer_issue],
         review_report=[review_report_item],
         cross_references=[cross_reference],
+        reconciliation_issues=[reconciliation_issue],
         scope_gaps=[scope_gap],
         estimator_risks=[estimator_risk],
         recommendations=[recommendation],
@@ -379,6 +404,7 @@ def test_to_dict_output():
         "manufacturer_review_issues": [manufacturer_issue.to_dict()],
         "review_report": [review_report_item.to_dict()],
         "cross_references": [cross_reference.to_dict()],
+        "reconciliation_issues": [reconciliation_issue.to_dict()],
         "scope_gaps": [scope_gap.to_dict()],
         "estimator_risks": [estimator_risk.to_dict()],
         "recommendations": [recommendation.to_dict()],

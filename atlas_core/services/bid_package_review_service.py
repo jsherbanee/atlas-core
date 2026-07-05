@@ -29,7 +29,11 @@ from atlas_core.services.device_schedule_extraction_service import (
 
 if TYPE_CHECKING:
     from atlas_core.domain import BidPackageReview
-    from atlas_core.services import KeynoteExtractionService, LegendExtractionService
+    from atlas_core.services import (
+        KeynoteExtractionService,
+        LegendExtractionService,
+        ScopeReconciliationService,
+    )
 
 
 class BidPackageReviewService:
@@ -45,6 +49,7 @@ class BidPackageReviewService:
         equipment_detection_service: EquipmentDetectionService | None = None,
         confidence_scoring_service: ConfidenceScoringService | None = None,
         recommendation_service: RecommendationService | None = None,
+        scope_reconciliation_service: ScopeReconciliationService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
         drawing_metadata_service: DrawingMetadataService | None = None,
         device_schedule_extraction_service: (
@@ -57,6 +62,7 @@ class BidPackageReviewService:
         from atlas_core.services import (
             KeynoteExtractionService,
             LegendExtractionService,
+            ScopeReconciliationService,
         )
 
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
@@ -78,6 +84,9 @@ class BidPackageReviewService:
             confidence_scoring_service or ConfidenceScoringService()
         )
         self.recommendation_service = recommendation_service or RecommendationService()
+        self.scope_reconciliation_service = (
+            scope_reconciliation_service or ScopeReconciliationService()
+        )
         self.drawing_metadata_service = (
             drawing_metadata_service or DrawingMetadataService()
         )
@@ -167,6 +176,12 @@ class BidPackageReviewService:
             system_items=system_items,
         )
         equipment_items = [*base_equipment_items, *schedule_derived_equipment]
+        reconciliation_issues = self.scope_reconciliation_service.reconcile(
+            equipment=equipment_items,
+            device_schedules=device_schedules,
+            keynotes=keynotes,
+            legends=legends,
+        )
 
         workflow_result = (
             self.estimate_workflow_service.build_equipment_matrix_with_resolutions(
@@ -199,6 +214,7 @@ class BidPackageReviewService:
             equipment_items=equipment_items,
             workflow_result=workflow_result,
             cross_references=cross_references,
+            reconciliation_issues=reconciliation_issues,
             scope_gaps=scope_gaps,
             drawing_metadata=drawing_metadata,
             device_schedules=device_schedules,
@@ -364,6 +380,7 @@ class BidPackageReviewService:
         equipment_items: list,
         workflow_result: Any,
         cross_references: list,
+        reconciliation_issues: list,
         scope_gaps: list,
     ) -> Any:
         return BidPackageReview(
@@ -382,6 +399,7 @@ class BidPackageReviewService:
             manufacturer_review_issues=workflow_result.manufacturer_review_issues,
             review_report=workflow_result.review_report,
             cross_references=cross_references,
+            reconciliation_issues=reconciliation_issues,
             scope_gaps=scope_gaps,
             confidence=0.75,
         )

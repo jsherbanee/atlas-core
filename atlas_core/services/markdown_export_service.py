@@ -77,6 +77,20 @@ class MarkdownExportService:
                 if gap.suggested_action:
                     lines.append(f"  Suggested action: {gap.suggested_action}")
 
+        lines.extend(["", "## Scope Reconciliation", ""])
+
+        if not getattr(result.review, "reconciliation_issues", None):
+            lines.append("No scope reconciliation issues found.")
+        else:
+            for issue in result.review.reconciliation_issues:
+                lines.append(
+                    f"- [{getattr(issue.severity, 'value', issue.severity)}] {issue.message}"
+                )
+                if issue.target_id:
+                    lines.append(f"  Target ID: {issue.target_id}")
+                if issue.suggested_action:
+                    lines.append(f"  Suggested action: {issue.suggested_action}")
+
         lines.extend(["", "## Estimator Risks", ""])
 
         if not result.review.estimator_risks:

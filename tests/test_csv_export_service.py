@@ -207,6 +207,7 @@ def test_exports_estimator_brief_csv(tmp_path):
         placeholder_count=1,
         review_required_count=2,
         cross_reference_count=3,
+        reconciliation_issue_count=0,
         scope_gap_count=4,
         estimator_risk_count=5,
         keynote_count=0,

@@ -18,6 +18,7 @@ from atlas_core.services import (
     EstimatorBriefService,
     EstimatorRisk,
     ManufacturerReviewIssue,
+    ReconciliationIssue,
     Recommendation,
     RecommendationPriority,
     ReviewReportItem,
@@ -94,6 +95,16 @@ def make_review() -> BidPackageReview:
                 source_id="eq-display",
                 target_id="av101",
                 message="Equipment references drawing.",
+            )
+        ],
+        reconciliation_issues=[
+            ReconciliationIssue(
+                issue_id="keynote_missing_equipment_category:projector",
+                message=(
+                    "Keynote references equipment category not found in "
+                    "equipment matrix."
+                ),
+                target_id="av101-keynote-k1",
             )
         ],
         scope_gaps=[
@@ -188,7 +199,7 @@ def test_counts_equipment():
 def test_counts_issues():
     brief = EstimatorBriefService().build_brief(make_review())
 
-    assert brief.issue_count == 5
+    assert brief.issue_count == 6
 
 
 def test_counts_placeholder_equipment():
@@ -207,6 +218,12 @@ def test_counts_cross_references():
     brief = EstimatorBriefService().build_brief(make_review())
 
     assert brief.cross_reference_count == 1
+
+
+def test_counts_reconciliation_issues():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.reconciliation_issue_count == 1
 
 
 def test_counts_scope_gaps():
@@ -258,6 +275,7 @@ def test_to_dict_output():
         placeholder_count=1,
         review_required_count=2,
         cross_reference_count=1,
+        reconciliation_issue_count=1,
         scope_gap_count=1,
         estimator_risk_count=1,
         keynote_count=1,
@@ -279,6 +297,7 @@ def test_to_dict_output():
         "placeholder_count": 1,
         "review_required_count": 2,
         "cross_reference_count": 1,
+        "reconciliation_issue_count": 1,
         "scope_gap_count": 1,
         "estimator_risk_count": 1,
         "keynote_count": 1,

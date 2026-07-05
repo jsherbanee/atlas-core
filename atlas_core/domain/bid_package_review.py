@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from atlas_core.domain import Keynote, Legend
     from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
     from atlas_core.services.cross_reference_service import CrossReference
+    from atlas_core.services.scope_reconciliation_service import ReconciliationIssue
     from atlas_core.services.estimator_risk_service import EstimatorRisk
     from atlas_core.services.recommendation_service import Recommendation
     from atlas_core.services.scope_gap_service import ScopeGap
@@ -44,6 +45,7 @@ class BidPackageReview:
     )
     review_report: list[ReviewReportItem] = field(default_factory=list)
     cross_references: list[CrossReference] = field(default_factory=list)
+    reconciliation_issues: list[ReconciliationIssue] = field(default_factory=list)
     scope_gaps: list[ScopeGap] = field(default_factory=list)
     estimator_risks: list[EstimatorRisk] = field(default_factory=list)
     recommendations: list[Recommendation] = field(default_factory=list)
@@ -96,6 +98,9 @@ class BidPackageReview:
     def scope_gap_count(self) -> int:
         return len(self.scope_gaps)
 
+    def reconciliation_issue_count(self) -> int:
+        return len(self.reconciliation_issues)
+
     def estimator_risk_count(self) -> int:
         return len(self.estimator_risks)
 
@@ -107,6 +112,7 @@ class BidPackageReview:
             len(self.resolutions)
             + len(self.manufacturer_review_issues)
             + len(self.review_report)
+            + len(self.reconciliation_issues)
             + len(self.scope_gaps)
             + len(self.estimator_risks)
         )
@@ -128,6 +134,7 @@ class BidPackageReview:
             ),
             "review_report": self._serialize_items(self.review_report),
             "cross_references": self._serialize_items(self.cross_references),
+            "reconciliation_issues": self._serialize_items(self.reconciliation_issues),
             "scope_gaps": self._serialize_items(self.scope_gaps),
             "estimator_risks": self._serialize_items(self.estimator_risks),
             "recommendations": self._serialize_items(self.recommendations),

@@ -22,6 +22,7 @@ class EstimatorBrief:
     placeholder_count: int
     review_required_count: int
     cross_reference_count: int
+    reconciliation_issue_count: int
     scope_gap_count: int
     estimator_risk_count: int
     keynote_count: int
@@ -48,6 +49,7 @@ class EstimatorBriefService:
             placeholder_count=self._placeholder_count(review),
             review_required_count=self._review_required_count(review),
             cross_reference_count=review.cross_reference_count(),
+            reconciliation_issue_count=review.reconciliation_issue_count(),
             scope_gap_count=review.scope_gap_count(),
             estimator_risk_count=review.estimator_risk_count(),
             keynote_count=review.keynote_count(),
