@@ -2,6 +2,10 @@
 
 from pathlib import Path
 
+from atlas_core.services.final_estimator_review_service import (
+    FinalEstimatorReview,
+    FinalEstimatorReviewService,
+)
 from atlas_core.services.plan_review_workflow_service import PlanReviewWorkflowResult
 
 
@@ -20,19 +24,62 @@ class MarkdownExportService:
 
     def _plan_review_summary(self, result: PlanReviewWorkflowResult) -> str:
         brief = result.brief
+        final_review = self._final_estimator_review(result)
         lines = [
             f"# {brief.name}",
             "",
-            f"Project ID: {brief.project_id}",
-            f"Review ID: {brief.review_id}",
-            f"Drawing count: {brief.drawing_count}",
-            f"Specification count: {brief.specification_count}",
-            f"System count: {brief.system_count}",
-            f"Equipment count: {brief.equipment_count}",
-            f"Issue count: {brief.issue_count}",
-            f"Placeholder count: {brief.placeholder_count}",
-            f"Review required count: {brief.review_required_count}",
+            "## Final Estimator Review",
+            "",
         ]
+
+        if final_review is not None:
+            lines.extend(
+                [
+                    f"- Executive Summary: {final_review.executive_summary}",
+                    (
+                        "- Readiness: "
+                        f"{final_review.readiness_status or 'n/a'}"
+                        + (
+                            f" - {final_review.readiness_message}"
+                            if final_review.readiness_message
+                            else ""
+                        )
+                    ),
+                    (
+                        "- Completeness: "
+                        f"{final_review.completeness_status or 'n/a'}"
+                        + (
+                            f" ({self._confidence_percentage(final_review.completeness_score)})"
+                            if final_review.completeness_score is not None
+                            else ""
+                        )
+                    ),
+                    f"- Confidence: {self._confidence_percentage(final_review.confidence)}",
+                    f"- Total Issues: {final_review.total_issues}",
+                    f"- Total Recommendations: {final_review.total_recommendations}",
+                    "- Next Actions:",
+                ]
+            )
+
+            for action in final_review.next_actions:
+                lines.append(f"  - {action}")
+        else:
+            lines.append("No final estimator review available.")
+
+        lines.extend(
+            [
+                "",
+                f"Project ID: {brief.project_id}",
+                f"Review ID: {brief.review_id}",
+                f"Drawing count: {brief.drawing_count}",
+                f"Specification count: {brief.specification_count}",
+                f"System count: {brief.system_count}",
+                f"Equipment count: {brief.equipment_count}",
+                f"Issue count: {brief.issue_count}",
+                f"Placeholder count: {brief.placeholder_count}",
+                f"Review required count: {brief.review_required_count}",
+            ]
+        )
         if hasattr(brief, "cross_reference_count"):
             lines.append(f"Cross reference count: {brief.cross_reference_count}")
 
@@ -233,6 +280,15 @@ class MarkdownExportService:
                     lines.append(f"  - {legend_item.symbol}: {legend_item.description}")
 
         return "\n".join(lines) + "\n"
+
+    @staticmethod
+    def _final_estimator_review(
+        result: PlanReviewWorkflowResult,
+    ) -> FinalEstimatorReview | None:
+        try:
+            return FinalEstimatorReviewService().build(result.review)
+        except Exception:
+            return None
 
     @staticmethod
     def _confidence_percentage(confidence: float) -> str:

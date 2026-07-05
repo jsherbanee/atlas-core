@@ -93,7 +93,49 @@ def test_includes_title(tmp_path):
         output_path,
     )
 
-    assert "# Plan Review" in output_path.read_text(encoding="utf-8")
+    content = output_path.read_text(encoding="utf-8")
+    assert "# Plan Review" in content
+    assert "## Final Estimator Review" in content
+
+
+def test_includes_final_estimator_review_fields(tmp_path):
+    output_path = tmp_path / "summary.md"
+    result = make_result()
+    result.review.readiness = PlanReviewReadiness(
+        status=ReadinessStatus.NEEDS_REVIEW,
+        message="Plan review needs estimator review before pricing.",
+        blockers=["No systems were detected."],
+        warnings=["Review confidence is below 0.75."],
+    )
+    result.review.bid_completeness = BidCompleteness(
+        status=CompletenessStatus.PARTIAL,
+        score=0.7,
+        drawing_completeness=1.0,
+        specification_completeness=1.0,
+        system_completeness=0.0,
+        equipment_completeness=1.0,
+        schedule_completeness=0.5,
+        missing_items=["Missing system detection."],
+    )
+
+    MarkdownExportService().export_plan_review_summary(result, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert (
+        "- Executive Summary: Bid package requires estimator review before pricing."
+        in content
+    )
+    assert (
+        "- Readiness: needs_review - Plan review needs estimator review before "
+        "pricing."
+    ) in content
+    assert "- Completeness: partial (70%)" in content
+    assert "- Confidence: 75%" in content
+    assert "- Total Issues: 0" in content
+    assert "- Total Recommendations: 0" in content
+    assert "- Next Actions:" in content
+    assert "  - No systems were detected." in content
+    assert "  - Review confidence is below 0.75." in content
 
 
 def test_includes_brief_counts(tmp_path):
