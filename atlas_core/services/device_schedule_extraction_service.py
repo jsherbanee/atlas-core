@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from atlas_core.domain import DeviceSchedule, DeviceScheduleItem
+from atlas_core.domain.device_schedule import DeviceSchedule, DeviceScheduleItem
 
 
 class DeviceScheduleExtractionService:
