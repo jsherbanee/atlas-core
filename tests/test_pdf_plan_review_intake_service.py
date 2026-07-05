@@ -38,6 +38,32 @@ def test_includes_raw_pages(fixture_pdf_path: Path) -> None:
     assert request.raw_pages[0]["source_file"] == "simple.pdf"
 
 
+def test_includes_document_sections_when_built_from_pdf(
+    fixture_pdf_path: Path,
+) -> None:
+    request = PdfPlanReviewIntakeService().build_request_from_pdf(
+        pdf_path=fixture_pdf_path,
+        review_id="review-001",
+        project_id="project-001",
+        name="Plan Review",
+    )
+
+    assert len(request.document_sections) >= 1
+
+
+def test_extracted_document_sections_are_dictionaries(
+    fixture_pdf_path: Path,
+) -> None:
+    request = PdfPlanReviewIntakeService().build_request_from_pdf(
+        pdf_path=fixture_pdf_path,
+        review_id="review-001",
+        project_id="project-001",
+        name="Plan Review",
+    )
+
+    assert all(isinstance(section, dict) for section in request.document_sections)
+
+
 def test_preserves_review_id(fixture_pdf_path: Path) -> None:
     request = PdfPlanReviewIntakeService().build_request_from_pdf(
         pdf_path=fixture_pdf_path,

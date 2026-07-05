@@ -44,6 +44,7 @@ def test_creating_valid_request():
     assert request.project_id == "project-001"
     assert request.name == "Plan Review"
     assert request.raw_pages == []
+    assert request.document_sections == []
     assert request.raw_sheets == []
     assert request.raw_sections == []
     assert request.raw_device_schedules == []
@@ -94,6 +95,7 @@ def test_to_dict_output():
         project_id="project-001",
         name="Plan Review",
         raw_pages=[{"page": 1}],
+        document_sections=[{"document_type": "cover_sheet"}],
         raw_sheets=[{"sheet": "AV-101"}],
         raw_sections=[{"section": "27 41 16"}],
         raw_device_schedules=[{"schedule": "S1"}],
@@ -104,6 +106,7 @@ def test_to_dict_output():
         "project_id": "project-001",
         "name": "Plan Review",
         "raw_pages": [{"page": 1}],
+        "document_sections": [{"document_type": "cover_sheet"}],
         "raw_sheets": [{"sheet": "AV-101"}],
         "raw_sections": [{"section": "27 41 16"}],
         "raw_device_schedules": [{"schedule": "S1"}],

@@ -14,6 +14,7 @@ class PlanReviewRequest:
     project_id: str
     name: str
     raw_pages: list[dict] = field(default_factory=list)
+    document_sections: list[dict] = field(default_factory=list)
     raw_sheets: list[dict] = field(default_factory=list)
     raw_sections: list[dict] = field(default_factory=list)
     raw_device_schedules: list[dict] = field(default_factory=list)
@@ -29,6 +30,7 @@ class PlanReviewRequest:
             "project_id": self.project_id,
             "name": self.name,
             "raw_pages": list(self.raw_pages),
+            "document_sections": list(self.document_sections),
             "raw_sheets": list(self.raw_sheets),
             "raw_sections": list(self.raw_sections),
             "raw_device_schedules": list(self.raw_device_schedules),
