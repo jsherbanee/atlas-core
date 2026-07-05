@@ -27,6 +27,9 @@ class PlanReviewWorkflowResult:
         return {
             "review": self.review.to_dict(),
             "brief": self.brief.to_dict(),
+            "drawing_metadata": [
+                md.to_dict() for md in getattr(self.review, "drawing_metadata", [])
+            ],
         }
 
 
