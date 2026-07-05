@@ -105,4 +105,7 @@ def test_to_dict_output():
     assert result.to_dict() == {
         "review": result.review.to_dict(),
         "brief": result.brief.to_dict(),
+        "drawing_metadata": [
+            metadata.to_dict() for metadata in result.review.drawing_metadata
+        ],
     }
