@@ -114,6 +114,7 @@ from atlas_core.services.plan_review_application_service import (
 from atlas_core.services.pdf_plan_review_intake_service import (
     PdfPlanReviewIntakeService,
 )
+from atlas_core.services.room_detection_service import RoomDetectionService
 
 __all__ = [
     "BaselineService",
@@ -163,6 +164,7 @@ __all__ = [
     "PlanReviewWorkflowService",
     "PdfPlanReviewIntakeService",
     "PdfTextExtractionService",
+    "RoomDetectionService",
     "ReadinessStatus",
     "ExtractedPdfPage",
     "Recommendation",
