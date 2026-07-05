@@ -16,6 +16,7 @@ class PlanReviewExportResult:
     estimator_brief_path: Path
     drawing_index_path: Path
     specification_index_path: Path
+    device_schedules_path: Path
     equipment_matrix_path: Path
     review_report_path: Path
     scope_gaps_path: Path
@@ -28,6 +29,7 @@ class PlanReviewExportResult:
             "estimator_brief_path": str(self.estimator_brief_path),
             "drawing_index_path": str(self.drawing_index_path),
             "specification_index_path": str(self.specification_index_path),
+            "device_schedules_path": str(self.device_schedules_path),
             "equipment_matrix_path": str(self.equipment_matrix_path),
             "review_report_path": str(self.review_report_path),
             "scope_gaps_path": str(self.scope_gaps_path),
@@ -69,6 +71,10 @@ class PlanReviewExportService:
             result.review.specification_sections,
             output_path / f"{prefix}_specification_index.csv",
         )
+        device_schedules_path = self.csv_export_service.export_device_schedules(
+            result.review.device_schedules,
+            output_path / f"{prefix}_device_schedules.csv",
+        )
         equipment_matrix_path = self.csv_export_service.export_equipment_matrix(
             self._equipment_matrix_rows(result),
             output_path / f"{prefix}_equipment_matrix.csv",
@@ -98,6 +104,7 @@ class PlanReviewExportService:
             estimator_brief_path=estimator_brief_path,
             drawing_index_path=drawing_index_path,
             specification_index_path=specification_index_path,
+            device_schedules_path=device_schedules_path,
             equipment_matrix_path=equipment_matrix_path,
             review_report_path=review_report_path,
             scope_gaps_path=scope_gaps_path,

@@ -13,11 +13,38 @@ from atlas_core.services.review_report_service import ReviewReportItem
 from atlas_core.services.scope_gap_service import ScopeGap
 
 if TYPE_CHECKING:
-    from atlas_core.domain import DrawingSheet, SpecificationSection
+    from atlas_core.domain import (
+        DeviceSchedule,
+        DeviceScheduleItem,
+        DrawingSheet,
+        SpecificationSection,
+    )
     from atlas_core.services.estimator_brief_service import EstimatorBrief
 
 
 class CsvExportService:
+    def export_device_schedule(
+        self,
+        schedule: DeviceSchedule,
+        output_path: str | Path,
+    ) -> Path:
+        return self.export_device_schedules([schedule], output_path)
+
+    def export_device_schedules(
+        self,
+        schedules: list[DeviceSchedule],
+        output_path: str | Path,
+    ) -> Path:
+        rows: list[dict] = []
+        for schedule in schedules:
+            rows.extend(self._device_schedule_rows(schedule))
+
+        return self._write_csv(
+            headers=self._device_schedule_headers(),
+            rows=rows,
+            output_path=output_path,
+        )
+
     def export_equipment_matrix(
         self,
         rows: list[EquipmentMatrixRow],
@@ -132,6 +159,42 @@ class CsvExportService:
             .to_dict()
             .keys()
         )
+
+    @staticmethod
+    def _device_schedule_headers() -> list[str]:
+        from atlas_core.domain import DeviceScheduleItem
+
+        return [
+            "schedule_id",
+            "source_sheet_number",
+            *list(
+                DeviceScheduleItem(
+                    item_id="item",
+                    tag="TAG",
+                    description="Item",
+                )
+                .to_dict()
+                .keys()
+            ),
+        ]
+
+    @staticmethod
+    def _device_schedule_rows(schedule: DeviceSchedule) -> list[dict]:
+        rows: list[dict] = []
+        for item in schedule.items:
+            rows.append(CsvExportService._device_schedule_row(item, schedule))
+
+        return rows
+
+    @staticmethod
+    def _device_schedule_row(
+        item: DeviceScheduleItem,
+        schedule: DeviceSchedule,
+    ) -> dict:
+        row = item.to_dict()
+        row["schedule_id"] = schedule.schedule_id
+        row["source_sheet_number"] = schedule.source_sheet_number
+        return row
 
     def export_review_report(
         self,

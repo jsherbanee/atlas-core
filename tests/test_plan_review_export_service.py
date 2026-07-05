@@ -1,5 +1,7 @@
 from atlas_core.domain import (
     BidPackageReview,
+    DeviceSchedule,
+    DeviceScheduleItem,
     DrawingSheet,
     Equipment,
     EquipmentCategory,
@@ -49,6 +51,19 @@ def make_result() -> PlanReviewWorkflowResult:
                     section_id="27-41-16",
                     section_number="27 41 16",
                     title="Integrated Audio Systems",
+                )
+            ],
+            device_schedules=[
+                DeviceSchedule(
+                    schedule_id="sched-1",
+                    source_sheet_number="AV-101",
+                    items=[
+                        DeviceScheduleItem(
+                            item_id="sched-1-spk-1",
+                            tag="SPK-1",
+                            description="Main loudspeaker",
+                        )
+                    ],
                 )
             ],
             systems=[system],
@@ -102,6 +117,7 @@ def test_exports_all_plan_review_files(tmp_path):
     assert result.estimator_brief_path.exists()
     assert result.drawing_index_path.exists()
     assert result.specification_index_path.exists()
+    assert result.device_schedules_path.exists()
     assert result.equipment_matrix_path.exists()
     assert result.review_report_path.exists()
     assert result.scope_gaps_path.exists()
@@ -127,6 +143,7 @@ def test_supports_custom_prefix(tmp_path):
     assert result.estimator_brief_path == tmp_path / "maw_estimator_brief.csv"
     assert result.drawing_index_path == tmp_path / "maw_drawing_index.csv"
     assert result.specification_index_path == tmp_path / "maw_specification_index.csv"
+    assert result.device_schedules_path == tmp_path / "maw_device_schedules.csv"
     assert result.equipment_matrix_path == tmp_path / "maw_equipment_matrix.csv"
     assert result.review_report_path == tmp_path / "maw_review_report.csv"
     assert result.scope_gaps_path == tmp_path / "maw_scope_gaps.csv"
@@ -142,6 +159,7 @@ def test_to_dict_returns_string_paths(tmp_path):
         "estimator_brief_path": str(result.estimator_brief_path),
         "drawing_index_path": str(result.drawing_index_path),
         "specification_index_path": str(result.specification_index_path),
+        "device_schedules_path": str(result.device_schedules_path),
         "equipment_matrix_path": str(result.equipment_matrix_path),
         "review_report_path": str(result.review_report_path),
         "scope_gaps_path": str(result.scope_gaps_path),
@@ -166,3 +184,10 @@ def test_exports_estimator_risks_csv(tmp_path):
 
     assert result.estimator_risks_path.exists()
     assert result.estimator_risks_path.name == "plan_review_estimator_risks.csv"
+
+
+def test_exports_device_schedules_csv(tmp_path):
+    result = PlanReviewExportService().export_plan_review(make_result(), tmp_path)
+
+    assert result.device_schedules_path.exists()
+    assert result.device_schedules_path.name == "plan_review_device_schedules.csv"

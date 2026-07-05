@@ -1,6 +1,11 @@
 import csv
 
-from atlas_core.domain import DrawingSheet, SpecificationSection
+from atlas_core.domain import (
+    DeviceSchedule,
+    DeviceScheduleItem,
+    DrawingSheet,
+    SpecificationSection,
+)
 from atlas_core.services import (
     CsvExportService,
     EquipmentMatrixRow,
@@ -472,3 +477,152 @@ def test_handles_empty_recommendations(tmp_path):
         records = list(csv.DictReader(file))
 
     assert records == []
+
+
+def test_exports_single_device_schedule_csv(tmp_path):
+    output_path = tmp_path / "device_schedule.csv"
+    schedule = DeviceSchedule(
+        schedule_id="sched-1",
+        source_sheet_number="AV1.01",
+        items=[
+            DeviceScheduleItem(
+                item_id="sched-1-spk-1",
+                tag="SPK-1",
+                description="Main loudspeaker",
+            )
+        ],
+    )
+
+    written_path = CsvExportService().export_device_schedule(schedule, output_path)
+
+    assert written_path == output_path
+    assert output_path.exists()
+
+
+def test_exports_multiple_device_schedules_csv(tmp_path):
+    output_path = tmp_path / "device_schedules.csv"
+    schedules = [
+        DeviceSchedule(
+            schedule_id="sched-1",
+            source_sheet_number="AV1.01",
+            items=[
+                DeviceScheduleItem(
+                    item_id="sched-1-spk-1",
+                    tag="SPK-1",
+                    description="Main loudspeaker",
+                )
+            ],
+        ),
+        DeviceSchedule(
+            schedule_id="sched-2",
+            source_sheet_number="AV2.01",
+            items=[
+                DeviceScheduleItem(
+                    item_id="sched-2-dsp-1",
+                    tag="DSP-1",
+                    description="Control processor",
+                )
+            ],
+        ),
+    ]
+
+    CsvExportService().export_device_schedules(schedules, output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert len(records) == 2
+
+
+def test_writes_schedule_id(tmp_path):
+    output_path = tmp_path / "device_schedule.csv"
+    schedule = DeviceSchedule(
+        schedule_id="sched-1",
+        items=[
+            DeviceScheduleItem(
+                item_id="sched-1-spk-1",
+                tag="SPK-1",
+                description="Main loudspeaker",
+            )
+        ],
+    )
+
+    CsvExportService().export_device_schedule(schedule, output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["schedule_id"] == "sched-1"
+
+
+def test_writes_source_sheet_number(tmp_path):
+    output_path = tmp_path / "device_schedule.csv"
+    schedule = DeviceSchedule(
+        schedule_id="sched-1",
+        source_sheet_number="AV1.01",
+        items=[
+            DeviceScheduleItem(
+                item_id="sched-1-spk-1",
+                tag="SPK-1",
+                description="Main loudspeaker",
+            )
+        ],
+    )
+
+    CsvExportService().export_device_schedule(schedule, output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["source_sheet_number"] == "AV1.01"
+
+
+def test_writes_device_schedule_item_values(tmp_path):
+    output_path = tmp_path / "device_schedule.csv"
+    schedule = DeviceSchedule(
+        schedule_id="sched-1",
+        source_sheet_number="AV1.01",
+        items=[
+            DeviceScheduleItem(
+                item_id="sched-1-spk-1",
+                tag="SPK-1",
+                description="Main loudspeaker",
+                quantity=2,
+                manufacturer="Acme",
+                model="X100",
+                drawing_reference="AV1.01",
+                specification_reference="27 41 16",
+            )
+        ],
+    )
+
+    CsvExportService().export_device_schedule(schedule, output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["item_id"] == "sched-1-spk-1"
+    assert records[0]["tag"] == "SPK-1"
+    assert records[0]["description"] == "Main loudspeaker"
+    assert records[0]["quantity"] == "2"
+    assert records[0]["manufacturer"] == "Acme"
+    assert records[0]["model"] == "X100"
+    assert records[0]["drawing_reference"] == "AV1.01"
+    assert records[0]["specification_reference"] == "27 41 16"
+
+
+def test_handles_empty_device_schedule(tmp_path):
+    output_path = tmp_path / "device_schedule.csv"
+    schedule = DeviceSchedule(schedule_id="sched-1", source_sheet_number="AV1.01")
+
+    CsvExportService().export_device_schedule(schedule, output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+        rows = list(reader)
+
+    assert "schedule_id" in headers
+    assert "source_sheet_number" in headers
+    assert "item_id" in headers
+    assert rows == []

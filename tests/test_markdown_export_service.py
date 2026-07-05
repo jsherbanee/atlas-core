@@ -1,4 +1,4 @@
-from atlas_core.domain import BidPackageReview
+from atlas_core.domain import BidPackageReview, DeviceSchedule, DeviceScheduleItem
 from atlas_core.services import (
     CrossReference,
     EstimatorBrief,
@@ -333,3 +333,39 @@ def test_includes_drawing_metadata_items(tmp_path):
     assert "Referenced sheets: A-701" in content
     assert "Referenced specifications: 27 41 16" in content
     assert "Rooms: Main Lobby" in content
+
+
+def test_includes_device_schedules_section_with_empty_message(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Device Schedules" in content
+    assert "No device schedules extracted." in content
+
+
+def test_includes_device_schedules_items(tmp_path):
+    output_path = tmp_path / "summary.md"
+    result = make_result()
+    result.review.device_schedules = [
+        DeviceSchedule(
+            schedule_id="sched-1",
+            title="Audio Device Schedule",
+            items=[
+                DeviceScheduleItem(
+                    item_id="sched-1-spk-1",
+                    tag="SPK-1",
+                    description="Main loudspeaker",
+                )
+            ],
+        )
+    ]
+
+    MarkdownExportService().export_plan_review_summary(result, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "- sched-1: Audio Device Schedule (1 items)" in content

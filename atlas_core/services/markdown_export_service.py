@@ -121,6 +121,16 @@ class MarkdownExportService:
                 if getattr(md, "room_names", None):
                     lines.append("  Rooms: " + ", ".join(md.room_names))
 
+        lines.extend(["", "## Device Schedules", ""])
+
+        if not getattr(result.review, "device_schedules", None):
+            lines.append("No device schedules extracted.")
+        else:
+            for schedule in result.review.device_schedules:
+                lines.append(
+                    f"- {schedule.schedule_id}: {schedule.title} ({schedule.item_count()} items)"
+                )
+
         return "\n".join(lines) + "\n"
 
     @staticmethod
