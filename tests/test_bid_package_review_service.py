@@ -387,3 +387,93 @@ def test_includes_drawing_metadata_for_indexed_drawing_sheets():
     assert len(review.drawing_metadata) == 1
     assert review.drawing_metadata[0].sheet_number == "AV1.01"
     assert review.drawing_metadata[0].title == "AV Plan"
+
+
+def test_extracts_device_schedules_from_raw_device_schedules():
+    review = build_review(
+        raw_device_schedules=[
+            {
+                "schedule_id": "sched-1",
+                "source_sheet_number": "AV1.01",
+                "title": "Audio Device Schedule",
+                "rows": [{"tag": "SPK-1", "description": "Main loudspeaker"}],
+            }
+        ]
+    )
+
+    assert len(review.device_schedules) == 1
+    assert review.device_schedules[0].schedule_id == "sched-1"
+    assert review.device_schedules[0].title == "Audio Device Schedule"
+
+
+def test_includes_device_schedules_in_review():
+    review = build_review(
+        raw_device_schedules=[
+            {
+                "schedule_id": "sched-1",
+                "rows": [{"tag": "DSP-1", "description": "Control processor"}],
+            }
+        ]
+    )
+
+    assert review.device_schedule_count() == 1
+
+
+def test_converts_device_schedule_rows_to_equipment():
+    review = build_review(
+        raw_device_schedules=[
+            {
+                "schedule_id": "sched-1",
+                "rows": [{"tag": "DSP-1", "description": "Q-SYS control processor"}],
+            }
+        ]
+    )
+
+    assert any(
+        item.equipment_id == "equipment-sched-1-dsp-1" for item in review.equipment
+    )
+
+
+def test_schedule_derived_equipment_flows_into_review_equipment():
+    supplied_equipment = Equipment(
+        equipment_id="eq-custom",
+        description="Custom display",
+        category=EquipmentCategory.DISPLAY,
+    )
+
+    review = build_review(
+        equipment=[supplied_equipment],
+        raw_device_schedules=[
+            {
+                "schedule_id": "sched-1",
+                "rows": [{"tag": "SPK-1", "description": "Main loudspeaker"}],
+            }
+        ],
+    )
+
+    assert any(item.equipment_id == "eq-custom" for item in review.equipment)
+    assert any(
+        item.equipment_id == "equipment-sched-1-spk-1" for item in review.equipment
+    )
+
+
+def test_schedule_derived_speaker_without_amplifier_creates_resolver_scope_gap_issue():
+    review = build_review(
+        raw_device_schedules=[
+            {
+                "schedule_id": "sched-1",
+                "rows": [{"tag": "SPK-1", "description": "Main loudspeaker"}],
+            }
+        ]
+    )
+
+    assert any(
+        resolution.rule_id == "RULE-001"
+        and resolution.target_id == "equipment-sched-1-spk-1"
+        for resolution in review.resolutions
+    )
+    assert any(
+        gap.gap_id == "speaker_missing_amplifier"
+        and gap.target_id == "equipment-sched-1-spk-1"
+        for gap in review.scope_gaps
+    )

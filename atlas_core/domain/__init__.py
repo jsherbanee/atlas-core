@@ -33,12 +33,12 @@ from atlas_core.domain.vendor_relationship import (
     VendorRelationship,
     VendorRelationshipType,
 )
+from atlas_core.domain.device_schedule import DeviceSchedule, DeviceScheduleItem
 from atlas_core.domain.bid_package_review import BidPackageReview
 from atlas_core.domain.estimate_baseline import (
     EstimateBaseline,
     EstimateBaselineStatus,
 )
-from atlas_core.domain.device_schedule import DeviceSchedule, DeviceScheduleItem
 
 __all__ = [
     "BidPackageReview",

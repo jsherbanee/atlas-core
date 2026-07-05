@@ -57,6 +57,22 @@ def test_includes_specification_count_in_brief():
     assert result.brief.specification_count == 1
 
 
+def test_passes_raw_device_schedules_through_to_review():
+    result = run_review(
+        raw_device_schedules=[
+            {
+                "schedule_id": "sched-1",
+                "source_sheet_number": "AV1.01",
+                "title": "Audio Device Schedule",
+                "rows": [{"tag": "SPK-1", "description": "Main loudspeaker"}],
+            }
+        ]
+    )
+
+    assert result.review.device_schedule_count() == 1
+    assert result.review.device_schedules[0].schedule_id == "sched-1"
+
+
 def test_includes_resolver_issues_in_review_when_equipment_needs_placeholders():
     speaker = Equipment(
         equipment_id="eq-speaker",

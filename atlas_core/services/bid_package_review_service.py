@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from atlas_core.domain import BidPackageReview
+from atlas_core.domain import BidPackageReview, DeviceSchedule
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.services import (
     ConfidenceScoringService,
@@ -20,6 +20,12 @@ from atlas_core.services import (
 )
 
 from atlas_core.services.drawing_metadata_service import DrawingMetadataService
+from atlas_core.services.device_schedule_equipment_service import (
+    DeviceScheduleEquipmentService,
+)
+from atlas_core.services.device_schedule_extraction_service import (
+    DeviceScheduleExtractionService,
+)
 
 if TYPE_CHECKING:
     from atlas_core.domain import BidPackageReview
@@ -40,6 +46,10 @@ class BidPackageReviewService:
         recommendation_service: RecommendationService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
         drawing_metadata_service: DrawingMetadataService | None = None,
+        device_schedule_extraction_service: (
+            DeviceScheduleExtractionService | None
+        ) = None,
+        device_schedule_equipment_service: DeviceScheduleEquipmentService | None = None,
     ) -> None:
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
         self.specification_indexer = (
@@ -63,6 +73,12 @@ class BidPackageReviewService:
         self.drawing_metadata_service = (
             drawing_metadata_service or DrawingMetadataService()
         )
+        self.device_schedule_extraction_service = (
+            device_schedule_extraction_service or DeviceScheduleExtractionService()
+        )
+        self.device_schedule_equipment_service = (
+            device_schedule_equipment_service or DeviceScheduleEquipmentService()
+        )
 
         self.estimate_workflow_service: EstimateWorkflowService = (
             estimate_workflow_service
@@ -82,6 +98,7 @@ class BidPackageReviewService:
         scenes: list | None = None,
         systems: list | None = None,
         equipment: list | None = None,
+        raw_device_schedules: list[dict] | None = None,
     ) -> BidPackageReview:
         inputs = self._prepare_inputs(
             raw_sheets=raw_sheets,
@@ -92,6 +109,7 @@ class BidPackageReviewService:
             scenes=scenes,
             systems=systems,
             equipment=equipment,
+            raw_device_schedules=raw_device_schedules,
         )
 
         drawing_sheets = self.drawing_indexer.index_sheets(inputs["sheet_items"])
@@ -101,18 +119,25 @@ class BidPackageReviewService:
         specification_sections = self.specification_indexer.index_sections(
             inputs["section_items"]
         )
+        device_schedules = self._extract_device_schedules(
+            inputs["device_schedule_items"]
+        )
+        schedule_derived_equipment = self._equipment_from_device_schedules(
+            device_schedules
+        )
 
         system_items = self._detect_systems(
             system_items=inputs["system_items"],
             drawing_sheets=drawing_sheets,
             specification_sections=specification_sections,
         )
-        equipment_items = self._detect_equipment(
+        base_equipment_items = self._detect_equipment(
             equipment_items=inputs["equipment_items"],
             drawing_sheets=drawing_sheets,
             specification_sections=specification_sections,
             system_items=system_items,
         )
+        equipment_items = [*base_equipment_items, *schedule_derived_equipment]
 
         workflow_result = (
             self.estimate_workflow_service.build_equipment_matrix_with_resolutions(
@@ -147,6 +172,7 @@ class BidPackageReviewService:
             cross_references=cross_references,
             scope_gaps=scope_gaps,
             drawing_metadata=drawing_metadata,
+            device_schedules=device_schedules,
         )
         review.estimator_risks = self.estimator_risk_service.assess(review)
         review.confidence = self.confidence_scoring_service.score_review(review)
@@ -165,6 +191,7 @@ class BidPackageReviewService:
         scenes: list | None = None,
         systems: list | None = None,
         equipment: list | None = None,
+        raw_device_schedules: list[dict] | None = None,
     ) -> dict[str, list]:
         return {
             "sheet_items": list(raw_sheets or []),
@@ -175,7 +202,53 @@ class BidPackageReviewService:
             "scene_items": list(scenes or []),
             "system_items": list(systems or []),
             "equipment_items": list(equipment or []),
+            "device_schedule_items": list(raw_device_schedules or []),
         }
+
+    def _extract_device_schedules(
+        self,
+        raw_device_schedules: list[dict],
+    ) -> list[DeviceSchedule]:
+        schedules: list[DeviceSchedule] = []
+        for idx, raw_schedule in enumerate(raw_device_schedules, start=1):
+            if not isinstance(raw_schedule, dict):
+                continue
+
+            schedule_id = raw_schedule.get("schedule_id") or f"device-schedule-{idx}"
+            source_sheet_number = raw_schedule.get("source_sheet_number")
+            title = raw_schedule.get("title") or "Device Schedule"
+            rows = raw_schedule.get("rows")
+            if not isinstance(rows, list):
+                rows = []
+
+            schedules.append(
+                self.device_schedule_extraction_service.extract_from_rows(
+                    schedule_id=schedule_id,
+                    rows=rows,
+                    source_sheet_number=source_sheet_number,
+                    title=title,
+                )
+            )
+
+        return schedules
+
+    def _equipment_from_device_schedules(
+        self,
+        schedules: list[DeviceSchedule],
+    ) -> list:
+        equipment_items: list = []
+        for schedule in schedules:
+            schedule_equipment = (
+                self.device_schedule_equipment_service.equipment_from_schedule(schedule)
+            )
+            fallback_system_id = f"schedule-{schedule.schedule_id}"
+            for equipment in schedule_equipment:
+                if not getattr(equipment, "system_id", None):
+                    equipment.system_id = fallback_system_id
+
+            equipment_items.extend(schedule_equipment)
+
+        return equipment_items
 
     def _detect_systems(
         self,
@@ -214,6 +287,7 @@ class BidPackageReviewService:
         name: str,
         drawing_sheets: list,
         drawing_metadata: list | None,
+        device_schedules: list | None,
         specification_sections: list,
         system_items: list,
         equipment_items: list,
@@ -227,6 +301,7 @@ class BidPackageReviewService:
             name=name,
             drawing_sheets=drawing_sheets,
             drawing_metadata=drawing_metadata or [],
+            device_schedules=device_schedules or [],
             specification_sections=specification_sections,
             systems=system_items,
             equipment=equipment_items,

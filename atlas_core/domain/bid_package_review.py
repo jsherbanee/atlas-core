@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from atlas_core.domain import (
+    DeviceSchedule,
     DrawingSheet,
     Equipment,
     IntegratedSystem,
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from atlas_core.services.estimator_risk_service import EstimatorRisk
     from atlas_core.services.recommendation_service import Recommendation
     from atlas_core.services.scope_gap_service import ScopeGap
+    from atlas_core.services.drawing_metadata_service import DrawingMetadata
 
 
 @dataclass
@@ -31,6 +33,8 @@ class BidPackageReview:
     specification_sections: list[SpecificationSection] = field(default_factory=list)
     systems: list[IntegratedSystem] = field(default_factory=list)
     equipment: list[Equipment] = field(default_factory=list)
+    drawing_metadata: list[DrawingMetadata] = field(default_factory=list)
+    device_schedules: list[DeviceSchedule] = field(default_factory=list)
     resolutions: list[Resolution] = field(default_factory=list)
     manufacturer_review_issues: list[ManufacturerReviewIssue] = field(
         default_factory=list
@@ -61,6 +65,12 @@ class BidPackageReview:
 
     def drawing_count(self) -> int:
         return len(self.drawing_sheets)
+
+    def drawing_metadata_count(self) -> int:
+        return len(self.drawing_metadata)
+
+    def device_schedule_count(self) -> int:
+        return len(self.device_schedules)
 
     def specification_count(self) -> int:
         return len(self.specification_sections)
@@ -109,6 +119,8 @@ class BidPackageReview:
             "scope_gaps": self._serialize_items(self.scope_gaps),
             "estimator_risks": self._serialize_items(self.estimator_risks),
             "recommendations": self._serialize_items(self.recommendations),
+            "drawing_metadata": self._serialize_items(self.drawing_metadata),
+            "device_schedules": self._serialize_items(self.device_schedules),
             "notes": list(self.notes),
             "confidence": self.confidence,
         }

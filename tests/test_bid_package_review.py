@@ -2,6 +2,7 @@ import pytest
 
 from atlas_core.domain import (
     BidPackageReview,
+    DeviceSchedule,
     DrawingDiscipline,
     DrawingSheet,
     Equipment,
@@ -23,6 +24,7 @@ from atlas_core.services import (
     RiskLevel,
     ScopeGap,
 )
+from atlas_core.services import DrawingMetadata
 
 
 def make_drawing_sheet() -> DrawingSheet:
@@ -101,6 +103,10 @@ def make_recommendation() -> Recommendation:
         priority=RecommendationPriority.HIGH,
         category="confidence",
     )
+
+
+def make_device_schedule() -> DeviceSchedule:
+    return DeviceSchedule(schedule_id="sched-001", title="Device Schedule")
 
 
 def test_creating_valid_review():
@@ -294,6 +300,7 @@ def test_to_dict_output():
     scope_gap = make_scope_gap()
     estimator_risk = make_estimator_risk()
     recommendation = make_recommendation()
+    device_schedule = make_device_schedule()
     review = BidPackageReview(
         review_id="review-001",
         project_id="project-001",
@@ -309,6 +316,8 @@ def test_to_dict_output():
         scope_gaps=[scope_gap],
         estimator_risks=[estimator_risk],
         recommendations=[recommendation],
+        drawing_metadata=[DrawingMetadata(sheet_number="AV1.01", title="AV Plan")],
+        device_schedules=[device_schedule],
         notes=["Confirm scope."],
         confidence=0.85,
     )
@@ -343,6 +352,34 @@ def test_to_dict_output():
         "scope_gaps": [scope_gap.to_dict()],
         "estimator_risks": [estimator_risk.to_dict()],
         "recommendations": [recommendation.to_dict()],
+        "drawing_metadata": [
+            DrawingMetadata(sheet_number="AV1.01", title="AV Plan").to_dict()
+        ],
+        "device_schedules": [device_schedule.to_dict()],
         "notes": ["Confirm scope."],
         "confidence": 0.85,
     }
+
+
+def test_drawing_metadata_count():
+    metadata = DrawingMetadata(sheet_number="AV1.01", title="AV Plan")
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        drawing_metadata=[metadata],
+    )
+
+    assert review.drawing_metadata_count() == 1
+
+
+def test_device_schedule_count():
+    schedule = DeviceSchedule(schedule_id="sched-001")
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        device_schedules=[schedule],
+    )
+
+    assert review.device_schedule_count() == 1
