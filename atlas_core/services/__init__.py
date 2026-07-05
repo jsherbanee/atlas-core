@@ -74,6 +74,10 @@ from atlas_core.services.pdf_text_extraction_service import (
     ExtractedPdfPage,
     PdfTextExtractionService,
 )
+from atlas_core.services.drawing_metadata_service import (
+    DrawingMetadata,
+    DrawingMetadataService,
+)
 
 __all__ = [
     "BaselineService",
@@ -87,6 +91,8 @@ __all__ = [
     "DocumentSection",
     "DocumentType",
     "DrawingIndexerService",
+    "DrawingMetadata",
+    "DrawingMetadataService",
     "EquipmentDetectionService",
     "EstimatorBrief",
     "EstimatorBriefService",
