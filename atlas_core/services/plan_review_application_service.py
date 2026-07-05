@@ -18,8 +18,21 @@ class PlanReviewApplicationService:
         )
 
     def run(self, request: PlanReviewRequest) -> PlanReviewResponse:
-        if request.raw_pages:
-            self.document_classifier_service.classify(request.raw_pages)
+        # Resolve request-level document metadata now so it can be passed through
+        # this application layer, while workflow inputs remain unchanged.
+        _document_sections = list(request.document_sections)
+        _document_section_summary = request.document_section_summary
+
+        if request.raw_pages and not _document_sections:
+            _document_sections = [
+                section.to_dict()
+                for section in self.document_classifier_service.classify(
+                    request.raw_pages
+                )
+            ]
+
+        request.document_sections = _document_sections
+        request.document_section_summary = _document_section_summary
 
         result = self.workflow_service.run_review(
             review_id=request.review_id,
