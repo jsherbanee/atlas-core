@@ -24,6 +24,9 @@ class EstimatorBrief:
     cross_reference_count: int
     scope_gap_count: int
     estimator_risk_count: int
+    keynote_count: int
+    legend_count: int
+    legend_item_count: int
     confidence: float
     recommendation_count: int = 0
 
@@ -47,6 +50,9 @@ class EstimatorBriefService:
             cross_reference_count=review.cross_reference_count(),
             scope_gap_count=review.scope_gap_count(),
             estimator_risk_count=review.estimator_risk_count(),
+            keynote_count=review.keynote_count(),
+            legend_count=review.legend_count(),
+            legend_item_count=review.legend_item_count(),
             recommendation_count=review.recommendation_count(),
             confidence=review.confidence,
         )

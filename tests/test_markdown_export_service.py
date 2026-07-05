@@ -1,4 +1,11 @@
-from atlas_core.domain import BidPackageReview, DeviceSchedule, DeviceScheduleItem
+from atlas_core.domain import (
+    BidPackageReview,
+    DeviceSchedule,
+    DeviceScheduleItem,
+    Keynote,
+    Legend,
+    LegendItem,
+)
 from atlas_core.services import (
     CrossReference,
     EstimatorBrief,
@@ -41,6 +48,9 @@ def make_result(
             cross_reference_count=len(cross_references or []),
             scope_gap_count=len(scope_gaps or []),
             estimator_risk_count=len(estimator_risks or []),
+            keynote_count=0,
+            legend_count=0,
+            legend_item_count=0,
             confidence=0.75,
         ),
     )
@@ -369,3 +379,77 @@ def test_includes_device_schedules_items(tmp_path):
 
     content = output_path.read_text(encoding="utf-8")
     assert "- sched-1: Audio Device Schedule (1 items)" in content
+
+
+def test_includes_keynotes_section_with_empty_message(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Keynotes" in content
+    assert "No keynotes extracted." in content
+
+
+def test_includes_keynotes_items(tmp_path):
+    output_path = tmp_path / "summary.md"
+    result = make_result()
+    result.review.keynotes = [
+        Keynote(
+            keynote_id="av1.01-keynote-k1",
+            number="K1",
+            description="Ceiling Speaker",
+            source_sheet_number="AV1.01",
+        )
+    ]
+
+    MarkdownExportService().export_plan_review_summary(result, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "- AV1.01 keynote K1: Ceiling Speaker" in content
+
+
+def test_includes_legends_section_with_empty_message(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Legends" in content
+    assert "No legends extracted." in content
+
+
+def test_includes_legend_items(tmp_path):
+    output_path = tmp_path / "summary.md"
+    result = make_result()
+    result.review.legends = [
+        Legend(
+            legend_id="av1.01-legend",
+            source_sheet_number="AV1.01",
+            items=[
+                LegendItem(
+                    legend_item_id="av1.01-legend-spk",
+                    symbol="SPK",
+                    description="Ceiling Speaker",
+                ),
+                LegendItem(
+                    legend_item_id="av1.01-legend-cam",
+                    symbol="CAM",
+                    description="PTZ Camera",
+                ),
+            ],
+        )
+    ]
+
+    MarkdownExportService().export_plan_review_summary(result, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "- AV1.01: 2 items" in content
+    assert "  - SPK: Ceiling Speaker" in content
+    assert "  - CAM: PTZ Camera" in content

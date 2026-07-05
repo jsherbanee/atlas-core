@@ -29,6 +29,7 @@ from atlas_core.services.device_schedule_extraction_service import (
 
 if TYPE_CHECKING:
     from atlas_core.domain import BidPackageReview
+    from atlas_core.services import KeynoteExtractionService, LegendExtractionService
 
 
 class BidPackageReviewService:
@@ -50,7 +51,14 @@ class BidPackageReviewService:
             DeviceScheduleExtractionService | None
         ) = None,
         device_schedule_equipment_service: DeviceScheduleEquipmentService | None = None,
+        keynote_extraction_service: KeynoteExtractionService | None = None,
+        legend_extraction_service: LegendExtractionService | None = None,
     ) -> None:
+        from atlas_core.services import (
+            KeynoteExtractionService,
+            LegendExtractionService,
+        )
+
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
         self.specification_indexer = (
             specification_indexer or SpecificationIndexerService()
@@ -78,6 +86,12 @@ class BidPackageReviewService:
         )
         self.device_schedule_equipment_service = (
             device_schedule_equipment_service or DeviceScheduleEquipmentService()
+        )
+        self.keynote_extraction_service = (
+            keynote_extraction_service or KeynoteExtractionService()
+        )
+        self.legend_extraction_service = (
+            legend_extraction_service or LegendExtractionService()
         )
 
         self.estimate_workflow_service: EstimateWorkflowService = (
@@ -113,8 +127,23 @@ class BidPackageReviewService:
         )
 
         drawing_sheets = self.drawing_indexer.index_sheets(inputs["sheet_items"])
+        self._enrich_indexed_drawing_sheets(
+            drawing_sheets=drawing_sheets,
+            raw_sheets=inputs["sheet_items"],
+        )
         drawing_metadata = [
             self.drawing_metadata_service.extract(sheet) for sheet in drawing_sheets
+        ]
+        keynotes = [
+            keynote
+            for sheet in drawing_sheets
+            for keynote in self.keynote_extraction_service.extract_from_sheet(sheet)
+        ]
+        legends = [
+            legend
+            for sheet in drawing_sheets
+            for legend in [self.legend_extraction_service.extract_from_sheet(sheet)]
+            if legend is not None
         ]
         specification_sections = self.specification_indexer.index_sections(
             inputs["section_items"]
@@ -173,6 +202,8 @@ class BidPackageReviewService:
             scope_gaps=scope_gaps,
             drawing_metadata=drawing_metadata,
             device_schedules=device_schedules,
+            keynotes=keynotes,
+            legends=legends,
         )
         review.estimator_risks = self.estimator_risk_service.assess(review)
         review.confidence = self.confidence_scoring_service.score_review(review)
@@ -280,6 +311,44 @@ class BidPackageReviewService:
             system_id=self._first_system_id(system_items),
         )
 
+    @staticmethod
+    def _enrich_indexed_drawing_sheets(
+        drawing_sheets: list,
+        raw_sheets: list[dict],
+    ) -> None:
+        raw_by_key: dict[tuple[str, str], dict] = {}
+        for raw_sheet in raw_sheets:
+            if not isinstance(raw_sheet, dict):
+                continue
+
+            sheet_number = raw_sheet.get("sheet_number")
+            title = raw_sheet.get("title")
+            if not isinstance(sheet_number, str) or not isinstance(title, str):
+                continue
+
+            key = (sheet_number.strip().casefold(), title.strip().casefold())
+            raw_by_key[key] = raw_sheet
+
+        for drawing_sheet in drawing_sheets:
+            key = (
+                drawing_sheet.sheet_number.strip().casefold(),
+                drawing_sheet.title.strip().casefold(),
+            )
+            matched_raw_sheet = raw_by_key.get(key)
+            if matched_raw_sheet is None:
+                continue
+
+            notes = matched_raw_sheet.get("notes")
+            if isinstance(notes, list):
+                drawing_sheet.notes = []
+                for note in notes:
+                    if isinstance(note, str) and note.strip():
+                        drawing_sheet.add_note(note)
+
+            confidence = matched_raw_sheet.get("confidence")
+            if isinstance(confidence, (int, float)) and 0 <= confidence <= 1:
+                drawing_sheet.confidence = confidence
+
     def _assemble_review(
         self,
         review_id: str,
@@ -288,6 +357,8 @@ class BidPackageReviewService:
         drawing_sheets: list,
         drawing_metadata: list | None,
         device_schedules: list | None,
+        keynotes: list | None,
+        legends: list | None,
         specification_sections: list,
         system_items: list,
         equipment_items: list,
@@ -302,6 +373,8 @@ class BidPackageReviewService:
             drawing_sheets=drawing_sheets,
             drawing_metadata=drawing_metadata or [],
             device_schedules=device_schedules or [],
+            keynotes=keynotes or [],
+            legends=legends or [],
             specification_sections=specification_sections,
             systems=system_items,
             equipment=equipment_items,

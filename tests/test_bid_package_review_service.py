@@ -477,3 +477,65 @@ def test_schedule_derived_speaker_without_amplifier_creates_resolver_scope_gap_i
         and gap.target_id == "equipment-sched-1-spk-1"
         for gap in review.scope_gaps
     )
+
+
+def test_extracts_keynotes_from_drawing_notes():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+                "notes": ["K1: Ceiling Speaker"],
+            }
+        ]
+    )
+
+    assert review.keynote_count() == 1
+    assert review.keynotes[0].number == "K1"
+    assert review.keynotes[0].description == "Ceiling Speaker"
+
+
+def test_extracts_legends_from_drawing_notes():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+                "notes": ["SPK - Ceiling Speaker"],
+            }
+        ]
+    )
+
+    assert review.legend_count() == 1
+    assert review.legends[0].item_count() == 1
+    assert review.legends[0].items[0].symbol == "SPK"
+
+
+def test_includes_keynotes_in_review():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+                "notes": ["1 - Projector"],
+            }
+        ]
+    )
+
+    assert len(review.keynotes) == 1
+    assert review.keynotes[0].keynote_id == "av1.01-keynote-1"
+
+
+def test_includes_legends_in_review():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+                "notes": ["△ Wireless Microphone"],
+            }
+        ]
+    )
+
+    assert len(review.legends) == 1
+    assert review.legends[0].legend_id == "av1.01-legend"

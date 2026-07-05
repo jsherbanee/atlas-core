@@ -8,6 +8,9 @@ from atlas_core.domain import (
     Equipment,
     EquipmentCategory,
     IntegratedSystem,
+    Keynote,
+    Legend,
+    LegendItem,
     SpecificationDiscipline,
     SpecificationSection,
     SystemCategory,
@@ -107,6 +110,29 @@ def make_recommendation() -> Recommendation:
 
 def make_device_schedule() -> DeviceSchedule:
     return DeviceSchedule(schedule_id="sched-001", title="Device Schedule")
+
+
+def make_keynote() -> Keynote:
+    return Keynote(
+        keynote_id="av101-kn-1",
+        number="1",
+        description="Ceiling Speaker",
+        source_sheet_number="AV1.01",
+    )
+
+
+def make_legend() -> Legend:
+    return Legend(
+        legend_id="av1.01-legend",
+        source_sheet_number="AV1.01",
+        items=[
+            LegendItem(
+                legend_item_id="av1.01-legend-spk",
+                symbol="SPK",
+                description="Ceiling Speaker",
+            )
+        ],
+    )
 
 
 def test_creating_valid_review():
@@ -301,6 +327,8 @@ def test_to_dict_output():
     estimator_risk = make_estimator_risk()
     recommendation = make_recommendation()
     device_schedule = make_device_schedule()
+    keynote = make_keynote()
+    legend = make_legend()
     review = BidPackageReview(
         review_id="review-001",
         project_id="project-001",
@@ -318,6 +346,8 @@ def test_to_dict_output():
         recommendations=[recommendation],
         drawing_metadata=[DrawingMetadata(sheet_number="AV1.01", title="AV Plan")],
         device_schedules=[device_schedule],
+        keynotes=[keynote],
+        legends=[legend],
         notes=["Confirm scope."],
         confidence=0.85,
     )
@@ -356,6 +386,8 @@ def test_to_dict_output():
             DrawingMetadata(sheet_number="AV1.01", title="AV Plan").to_dict()
         ],
         "device_schedules": [device_schedule.to_dict()],
+        "keynotes": [keynote.to_dict()],
+        "legends": [legend.to_dict()],
         "notes": ["Confirm scope."],
         "confidence": 0.85,
     }
@@ -383,3 +415,54 @@ def test_device_schedule_count():
     )
 
     assert review.device_schedule_count() == 1
+
+
+def test_keynote_count():
+    keynote = make_keynote()
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        keynotes=[keynote],
+    )
+
+    assert review.keynote_count() == 1
+
+
+def test_legend_count():
+    legend = make_legend()
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        legends=[legend],
+    )
+
+    assert review.legend_count() == 1
+
+
+def test_legend_item_count():
+    legend_a = make_legend()
+    legend_b = Legend(
+        legend_id="av1.02-legend",
+        items=[
+            LegendItem(
+                legend_item_id="av1.02-legend-cam",
+                symbol="CAM",
+                description="PTZ Camera",
+            ),
+            LegendItem(
+                legend_item_id="av1.02-legend-dsp",
+                symbol="DSP",
+                description="Display",
+            ),
+        ],
+    )
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        legends=[legend_a, legend_b],
+    )
+
+    assert review.legend_item_count() == 3

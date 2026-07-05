@@ -16,6 +16,7 @@ from atlas_core.rules import Resolution
 from atlas_core.utils.refactoring import serialize_item, serialize_items
 
 if TYPE_CHECKING:
+    from atlas_core.domain import Keynote, Legend
     from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
     from atlas_core.services.cross_reference_service import CrossReference
     from atlas_core.services.estimator_risk_service import EstimatorRisk
@@ -35,6 +36,8 @@ class BidPackageReview:
     equipment: list[Equipment] = field(default_factory=list)
     drawing_metadata: list[DrawingMetadata] = field(default_factory=list)
     device_schedules: list[DeviceSchedule] = field(default_factory=list)
+    keynotes: list[Keynote] = field(default_factory=list)
+    legends: list[Legend] = field(default_factory=list)
     resolutions: list[Resolution] = field(default_factory=list)
     manufacturer_review_issues: list[ManufacturerReviewIssue] = field(
         default_factory=list
@@ -71,6 +74,15 @@ class BidPackageReview:
 
     def device_schedule_count(self) -> int:
         return len(self.device_schedules)
+
+    def keynote_count(self) -> int:
+        return len(self.keynotes)
+
+    def legend_count(self) -> int:
+        return len(self.legends)
+
+    def legend_item_count(self) -> int:
+        return sum(legend.item_count() for legend in self.legends)
 
     def specification_count(self) -> int:
         return len(self.specification_sections)
@@ -121,6 +133,8 @@ class BidPackageReview:
             "recommendations": self._serialize_items(self.recommendations),
             "drawing_metadata": self._serialize_items(self.drawing_metadata),
             "device_schedules": self._serialize_items(self.device_schedules),
+            "keynotes": self._serialize_items(self.keynotes),
+            "legends": self._serialize_items(self.legends),
             "notes": list(self.notes),
             "confidence": self.confidence,
         }

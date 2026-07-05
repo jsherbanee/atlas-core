@@ -4,6 +4,9 @@ from atlas_core.domain import (
     Equipment,
     EquipmentCategory,
     IntegratedSystem,
+    Keynote,
+    Legend,
+    LegendItem,
     SpecificationSection,
     SystemCategory,
 )
@@ -119,6 +122,32 @@ def make_review() -> BidPackageReview:
                 category="confidence",
             )
         ],
+        keynotes=[
+            Keynote(
+                keynote_id="av101-keynote-k1",
+                number="K1",
+                description="Ceiling Speaker",
+                source_sheet_number="AV1.01",
+            )
+        ],
+        legends=[
+            Legend(
+                legend_id="av1.01-legend",
+                source_sheet_number="AV1.01",
+                items=[
+                    LegendItem(
+                        legend_item_id="av1.01-legend-spk",
+                        symbol="SPK",
+                        description="Ceiling Speaker",
+                    ),
+                    LegendItem(
+                        legend_item_id="av1.01-legend-cam",
+                        symbol="CAM",
+                        description="PTZ Camera",
+                    ),
+                ],
+            )
+        ],
         confidence=0.82,
     )
 
@@ -192,6 +221,24 @@ def test_counts_estimator_risks():
     assert brief.estimator_risk_count == 1
 
 
+def test_counts_keynotes():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.keynote_count == 1
+
+
+def test_counts_legends():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.legend_count == 1
+
+
+def test_counts_legend_items():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.legend_item_count == 2
+
+
 def test_counts_recommendations():
     brief = EstimatorBriefService().build_brief(make_review())
 
@@ -213,6 +260,9 @@ def test_to_dict_output():
         cross_reference_count=1,
         scope_gap_count=1,
         estimator_risk_count=1,
+        keynote_count=1,
+        legend_count=1,
+        legend_item_count=2,
         recommendation_count=1,
         confidence=0.82,
     )
@@ -231,6 +281,9 @@ def test_to_dict_output():
         "cross_reference_count": 1,
         "scope_gap_count": 1,
         "estimator_risk_count": 1,
+        "keynote_count": 1,
+        "legend_count": 1,
+        "legend_item_count": 2,
         "recommendation_count": 1,
         "confidence": 0.82,
     }

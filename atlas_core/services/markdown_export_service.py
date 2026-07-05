@@ -131,6 +131,28 @@ class MarkdownExportService:
                     f"- {schedule.schedule_id}: {schedule.title} ({schedule.item_count()} items)"
                 )
 
+        lines.extend(["", "## Keynotes", ""])
+
+        if not getattr(result.review, "keynotes", None):
+            lines.append("No keynotes extracted.")
+        else:
+            for keynote in result.review.keynotes:
+                lines.append(
+                    f"- {keynote.source_sheet_number} keynote {keynote.number}: {keynote.description}"
+                )
+
+        lines.extend(["", "## Legends", ""])
+
+        if not getattr(result.review, "legends", None):
+            lines.append("No legends extracted.")
+        else:
+            for legend in result.review.legends:
+                lines.append(
+                    f"- {legend.source_sheet_number}: {legend.item_count()} items"
+                )
+                for legend_item in legend.items:
+                    lines.append(f"  - {legend_item.symbol}: {legend_item.description}")
+
         return "\n".join(lines) + "\n"
 
     @staticmethod

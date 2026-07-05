@@ -206,6 +206,9 @@ def test_exports_estimator_brief_csv(tmp_path):
         cross_reference_count=3,
         scope_gap_count=4,
         estimator_risk_count=5,
+        keynote_count=0,
+        legend_count=0,
+        legend_item_count=0,
         confidence=0.75,
     )
 

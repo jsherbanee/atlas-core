@@ -106,6 +106,9 @@ def make_result() -> PlanReviewWorkflowResult:
             cross_reference_count=0,
             scope_gap_count=1,
             estimator_risk_count=1,
+            keynote_count=0,
+            legend_count=0,
+            legend_item_count=0,
             confidence=0.75,
         ),
     )
