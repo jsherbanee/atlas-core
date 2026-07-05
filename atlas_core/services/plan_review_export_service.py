@@ -20,6 +20,7 @@ class PlanReviewExportResult:
     review_report_path: Path
     scope_gaps_path: Path
     estimator_risks_path: Path
+    recommendations_path: Path
     markdown_summary_path: Path
 
     def to_dict(self) -> dict[str, str]:
@@ -31,6 +32,7 @@ class PlanReviewExportResult:
             "review_report_path": str(self.review_report_path),
             "scope_gaps_path": str(self.scope_gaps_path),
             "estimator_risks_path": str(self.estimator_risks_path),
+            "recommendations_path": str(self.recommendations_path),
             "markdown_summary_path": str(self.markdown_summary_path),
         }
 
@@ -85,6 +87,10 @@ class PlanReviewExportService:
             result.review.estimator_risks,
             output_path / f"{prefix}_estimator_risks.csv",
         )
+        recommendations_path = self.csv_export_service.export_recommendations(
+            result.review.recommendations,
+            output_path / f"{prefix}_recommendations.csv",
+        )
         markdown_summary_path = (
             self.markdown_export_service.export_plan_review_summary(
                 result,
@@ -100,6 +106,7 @@ class PlanReviewExportService:
             review_report_path=review_report_path,
             scope_gaps_path=scope_gaps_path,
             estimator_risks_path=estimator_risks_path,
+            recommendations_path=recommendations_path,
             markdown_summary_path=markdown_summary_path,
         )
 

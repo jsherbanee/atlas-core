@@ -219,6 +219,7 @@ def _demo_maw_plan_review(output_dir: Path) -> int:
     )
     print(f"equipment matrix csv export: {export_paths['equipment_matrix_path']}")
     print(f"review report csv export: {export_paths['review_report_path']}")
+    print(f"recommendations csv export: {export_paths['recommendations_path']}")
     print(
         "plan review summary markdown export: "
         f"{export_paths['markdown_summary_path']}"

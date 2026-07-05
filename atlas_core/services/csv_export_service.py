@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from atlas_core.services.equipment_matrix_service import EquipmentMatrixRow
 from atlas_core.services.estimator_risk_service import EstimatorRisk
+from atlas_core.services.recommendation_service import Recommendation
 from atlas_core.services.review_report_service import ReviewReportItem
 from atlas_core.services.scope_gap_service import ScopeGap
 
@@ -67,6 +68,22 @@ class CsvExportService:
         return self._write_csv(
             headers=list(brief_data.keys()),
             rows=[brief_data],
+            output_path=output_path,
+        )
+
+    def export_recommendations(
+        self,
+        recommendations: list[Recommendation],
+        output_path: str | Path,
+    ) -> Path:
+        return self._write_csv(
+            headers=list(
+                Recommendation(
+                    recommendation_id="recommendation_id",
+                    message="Message.",
+                ).to_dict().keys()
+            ),
+            rows=[recommendation.to_dict() for recommendation in recommendations],
             output_path=output_path,
         )
 

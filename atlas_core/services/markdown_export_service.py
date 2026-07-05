@@ -90,6 +90,17 @@ class MarkdownExportService:
                     f"{risk.category}: {risk.message}"
                 )
 
+        lines.extend(["", "## Recommendations", ""])
+
+        if not result.review.recommendations:
+            lines.append("No recommendations found.")
+        else:
+            for recommendation in result.review.recommendations:
+                lines.append(
+                    f"- [{recommendation.priority.value}] "
+                    f"{recommendation.category}: {recommendation.message}"
+                )
+
         return "\n".join(lines) + "\n"
 
     @staticmethod
