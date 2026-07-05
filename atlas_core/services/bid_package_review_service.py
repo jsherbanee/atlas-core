@@ -19,6 +19,8 @@ from atlas_core.services import (
     SystemDetectionService,
 )
 
+from atlas_core.services.drawing_metadata_service import DrawingMetadataService
+
 if TYPE_CHECKING:
     from atlas_core.domain import BidPackageReview
 
@@ -37,6 +39,7 @@ class BidPackageReviewService:
         confidence_scoring_service: ConfidenceScoringService | None = None,
         recommendation_service: RecommendationService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
+        drawing_metadata_service: DrawingMetadataService | None = None,
     ) -> None:
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
         self.specification_indexer = (
@@ -57,6 +60,9 @@ class BidPackageReviewService:
             confidence_scoring_service or ConfidenceScoringService()
         )
         self.recommendation_service = recommendation_service or RecommendationService()
+        self.drawing_metadata_service = (
+            drawing_metadata_service or DrawingMetadataService()
+        )
 
         self.estimate_workflow_service: EstimateWorkflowService = (
             estimate_workflow_service
@@ -89,6 +95,9 @@ class BidPackageReviewService:
         )
 
         drawing_sheets = self.drawing_indexer.index_sheets(inputs["sheet_items"])
+        drawing_metadata = [
+            self.drawing_metadata_service.extract(sheet) for sheet in drawing_sheets
+        ]
         specification_sections = self.specification_indexer.index_sections(
             inputs["section_items"]
         )
@@ -137,6 +146,7 @@ class BidPackageReviewService:
             workflow_result=workflow_result,
             cross_references=cross_references,
             scope_gaps=scope_gaps,
+            drawing_metadata=drawing_metadata,
         )
         review.estimator_risks = self.estimator_risk_service.assess(review)
         review.confidence = self.confidence_scoring_service.score_review(review)
@@ -203,6 +213,7 @@ class BidPackageReviewService:
         project_id: str,
         name: str,
         drawing_sheets: list,
+        drawing_metadata: list | None,
         specification_sections: list,
         system_items: list,
         equipment_items: list,
@@ -215,6 +226,7 @@ class BidPackageReviewService:
             project_id=project_id,
             name=name,
             drawing_sheets=drawing_sheets,
+            drawing_metadata=drawing_metadata or [],
             specification_sections=specification_sections,
             systems=system_items,
             equipment=equipment_items,

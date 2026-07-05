@@ -372,3 +372,18 @@ def test_works_with_empty_inputs():
     assert review.cross_references == []
     assert review.scope_gaps == []
     assert review.estimator_risks == []
+
+
+def test_includes_drawing_metadata_for_indexed_drawing_sheets():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+            }
+        ],
+    )
+
+    assert len(review.drawing_metadata) == 1
+    assert review.drawing_metadata[0].sheet_number == "AV1.01"
+    assert review.drawing_metadata[0].title == "AV Plan"
