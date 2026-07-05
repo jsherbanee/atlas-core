@@ -101,6 +101,9 @@ from atlas_core.services.final_estimator_review_service import (
     FinalEstimatorReviewService,
 )
 from atlas_core.services.json_export_service import JsonExportService
+from atlas_core.services.plan_review_application_service import (
+    PlanReviewApplicationService,
+)
 
 __all__ = [
     "BaselineService",
@@ -140,6 +143,7 @@ __all__ = [
     "MarkdownExportService",
     "PlanReviewExportResult",
     "PlanReviewExportService",
+    "PlanReviewApplicationService",
     "PlanReviewReadiness",
     "PlanReviewReadinessService",
     "PlanReviewWorkflowResult",
