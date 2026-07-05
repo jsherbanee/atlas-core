@@ -169,6 +169,7 @@ def test_exports_all_plan_review_files(tmp_path):
 
     assert result.estimator_brief_path.exists()
     assert result.final_estimator_review_path.exists()
+    assert result.json_path.exists()
     assert result.drawing_index_path.exists()
     assert result.specification_index_path.exists()
     assert result.device_schedules_path.exists()
@@ -203,6 +204,7 @@ def test_supports_custom_prefix(tmp_path):
         result.final_estimator_review_path
         == tmp_path / "maw_final_estimator_review.csv"
     )
+    assert result.json_path == tmp_path / "maw_plan_review.json"
     assert result.drawing_index_path == tmp_path / "maw_drawing_index.csv"
     assert result.specification_index_path == tmp_path / "maw_specification_index.csv"
     assert result.device_schedules_path == tmp_path / "maw_device_schedules.csv"
@@ -225,6 +227,7 @@ def test_to_dict_returns_string_paths(tmp_path):
     assert result.to_dict() == {
         "estimator_brief_path": str(result.estimator_brief_path),
         "final_estimator_review_path": str(result.final_estimator_review_path),
+        "json_path": str(result.json_path),
         "drawing_index_path": str(result.drawing_index_path),
         "specification_index_path": str(result.specification_index_path),
         "device_schedules_path": str(result.device_schedules_path),

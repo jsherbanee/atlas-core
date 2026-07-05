@@ -100,6 +100,7 @@ from atlas_core.services.final_estimator_review_service import (
     FinalEstimatorReview,
     FinalEstimatorReviewService,
 )
+from atlas_core.services.json_export_service import JsonExportService
 
 __all__ = [
     "BaselineService",
@@ -131,6 +132,7 @@ __all__ = [
     "EstimateWorkflowService",
     "FinalEstimatorReview",
     "FinalEstimatorReviewService",
+    "JsonExportService",
     "KeynoteExtractionService",
     "LegendExtractionService",
     "ManufacturerReviewIssue",

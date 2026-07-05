@@ -9,12 +9,14 @@ from atlas_core.services import (
     MarkdownExportService,
     PlanReviewWorkflowResult,
 )
+from atlas_core.services.json_export_service import JsonExportService
 
 
 @dataclass
 class PlanReviewExportResult:
     estimator_brief_path: Path
     final_estimator_review_path: Path
+    json_path: Path
     drawing_index_path: Path
     specification_index_path: Path
     device_schedules_path: Path
@@ -32,6 +34,7 @@ class PlanReviewExportResult:
         return {
             "estimator_brief_path": str(self.estimator_brief_path),
             "final_estimator_review_path": str(self.final_estimator_review_path),
+            "json_path": str(self.json_path),
             "drawing_index_path": str(self.drawing_index_path),
             "specification_index_path": str(self.specification_index_path),
             "device_schedules_path": str(self.device_schedules_path),
@@ -51,9 +54,11 @@ class PlanReviewExportService:
     def __init__(
         self,
         csv_export_service: CsvExportService | None = None,
+        json_export_service: JsonExportService | None = None,
         markdown_export_service: MarkdownExportService | None = None,
     ) -> None:
         self.csv_export_service = csv_export_service or CsvExportService()
+        self.json_export_service = json_export_service or JsonExportService()
         self.markdown_export_service = (
             markdown_export_service or MarkdownExportService()
         )
@@ -82,6 +87,10 @@ class PlanReviewExportService:
                 final_review,
                 output_path / f"{prefix}_final_estimator_review.csv",
             )
+        )
+        json_path = self.json_export_service.export_plan_review_result(
+            result,
+            output_path / f"{prefix}_plan_review.json",
         )
         drawing_index_path = self.csv_export_service.export_drawing_index(
             result.review.drawing_sheets,
@@ -137,6 +146,7 @@ class PlanReviewExportService:
         return PlanReviewExportResult(
             estimator_brief_path=estimator_brief_path,
             final_estimator_review_path=final_estimator_review_path,
+            json_path=json_path,
             drawing_index_path=drawing_index_path,
             specification_index_path=specification_index_path,
             device_schedules_path=device_schedules_path,
