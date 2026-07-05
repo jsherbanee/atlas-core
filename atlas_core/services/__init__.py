@@ -16,6 +16,10 @@ from atlas_core.services.document_classifier_service import (
     DocumentSection,
     DocumentType,
 )
+from atlas_core.services.document_section_summary_service import (
+    DocumentSectionSummary,
+    DocumentSectionSummaryService,
+)
 from atlas_core.services.drawing_indexer_service import DrawingIndexerService
 from atlas_core.services.equipment_detection_service import EquipmentDetectionService
 from atlas_core.services.resolution_service import ResolutionService
@@ -121,6 +125,8 @@ __all__ = [
     "CsvExportService",
     "DocumentClassifierService",
     "DocumentSection",
+    "DocumentSectionSummary",
+    "DocumentSectionSummaryService",
     "DocumentType",
     "DrawingIndexerService",
     "DrawingMetadata",
