@@ -14,6 +14,8 @@ from atlas_core.services import (
     EquipmentMatrixRow,
     EstimatorBrief,
     EstimatorRisk,
+    ReconciliationIssue,
+    ReconciliationSeverity,
     Recommendation,
     ReviewReportItem,
     ScopeGap,
@@ -516,6 +518,85 @@ def test_handles_empty_scope_gaps(tmp_path):
     output_path = tmp_path / "scope_gaps.csv"
 
     CsvExportService().export_scope_gaps([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records == []
+
+
+def test_exports_reconciliation_issues_csv(tmp_path):
+    output_path = tmp_path / "reconciliation" / "issues.csv"
+
+    written_path = CsvExportService().export_reconciliation_issues(
+        [
+            ReconciliationIssue(
+                issue_id="device_schedule_item_missing_equipment:sched-1-dsp-1",
+                message=(
+                    "Device schedule item is not represented in equipment matrix."
+                ),
+            )
+        ],
+        output_path,
+    )
+
+    assert written_path == output_path
+    assert output_path.exists()
+
+
+def test_writes_reconciliation_issue_headers(tmp_path):
+    output_path = tmp_path / "reconciliation_issues.csv"
+
+    CsvExportService().export_reconciliation_issues([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+
+    assert headers == list(
+        ReconciliationIssue(
+            issue_id="issue",
+            message="Message.",
+        )
+        .to_dict()
+        .keys()
+    )
+
+
+def test_writes_reconciliation_issue_values(tmp_path):
+    output_path = tmp_path / "reconciliation_issues.csv"
+    issue = ReconciliationIssue(
+        issue_id="device_schedule_item_missing_equipment:sched-1-dsp-1",
+        message="Device schedule item is not represented in equipment matrix.",
+        severity=ReconciliationSeverity.HIGH,
+        target_id="sched-1-dsp-1",
+        suggested_action="Add item to equipment matrix.",
+        confidence=0.9,
+    )
+
+    CsvExportService().export_reconciliation_issues([issue], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert (
+        records[0]["issue_id"] == "device_schedule_item_missing_equipment:sched-1-dsp-1"
+    )
+    assert (
+        records[0]["message"]
+        == "Device schedule item is not represented in equipment matrix."
+    )
+    assert records[0]["severity"] == "high"
+    assert records[0]["source"] == "scope_reconciliation"
+    assert records[0]["target_id"] == "sched-1-dsp-1"
+    assert records[0]["suggested_action"] == "Add item to equipment matrix."
+    assert records[0]["confidence"] == "0.9"
+
+
+def test_handles_empty_reconciliation_issues(tmp_path):
+    output_path = tmp_path / "reconciliation_issues.csv"
+
+    CsvExportService().export_reconciliation_issues([], output_path)
 
     with output_path.open(encoding="utf-8", newline="") as file:
         records = list(csv.DictReader(file))

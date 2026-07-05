@@ -10,6 +10,7 @@ from atlas_core.services.equipment_matrix_service import EquipmentMatrixRow
 from atlas_core.services.estimator_risk_service import EstimatorRisk
 from atlas_core.services.recommendation_service import Recommendation
 from atlas_core.services.review_report_service import ReviewReportItem
+from atlas_core.services.scope_reconciliation_service import ReconciliationIssue
 from atlas_core.services.scope_gap_service import ScopeGap
 
 if TYPE_CHECKING:
@@ -314,6 +315,24 @@ class CsvExportService:
                 .keys()
             ),
             rows=[gap.to_dict() for gap in gaps],
+            output_path=output_path,
+        )
+
+    def export_reconciliation_issues(
+        self,
+        issues: list[ReconciliationIssue],
+        output_path: str | Path,
+    ) -> Path:
+        return self._write_csv(
+            headers=list(
+                ReconciliationIssue(
+                    issue_id="issue",
+                    message="Message.",
+                )
+                .to_dict()
+                .keys()
+            ),
+            rows=[issue.to_dict() for issue in issues],
             output_path=output_path,
         )
 

@@ -17,6 +17,7 @@ from atlas_core.services import (
     EstimatorRisk,
     PlanReviewExportService,
     PlanReviewWorkflowResult,
+    ReconciliationIssue,
     ReviewReportItem,
     ScopeGap,
     RiskLevel,
@@ -98,6 +99,16 @@ def make_result() -> PlanReviewWorkflowResult:
                     message="Review item.",
                 )
             ],
+            reconciliation_issues=[
+                ReconciliationIssue(
+                    issue_id="keynote_missing_equipment_category:projector",
+                    message=(
+                        "Keynote references equipment category not found in "
+                        "equipment matrix."
+                    ),
+                    target_id="kn-001",
+                )
+            ],
             scope_gaps=[
                 ScopeGap(
                     gap_id="speaker_missing_amplifier",
@@ -147,6 +158,7 @@ def test_exports_all_plan_review_files(tmp_path):
     assert result.device_schedules_path.exists()
     assert result.keynotes_path.exists()
     assert result.legends_path.exists()
+    assert result.reconciliation_issues_path.exists()
     assert result.equipment_matrix_path.exists()
     assert result.review_report_path.exists()
     assert result.scope_gaps_path.exists()
@@ -176,6 +188,9 @@ def test_supports_custom_prefix(tmp_path):
     assert result.device_schedules_path == tmp_path / "maw_device_schedules.csv"
     assert result.keynotes_path == tmp_path / "maw_keynotes.csv"
     assert result.legends_path == tmp_path / "maw_legends.csv"
+    assert (
+        result.reconciliation_issues_path == tmp_path / "maw_reconciliation_issues.csv"
+    )
     assert result.equipment_matrix_path == tmp_path / "maw_equipment_matrix.csv"
     assert result.review_report_path == tmp_path / "maw_review_report.csv"
     assert result.scope_gaps_path == tmp_path / "maw_scope_gaps.csv"
@@ -194,6 +209,7 @@ def test_to_dict_returns_string_paths(tmp_path):
         "device_schedules_path": str(result.device_schedules_path),
         "keynotes_path": str(result.keynotes_path),
         "legends_path": str(result.legends_path),
+        "reconciliation_issues_path": str(result.reconciliation_issues_path),
         "equipment_matrix_path": str(result.equipment_matrix_path),
         "review_report_path": str(result.review_report_path),
         "scope_gaps_path": str(result.scope_gaps_path),
@@ -234,3 +250,13 @@ def test_exports_keynotes_and_legends_csv(tmp_path):
     assert result.keynotes_path.name == "plan_review_keynotes.csv"
     assert result.legends_path.exists()
     assert result.legends_path.name == "plan_review_legends.csv"
+
+
+def test_exports_reconciliation_issues_csv(tmp_path):
+    result = PlanReviewExportService().export_plan_review(make_result(), tmp_path)
+
+    assert result.reconciliation_issues_path.exists()
+    assert (
+        result.reconciliation_issues_path.name
+        == "plan_review_reconciliation_issues.csv"
+    )

@@ -19,6 +19,7 @@ class PlanReviewExportResult:
     device_schedules_path: Path
     keynotes_path: Path
     legends_path: Path
+    reconciliation_issues_path: Path
     equipment_matrix_path: Path
     review_report_path: Path
     scope_gaps_path: Path
@@ -34,6 +35,7 @@ class PlanReviewExportResult:
             "device_schedules_path": str(self.device_schedules_path),
             "keynotes_path": str(self.keynotes_path),
             "legends_path": str(self.legends_path),
+            "reconciliation_issues_path": str(self.reconciliation_issues_path),
             "equipment_matrix_path": str(self.equipment_matrix_path),
             "review_report_path": str(self.review_report_path),
             "scope_gaps_path": str(self.scope_gaps_path),
@@ -87,6 +89,12 @@ class PlanReviewExportService:
             result.review.legends,
             output_path / f"{prefix}_legends.csv",
         )
+        reconciliation_issues_path = (
+            self.csv_export_service.export_reconciliation_issues(
+                result.review.reconciliation_issues,
+                output_path / f"{prefix}_reconciliation_issues.csv",
+            )
+        )
         equipment_matrix_path = self.csv_export_service.export_equipment_matrix(
             self._equipment_matrix_rows(result),
             output_path / f"{prefix}_equipment_matrix.csv",
@@ -119,6 +127,7 @@ class PlanReviewExportService:
             device_schedules_path=device_schedules_path,
             keynotes_path=keynotes_path,
             legends_path=legends_path,
+            reconciliation_issues_path=reconciliation_issues_path,
             equipment_matrix_path=equipment_matrix_path,
             review_report_path=review_report_path,
             scope_gaps_path=scope_gaps_path,
