@@ -84,6 +84,7 @@ from atlas_core.services.device_schedule_extraction_service import (
 from atlas_core.services.device_schedule_equipment_service import (
     DeviceScheduleEquipmentService,
 )
+from atlas_core.services.keynote_extraction_service import KeynoteExtractionService
 
 __all__ = [
     "BaselineService",
@@ -110,6 +111,7 @@ __all__ = [
     "EquipmentMatrixService",
     "EstimateWorkflowResult",
     "EstimateWorkflowService",
+    "KeynoteExtractionService",
     "ManufacturerReviewIssue",
     "ManufacturerReviewService",
     "MarkdownExportService",
