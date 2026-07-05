@@ -15,18 +15,23 @@ from atlas_core.services import (
 
 if TYPE_CHECKING:
     from atlas_core.domain import BidPackageReview
+    from atlas_core.services import FinalEstimatorReview, FinalEstimatorReviewService
 
 
 @dataclass
 class PlanReviewWorkflowResult:
     review: BidPackageReview
     brief: EstimatorBrief
+    final_review: FinalEstimatorReview | None = None
     rows: list[EquipmentMatrixRow] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "review": self.review.to_dict(),
             "brief": self.brief.to_dict(),
+            "final_review": (
+                self.final_review.to_dict() if self.final_review is not None else None
+            ),
             "drawing_metadata": [
                 md.to_dict() for md in getattr(self.review, "drawing_metadata", [])
             ],
@@ -38,8 +43,11 @@ class PlanReviewWorkflowService:
         self,
         bid_package_review_service: BidPackageReviewService | None = None,
         estimator_brief_service: EstimatorBriefService | None = None,
+        final_estimator_review_service: FinalEstimatorReviewService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
     ) -> None:
+        from atlas_core.services import FinalEstimatorReviewService
+
         self.bid_package_review_service: BidPackageReviewService = (
             bid_package_review_service
             or BidPackageReviewService(manufacturer_registry=manufacturer_registry)
@@ -47,6 +55,9 @@ class PlanReviewWorkflowService:
 
         self.estimator_brief_service = (
             estimator_brief_service or EstimatorBriefService()
+        )
+        self.final_estimator_review_service = (
+            final_estimator_review_service or FinalEstimatorReviewService()
         )
 
     def run_review(
@@ -79,4 +90,9 @@ class PlanReviewWorkflowService:
             equipment=equipment,
         )
         brief = self.estimator_brief_service.build_brief(review)
-        return PlanReviewWorkflowResult(review=review, brief=brief)
+        final_review = self.final_estimator_review_service.build(review)
+        return PlanReviewWorkflowResult(
+            review=review,
+            brief=brief,
+            final_review=final_review,
+        )

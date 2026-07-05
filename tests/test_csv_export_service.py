@@ -14,6 +14,7 @@ from atlas_core.services import (
     EquipmentMatrixRow,
     EstimatorBrief,
     EstimatorRisk,
+    FinalEstimatorReview,
     ReconciliationIssue,
     ReconciliationSeverity,
     Recommendation,
@@ -230,6 +231,88 @@ def test_exports_estimator_brief_csv(tmp_path):
     assert records[0]["scope_gap_count"] == "4"
     assert records[0]["estimator_risk_count"] == "5"
     assert records[0]["confidence"] == "0.75"
+
+
+def test_exports_final_estimator_review_csv(tmp_path):
+    output_path = tmp_path / "plan_review" / "final_review.csv"
+    final_review = FinalEstimatorReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Plan Review",
+        readiness_status="needs_review",
+        readiness_message="Plan review needs estimator review before pricing.",
+        completeness_status="partial",
+        completeness_score=0.7,
+        confidence=0.75,
+        total_issues=6,
+        total_recommendations=2,
+        executive_summary="Bid package requires estimator review before pricing.",
+        next_actions=["Review confidence before pricing."],
+    )
+
+    written_path = CsvExportService().export_final_estimator_review(
+        final_review,
+        output_path,
+    )
+
+    assert written_path == output_path
+    assert output_path.exists()
+
+
+def test_writes_final_review_headers(tmp_path):
+    output_path = tmp_path / "final_review.csv"
+    final_review = FinalEstimatorReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Plan Review",
+    )
+
+    CsvExportService().export_final_estimator_review(final_review, output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+
+    assert headers == list(final_review.to_dict().keys())
+
+
+def test_writes_final_review_values(tmp_path):
+    output_path = tmp_path / "final_review.csv"
+    final_review = FinalEstimatorReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Plan Review",
+        readiness_status="not_ready",
+        readiness_message="Plan review is not ready for pricing.",
+        completeness_status="incomplete",
+        completeness_score=0.3,
+        confidence=0.6,
+        total_issues=9,
+        total_recommendations=3,
+        executive_summary="Bid package is not ready for pricing.",
+        next_actions=[
+            "No drawing sheets are available.",
+            "No specification sections are available.",
+        ],
+    )
+
+    CsvExportService().export_final_estimator_review(final_review, output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["review_id"] == "review-001"
+    assert records[0]["readiness_status"] == "not_ready"
+    assert records[0]["completeness_status"] == "incomplete"
+    assert records[0]["completeness_score"] == "0.3"
+    assert records[0]["confidence"] == "0.6"
+    assert records[0]["total_issues"] == "9"
+    assert records[0]["total_recommendations"] == "3"
+    assert records[0]["executive_summary"] == "Bid package is not ready for pricing."
+    assert records[0]["next_actions"] == (
+        "['No drawing sheets are available.', "
+        "'No specification sections are available.']"
+    )
 
 
 def test_exports_keynotes_csv(tmp_path):

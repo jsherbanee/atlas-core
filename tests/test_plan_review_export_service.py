@@ -13,6 +13,7 @@ from atlas_core.domain import (
     SystemCategory,
 )
 from atlas_core.services import (
+    FinalEstimatorReview,
     EstimatorBrief,
     EstimatorRisk,
     PlanReviewExportService,
@@ -146,6 +147,20 @@ def make_result() -> PlanReviewWorkflowResult:
             legend_item_count=0,
             confidence=0.75,
         ),
+        final_review=FinalEstimatorReview(
+            review_id="review-001",
+            project_id="project-001",
+            name="Plan Review",
+            readiness_status="needs_review",
+            readiness_message="Plan review needs estimator review before pricing.",
+            completeness_status="partial",
+            completeness_score=0.7,
+            confidence=0.75,
+            total_issues=3,
+            total_recommendations=1,
+            executive_summary="Bid package requires estimator review before pricing.",
+            next_actions=["Review confidence before pricing."],
+        ),
     )
 
 
@@ -153,6 +168,7 @@ def test_exports_all_plan_review_files(tmp_path):
     result = PlanReviewExportService().export_plan_review(make_result(), tmp_path)
 
     assert result.estimator_brief_path.exists()
+    assert result.final_estimator_review_path.exists()
     assert result.drawing_index_path.exists()
     assert result.specification_index_path.exists()
     assert result.device_schedules_path.exists()
@@ -183,6 +199,10 @@ def test_supports_custom_prefix(tmp_path):
     )
 
     assert result.estimator_brief_path == tmp_path / "maw_estimator_brief.csv"
+    assert (
+        result.final_estimator_review_path
+        == tmp_path / "maw_final_estimator_review.csv"
+    )
     assert result.drawing_index_path == tmp_path / "maw_drawing_index.csv"
     assert result.specification_index_path == tmp_path / "maw_specification_index.csv"
     assert result.device_schedules_path == tmp_path / "maw_device_schedules.csv"
@@ -204,6 +224,7 @@ def test_to_dict_returns_string_paths(tmp_path):
 
     assert result.to_dict() == {
         "estimator_brief_path": str(result.estimator_brief_path),
+        "final_estimator_review_path": str(result.final_estimator_review_path),
         "drawing_index_path": str(result.drawing_index_path),
         "specification_index_path": str(result.specification_index_path),
         "device_schedules_path": str(result.device_schedules_path),

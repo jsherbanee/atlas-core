@@ -14,6 +14,7 @@ from atlas_core.services import (
 @dataclass
 class PlanReviewExportResult:
     estimator_brief_path: Path
+    final_estimator_review_path: Path
     drawing_index_path: Path
     specification_index_path: Path
     device_schedules_path: Path
@@ -30,6 +31,7 @@ class PlanReviewExportResult:
     def to_dict(self) -> dict[str, str]:
         return {
             "estimator_brief_path": str(self.estimator_brief_path),
+            "final_estimator_review_path": str(self.final_estimator_review_path),
             "drawing_index_path": str(self.drawing_index_path),
             "specification_index_path": str(self.specification_index_path),
             "device_schedules_path": str(self.device_schedules_path),
@@ -68,6 +70,18 @@ class PlanReviewExportService:
         estimator_brief_path = self.csv_export_service.export_estimator_brief(
             result.brief,
             output_path / f"{prefix}_estimator_brief.csv",
+        )
+        final_review = getattr(result, "final_review", None)
+        if final_review is None:
+            from atlas_core.services import FinalEstimatorReviewService
+
+            final_review = FinalEstimatorReviewService().build(result.review)
+
+        final_estimator_review_path = (
+            self.csv_export_service.export_final_estimator_review(
+                final_review,
+                output_path / f"{prefix}_final_estimator_review.csv",
+            )
         )
         drawing_index_path = self.csv_export_service.export_drawing_index(
             result.review.drawing_sheets,
@@ -122,6 +136,7 @@ class PlanReviewExportService:
 
         return PlanReviewExportResult(
             estimator_brief_path=estimator_brief_path,
+            final_estimator_review_path=final_estimator_review_path,
             drawing_index_path=drawing_index_path,
             specification_index_path=specification_index_path,
             device_schedules_path=device_schedules_path,

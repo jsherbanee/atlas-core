@@ -12,6 +12,7 @@ from atlas_core.services.recommendation_service import Recommendation
 from atlas_core.services.review_report_service import ReviewReportItem
 from atlas_core.services.scope_reconciliation_service import ReconciliationIssue
 from atlas_core.services.scope_gap_service import ScopeGap
+from atlas_core.services.final_estimator_review_service import FinalEstimatorReview
 
 if TYPE_CHECKING:
     from atlas_core.domain import (
@@ -124,6 +125,18 @@ class CsvExportService:
         return self._write_csv(
             headers=list(brief_data.keys()),
             rows=[brief_data],
+            output_path=output_path,
+        )
+
+    def export_final_estimator_review(
+        self,
+        review: FinalEstimatorReview,
+        output_path: str | Path,
+    ) -> Path:
+        review_data = review.to_dict()
+        return self._write_csv(
+            headers=list(review_data.keys()),
+            rows=[review_data],
             output_path=output_path,
         )
 

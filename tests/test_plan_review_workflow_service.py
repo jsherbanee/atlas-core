@@ -19,6 +19,8 @@ def test_run_review_returns_review_and_brief():
 
     assert result.review.review_id == "review-001"
     assert result.brief.review_id == "review-001"
+    assert result.final_review is not None
+    assert result.final_review.review_id == "review-001"
 
 
 def test_works_with_empty_inputs():
@@ -29,6 +31,27 @@ def test_works_with_empty_inputs():
     assert result.review.equipment == []
     assert result.review.resolutions == []
     assert result.brief.equipment_count == 0
+
+
+def test_final_review_includes_readiness_and_completeness_when_available():
+    result = run_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+            }
+        ],
+        raw_sections=[
+            {
+                "section_number": "27 41 16",
+                "title": "Integrated Audio-Video Systems",
+            }
+        ],
+    )
+
+    assert result.final_review is not None
+    assert result.final_review.readiness_status is not None
+    assert result.final_review.completeness_status is not None
 
 
 def test_includes_drawing_count_in_brief():
@@ -106,6 +129,7 @@ def test_to_dict_output():
     assert result.to_dict() == {
         "review": result.review.to_dict(),
         "brief": result.brief.to_dict(),
+        "final_review": result.final_review.to_dict(),
         "drawing_metadata": [
             metadata.to_dict() for metadata in result.review.drawing_metadata
         ],
