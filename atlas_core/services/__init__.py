@@ -91,10 +91,18 @@ from atlas_core.services.scope_reconciliation_service import (
     ReconciliationSeverity,
     ScopeReconciliationService,
 )
+from atlas_core.services.bid_completeness_service import (
+    BidCompleteness,
+    BidCompletenessService,
+    CompletenessStatus,
+)
 
 __all__ = [
     "BaselineService",
+    "BidCompleteness",
+    "BidCompletenessService",
     "BidPackageReviewService",
+    "CompletenessStatus",
     "ConfidenceScoringService",
     "CrossReference",
     "CrossReferenceService",
