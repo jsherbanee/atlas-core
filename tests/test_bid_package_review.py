@@ -17,6 +17,8 @@ from atlas_core.domain import (
 )
 from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import (
+    BidCompleteness,
+    CompletenessStatus,
     CrossReference,
     CrossReferenceType,
     EstimatorRisk,
@@ -107,6 +109,19 @@ def make_recommendation() -> Recommendation:
         message="Review confidence before pricing.",
         priority=RecommendationPriority.HIGH,
         category="confidence",
+    )
+
+
+def make_bid_completeness() -> BidCompleteness:
+    return BidCompleteness(
+        status=CompletenessStatus.PARTIAL,
+        score=0.7,
+        drawing_completeness=1.0,
+        specification_completeness=1.0,
+        system_completeness=0.0,
+        equipment_completeness=1.0,
+        schedule_completeness=0.5,
+        missing_items=["Missing system detection."],
     )
 
 
@@ -350,6 +365,7 @@ def test_to_dict_output():
     estimator_risk = make_estimator_risk()
     recommendation = make_recommendation()
     reconciliation_issue = make_reconciliation_issue()
+    bid_completeness = make_bid_completeness()
     device_schedule = make_device_schedule()
     keynote = make_keynote()
     legend = make_legend()
@@ -369,6 +385,7 @@ def test_to_dict_output():
         scope_gaps=[scope_gap],
         estimator_risks=[estimator_risk],
         recommendations=[recommendation],
+        bid_completeness=bid_completeness,
         drawing_metadata=[DrawingMetadata(sheet_number="AV1.01", title="AV Plan")],
         device_schedules=[device_schedule],
         keynotes=[keynote],
@@ -408,6 +425,7 @@ def test_to_dict_output():
         "scope_gaps": [scope_gap.to_dict()],
         "estimator_risks": [estimator_risk.to_dict()],
         "recommendations": [recommendation.to_dict()],
+        "bid_completeness": bid_completeness.to_dict(),
         "drawing_metadata": [
             DrawingMetadata(sheet_number="AV1.01", title="AV Plan").to_dict()
         ],
@@ -417,6 +435,16 @@ def test_to_dict_output():
         "notes": ["Confirm scope."],
         "confidence": 0.85,
     }
+
+
+def test_to_dict_output_includes_none_bid_completeness_when_missing():
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+    )
+
+    assert review.to_dict()["bid_completeness"] is None
 
 
 def test_drawing_metadata_count():

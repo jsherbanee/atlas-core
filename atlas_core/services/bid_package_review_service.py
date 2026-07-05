@@ -30,6 +30,7 @@ from atlas_core.services.device_schedule_extraction_service import (
 if TYPE_CHECKING:
     from atlas_core.domain import BidPackageReview
     from atlas_core.services import (
+        BidCompletenessService,
         KeynoteExtractionService,
         LegendExtractionService,
         ScopeReconciliationService,
@@ -49,6 +50,7 @@ class BidPackageReviewService:
         equipment_detection_service: EquipmentDetectionService | None = None,
         confidence_scoring_service: ConfidenceScoringService | None = None,
         recommendation_service: RecommendationService | None = None,
+        bid_completeness_service: BidCompletenessService | None = None,
         scope_reconciliation_service: ScopeReconciliationService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
         drawing_metadata_service: DrawingMetadataService | None = None,
@@ -60,6 +62,7 @@ class BidPackageReviewService:
         legend_extraction_service: LegendExtractionService | None = None,
     ) -> None:
         from atlas_core.services import (
+            BidCompletenessService,
             KeynoteExtractionService,
             LegendExtractionService,
             ScopeReconciliationService,
@@ -84,6 +87,9 @@ class BidPackageReviewService:
             confidence_scoring_service or ConfidenceScoringService()
         )
         self.recommendation_service = recommendation_service or RecommendationService()
+        self.bid_completeness_service = (
+            bid_completeness_service or BidCompletenessService()
+        )
         self.scope_reconciliation_service = (
             scope_reconciliation_service or ScopeReconciliationService()
         )
@@ -221,6 +227,7 @@ class BidPackageReviewService:
             keynotes=keynotes,
             legends=legends,
         )
+        review.bid_completeness = self.bid_completeness_service.assess(review)
         review.estimator_risks = self.estimator_risk_service.assess(review)
         review.confidence = self.confidence_scoring_service.score_review(review)
         review.recommendations = self.recommendation_service.build_recommendations(

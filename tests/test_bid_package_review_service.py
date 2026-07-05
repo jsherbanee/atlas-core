@@ -6,6 +6,7 @@ from atlas_core.domain import (
 )
 from atlas_core.services import (
     BidPackageReviewService,
+    CompletenessStatus,
     ConfidenceScoringService,
     CrossReferenceType,
 )
@@ -362,6 +363,79 @@ def test_includes_recommendations_when_scope_gaps_exist():
         and recommendation.target_id == "eq-projector"
         for recommendation in review.recommendations
     )
+
+
+def test_includes_bid_completeness():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+            }
+        ],
+        raw_sections=[
+            {
+                "section_number": "27 41 16",
+                "title": "Integrated Audio-Video Systems",
+            }
+        ],
+    )
+
+    assert review.bid_completeness is not None
+
+
+def test_bid_completeness_is_incomplete_when_drawings_and_specs_are_missing():
+    review = build_review(
+        raw_sheets=[],
+        raw_sections=[],
+        systems=[],
+        equipment=[],
+        raw_device_schedules=[],
+    )
+
+    assert review.bid_completeness is not None
+    assert review.bid_completeness.status is CompletenessStatus.INCOMPLETE
+
+
+def test_bid_completeness_is_complete_when_core_data_exists():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+            }
+        ],
+        raw_sections=[
+            {
+                "section_number": "27 41 16",
+                "title": "Integrated Audio-Video Systems",
+            }
+        ],
+        systems=[
+            IntegratedSystem(
+                system_id="sys-001",
+                name="Audio System",
+                category=SystemCategory.AUDIO,
+            )
+        ],
+        equipment=[
+            Equipment(
+                equipment_id="eq-001",
+                description="Display",
+                category=EquipmentCategory.DISPLAY,
+            )
+        ],
+        raw_device_schedules=[
+            {
+                "schedule_id": "sched-1",
+                "title": "Device Schedule",
+                "rows": [],
+            }
+        ],
+    )
+
+    assert review.bid_completeness is not None
+    assert review.bid_completeness.status is CompletenessStatus.COMPLETE
 
 
 def test_works_with_empty_inputs():

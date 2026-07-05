@@ -91,6 +91,46 @@ class MarkdownExportService:
                 if issue.suggested_action:
                     lines.append(f"  Suggested action: {issue.suggested_action}")
 
+        lines.extend(["", "## Bid Completeness", ""])
+
+        bid_completeness = getattr(result.review, "bid_completeness", None)
+        if bid_completeness is None:
+            lines.append("No bid completeness assessment available.")
+        else:
+            lines.extend(
+                [
+                    f"- Status: {getattr(bid_completeness.status, 'value', bid_completeness.status)}",
+                    f"- Score: {self._confidence_percentage(bid_completeness.score)}",
+                    (
+                        "- Drawing completeness: "
+                        f"{self._confidence_percentage(bid_completeness.drawing_completeness)}"
+                    ),
+                    (
+                        "- Specification completeness: "
+                        f"{self._confidence_percentage(bid_completeness.specification_completeness)}"
+                    ),
+                    (
+                        "- System completeness: "
+                        f"{self._confidence_percentage(bid_completeness.system_completeness)}"
+                    ),
+                    (
+                        "- Equipment completeness: "
+                        f"{self._confidence_percentage(bid_completeness.equipment_completeness)}"
+                    ),
+                    (
+                        "- Schedule completeness: "
+                        f"{self._confidence_percentage(bid_completeness.schedule_completeness)}"
+                    ),
+                ]
+            )
+
+            lines.append("- Missing items:")
+            if bid_completeness.missing_items:
+                for missing_item in bid_completeness.missing_items:
+                    lines.append(f"  - {missing_item}")
+            else:
+                lines.append("  - None")
+
         lines.extend(["", "## Estimator Risks", ""])
 
         if not result.review.estimator_risks:

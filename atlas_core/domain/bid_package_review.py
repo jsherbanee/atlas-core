@@ -18,6 +18,7 @@ from atlas_core.utils.refactoring import serialize_item, serialize_items
 if TYPE_CHECKING:
     from atlas_core.domain import Keynote, Legend
     from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
+    from atlas_core.services.bid_completeness_service import BidCompleteness
     from atlas_core.services.cross_reference_service import CrossReference
     from atlas_core.services.scope_reconciliation_service import ReconciliationIssue
     from atlas_core.services.estimator_risk_service import EstimatorRisk
@@ -49,6 +50,7 @@ class BidPackageReview:
     scope_gaps: list[ScopeGap] = field(default_factory=list)
     estimator_risks: list[EstimatorRisk] = field(default_factory=list)
     recommendations: list[Recommendation] = field(default_factory=list)
+    bid_completeness: BidCompleteness | None = None
     notes: list[str] = field(default_factory=list)
     confidence: float = 0.75
 
@@ -138,6 +140,11 @@ class BidPackageReview:
             "scope_gaps": self._serialize_items(self.scope_gaps),
             "estimator_risks": self._serialize_items(self.estimator_risks),
             "recommendations": self._serialize_items(self.recommendations),
+            "bid_completeness": (
+                self.bid_completeness.to_dict()
+                if self.bid_completeness is not None
+                else None
+            ),
             "drawing_metadata": self._serialize_items(self.drawing_metadata),
             "device_schedules": self._serialize_items(self.device_schedules),
             "keynotes": self._serialize_items(self.keynotes),

@@ -7,6 +7,8 @@ from atlas_core.domain import (
     LegendItem,
 )
 from atlas_core.services import (
+    BidCompleteness,
+    CompletenessStatus,
     CrossReference,
     EstimatorBrief,
     EstimatorRisk,
@@ -298,6 +300,58 @@ def test_includes_scope_reconciliation_issue_items(tmp_path):
     )
     assert "  Target ID: sched-1-dsp-1" in content
     assert "  Suggested action: Add missing equipment." in content
+
+
+def test_includes_bid_completeness_section(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Bid Completeness" in content
+
+
+def test_handles_missing_bid_completeness(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "No bid completeness assessment available." in content
+
+
+def test_includes_bid_completeness_details(tmp_path):
+    output_path = tmp_path / "summary.md"
+    result = make_result()
+    result.review.bid_completeness = BidCompleteness(
+        status=CompletenessStatus.PARTIAL,
+        score=0.7,
+        drawing_completeness=1.0,
+        specification_completeness=1.0,
+        system_completeness=0.0,
+        equipment_completeness=1.0,
+        schedule_completeness=0.5,
+        missing_items=["Missing system detection."],
+    )
+
+    MarkdownExportService().export_plan_review_summary(result, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "- Status: partial" in content
+    assert "- Score: 70%" in content
+    assert "- Drawing completeness: 100%" in content
+    assert "- Specification completeness: 100%" in content
+    assert "- System completeness: 0%" in content
+    assert "- Equipment completeness: 100%" in content
+    assert "- Schedule completeness: 50%" in content
+    assert "- Missing items:" in content
+    assert "  - Missing system detection." in content
 
 
 def test_includes_estimator_risks_section(tmp_path):

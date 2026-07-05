@@ -12,6 +12,8 @@ from atlas_core.domain import (
 )
 from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import (
+    BidCompleteness,
+    CompletenessStatus,
     CrossReference,
     CrossReferenceType,
     EstimatorBrief,
@@ -159,6 +161,16 @@ def make_review() -> BidPackageReview:
                 ],
             )
         ],
+        bid_completeness=BidCompleteness(
+            status=CompletenessStatus.PARTIAL,
+            score=0.7,
+            drawing_completeness=1.0,
+            specification_completeness=1.0,
+            system_completeness=0.0,
+            equipment_completeness=1.0,
+            schedule_completeness=0.5,
+            missing_items=["Missing system detection."],
+        ),
         confidence=0.82,
     )
 
@@ -262,6 +274,13 @@ def test_counts_recommendations():
     assert brief.recommendation_count == 1
 
 
+def test_includes_bid_completeness_fields_when_present():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.bid_completeness_score == 0.7
+    assert brief.bid_completeness_status == "partial"
+
+
 def test_to_dict_output():
     brief = EstimatorBrief(
         review_id="review-001",
@@ -283,6 +302,8 @@ def test_to_dict_output():
         legend_item_count=2,
         recommendation_count=1,
         confidence=0.82,
+        bid_completeness_score=0.7,
+        bid_completeness_status="partial",
     )
 
     assert brief.to_dict() == {
@@ -305,4 +326,16 @@ def test_to_dict_output():
         "legend_item_count": 2,
         "recommendation_count": 1,
         "confidence": 0.82,
+        "bid_completeness_score": 0.7,
+        "bid_completeness_status": "partial",
     }
+
+
+def test_bid_completeness_fields_are_none_when_missing():
+    review = make_review()
+    review.bid_completeness = None
+
+    brief = EstimatorBriefService().build_brief(review)
+
+    assert brief.bid_completeness_score is None
+    assert brief.bid_completeness_status is None

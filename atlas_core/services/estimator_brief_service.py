@@ -29,6 +29,8 @@ class EstimatorBrief:
     legend_count: int
     legend_item_count: int
     confidence: float
+    bid_completeness_score: float | None = None
+    bid_completeness_status: str | None = None
     recommendation_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
@@ -57,7 +59,25 @@ class EstimatorBriefService:
             legend_item_count=review.legend_item_count(),
             recommendation_count=review.recommendation_count(),
             confidence=review.confidence,
+            bid_completeness_score=self._bid_completeness_score(review),
+            bid_completeness_status=self._bid_completeness_status(review),
         )
+
+    @classmethod
+    def _bid_completeness_score(cls, review: BidPackageReview) -> float | None:
+        bid_completeness = getattr(review, "bid_completeness", None)
+        if bid_completeness is None:
+            return None
+
+        return float(bid_completeness.score)
+
+    @classmethod
+    def _bid_completeness_status(cls, review: BidPackageReview) -> str | None:
+        bid_completeness = getattr(review, "bid_completeness", None)
+        if bid_completeness is None:
+            return None
+
+        return str(getattr(bid_completeness.status, "value", bid_completeness.status))
 
     @classmethod
     def _placeholder_count(cls, review: BidPackageReview) -> int:
