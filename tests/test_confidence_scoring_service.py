@@ -1,3 +1,5 @@
+from typing import Any
+
 from atlas_core.domain import (
     BidPackageReview,
     DrawingSheet,
@@ -16,8 +18,8 @@ from atlas_core.services import (
 )
 
 
-def make_review(**overrides) -> BidPackageReview:
-    values = {
+def make_review(**overrides: Any) -> BidPackageReview:
+    values: dict[str, Any] = {
         "review_id": "review-001",
         "project_id": "project-001",
         "name": "Plan Review",
@@ -103,9 +105,7 @@ def test_estimator_risks_reduce_confidence():
 
 
 def test_manufacturer_issues_reduce_confidence():
-    review = make_review(
-        manufacturer_review_issues=[make_manufacturer_issue()]
-    )
+    review = make_review(manufacturer_review_issues=[make_manufacturer_issue()])
 
     assert ConfidenceScoringService().score_review(review) == 0.98
 

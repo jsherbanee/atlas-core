@@ -31,18 +31,13 @@ class EstimateWorkflowResult:
         return {
             "rows": [row.to_dict() for row in self.rows],
             "resolutions": [
-                self._resolution_to_dict(resolution)
-                for resolution in self.resolutions
+                self._resolution_to_dict(resolution) for resolution in self.resolutions
             ],
             "placeholder_equipment_count": self.placeholder_equipment_count,
             "manufacturer_review_issues": [
-                issue.to_dict()
-                for issue in self.manufacturer_review_issues
+                issue.to_dict() for issue in self.manufacturer_review_issues
             ],
-            "review_report": [
-                item.to_dict()
-                for item in self.review_report
-            ],
+            "review_report": [item.to_dict() for item in self.review_report],
         }
 
     @staticmethod
@@ -102,16 +97,14 @@ class EstimateWorkflowService:
             equipment_items,
             resolutions,
         )
-        placeholder_equipment = (
-            self.resolution_service.create_placeholder_equipment(resolutions)
+        placeholder_equipment = self.resolution_service.create_placeholder_equipment(
+            resolutions
         )
         combined_equipment = equipment_items + placeholder_equipment
         manufacturer_review_issues = []
         if self.manufacturer_review_service is not None:
             manufacturer_review_issues = (
-                self.manufacturer_review_service.review_equipment(
-                    combined_equipment
-                )
+                self.manufacturer_review_service.review_equipment(combined_equipment)
             )
 
         review_report = self.review_report_service.build_report(

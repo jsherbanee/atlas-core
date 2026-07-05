@@ -41,14 +41,11 @@ class BidPackageReviewService:
         self.specification_indexer = (
             specification_indexer or SpecificationIndexerService()
         )
-        self.estimate_workflow_service = estimate_workflow_service
         self.cross_reference_service = (
             cross_reference_service or CrossReferenceService()
         )
         self.scope_gap_service = scope_gap_service or ScopeGapService()
-        self.estimator_risk_service = (
-            estimator_risk_service or EstimatorRiskService()
-        )
+        self.estimator_risk_service = estimator_risk_service or EstimatorRiskService()
         self.system_detection_service = (
             system_detection_service or SystemDetectionService()
         )
@@ -60,10 +57,10 @@ class BidPackageReviewService:
         )
         self.recommendation_service = recommendation_service or RecommendationService()
 
-        if self.estimate_workflow_service is None:
-            self.estimate_workflow_service = EstimateWorkflowService(
-                manufacturer_registry=manufacturer_registry
-            )
+        self.estimate_workflow_service: EstimateWorkflowService = (
+            estimate_workflow_service
+            or EstimateWorkflowService(manufacturer_registry=manufacturer_registry)
+        )
 
     def build_review(
         self,

@@ -7,6 +7,7 @@ from atlas_core.domain import (
     DrawingSheet,
     Equipment,
     EquipmentCategory,
+    EquipmentStatus,
     SpecificationSection,
 )
 
@@ -296,7 +297,7 @@ class EquipmentDetectionService:
                 system_id=system_id,
                 room_id=room_id,
                 building_id=building_id,
-                status="detected",
+                status=EquipmentStatus.DETECTED,
                 drawing_reference=source.drawing_reference,
                 specification_reference=source.specification_reference,
                 confidence=0.65,

@@ -124,8 +124,7 @@ class BidPackageReview:
 
         if hasattr(item, "__dict__"):
             return {
-                key: cls._serialize_value(value)
-                for key, value in item.__dict__.items()
+                key: cls._serialize_value(value) for key, value in item.__dict__.items()
             }
 
         return item

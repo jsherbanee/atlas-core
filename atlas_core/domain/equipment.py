@@ -56,7 +56,7 @@ class Equipment:
     system_id: str | None = None
     room_id: str | None = None
     building_id: str | None = None
-    status: EquipmentStatus = EquipmentStatus.DETECTED
+    status: EquipmentStatus | str = EquipmentStatus.DETECTED
     budget_cost: float | None = None
     sell_price: float | None = None
     labor_template: str | None = None
@@ -106,9 +106,7 @@ class Equipment:
         self.status = EquipmentStatus.PRICED
 
     def add_assumption(self, assumption: str) -> None:
-        self.assumptions.append(
-            self._normalize_required_text("assumption", assumption)
-        )
+        self.assumptions.append(self._normalize_required_text("assumption", assumption))
 
     def mark_placeholder(self, reason: str | None = None) -> None:
         self.status = EquipmentStatus.PLACEHOLDER
@@ -126,14 +124,22 @@ class Equipment:
         return {
             "equipment_id": self.equipment_id,
             "description": self.description,
-            "category": self.category.value,
+            "category": (
+                self.category.value
+                if isinstance(self.category, EquipmentCategory)
+                else self.category
+            ),
             "quantity": self.quantity,
             "manufacturer": self.manufacturer,
             "model": self.model,
             "system_id": self.system_id,
             "room_id": self.room_id,
             "building_id": self.building_id,
-            "status": self.status.value,
+            "status": (
+                self.status.value
+                if isinstance(self.status, EquipmentStatus)
+                else self.status
+            ),
             "budget_cost": self.budget_cost,
             "sell_price": self.sell_price,
             "labor_template": self.labor_template,
@@ -155,9 +161,7 @@ class Equipment:
         return value.strip()
 
     @staticmethod
-    def _validate_non_negative_price(
-        field_name: str, value: float | None
-    ) -> None:
+    def _validate_non_negative_price(field_name: str, value: float | None) -> None:
         if value is None:
             return
 

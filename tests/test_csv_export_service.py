@@ -105,7 +105,9 @@ def test_writes_review_report_headers(tmp_path):
             source="",
             target_id="",
             message="",
-        ).to_dict().keys()
+        )
+        .to_dict()
+        .keys()
     )
 
 
@@ -230,7 +232,9 @@ def test_empty_drawing_index_writes_headers(tmp_path):
             sheet_id="sheet",
             sheet_number="SHEET",
             title="Sheet",
-        ).to_dict().keys()
+        )
+        .to_dict()
+        .keys()
     )
 
 
@@ -248,7 +252,9 @@ def test_empty_specification_index_writes_headers(tmp_path):
             section_id="section",
             section_number="SECTION",
             title="Section",
-        ).to_dict().keys()
+        )
+        .to_dict()
+        .keys()
     )
 
 
@@ -278,7 +284,9 @@ def test_writes_scope_gap_headers(tmp_path):
             gap_id="gap",
             target_id="target",
             message="Message.",
-        ).to_dict().keys()
+        )
+        .to_dict()
+        .keys()
     )
 
 
@@ -353,7 +361,9 @@ def test_writes_estimator_risk_headers(tmp_path):
         EstimatorRisk(
             risk_id="risk",
             message="Message.",
-        ).to_dict().keys()
+        )
+        .to_dict()
+        .keys()
     )
 
 
@@ -425,7 +435,9 @@ def test_writes_recommendation_headers(tmp_path):
         Recommendation(
             recommendation_id="recommendation_id",
             message="Message.",
-        ).to_dict().keys()
+        )
+        .to_dict()
+        .keys()
     )
 
 

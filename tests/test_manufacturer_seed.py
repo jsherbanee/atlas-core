@@ -10,10 +10,7 @@ def test_build_manufacturer_seed_data_returns_manufacturers():
     manufacturers = build_manufacturer_seed_data()
 
     assert manufacturers
-    assert all(
-        isinstance(manufacturer, Manufacturer)
-        for manufacturer in manufacturers
-    )
+    assert all(isinstance(manufacturer, Manufacturer) for manufacturer in manufacturers)
 
 
 def test_build_manufacturer_registry_returns_manufacturer_registry():

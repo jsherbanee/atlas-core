@@ -10,6 +10,7 @@ from atlas_core.services import (
     BidPackageReviewService,
     EstimatorBrief,
     EstimatorBriefService,
+    EquipmentMatrixRow,
 )
 
 if TYPE_CHECKING:
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
 class PlanReviewWorkflowResult:
     review: BidPackageReview
     brief: EstimatorBrief
+    rows: list[EquipmentMatrixRow] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -35,11 +37,10 @@ class PlanReviewWorkflowService:
         estimator_brief_service: EstimatorBriefService | None = None,
         manufacturer_registry: ManufacturerRegistry | None = None,
     ) -> None:
-        self.bid_package_review_service = bid_package_review_service
-        if self.bid_package_review_service is None:
-            self.bid_package_review_service = BidPackageReviewService(
-                manufacturer_registry=manufacturer_registry
-            )
+        self.bid_package_review_service: BidPackageReviewService = (
+            bid_package_review_service
+            or BidPackageReviewService(manufacturer_registry=manufacturer_registry)
+        )
 
         self.estimator_brief_service = (
             estimator_brief_service or EstimatorBriefService()

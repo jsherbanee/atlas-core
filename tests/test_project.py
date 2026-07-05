@@ -113,10 +113,7 @@ def test_opportunity_to_submitted_to_awarded_to_active_preserves_project_data():
     assert project.project_id == "p-001"
     assert project.buildings == ["Main Building"]
     assert project.status is ProjectStatus.ACTIVE
-    assert [
-        event.to_status
-        for event in project.lifecycle_events
-    ] == [
+    assert [event.to_status for event in project.lifecycle_events] == [
         ProjectStatus.OPPORTUNITY,
         ProjectStatus.SUBMITTED,
         ProjectStatus.AWARDED,

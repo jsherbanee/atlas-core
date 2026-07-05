@@ -14,12 +14,31 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=9.0"
+  "pytest>=9.0",
+  "black>=24.10",
+  "ruff>=0.0.280",
+  "mypy>=1.9",
+  "pre-commit>=4.5",
 ]
 
 [project.scripts]
 atlas = "atlas_core.cli.__main__:main"
 atlas-core = "atlas_core.cli:main"
+
+[tool.black]
+line-length = 88
+target-version = ["py314"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+exclude = ['\.venv/','__pycache__/','\.pytest_cache/','dist/','build/','.git/','.idea/','.vscode/']
+
+[tool.mypy]
+python_version = "3.14"
+ignore_missing_imports = true
+strict = false
+files = ["atlas_core", "tests"]
 
 [tool.setuptools.packages.find]
 where = ["."]

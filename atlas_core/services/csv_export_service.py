@@ -81,7 +81,9 @@ class CsvExportService:
                 Recommendation(
                     recommendation_id="recommendation_id",
                     message="Message.",
-                ).to_dict().keys()
+                )
+                .to_dict()
+                .keys()
             ),
             rows=[recommendation.to_dict() for recommendation in recommendations],
             output_path=output_path,
@@ -112,7 +114,9 @@ class CsvExportService:
                 sheet_id="sheet",
                 sheet_number="SHEET",
                 title="Sheet",
-            ).to_dict().keys()
+            )
+            .to_dict()
+            .keys()
         )
 
     @staticmethod
@@ -124,7 +128,9 @@ class CsvExportService:
                 section_id="section",
                 section_number="SECTION",
                 title="Section",
-            ).to_dict().keys()
+            )
+            .to_dict()
+            .keys()
         )
 
     def export_review_report(
@@ -140,7 +146,9 @@ class CsvExportService:
                 source="",
                 target_id="",
                 message="",
-            ).to_dict().keys()
+            )
+            .to_dict()
+            .keys()
         )
 
         with path.open("w", encoding="utf-8", newline="") as file:
@@ -163,7 +171,9 @@ class CsvExportService:
                     gap_id="gap",
                     target_id="target",
                     message="Message.",
-                ).to_dict().keys()
+                )
+                .to_dict()
+                .keys()
             ),
             rows=[gap.to_dict() for gap in gaps],
             output_path=output_path,
@@ -179,7 +189,9 @@ class CsvExportService:
                 EstimatorRisk(
                     risk_id="risk",
                     message="Message.",
-                ).to_dict().keys()
+                )
+                .to_dict()
+                .keys()
             ),
             rows=[risk.to_dict() for risk in risks],
             output_path=output_path,

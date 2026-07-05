@@ -105,8 +105,7 @@ class PlanReviewReadinessService:
             warnings.append("Scope gaps require estimator review.")
 
         if any(
-            cls._value(risk.risk_level) == "high"
-            for risk in review.estimator_risks
+            cls._value(risk.risk_level) == "high" for risk in review.estimator_risks
         ):
             warnings.append("High estimator risks require estimator review.")
 
@@ -114,9 +113,7 @@ class PlanReviewReadinessService:
             cls._value(recommendation.priority) == "high"
             for recommendation in review.recommendations
         ):
-            warnings.append(
-                "High-priority recommendations require estimator review."
-            )
+            warnings.append("High-priority recommendations require estimator review.")
 
         if review.confidence < 0.75:
             warnings.append("Review confidence is below 0.75.")

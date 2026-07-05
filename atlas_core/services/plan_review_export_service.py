@@ -65,11 +65,9 @@ class PlanReviewExportService:
             result.review.drawing_sheets,
             output_path / f"{prefix}_drawing_index.csv",
         )
-        specification_index_path = (
-            self.csv_export_service.export_specification_index(
-                result.review.specification_sections,
-                output_path / f"{prefix}_specification_index.csv",
-            )
+        specification_index_path = self.csv_export_service.export_specification_index(
+            result.review.specification_sections,
+            output_path / f"{prefix}_specification_index.csv",
         )
         equipment_matrix_path = self.csv_export_service.export_equipment_matrix(
             self._equipment_matrix_rows(result),
@@ -91,11 +89,9 @@ class PlanReviewExportService:
             result.review.recommendations,
             output_path / f"{prefix}_recommendations.csv",
         )
-        markdown_summary_path = (
-            self.markdown_export_service.export_plan_review_summary(
-                result,
-                output_path / f"{prefix}_summary.md",
-            )
+        markdown_summary_path = self.markdown_export_service.export_plan_review_summary(
+            result,
+            output_path / f"{prefix}_summary.md",
         )
 
         return PlanReviewExportResult(

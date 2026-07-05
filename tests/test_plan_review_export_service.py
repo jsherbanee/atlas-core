@@ -14,6 +14,8 @@ from atlas_core.services import (
     PlanReviewWorkflowResult,
     ReviewReportItem,
     ScopeGap,
+    RiskLevel,
+    ScopeGapSeverity,
 )
 
 
@@ -63,14 +65,14 @@ def make_result() -> PlanReviewWorkflowResult:
                     gap_id="speaker_missing_amplifier",
                     target_id=equipment.equipment_id,
                     message="Speaker equipment is missing an amplifier.",
-                    severity="high",
+                    severity=ScopeGapSeverity.HIGH,
                 )
             ],
             estimator_risks=[
                 EstimatorRisk(
                     risk_id="scope_gaps_detected",
                     message="Scope gaps were detected.",
-                    risk_level="high",
+                    risk_level=RiskLevel.HIGH,
                     category="scope",
                 )
             ],
@@ -124,10 +126,7 @@ def test_supports_custom_prefix(tmp_path):
 
     assert result.estimator_brief_path == tmp_path / "maw_estimator_brief.csv"
     assert result.drawing_index_path == tmp_path / "maw_drawing_index.csv"
-    assert (
-        result.specification_index_path
-        == tmp_path / "maw_specification_index.csv"
-    )
+    assert result.specification_index_path == tmp_path / "maw_specification_index.csv"
     assert result.equipment_matrix_path == tmp_path / "maw_equipment_matrix.csv"
     assert result.review_report_path == tmp_path / "maw_review_report.csv"
     assert result.scope_gaps_path == tmp_path / "maw_scope_gaps.csv"

@@ -52,19 +52,17 @@ class MarkdownExportService:
             lines.append("No review items found.")
         else:
             for item in result.review.review_report:
-                lines.append(
-                    f"- [{item.source}] {item.target_id}: {item.message}"
-                )
+                lines.append(f"- [{item.source}] {item.target_id}: {item.message}")
 
         lines.extend(["", "## Cross References", ""])
 
         if not result.review.cross_references:
             lines.append("No cross references found.")
         else:
-            for item in result.review.cross_references:
+            for reference in result.review.cross_references:
                 lines.append(
-                    f"- [{item.reference_type.value}] "
-                    f"{item.source_id} -> {item.target_id}: {item.message}"
+                    f"- [{getattr(reference.reference_type, 'value', reference.reference_type)}] "
+                    f"{reference.source_id} -> {reference.target_id}: {reference.message}"
                 )
 
         lines.extend(["", "## Scope Gaps", ""])
@@ -74,7 +72,7 @@ class MarkdownExportService:
         else:
             for gap in result.review.scope_gaps:
                 lines.append(
-                    f"- [{gap.severity.value}] {gap.target_id}: {gap.message}"
+                    f"- [{getattr(gap.severity, 'value', gap.severity)}] {gap.target_id}: {gap.message}"
                 )
                 if gap.suggested_action:
                     lines.append(f"  Suggested action: {gap.suggested_action}")
@@ -86,7 +84,7 @@ class MarkdownExportService:
         else:
             for risk in result.review.estimator_risks:
                 lines.append(
-                    f"- [{risk.risk_level.value}] "
+                    f"- [{getattr(risk.risk_level, 'value', risk.risk_level)}] "
                     f"{risk.category}: {risk.message}"
                 )
 
@@ -97,7 +95,7 @@ class MarkdownExportService:
         else:
             for recommendation in result.review.recommendations:
                 lines.append(
-                    f"- [{recommendation.priority.value}] "
+                    f"- [{getattr(recommendation.priority, 'value', recommendation.priority)}] "
                     f"{recommendation.category}: {recommendation.message}"
                 )
 

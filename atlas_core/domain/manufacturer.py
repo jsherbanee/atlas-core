@@ -75,8 +75,7 @@ class Manufacturer:
             for relationship in self.vendor_relationships
         ]
         self.notes = [
-            self._normalize_required_text("note", note)
-            for note in self.notes
+            self._normalize_required_text("note", note) for note in self.notes
         ]
 
     def add_product_family(self, product_family: str) -> None:
@@ -87,9 +86,7 @@ class Manufacturer:
     def add_note(self, note: str) -> None:
         self.notes.append(self._normalize_required_text("note", note))
 
-    def add_vendor_relationship(
-        self, relationship: VendorRelationship
-    ) -> None:
+    def add_vendor_relationship(self, relationship: VendorRelationship) -> None:
         self.vendor_relationships.append(
             self._validate_vendor_relationship(relationship)
         )
@@ -129,8 +126,7 @@ class Manufacturer:
             "product_families": list(self.product_families),
             "preferred_vendor": self.preferred_vendor,
             "vendor_relationships": [
-                relationship.to_dict()
-                for relationship in self.vendor_relationships
+                relationship.to_dict() for relationship in self.vendor_relationships
             ],
             "notes": list(self.notes),
             "active": self.active,

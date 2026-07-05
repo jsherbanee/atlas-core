@@ -36,9 +36,9 @@ class ManufacturerRegistry:
             )
 
         self._manufacturers_by_id[manufacturer.manufacturer_id] = manufacturer
-        self._manufacturer_ids_by_name[
-            self._normalize_name(manufacturer.name)
-        ] = manufacturer.manufacturer_id
+        self._manufacturer_ids_by_name[self._normalize_name(manufacturer.name)] = (
+            manufacturer.manufacturer_id
+        )
 
     def get_by_id(self, manufacturer_id: str) -> Manufacturer | None:
         if not isinstance(manufacturer_id, str):
@@ -47,9 +47,7 @@ class ManufacturerRegistry:
         return self._manufacturers_by_id.get(manufacturer_id.strip())
 
     def get_by_name(self, name: str) -> Manufacturer | None:
-        manufacturer_id = self._manufacturer_ids_by_name.get(
-            self._normalize_name(name)
-        )
+        manufacturer_id = self._manufacturer_ids_by_name.get(self._normalize_name(name))
         if manufacturer_id is None:
             return None
 

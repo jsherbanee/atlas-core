@@ -1,3 +1,5 @@
+from typing import Any
+
 from atlas_core.domain import BidPackageReview, Equipment, EquipmentCategory
 from atlas_core.services import (
     EstimatorRisk,
@@ -9,8 +11,8 @@ from atlas_core.services import (
 )
 
 
-def make_review(**overrides) -> BidPackageReview:
-    values = {
+def make_review(**overrides: Any) -> BidPackageReview:
+    values: dict[str, Any] = {
         "review_id": "review-001",
         "project_id": "project-001",
         "name": "Plan Review",
@@ -35,10 +37,7 @@ def test_scope_gaps_create_high_risk():
     assert risks[0].risk_id == "scope_gaps_detected"
     assert risks[0].risk_level is RiskLevel.HIGH
     assert risks[0].category == "scope"
-    assert (
-        risks[0].message
-        == "Scope gaps were detected and require estimator review."
-    )
+    assert risks[0].message == "Scope gaps were detected and require estimator review."
 
 
 def test_manufacturer_issues_create_medium_risk():

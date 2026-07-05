@@ -61,9 +61,7 @@ def test_manufacturer_issue_converted_to_review_item():
         ReviewReportItem(
             source="manufacturer_registry",
             target_id="eq-display",
-            message=(
-                "Manufacturer is not registered and requires estimator review."
-            ),
+            message=("Manufacturer is not registered and requires estimator review."),
             severity="review",
             manufacturer="Unknown",
         )

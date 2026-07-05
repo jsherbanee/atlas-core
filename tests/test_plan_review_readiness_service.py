@@ -1,3 +1,5 @@
+from typing import Any
+
 from atlas_core.domain import (
     BidPackageReview,
     DrawingDiscipline,
@@ -53,8 +55,8 @@ def make_equipment() -> Equipment:
     )
 
 
-def make_review(**overrides) -> BidPackageReview:
-    values = {
+def make_review(**overrides: Any) -> BidPackageReview:
+    values: dict[str, Any] = {
         "review_id": "review-001",
         "project_id": "project-001",
         "name": "Bid Package Review",
@@ -158,8 +160,7 @@ def test_high_recommendations_return_needs_review():
 
     assert readiness.status is ReadinessStatus.NEEDS_REVIEW
     assert (
-        "High-priority recommendations require estimator review."
-        in readiness.warnings
+        "High-priority recommendations require estimator review." in readiness.warnings
     )
 
 

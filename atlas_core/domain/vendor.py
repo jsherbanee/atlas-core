@@ -50,8 +50,7 @@ class Vendor:
             self.status = VendorStatus(self.status)
 
         self.notes = [
-            self._normalize_required_text("note", note)
-            for note in self.notes
+            self._normalize_required_text("note", note) for note in self.notes
         ]
 
     def add_note(self, note: str) -> None:

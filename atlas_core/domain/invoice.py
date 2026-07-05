@@ -107,9 +107,7 @@ class Invoice:
             "vendor_name",
             self.vendor_name,
         )
-        self.purchase_order_id = self._normalize_optional_text(
-            self.purchase_order_id
-        )
+        self.purchase_order_id = self._normalize_optional_text(self.purchase_order_id)
 
         if not isinstance(self.status, InvoiceStatus):
             self.status = InvoiceStatus(self.status)

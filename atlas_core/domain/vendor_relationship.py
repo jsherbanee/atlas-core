@@ -31,9 +31,7 @@ class VendorRelationship:
         )
 
         if not isinstance(self.relationship_type, VendorRelationshipType):
-            self.relationship_type = VendorRelationshipType(
-                self.relationship_type
-            )
+            self.relationship_type = VendorRelationshipType(self.relationship_type)
 
         if (
             not isinstance(self.priority, int)
@@ -42,19 +40,15 @@ class VendorRelationship:
         ):
             raise ValueError("priority must be greater than 0")
 
-        if (
-            self.typical_lead_time_days is not None
-            and (
-                not isinstance(self.typical_lead_time_days, int)
-                or isinstance(self.typical_lead_time_days, bool)
-                or self.typical_lead_time_days < 0
-            )
+        if self.typical_lead_time_days is not None and (
+            not isinstance(self.typical_lead_time_days, int)
+            or isinstance(self.typical_lead_time_days, bool)
+            or self.typical_lead_time_days < 0
         ):
             raise ValueError("typical_lead_time_days cannot be negative")
 
         self.notes = [
-            self._normalize_required_text("note", note)
-            for note in self.notes
+            self._normalize_required_text("note", note) for note in self.notes
         ]
 
     def add_note(self, note: str) -> None:

@@ -4,7 +4,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -81,9 +80,7 @@ def test_demo_maw_exports_csv(tmp_path):
     assert len(records) == 10
     assert records[0]["building_name"] == "MAW Music Education Center"
     drapery_record = next(
-        record
-        for record in records
-        if record["equipment_id"] == "maw-recital-drapery"
+        record for record in records if record["equipment_id"] == "maw-recital-drapery"
     )
 
     assert drapery_record["review_required"] == "True"
@@ -230,9 +227,8 @@ def test_demo_maw_plan_review_markdown_summary_includes_name(tmp_path):
 
     assert result.returncode == 0
     assert result.stderr == ""
-    assert (
-        "MAW Music Education Center Plan Review"
-        in output_path.read_text(encoding="utf-8")
+    assert "MAW Music Education Center Plan Review" in output_path.read_text(
+        encoding="utf-8"
     )
 
 
