@@ -61,8 +61,7 @@ class Room:
             for system_id in self.system_ids
         ]
         self.notes = [
-            self._normalize_required_text("note", note)
-            for note in self.notes
+            self._normalize_required_text("note", note) for note in self.notes
         ]
 
     def add_space(self, space_id: str) -> None:

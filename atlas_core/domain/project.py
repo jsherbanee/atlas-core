@@ -56,8 +56,7 @@ class Project:
             self.status = ProjectStatus(self.status)
 
         self.lifecycle_events = [
-            self._normalize_lifecycle_event(event)
-            for event in self.lifecycle_events
+            self._normalize_lifecycle_event(event) for event in self.lifecycle_events
         ]
 
     def add_building(self, name: str) -> None:
@@ -158,10 +157,7 @@ class Project:
             "target_margin": self.target_margin,
             "cslb_scope": self.cslb_scope,
             "notes": list(self.notes),
-            "lifecycle_events": [
-                event.to_dict()
-                for event in self.lifecycle_events
-            ],
+            "lifecycle_events": [event.to_dict() for event in self.lifecycle_events],
         }
 
     def _set_status(

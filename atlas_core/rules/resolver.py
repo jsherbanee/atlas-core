@@ -32,15 +32,9 @@ class Resolution:
         self.rule_id = self._normalize_required_text("rule_id", self.rule_id)
         self.target_id = self._normalize_required_text("target_id", self.target_id)
         self.message = self._normalize_required_text("message", self.message)
-        self.source_system_id = self._normalize_optional_text(
-            self.source_system_id
-        )
-        self.source_room_id = self._normalize_optional_text(
-            self.source_room_id
-        )
-        self.source_building_id = self._normalize_optional_text(
-            self.source_building_id
-        )
+        self.source_system_id = self._normalize_optional_text(self.source_system_id)
+        self.source_room_id = self._normalize_optional_text(self.source_room_id)
+        self.source_building_id = self._normalize_optional_text(self.source_building_id)
 
         if not isinstance(self.action, ResolutionAction):
             self.action = ResolutionAction(self.action)
@@ -89,13 +83,16 @@ class Resolver:
             system_id = self._value(item, "system_id")
             system = systems_by_id.get(system_id)
             room_id = self._value(item, "room_id") or self._value(system, "room_id")
-            building_id = (
-                self._value(item, "building_id")
-                or self._value(system, "building_id")
+            building_id = self._value(item, "building_id") or self._value(
+                system, "building_id"
             )
 
-            if category == "speaker" and system_id and not self._has_category_in_scope(
-                equipment, "amplifier", "system_id", system_id
+            if (
+                category == "speaker"
+                and system_id
+                and not self._has_category_in_scope(
+                    equipment, "amplifier", "system_id", system_id
+                )
             ):
                 self._add_resolution(
                     resolutions,
@@ -113,8 +110,12 @@ class Resolver:
                     source_building_id=building_id,
                 )
 
-            if category == "display" and room_id and not self._has_category_in_scope(
-                equipment, "mount", "room_id", room_id
+            if (
+                category == "display"
+                and room_id
+                and not self._has_category_in_scope(
+                    equipment, "mount", "room_id", room_id
+                )
             ):
                 self._add_resolution(
                     resolutions,
@@ -133,8 +134,12 @@ class Resolver:
                     source_building_id=building_id,
                 )
 
-            if category == "projector" and room_id and not self._has_category_in_scope(
-                equipment, "mount", "room_id", room_id
+            if (
+                category == "projector"
+                and room_id
+                and not self._has_category_in_scope(
+                    equipment, "mount", "room_id", room_id
+                )
             ):
                 self._add_resolution(
                     resolutions,

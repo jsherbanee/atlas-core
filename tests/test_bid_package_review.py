@@ -14,10 +14,13 @@ from atlas_core.domain import (
 from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import (
     CrossReference,
+    CrossReferenceType,
     EstimatorRisk,
     ManufacturerReviewIssue,
     Recommendation,
+    RecommendationPriority,
     ReviewReportItem,
+    RiskLevel,
     ScopeGap,
 )
 
@@ -67,7 +70,7 @@ def make_resolution() -> Resolution:
 
 def make_cross_reference() -> CrossReference:
     return CrossReference(
-        reference_type="equipment_to_drawing",
+        reference_type=CrossReferenceType.EQUIPMENT_TO_DRAWING,
         source_id="eq-001",
         target_id="av101",
         message="Equipment references drawing.",
@@ -86,7 +89,7 @@ def make_estimator_risk() -> EstimatorRisk:
     return EstimatorRisk(
         risk_id="scope_gaps_detected",
         message="Scope gaps were detected and require estimator review.",
-        risk_level="high",
+        risk_level=RiskLevel.HIGH,
         category="scope",
     )
 
@@ -95,7 +98,7 @@ def make_recommendation() -> Recommendation:
     return Recommendation(
         recommendation_id="review-low-confidence",
         message="Review confidence before pricing.",
-        priority="high",
+        priority=RecommendationPriority.HIGH,
         category="confidence",
     )
 

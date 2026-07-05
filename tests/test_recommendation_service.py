@@ -1,3 +1,5 @@
+from typing import Any
+
 from atlas_core.domain import BidPackageReview, DrawingSheet, SpecificationSection
 from atlas_core.services import (
     EstimatorRisk,
@@ -9,8 +11,8 @@ from atlas_core.services import (
 )
 
 
-def make_review(**overrides) -> BidPackageReview:
-    values = {
+def make_review(**overrides: Any) -> BidPackageReview:
+    values: dict[str, Any] = {
         "review_id": "review-001",
         "project_id": "project-001",
         "name": "Plan Review",

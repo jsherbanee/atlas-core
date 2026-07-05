@@ -48,15 +48,20 @@ class SpecificationIndexerService:
         ):
             return SpecificationDiscipline.AUDIOVISUAL
 
-        if normalized_section_number.startswith("27") or "communications" in normalized_title:
+        if (
+            normalized_section_number.startswith("27")
+            or "communications" in normalized_title
+        ):
             return SpecificationDiscipline.COMMUNICATIONS
 
-        if normalized_section_number.startswith("11 61") or "theatrical" in normalized_title:
+        if (
+            normalized_section_number.startswith("11 61")
+            or "theatrical" in normalized_title
+        ):
             return SpecificationDiscipline.THEATRICAL
 
         if any(
-            phrase in normalized_title
-            for phrase in ("drapery", "curtain", "traveler")
+            phrase in normalized_title for phrase in ("drapery", "curtain", "traveler")
         ):
             return SpecificationDiscipline.DRAPERY
 
@@ -66,7 +71,10 @@ class SpecificationIndexerService:
         if "acoustics" in normalized_title:
             return SpecificationDiscipline.ACOUSTICS
 
-        if normalized_section_number.startswith("26") or "electrical" in normalized_title:
+        if (
+            normalized_section_number.startswith("26")
+            or "electrical" in normalized_title
+        ):
             return SpecificationDiscipline.ELECTRICAL
 
         if "lighting" in normalized_title:

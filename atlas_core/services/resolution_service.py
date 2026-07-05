@@ -52,9 +52,7 @@ class ResolutionService:
                 Equipment(
                     equipment_id=equipment_id,
                     description=self._description(resolution),
-                    category=self._equipment_category(
-                        resolution.suggested_category
-                    ),
+                    category=self._equipment_category(resolution.suggested_category),
                     manufacturer=resolution.suggested_manufacturer,
                     model=resolution.suggested_model,
                     system_id=resolution.source_system_id,

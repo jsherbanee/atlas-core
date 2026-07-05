@@ -34,8 +34,7 @@ def test_seed_data_contains_speaker_equipment():
 def test_seed_data_uses_preferred_projector_and_display_manufacturers():
     seed = build_maw_seed_data()
     equipment_by_id = {
-        equipment.equipment_id: equipment
-        for equipment in seed["equipment"]
+        equipment.equipment_id: equipment for equipment in seed["equipment"]
     }
 
     assert equipment_by_id["maw-recital-projector"].manufacturer == "Epson"
@@ -71,16 +70,13 @@ def test_seed_placeholder_rows_keep_source_context():
         systems=seed["systems"],
         equipment=seed["equipment"],
     )
-    placeholder_rows = [
-        row for row in result.rows if row.status == "placeholder"
-    ]
+    placeholder_rows = [row for row in result.rows if row.status == "placeholder"]
 
     assert placeholder_rows
     assert all(row.system_id for row in placeholder_rows)
     assert all(row.room_id for row in placeholder_rows)
     assert all(
-        row.building_name == "MAW Music Education Center"
-        for row in placeholder_rows
+        row.building_name == "MAW Music Education Center" for row in placeholder_rows
     )
 
 

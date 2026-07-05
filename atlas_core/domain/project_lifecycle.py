@@ -31,9 +31,7 @@ class ProjectLifecycleEvent:
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["from_status"] = (
-            self.from_status.value
-            if self.from_status is not None
-            else None
+            self.from_status.value if self.from_status is not None else None
         )
         data["to_status"] = self.to_status.value
         return data

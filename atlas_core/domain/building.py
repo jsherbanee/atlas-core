@@ -51,8 +51,7 @@ class Building:
             for room_id in self.room_ids
         ]
         self.notes = [
-            self._normalize_required_text("note", note)
-            for note in self.notes
+            self._normalize_required_text("note", note) for note in self.notes
         ]
 
     def add_room(self, room_id: str) -> None:

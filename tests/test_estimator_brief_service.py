@@ -10,12 +10,15 @@ from atlas_core.domain import (
 from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import (
     CrossReference,
+    CrossReferenceType,
     EstimatorBrief,
     EstimatorBriefService,
     EstimatorRisk,
     ManufacturerReviewIssue,
     Recommendation,
+    RecommendationPriority,
     ReviewReportItem,
+    RiskLevel,
     ScopeGap,
 )
 
@@ -84,7 +87,7 @@ def make_review() -> BidPackageReview:
         ],
         cross_references=[
             CrossReference(
-                reference_type="equipment_to_drawing",
+                reference_type=CrossReferenceType.EQUIPMENT_TO_DRAWING,
                 source_id="eq-display",
                 target_id="av101",
                 message="Equipment references drawing.",
@@ -101,7 +104,7 @@ def make_review() -> BidPackageReview:
             EstimatorRisk(
                 risk_id="scope_gaps_detected",
                 message="Scope gaps were detected and require estimator review.",
-                risk_level="high",
+                risk_level=RiskLevel.HIGH,
                 category="scope",
             )
         ],
@@ -112,7 +115,7 @@ def make_review() -> BidPackageReview:
                     "Review confidence is below target threshold; estimator "
                     "review is required."
                 ),
-                priority="high",
+                priority=RecommendationPriority.HIGH,
                 category="confidence",
             )
         ],

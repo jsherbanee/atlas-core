@@ -23,7 +23,7 @@ class SpecificationSection:
     section_id: str
     section_number: str
     title: str
-    discipline: SpecificationDiscipline = SpecificationDiscipline.UNKNOWN
+    discipline: SpecificationDiscipline | str = SpecificationDiscipline.UNKNOWN
     source_file: str | None = None
     page_start: int | None = None
     page_end: int | None = None
@@ -82,7 +82,11 @@ class SpecificationSection:
             "section_id": self.section_id,
             "section_number": self.section_number,
             "title": self.title,
-            "discipline": self.discipline.value,
+            "discipline": (
+                self.discipline.value
+                if isinstance(self.discipline, SpecificationDiscipline)
+                else self.discipline
+            ),
             "source_file": self.source_file,
             "page_start": self.page_start,
             "page_end": self.page_end,

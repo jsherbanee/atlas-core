@@ -75,10 +75,7 @@ class DrawingIndexerService:
         if normalized_sheet_number.startswith("P"):
             return DrawingDiscipline.PLUMBING
 
-        if (
-            "audiovisual" in normalized_title
-            or "audio visual" in normalized_title
-        ):
+        if "audiovisual" in normalized_title or "audio visual" in normalized_title:
             return DrawingDiscipline.AUDIOVISUAL
 
         if "theatrical" in normalized_title:

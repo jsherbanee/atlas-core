@@ -4,8 +4,7 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Any
 
-
-MatrixNumber = int | float | str
+MatrixNumber = int | float | str | None
 MatrixBool = bool | str
 
 
@@ -70,26 +69,40 @@ class EquipmentMatrixService:
 
     def _build_equipment_row(self, equipment: Any) -> EquipmentMatrixRow:
         equipment_system_id = self._value(equipment, "system_id")
-        system = self._systems_by_id.get(equipment_system_id)
+        system = (
+            self._systems_by_id.get(str(equipment_system_id))
+            if equipment_system_id is not None
+            else None
+        )
 
         equipment_room_id = self._value(equipment, "room_id")
         system_room_id = self._value(system, "room_id")
         room_id = system_room_id or equipment_room_id
-        room = self._rooms_by_id.get(room_id)
+        room = self._rooms_by_id.get(str(room_id)) if room_id is not None else None
 
         room_building_id = self._value(room, "building_id")
         system_building_id = self._value(system, "building_id")
         equipment_building_id = self._value(equipment, "building_id")
-        building_id = (
-            room_building_id or system_building_id or equipment_building_id
+        building_id = room_building_id or system_building_id or equipment_building_id
+        building = (
+            self._buildings_by_id.get(str(building_id))
+            if building_id is not None
+            else None
         )
-        building = self._buildings_by_id.get(building_id)
 
         equipment_space_id = getattr(equipment, "space_id", None)
-        space = self._spaces_by_id.get(equipment_space_id)
+        space = (
+            self._spaces_by_id.get(str(equipment_space_id))
+            if equipment_space_id is not None
+            else None
+        )
 
         equipment_scene_id = getattr(equipment, "scene_id", None)
-        scene = self._scenes_by_id.get(equipment_scene_id)
+        scene = (
+            self._scenes_by_id.get(str(equipment_scene_id))
+            if equipment_scene_id is not None
+            else None
+        )
 
         return EquipmentMatrixRow(
             project_building_id=self._value(building, "building_id", building_id),
@@ -114,9 +127,7 @@ class EquipmentMatrixService:
             sell_price=self._value(equipment, "sell_price"),
             labor_template=self._value(equipment, "labor_template"),
             drawing_reference=self._value(equipment, "drawing_reference"),
-            specification_reference=self._value(
-                equipment, "specification_reference"
-            ),
+            specification_reference=self._value(equipment, "specification_reference"),
             confidence=self._value(equipment, "confidence"),
             review_required=self._value(equipment, "review_required"),
             assumptions=self._join_values(self._value(equipment, "assumptions")),

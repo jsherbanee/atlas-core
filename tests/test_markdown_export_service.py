@@ -7,6 +7,7 @@ from atlas_core.services import (
     PlanReviewWorkflowResult,
     ReviewReportItem,
     ScopeGap,
+    CrossReferenceType,
 )
 
 
@@ -148,7 +149,7 @@ def test_includes_cross_references_section(tmp_path):
 def test_includes_cross_reference_items(tmp_path):
     output_path = tmp_path / "summary.md"
     item = CrossReference(
-        reference_type="equipment_to_drawing",
+        reference_type=CrossReferenceType.EQUIPMENT_TO_DRAWING,
         source_id="eq-001",
         target_id="av101",
         message="Equipment references drawing.",
@@ -161,8 +162,7 @@ def test_includes_cross_reference_items(tmp_path):
 
     content = output_path.read_text(encoding="utf-8")
     assert (
-        "- [equipment_to_drawing] eq-001 -> av101: "
-        "Equipment references drawing."
+        "- [equipment_to_drawing] eq-001 -> av101: " "Equipment references drawing."
     ) in content
 
 
@@ -192,9 +192,7 @@ def test_includes_cross_reference_count_when_present(tmp_path):
         output_path,
     )
 
-    assert "Cross reference count: 1" in output_path.read_text(
-        encoding="utf-8"
-    )
+    assert "Cross reference count: 1" in output_path.read_text(encoding="utf-8")
 
 
 def test_includes_scope_gaps_section(tmp_path):

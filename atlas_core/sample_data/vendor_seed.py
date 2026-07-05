@@ -10,9 +10,7 @@ def build_vendor_seed_data() -> list[Vendor]:
             vendor_id="direct",
             name="DIRECT",
             vendor_type=VendorType.MANUFACTURER_DIRECT,
-            notes=[
-                "Used when AKJOHNSTON buys directly from the manufacturer."
-            ],
+            notes=["Used when AKJOHNSTON buys directly from the manufacturer."],
         ),
         Vendor(
             vendor_id="midwich",

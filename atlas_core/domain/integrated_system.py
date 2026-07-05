@@ -86,9 +86,7 @@ class IntegratedSystem:
         )
 
     def add_assumption(self, assumption: str) -> None:
-        self.assumptions.append(
-            self._normalize_required_text("assumption", assumption)
-        )
+        self.assumptions.append(self._normalize_required_text("assumption", assumption))
 
     def mark_for_review(self, reason: str | None = None) -> None:
         self.review_required = True

@@ -17,7 +17,7 @@ class RecommendationPriority(str, Enum):
 class Recommendation:
     recommendation_id: str
     message: str
-    priority: RecommendationPriority = RecommendationPriority.MEDIUM
+    priority: RecommendationPriority | str = RecommendationPriority.MEDIUM
     category: str = "general"
     target_id: str | None = None
 
@@ -36,7 +36,7 @@ class Recommendation:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        data["priority"] = self.priority.value
+        data["priority"] = getattr(self.priority, "value", self.priority)
         return data
 
     @staticmethod

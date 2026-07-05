@@ -248,6 +248,4 @@ def test_to_dict_includes_vendor_relationships():
         vendor_relationships=[relationship],
     )
 
-    assert manufacturer.to_dict()["vendor_relationships"] == [
-        relationship.to_dict()
-    ]
+    assert manufacturer.to_dict()["vendor_relationships"] == [relationship.to_dict()]

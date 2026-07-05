@@ -20,9 +20,7 @@ class VendorRegistry:
             )
 
         self._vendors_by_id[vendor.vendor_id] = vendor
-        self._vendor_ids_by_name[
-            self._normalize_name(vendor.name)
-        ] = vendor.vendor_id
+        self._vendor_ids_by_name[self._normalize_name(vendor.name)] = vendor.vendor_id
 
     def get_by_id(self, vendor_id: str) -> Vendor | None:
         if not isinstance(vendor_id, str):

@@ -73,9 +73,7 @@ def test_includes_indexed_specification_sections():
     )
 
     assert review.specification_sections[0].section_id == "27-41-16"
-    assert review.specification_sections[0].title == (
-        "Integrated Audio-Video Systems"
-    )
+    assert review.specification_sections[0].title == ("Integrated Audio-Video Systems")
 
 
 def test_includes_equipment():
@@ -156,8 +154,7 @@ def test_detected_equipment_creates_resolver_and_scope_gap_issues():
     )
 
     assert any(
-        resolution.rule_id == "RULE-001"
-        and resolution.target_id == "detected-speaker"
+        resolution.rule_id == "RULE-001" and resolution.target_id == "detected-speaker"
         for resolution in review.resolutions
     )
     assert any(
@@ -304,8 +301,7 @@ def test_includes_estimator_risks_when_scope_gaps_exist():
     review = build_review(equipment=equipment)
 
     assert any(
-        risk.risk_id == "scope_gaps_detected"
-        and risk.category == "scope"
+        risk.risk_id == "scope_gaps_detected" and risk.category == "scope"
         for risk in review.estimator_risks
     )
 

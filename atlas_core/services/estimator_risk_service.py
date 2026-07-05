@@ -17,7 +17,7 @@ class RiskLevel(str, Enum):
 class EstimatorRisk:
     risk_id: str
     message: str
-    risk_level: RiskLevel = RiskLevel.MEDIUM
+    risk_level: RiskLevel | str = RiskLevel.MEDIUM
     category: str = "general"
     confidence: float = 0.75
 
@@ -37,7 +37,7 @@ class EstimatorRisk:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        data["risk_level"] = self.risk_level.value
+        data["risk_level"] = getattr(self.risk_level, "value", self.risk_level)
         return data
 
     @staticmethod
@@ -59,9 +59,7 @@ class EstimatorRiskService:
                 emitted,
                 EstimatorRisk(
                     risk_id="scope_gaps_detected",
-                    message=(
-                        "Scope gaps were detected and require estimator review."
-                    ),
+                    message=("Scope gaps were detected and require estimator review."),
                     risk_level=RiskLevel.HIGH,
                     category="scope",
                 ),

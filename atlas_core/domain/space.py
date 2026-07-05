@@ -60,8 +60,7 @@ class Space:
             for equipment_id in self.equipment_ids
         ]
         self.notes = [
-            self._normalize_required_text("note", note)
-            for note in self.notes
+            self._normalize_required_text("note", note) for note in self.notes
         ]
 
     def add_scene(self, scene_id: str) -> None:

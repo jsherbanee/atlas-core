@@ -46,7 +46,9 @@ class CrossReference:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        data["reference_type"] = self.reference_type.value
+        data["reference_type"] = getattr(
+            self.reference_type, "value", self.reference_type
+        )
         return data
 
     @staticmethod
@@ -71,8 +73,7 @@ class CrossReferenceService:
         equipment_items = list(equipment or [])
 
         drawing_by_number = {
-            self._match_key(drawing.sheet_number): drawing
-            for drawing in drawing_items
+            self._match_key(drawing.sheet_number): drawing for drawing in drawing_items
         }
         specification_by_number = {
             self._match_key(specification.section_number): specification
@@ -247,9 +248,7 @@ class CrossReferenceService:
             return ""
 
         return "".join(
-            character
-            for character in value.casefold()
-            if character.isalnum()
+            character for character in value.casefold() if character.isalnum()
         )
 
     @staticmethod

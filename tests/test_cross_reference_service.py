@@ -4,6 +4,7 @@ from atlas_core.domain import (
     EquipmentCategory,
     IntegratedSystem,
     SpecificationSection,
+    SpecificationDiscipline,
     SystemCategory,
 )
 from atlas_core.services import (
@@ -26,7 +27,7 @@ def make_specification() -> SpecificationSection:
         section_id="spec-27-41-16",
         section_number="27 41 16",
         title="Integrated Audio Systems",
-        discipline="audiovisual",
+        discipline=SpecificationDiscipline.AUDIOVISUAL,
     )
 
 

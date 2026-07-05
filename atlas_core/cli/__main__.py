@@ -141,11 +141,9 @@ def _demo_maw(
         equipment_matrix_path = output_dir / "maw_equipment_matrix.csv"
         review_report_path = output_dir / "maw_review_report.csv"
 
-        written_equipment_matrix_path = (
-            csv_export_service.export_equipment_matrix(
-                result.rows,
-                equipment_matrix_path,
-            )
+        written_equipment_matrix_path = csv_export_service.export_equipment_matrix(
+            result.rows,
+            equipment_matrix_path,
         )
         written_review_report_path = csv_export_service.export_review_report(
             result.review_report,
@@ -214,8 +212,7 @@ def _demo_maw_plan_review(output_dir: Path) -> int:
     print(f"estimator brief csv export: {export_paths['estimator_brief_path']}")
     print(f"drawing index csv export: {export_paths['drawing_index_path']}")
     print(
-        "specification index csv export: "
-        f"{export_paths['specification_index_path']}"
+        "specification index csv export: " f"{export_paths['specification_index_path']}"
     )
     print(f"equipment matrix csv export: {export_paths['equipment_matrix_path']}")
     print(f"review report csv export: {export_paths['review_report_path']}")

@@ -19,7 +19,7 @@ class ScopeGap:
     gap_id: str
     target_id: str
     message: str
-    severity: ScopeGapSeverity = ScopeGapSeverity.MEDIUM
+    severity: ScopeGapSeverity | str = ScopeGapSeverity.MEDIUM
     confidence: float = 0.75
     suggested_action: str | None = None
 
@@ -39,7 +39,7 @@ class ScopeGap:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        data["severity"] = self.severity.value
+        data["severity"] = getattr(self.severity, "value", self.severity)
         return data
 
     @staticmethod
@@ -201,8 +201,7 @@ class ScopeGapService:
         cross_references: list[CrossReference],
     ) -> bool:
         return any(
-            reference.source_id == equipment_id
-            or reference.target_id == equipment_id
+            reference.source_id == equipment_id or reference.target_id == equipment_id
             for reference in cross_references
         )
 
