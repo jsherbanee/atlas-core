@@ -33,6 +33,7 @@ def make_result() -> PlanReviewWorkflowResult:
         keynote_count=0,
         legend_count=0,
         legend_item_count=0,
+        room_count=0,
         confidence=0.75,
     )
     final_review = FinalEstimatorReview(

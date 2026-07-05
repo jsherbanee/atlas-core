@@ -9,6 +9,8 @@ from atlas_core.domain import (
     Keynote,
     Legend,
     LegendItem,
+    Room,
+    RoomType,
     SpecificationSection,
     SystemCategory,
 )
@@ -44,6 +46,14 @@ def make_result() -> PlanReviewWorkflowResult:
             review_id="review-001",
             project_id="project-001",
             name="Plan Review",
+            rooms=[
+                Room(
+                    room_id="building-001-main-lobby",
+                    name="Main Lobby",
+                    building_id="building-001",
+                    room_type=RoomType.LOBBY,
+                )
+            ],
             drawing_sheets=[
                 DrawingSheet(
                     sheet_id="av-101",
@@ -135,6 +145,7 @@ def make_result() -> PlanReviewWorkflowResult:
             specification_count=1,
             system_count=1,
             equipment_count=1,
+            room_count=1,
             issue_count=1,
             placeholder_count=0,
             review_required_count=1,

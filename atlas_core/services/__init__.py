@@ -23,6 +23,7 @@ from atlas_core.services.document_section_summary_service import (
 from atlas_core.services.page_candidate_extraction_service import (
     PageCandidateExtractionService,
 )
+from atlas_core.services.room_detection_service import RoomDetectionService
 from atlas_core.services.drawing_indexer_service import DrawingIndexerService
 from atlas_core.services.equipment_detection_service import EquipmentDetectionService
 from atlas_core.services.resolution_service import ResolutionService
@@ -114,7 +115,6 @@ from atlas_core.services.plan_review_application_service import (
 from atlas_core.services.pdf_plan_review_intake_service import (
     PdfPlanReviewIntakeService,
 )
-from atlas_core.services.room_detection_service import RoomDetectionService
 
 __all__ = [
     "BaselineService",

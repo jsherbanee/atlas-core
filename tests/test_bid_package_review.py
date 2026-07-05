@@ -11,6 +11,8 @@ from atlas_core.domain import (
     Keynote,
     Legend,
     LegendItem,
+    Room,
+    RoomType,
     SpecificationDiscipline,
     SpecificationSection,
     SystemCategory,
@@ -160,6 +162,15 @@ def make_legend() -> Legend:
                 description="Ceiling Speaker",
             )
         ],
+    )
+
+
+def make_room() -> Room:
+    return Room(
+        room_id="building-001-main-lobby",
+        name="Main Lobby",
+        building_id="building-001",
+        room_type=RoomType.LOBBY,
     )
 
 
@@ -352,6 +363,7 @@ def test_to_dict_output():
     system = make_system()
     equipment = make_equipment()
     resolution = make_resolution()
+    room = make_room()
     manufacturer_issue = ManufacturerReviewIssue(
         equipment_id="eq-001",
         manufacturer="Unknown",
@@ -379,6 +391,7 @@ def test_to_dict_output():
         specification_sections=[specification_section],
         systems=[system],
         equipment=[equipment],
+        rooms=[room],
         resolutions=[resolution],
         manufacturer_review_issues=[manufacturer_issue],
         review_report=[review_report_item],
@@ -404,6 +417,7 @@ def test_to_dict_output():
         "specification_sections": [specification_section.to_dict()],
         "systems": [system.to_dict()],
         "equipment": [equipment.to_dict()],
+        "rooms": [room.to_dict()],
         "resolutions": [
             {
                 "rule_id": "RULE-001",
@@ -540,3 +554,14 @@ def test_legend_item_count():
     )
 
     assert review.legend_item_count() == 3
+
+
+def test_room_count():
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        rooms=[make_room()],
+    )
+
+    assert review.room_count() == 1

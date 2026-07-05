@@ -18,6 +18,7 @@ class EstimatorBrief:
     specification_count: int
     system_count: int
     equipment_count: int
+    room_count: int
     issue_count: int
     placeholder_count: int
     review_required_count: int
@@ -49,6 +50,7 @@ class EstimatorBriefService:
             specification_count=review.specification_count(),
             system_count=len(review.systems),
             equipment_count=review.equipment_count(),
+            room_count=review.room_count(),
             issue_count=review.issue_count(),
             placeholder_count=self._placeholder_count(review),
             review_required_count=self._review_required_count(review),

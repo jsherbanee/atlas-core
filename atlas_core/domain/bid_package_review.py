@@ -10,6 +10,7 @@ from atlas_core.domain import (
     DrawingSheet,
     Equipment,
     IntegratedSystem,
+    Room,
     SpecificationSection,
 )
 from atlas_core.rules import Resolution
@@ -37,6 +38,7 @@ class BidPackageReview:
     specification_sections: list[SpecificationSection] = field(default_factory=list)
     systems: list[IntegratedSystem] = field(default_factory=list)
     equipment: list[Equipment] = field(default_factory=list)
+    rooms: list[Room] = field(default_factory=list)
     drawing_metadata: list[DrawingMetadata] = field(default_factory=list)
     device_schedules: list[DeviceSchedule] = field(default_factory=list)
     keynotes: list[Keynote] = field(default_factory=list)
@@ -96,6 +98,9 @@ class BidPackageReview:
     def equipment_count(self) -> int:
         return len(self.equipment)
 
+    def room_count(self) -> int:
+        return len(self.rooms)
+
     def cross_reference_count(self) -> int:
         return len(self.cross_references)
 
@@ -132,6 +137,7 @@ class BidPackageReview:
             ),
             "systems": self._serialize_items(self.systems),
             "equipment": self._serialize_items(self.equipment),
+            "rooms": self._serialize_items(self.rooms),
             "resolutions": self._serialize_items(self.resolutions),
             "manufacturer_review_issues": self._serialize_items(
                 self.manufacturer_review_issues

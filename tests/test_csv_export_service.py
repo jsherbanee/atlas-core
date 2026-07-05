@@ -216,6 +216,7 @@ def test_exports_estimator_brief_csv(tmp_path):
         keynote_count=0,
         legend_count=0,
         legend_item_count=0,
+        room_count=0,
         confidence=0.75,
     )
 

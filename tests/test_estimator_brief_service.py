@@ -7,6 +7,8 @@ from atlas_core.domain import (
     Keynote,
     Legend,
     LegendItem,
+    Room,
+    RoomType,
     SpecificationSection,
     SystemCategory,
 )
@@ -44,6 +46,12 @@ def make_review() -> BidPackageReview:
         description="Display",
         category=EquipmentCategory.DISPLAY,
     )
+    room = Room(
+        room_id="building-001-main-lobby",
+        name="Main Lobby",
+        building_id="building-001",
+        room_type=RoomType.LOBBY,
+    )
 
     return BidPackageReview(
         review_id="review-001",
@@ -71,6 +79,7 @@ def make_review() -> BidPackageReview:
             )
         ],
         equipment=[placeholder, display],
+        rooms=[room],
         resolutions=[
             Resolution(
                 rule_id="RULE-001",
@@ -215,6 +224,12 @@ def test_counts_equipment():
     assert brief.equipment_count == 2
 
 
+def test_counts_rooms():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.room_count == 1
+
+
 def test_counts_issues():
     brief = EstimatorBriefService().build_brief(make_review())
 
@@ -306,6 +321,7 @@ def test_to_dict_output():
         specification_count=1,
         system_count=1,
         equipment_count=2,
+        room_count=1,
         issue_count=5,
         placeholder_count=1,
         review_required_count=2,
@@ -332,6 +348,7 @@ def test_to_dict_output():
         "specification_count": 1,
         "system_count": 1,
         "equipment_count": 2,
+        "room_count": 1,
         "issue_count": 5,
         "placeholder_count": 1,
         "review_required_count": 2,

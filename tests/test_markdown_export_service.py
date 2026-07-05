@@ -5,6 +5,8 @@ from atlas_core.domain import (
     Keynote,
     Legend,
     LegendItem,
+    Room,
+    RoomType,
 )
 from atlas_core.services import (
     BidCompleteness,
@@ -34,6 +36,14 @@ def make_result(
             review_id="review-001",
             project_id="project-001",
             name="Plan Review",
+            rooms=[
+                Room(
+                    room_id="building-001-main-lobby",
+                    name="Main Lobby",
+                    building_id="building-001",
+                    room_type=RoomType.LOBBY,
+                )
+            ],
             review_report=list(review_report or []),
             cross_references=list(cross_references or []),
             scope_gaps=list(scope_gaps or []),
@@ -47,6 +57,7 @@ def make_result(
             specification_count=3,
             system_count=4,
             equipment_count=5,
+            room_count=1,
             issue_count=6,
             placeholder_count=1,
             review_required_count=2,

@@ -1,8 +1,11 @@
 from atlas_core.domain import (
+    Building,
     Equipment,
     EquipmentCategory,
     IntegratedSystem,
     SystemCategory,
+    Room,
+    RoomType,
 )
 from atlas_core.services import (
     BidPackageReviewService,
@@ -18,6 +21,23 @@ def build_review(**kwargs):
         project_id="project-001",
         name="Bid Package Review",
         **kwargs,
+    )
+
+
+def make_room() -> Room:
+    return Room(
+        room_id="building-001-main-lobby",
+        name="Main Lobby",
+        building_id="building-001",
+        room_type=RoomType.LOBBY,
+    )
+
+
+def make_building() -> Building:
+    return Building(
+        building_id="building-001",
+        name="Main Building",
+        project_id="project-001",
     )
 
 
@@ -275,6 +295,52 @@ def test_does_not_replace_supplied_systems():
     )
 
     assert review.systems == [supplied_system]
+
+
+def test_detects_rooms_when_no_rooms_are_supplied():
+    review = build_review(
+        buildings=[make_building()],
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "Main Lobby AV Plan",
+            }
+        ],
+    )
+
+    assert len(review.rooms) == 1
+    assert review.rooms[0].name == "Main Lobby"
+    assert review.rooms[0].building_id == "building-001"
+
+
+def test_does_not_replace_supplied_rooms():
+    supplied_room = make_room()
+
+    review = build_review(
+        buildings=[make_building()],
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "Main Lobby AV Plan",
+            }
+        ],
+        rooms=[supplied_room],
+    )
+
+    assert review.rooms == [supplied_room]
+
+
+def test_does_not_detect_rooms_without_building_context():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "Main Lobby AV Plan",
+            }
+        ],
+    )
+
+    assert review.rooms == []
 
 
 def test_includes_scope_gaps_for_missing_projector_mount():

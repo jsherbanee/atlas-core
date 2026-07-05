@@ -14,6 +14,7 @@ from atlas_core.services import (
     EstimateWorkflowService,
     EstimatorRiskService,
     RecommendationService,
+    RoomDetectionService,
     ScopeGapService,
     SpecificationIndexerService,
     SystemDetectionService,
@@ -62,6 +63,7 @@ class BidPackageReviewService:
         device_schedule_equipment_service: DeviceScheduleEquipmentService | None = None,
         keynote_extraction_service: KeynoteExtractionService | None = None,
         legend_extraction_service: LegendExtractionService | None = None,
+        room_detection_service: RoomDetectionService | None = None,
     ) -> None:
         from atlas_core.services import (
             BidCompletenessService,
@@ -114,6 +116,7 @@ class BidPackageReviewService:
         self.legend_extraction_service = (
             legend_extraction_service or LegendExtractionService()
         )
+        self.room_detection_service = room_detection_service or RoomDetectionService()
 
         self.estimate_workflow_service: EstimateWorkflowService = (
             estimate_workflow_service
@@ -188,6 +191,17 @@ class BidPackageReviewService:
             system_items=system_items,
         )
         equipment_items = [*base_equipment_items, *schedule_derived_equipment]
+        room_items = self._prepare_rooms(
+            room_items=inputs["room_items"],
+            building_items=inputs["building_items"],
+            drawing_metadata=drawing_metadata,
+            drawing_sheets=drawing_sheets,
+            specification_sections=specification_sections,
+            device_schedules=device_schedules,
+            keynotes=keynotes,
+            legends=legends,
+            equipment_items=equipment_items,
+        )
         reconciliation_issues = self.scope_reconciliation_service.reconcile(
             equipment=equipment_items,
             device_schedules=device_schedules,
@@ -198,7 +212,7 @@ class BidPackageReviewService:
         workflow_result = (
             self.estimate_workflow_service.build_equipment_matrix_with_resolutions(
                 buildings=inputs["building_items"],
-                rooms=inputs["room_items"],
+                rooms=room_items,
                 spaces=inputs["space_items"],
                 scenes=inputs["scene_items"],
                 systems=system_items,
@@ -222,6 +236,7 @@ class BidPackageReviewService:
             name=name,
             drawing_sheets=drawing_sheets,
             specification_sections=specification_sections,
+            room_items=room_items,
             system_items=system_items,
             equipment_items=equipment_items,
             workflow_result=workflow_result,
@@ -341,6 +356,37 @@ class BidPackageReviewService:
             system_id=self._first_system_id(system_items),
         )
 
+    def _prepare_rooms(
+        self,
+        room_items: list,
+        building_items: list,
+        drawing_metadata: list,
+        drawing_sheets: list,
+        specification_sections: list,
+        device_schedules: list,
+        keynotes: list,
+        legends: list,
+        equipment_items: list,
+    ) -> list:
+        normalized_rooms = list(room_items or [])
+        if normalized_rooms:
+            return normalized_rooms
+
+        building_id = self._first_building_id(building_items)
+        if building_id is None:
+            return []
+
+        return self.room_detection_service.detect_rooms(
+            building_id=building_id,
+            drawing_metadata=drawing_metadata,
+            drawings=drawing_sheets,
+            specifications=specification_sections,
+            device_schedules=device_schedules,
+            keynotes=keynotes,
+            legends=legends,
+            equipment=equipment_items,
+        )
+
     @staticmethod
     def _enrich_indexed_drawing_sheets(
         drawing_sheets: list,
@@ -390,6 +436,7 @@ class BidPackageReviewService:
         keynotes: list | None,
         legends: list | None,
         specification_sections: list,
+        room_items: list,
         system_items: list,
         equipment_items: list,
         workflow_result: Any,
@@ -406,6 +453,7 @@ class BidPackageReviewService:
             device_schedules=device_schedules or [],
             keynotes=keynotes or [],
             legends=legends or [],
+            rooms=room_items,
             specification_sections=specification_sections,
             systems=system_items,
             equipment=equipment_items,
@@ -424,3 +472,20 @@ class BidPackageReviewService:
             return None
 
         return getattr(systems[0], "system_id", None)
+
+    @staticmethod
+    def _first_building_id(buildings: list) -> str | None:
+        if not buildings:
+            return None
+
+        first_building = buildings[0]
+        building_id = getattr(first_building, "building_id", None)
+        if isinstance(building_id, str) and building_id.strip():
+            return building_id.strip()
+
+        if isinstance(first_building, dict):
+            building_id = first_building.get("building_id")
+            if isinstance(building_id, str) and building_id.strip():
+                return building_id.strip()
+
+        return None
