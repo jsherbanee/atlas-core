@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from atlas_core.services import ExtractedPdfPage, PdfTextExtractionService
 from atlas_core.services.pdf_plan_review_intake_service import (
     PdfPlanReviewIntakeService,
 )
@@ -62,6 +63,65 @@ def test_extracted_document_sections_are_dictionaries(
     )
 
     assert all(isinstance(section, dict) for section in request.document_sections)
+
+
+def test_request_includes_document_section_summary(fixture_pdf_path: Path) -> None:
+    request = PdfPlanReviewIntakeService().build_request_from_pdf(
+        pdf_path=fixture_pdf_path,
+        review_id="review-001",
+        project_id="project-001",
+        name="Plan Review",
+    )
+
+    assert isinstance(request.document_section_summary, dict)
+
+
+def test_summary_includes_total_pages(fixture_pdf_path: Path) -> None:
+    request = PdfPlanReviewIntakeService().build_request_from_pdf(
+        pdf_path=fixture_pdf_path,
+        review_id="review-001",
+        project_id="project-001",
+        name="Plan Review",
+    )
+
+    assert request.document_section_summary is not None
+    assert request.document_section_summary["total_pages"] == 2
+
+
+def test_summary_includes_drawing_spec_unknown_counts() -> None:
+    class StubPdfTextExtractionService(PdfTextExtractionService):
+        def extract_pages(self, pdf_path: str | Path) -> list[ExtractedPdfPage]:
+            return [
+                ExtractedPdfPage(
+                    page_number=1,
+                    text="A101 Floor Plan",
+                    source_file="stub.pdf",
+                ),
+                ExtractedPdfPage(
+                    page_number=2,
+                    text="Division 27 Specification",
+                    source_file="stub.pdf",
+                ),
+                ExtractedPdfPage(
+                    page_number=3,
+                    text="General project notes",
+                    source_file="stub.pdf",
+                ),
+            ]
+
+    request = PdfPlanReviewIntakeService(
+        pdf_text_extraction_service=StubPdfTextExtractionService()
+    ).build_request_from_pdf(
+        pdf_path="unused.pdf",
+        review_id="review-001",
+        project_id="project-001",
+        name="Plan Review",
+    )
+
+    assert request.document_section_summary is not None
+    assert request.document_section_summary["drawing_pages"] == 1
+    assert request.document_section_summary["specification_pages"] == 1
+    assert request.document_section_summary["unknown_pages"] == 1
 
 
 def test_preserves_review_id(fixture_pdf_path: Path) -> None:

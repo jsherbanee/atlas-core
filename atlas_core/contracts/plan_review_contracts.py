@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from atlas_core.services import PlanReviewWorkflowResult
+if TYPE_CHECKING:
+    from atlas_core.services import PlanReviewWorkflowResult
 
 
 @dataclass
@@ -15,6 +16,7 @@ class PlanReviewRequest:
     name: str
     raw_pages: list[dict] = field(default_factory=list)
     document_sections: list[dict] = field(default_factory=list)
+    document_section_summary: dict | None = None
     raw_sheets: list[dict] = field(default_factory=list)
     raw_sections: list[dict] = field(default_factory=list)
     raw_device_schedules: list[dict] = field(default_factory=list)
@@ -31,6 +33,7 @@ class PlanReviewRequest:
             "name": self.name,
             "raw_pages": list(self.raw_pages),
             "document_sections": list(self.document_sections),
+            "document_section_summary": self.document_section_summary,
             "raw_sheets": list(self.raw_sheets),
             "raw_sections": list(self.raw_sections),
             "raw_device_schedules": list(self.raw_device_schedules),
