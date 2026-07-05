@@ -39,6 +39,7 @@ from atlas_core.domain.estimate_baseline import (
     EstimateBaseline,
     EstimateBaselineStatus,
 )
+from atlas_core.domain.keynote import Keynote
 
 __all__ = [
     "BidPackageReview",
@@ -47,6 +48,7 @@ __all__ = [
     "ProjectLifecycleEvent",
     "EstimateBaseline",
     "EstimateBaselineStatus",
+    "Keynote",
     "DrawingDiscipline",
     "DrawingSheet",
     "SpecificationDiscipline",
