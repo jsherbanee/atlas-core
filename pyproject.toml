@@ -10,7 +10,9 @@ requires-python = ">=3.12"
 authors = [
   { name = "Atlas Core" }
 ]
-dependencies = []
+dependencies = [
+  "pypdf>=6.0",
+]
 
 [project.optional-dependencies]
 dev = [

@@ -70,6 +70,10 @@ from atlas_core.services.plan_review_readiness_service import (
     PlanReviewReadinessService,
     ReadinessStatus,
 )
+from atlas_core.services.pdf_text_extraction_service import (
+    ExtractedPdfPage,
+    PdfTextExtractionService,
+)
 
 __all__ = [
     "BaselineService",
@@ -101,7 +105,9 @@ __all__ = [
     "PlanReviewReadinessService",
     "PlanReviewWorkflowResult",
     "PlanReviewWorkflowService",
+    "PdfTextExtractionService",
     "ReadinessStatus",
+    "ExtractedPdfPage",
     "Recommendation",
     "RecommendationPriority",
     "RecommendationService",
