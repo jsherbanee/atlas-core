@@ -38,6 +38,7 @@ from atlas_core.domain.estimate_baseline import (
     EstimateBaseline,
     EstimateBaselineStatus,
 )
+from atlas_core.domain.device_schedule import DeviceSchedule, DeviceScheduleItem
 
 __all__ = [
     "BidPackageReview",
@@ -78,4 +79,6 @@ __all__ = [
     "VendorType",
     "VendorRelationship",
     "VendorRelationshipType",
+    "DeviceSchedule",
+    "DeviceScheduleItem",
 ]
