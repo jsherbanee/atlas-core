@@ -104,6 +104,9 @@ from atlas_core.services.json_export_service import JsonExportService
 from atlas_core.services.plan_review_application_service import (
     PlanReviewApplicationService,
 )
+from atlas_core.services.pdf_plan_review_intake_service import (
+    PdfPlanReviewIntakeService,
+)
 
 __all__ = [
     "BaselineService",
@@ -148,6 +151,7 @@ __all__ = [
     "PlanReviewReadinessService",
     "PlanReviewWorkflowResult",
     "PlanReviewWorkflowService",
+    "PdfPlanReviewIntakeService",
     "PdfTextExtractionService",
     "ReadinessStatus",
     "ExtractedPdfPage",
