@@ -81,6 +81,9 @@ from atlas_core.services.drawing_metadata_service import (
 from atlas_core.services.device_schedule_extraction_service import (
     DeviceScheduleExtractionService,
 )
+from atlas_core.services.device_schedule_equipment_service import (
+    DeviceScheduleEquipmentService,
+)
 
 __all__ = [
     "BaselineService",
@@ -97,6 +100,7 @@ __all__ = [
     "DrawingMetadata",
     "DrawingMetadataService",
     "DeviceScheduleExtractionService",
+    "DeviceScheduleEquipmentService",
     "EquipmentDetectionService",
     "EstimatorBrief",
     "EstimatorBriefService",
