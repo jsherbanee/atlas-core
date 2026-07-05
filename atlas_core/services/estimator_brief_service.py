@@ -24,8 +24,8 @@ class EstimatorBrief:
     cross_reference_count: int
     scope_gap_count: int
     estimator_risk_count: int
-    recommendation_count: int
     confidence: float
+    recommendation_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

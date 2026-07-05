@@ -6,6 +6,7 @@ from atlas_core.services import (
     EquipmentMatrixRow,
     EstimatorBrief,
     EstimatorRisk,
+    Recommendation,
     ReviewReportItem,
     ScopeGap,
 )
@@ -384,6 +385,76 @@ def test_handles_empty_estimator_risks(tmp_path):
     output_path = tmp_path / "estimator_risks.csv"
 
     CsvExportService().export_estimator_risks([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records == []
+
+
+def test_exports_recommendations_csv(tmp_path):
+    output_path = tmp_path / "recommendations.csv"
+
+    written_path = CsvExportService().export_recommendations(
+        [
+            Recommendation(
+                recommendation_id="confirm-manufacturers",
+                message="Confirm manufacturers before pricing.",
+                priority="medium",
+                category="manufacturer",
+                target_id="eq-001",
+            )
+        ],
+        output_path,
+    )
+
+    assert written_path == output_path
+    assert output_path.exists()
+
+
+def test_writes_recommendation_headers(tmp_path):
+    output_path = tmp_path / "recommendations.csv"
+
+    CsvExportService().export_recommendations([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+
+    assert headers == list(
+        Recommendation(
+            recommendation_id="recommendation_id",
+            message="Message.",
+        ).to_dict().keys()
+    )
+
+
+def test_writes_recommendation_values(tmp_path):
+    output_path = tmp_path / "recommendations.csv"
+    recommendation = Recommendation(
+        recommendation_id="confirm-manufacturers",
+        message="Confirm manufacturers before pricing.",
+        priority="medium",
+        category="manufacturer",
+        target_id="eq-001",
+    )
+
+    CsvExportService().export_recommendations([recommendation], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["recommendation_id"] == "confirm-manufacturers"
+    assert records[0]["message"] == "Confirm manufacturers before pricing."
+    assert records[0]["priority"] == "medium"
+    assert records[0]["category"] == "manufacturer"
+    assert records[0]["target_id"] == "eq-001"
+
+
+def test_handles_empty_recommendations(tmp_path):
+    output_path = tmp_path / "recommendations.csv"
+
+    CsvExportService().export_recommendations([], output_path)
 
     with output_path.open(encoding="utf-8", newline="") as file:
         records = list(csv.DictReader(file))

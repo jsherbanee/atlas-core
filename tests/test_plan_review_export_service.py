@@ -132,6 +132,7 @@ def test_supports_custom_prefix(tmp_path):
     assert result.review_report_path == tmp_path / "maw_review_report.csv"
     assert result.scope_gaps_path == tmp_path / "maw_scope_gaps.csv"
     assert result.estimator_risks_path == tmp_path / "maw_estimator_risks.csv"
+    assert result.recommendations_path == tmp_path / "maw_recommendations.csv"
     assert result.markdown_summary_path == tmp_path / "maw_summary.md"
 
 
@@ -146,6 +147,7 @@ def test_to_dict_returns_string_paths(tmp_path):
         "review_report_path": str(result.review_report_path),
         "scope_gaps_path": str(result.scope_gaps_path),
         "estimator_risks_path": str(result.estimator_risks_path),
+        "recommendations_path": str(result.recommendations_path),
         "markdown_summary_path": str(result.markdown_summary_path),
     }
     assert all(isinstance(value, str) for value in result.to_dict().values())
@@ -156,6 +158,8 @@ def test_exports_scope_gaps_csv(tmp_path):
 
     assert result.scope_gaps_path.exists()
     assert result.scope_gaps_path.name == "plan_review_scope_gaps.csv"
+    assert result.recommendations_path.exists()
+    assert result.recommendations_path.name == "plan_review_recommendations.csv"
 
 
 def test_exports_estimator_risks_csv(tmp_path):
