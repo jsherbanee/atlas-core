@@ -36,6 +36,17 @@ def test_rejecting_blank_assumption_id():
         )
 
 
+def test_accepting_string_severity():
+    assumption = EngineeringAssumption(
+        assumption_id="assumption-001",
+        category="mounting",
+        description="Coordinate mounting heights in field.",
+        severity="review",
+    )
+
+    assert assumption.severity is AssumptionSeverity.REVIEW
+
+
 def test_rejecting_blank_category():
     with pytest.raises(ValueError, match="category cannot be blank"):
         EngineeringAssumption(

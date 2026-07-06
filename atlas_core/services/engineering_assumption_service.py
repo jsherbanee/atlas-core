@@ -2,165 +2,171 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from typing import TYPE_CHECKING
-
-from atlas_core.domain.engineering_assumption import (
-    AssumptionSeverity,
-    EngineeringAssumption,
-)
 from atlas_core.utils.refactoring import enum_value
 
 if TYPE_CHECKING:
-    from atlas_core.domain import BidPackageReview
+    from atlas_core.domain import BidPackageReview, EngineeringAssumption
 
 
 class EngineeringAssumptionService:
+    _MOUNT_KEYWORDS = ("mount", "mounting", "ceiling mount", "wall mount")
+    _RACK_KEYWORDS = ("rack", "equipment rack")
+    _PROGRAMMING_KEYWORDS = ("program", "programming", "configuration")
+    _ANTENNA_KEYWORDS = ("antenna", "antennae", "antenna distribution")
+    _PTZ_CONNECTIVITY_KEYWORDS = ("network", "usb", "control")
+
     def build(self, review: BidPackageReview) -> list[EngineeringAssumption]:
+        from atlas_core.domain import (
+            AssumptionSeverity,
+            EngineeringAssumption,
+            EquipmentCategory,
+        )
+
         assumptions: list[EngineeringAssumption] = []
         emitted: set[str] = set()
 
-        equipment = list(review.equipment)
-        detail_callouts = list(getattr(review, "detail_callouts", []))
+        equipment = list(getattr(review, "equipment", []) or [])
+        detail_callouts = list(getattr(review, "detail_callouts", []) or [])
 
         has_mount_detail = any(
-            self._value(getattr(callout, "equipment_category", None)) == "mount"
+            self._detail_mentions(callout, self._MOUNT_KEYWORDS)
             for callout in detail_callouts
         )
         has_rack_detail = any(
-            self._value(getattr(callout, "equipment_category", None)) == "rack"
+            self._detail_mentions(callout, self._RACK_KEYWORDS)
             for callout in detail_callouts
         )
 
-        projectors = [
-            item for item in equipment if self._value(item.category) == "projector"
-        ]
-        if projectors and not has_mount_detail:
-            self._add_assumption(
-                assumptions,
-                emitted,
-                EngineeringAssumption(
-                    assumption_id="projector_mounting_detail_missing",
-                    category="mounting",
-                    description="No projector mounting hardware has been identified.",
-                    severity=AssumptionSeverity.REVIEW,
-                    related_equipment=projectors[0].equipment_id,
-                ),
-            )
+        for item in equipment:
+            category = self._value(getattr(item, "category", None))
 
-        displays = [item for item in equipment if self._value(item.category) == "display"]
-        if displays and not has_mount_detail:
-            self._add_assumption(
-                assumptions,
-                emitted,
-                EngineeringAssumption(
-                    assumption_id="display_mounting_detail_missing",
-                    category="mounting",
-                    description="Display mounting solution should be confirmed.",
-                    severity=AssumptionSeverity.REVIEW,
-                    related_equipment=displays[0].equipment_id,
-                ),
-            )
-
-        racks = [item for item in equipment if self._value(item.category) == "rack"]
-        if racks and not has_rack_detail:
-            self._add_assumption(
-                assumptions,
-                emitted,
-                EngineeringAssumption(
-                    assumption_id="rack_detail_missing",
-                    category="rack",
-                    description="Equipment rack details should be confirmed.",
-                    severity=AssumptionSeverity.RISK,
-                    related_equipment=racks[0].equipment_id,
-                ),
-            )
-
-        dsp_items = [item for item in equipment if self._value(item.category) == "dsp"]
-        if dsp_items and not any(self._has_programming_notes(item) for item in dsp_items):
-            self._add_assumption(
-                assumptions,
-                emitted,
-                EngineeringAssumption(
-                    assumption_id="dsp_programming_scope_unverified",
-                    category="programming",
-                    description="DSP programming scope should be verified.",
-                    severity=AssumptionSeverity.REVIEW,
-                    related_equipment=dsp_items[0].equipment_id,
-                ),
-            )
-
-        wireless_microphones = [
-            item
-            for item in equipment
-            if self._value(item.category) == "microphone"
-            and "wireless" in self._equipment_text(item)
-        ]
-        if wireless_microphones and not any(
-            self._is_antenna_equipment(item) for item in equipment
-        ):
-            self._add_assumption(
-                assumptions,
-                emitted,
-                EngineeringAssumption(
-                    assumption_id="wireless_microphone_antenna_unverified",
-                    category="wireless",
-                    description=(
-                        "Wireless microphone antenna distribution should be "
-                        "reviewed."
+            if (
+                category == enum_value(EquipmentCategory.PROJECTOR)
+                and not has_mount_detail
+            ):
+                self._add_assumption(
+                    assumptions,
+                    emitted,
+                    EngineeringAssumption(
+                        assumption_id=(
+                            f"projector_mounting_detail_missing_{item.equipment_id}"
+                        ),
+                        category="mounting",
+                        description=(
+                            "No projector mounting hardware or mounting detail has "
+                            "been identified."
+                        ),
+                        severity=AssumptionSeverity.REVIEW,
+                        related_equipment=item.equipment_id,
                     ),
-                    severity=AssumptionSeverity.RISK,
-                    related_equipment=wireless_microphones[0].equipment_id,
-                ),
-            )
+                )
 
-        ptz_cameras = [
-            item
-            for item in equipment
-            if self._value(item.category) == "camera"
-            and "ptz" in self._equipment_text(item)
-        ]
-        if ptz_cameras and not self._has_usb_network_path(ptz_cameras, equipment):
-            self._add_assumption(
-                assumptions,
-                emitted,
-                EngineeringAssumption(
-                    assumption_id="ptz_connectivity_unverified",
-                    category="connectivity",
-                    description="PTZ camera connectivity should be verified.",
-                    severity=AssumptionSeverity.REVIEW,
-                    related_equipment=ptz_cameras[0].equipment_id,
-                ),
-            )
+            if (
+                category == enum_value(EquipmentCategory.DISPLAY)
+                and not has_mount_detail
+            ):
+                self._add_assumption(
+                    assumptions,
+                    emitted,
+                    EngineeringAssumption(
+                        assumption_id=(
+                            f"display_mounting_detail_missing_{item.equipment_id}"
+                        ),
+                        category="mounting",
+                        description="Display mounting solution should be confirmed.",
+                        severity=AssumptionSeverity.REVIEW,
+                        related_equipment=item.equipment_id,
+                    ),
+                )
 
-        if equipment and any(not self._has_power_reference(item) for item in equipment):
-            self._add_assumption(
-                assumptions,
-                emitted,
-                EngineeringAssumption(
-                    assumption_id="equipment_power_reference_missing",
-                    category="power",
-                    description="Power requirements should be confirmed.",
-                    severity=AssumptionSeverity.REVIEW,
-                ),
-            )
+            if category == enum_value(EquipmentCategory.RACK) and not has_rack_detail:
+                self._add_assumption(
+                    assumptions,
+                    emitted,
+                    EngineeringAssumption(
+                        assumption_id=f"rack_detail_missing_{item.equipment_id}",
+                        category="rack",
+                        description="Equipment rack details should be confirmed.",
+                        severity=AssumptionSeverity.RISK,
+                        related_equipment=item.equipment_id,
+                    ),
+                )
 
-        if equipment and any(
-            not isinstance(item.specification_reference, str)
-            or not item.specification_reference.strip()
-            for item in equipment
-        ):
-            self._add_assumption(
-                assumptions,
-                emitted,
-                EngineeringAssumption(
-                    assumption_id="equipment_specification_reference_missing",
-                    category="specification",
-                    description="Equipment should be validated against specifications.",
-                    severity=AssumptionSeverity.INFORMATIONAL,
-                ),
-            )
+            if category in {
+                enum_value(EquipmentCategory.DSP),
+                enum_value(EquipmentCategory.CONTROL_PROCESSOR),
+            } and not self._equipment_mentions(item, self._PROGRAMMING_KEYWORDS):
+                self._add_assumption(
+                    assumptions,
+                    emitted,
+                    EngineeringAssumption(
+                        assumption_id=f"programming_scope_unverified_{item.equipment_id}",
+                        category="programming",
+                        description="DSP or control programming scope should be verified.",
+                        severity=AssumptionSeverity.REVIEW,
+                        related_equipment=item.equipment_id,
+                    ),
+                )
+
+            if (
+                category == enum_value(EquipmentCategory.MICROPHONE)
+                and "wireless" in self._equipment_text(item)
+                and not self._has_antenna_equipment(equipment)
+            ):
+                self._add_assumption(
+                    assumptions,
+                    emitted,
+                    EngineeringAssumption(
+                        assumption_id=(
+                            "wireless_microphone_antenna_unverified_"
+                            f"{item.equipment_id}"
+                        ),
+                        category="wireless",
+                        description=(
+                            "Wireless microphone antenna distribution should be "
+                            "reviewed."
+                        ),
+                        severity=AssumptionSeverity.RISK,
+                        related_equipment=item.equipment_id,
+                    ),
+                )
+
+            if (
+                category == enum_value(EquipmentCategory.CAMERA)
+                and "ptz" in self._equipment_text(item)
+                and not self._equipment_mentions(item, self._PTZ_CONNECTIVITY_KEYWORDS)
+            ):
+                self._add_assumption(
+                    assumptions,
+                    emitted,
+                    EngineeringAssumption(
+                        assumption_id=f"ptz_connectivity_unverified_{item.equipment_id}",
+                        category="connectivity",
+                        description="PTZ camera connectivity should be verified.",
+                        severity=AssumptionSeverity.REVIEW,
+                        related_equipment=item.equipment_id,
+                    ),
+                )
+
+            if not self._has_specification_reference(item):
+                self._add_assumption(
+                    assumptions,
+                    emitted,
+                    EngineeringAssumption(
+                        assumption_id=(
+                            "equipment_specification_reference_missing_"
+                            f"{item.equipment_id}"
+                        ),
+                        category="specification",
+                        description=(
+                            "Equipment should be validated against specifications."
+                        ),
+                        severity=AssumptionSeverity.INFORMATIONAL,
+                        related_equipment=item.equipment_id,
+                    ),
+                )
 
         return assumptions
 
@@ -187,33 +193,35 @@ class EngineeringAssumptionService:
         ).casefold()
 
     @classmethod
-    def _has_programming_notes(cls, item: Any) -> bool:
-        return "program" in cls._equipment_text(item)
+    def _detail_mentions(cls, callout: Any, keywords: tuple[str, ...]) -> bool:
+        value = " ".join(
+            [
+                str(getattr(callout, "equipment_category", "") or ""),
+                str(getattr(callout, "description", "") or ""),
+                " ".join(str(note) for note in getattr(callout, "notes", []) or []),
+            ]
+        ).casefold()
+        return any(keyword in value for keyword in keywords)
 
     @classmethod
-    def _is_antenna_equipment(cls, item: Any) -> bool:
-        return "antenna" in cls._equipment_text(item)
+    def _equipment_mentions(cls, item: Any, keywords: tuple[str, ...]) -> bool:
+        value = cls._equipment_text(item)
+        return any(keyword in value for keyword in keywords)
 
     @classmethod
-    def _has_usb_network_path(cls, ptz_items: list[Any], equipment: list[Any]) -> bool:
-        connectivity_tokens = ("usb", "network", "ethernet", "cat6", "cat 6")
-
-        for item in ptz_items:
-            if any(token in cls._equipment_text(item) for token in connectivity_tokens):
-                return True
-
+    def _has_antenna_equipment(cls, equipment: list[Any]) -> bool:
         for item in equipment:
-            if cls._value(getattr(item, "category", None)) == "network":
-                return True
-            if any(token in cls._equipment_text(item) for token in connectivity_tokens):
+            if cls._equipment_mentions(item, cls._ANTENNA_KEYWORDS):
                 return True
 
         return False
 
-    @classmethod
-    def _has_power_reference(cls, item: Any) -> bool:
-        power_tokens = ("power", "120v", "208v", "277v", "poe")
-        return any(token in cls._equipment_text(item) for token in power_tokens)
+    @staticmethod
+    def _has_specification_reference(item: Any) -> bool:
+        specification_reference = getattr(item, "specification_reference", None)
+        return isinstance(specification_reference, str) and bool(
+            specification_reference.strip()
+        )
 
     @staticmethod
     def _value(value: Any) -> Any:

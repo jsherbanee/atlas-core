@@ -228,7 +228,7 @@ def test_includes_engineering_assumptions_in_output_and_actions():
     projector_assumption = next(
         assumption
         for assumption in final_review.engineering_assumptions
-        if assumption.assumption_id == "projector_mounting_detail_missing"
+        if assumption.assumption_id == "projector_mounting_detail_missing_eq-projector"
     )
     assert projector_assumption.severity is AssumptionSeverity.REVIEW
     assert projector_assumption.description in final_review.next_actions
