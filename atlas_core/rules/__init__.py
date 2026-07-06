@@ -12,6 +12,17 @@ from atlas_core.rules.audio import (
 from atlas_core.rules.engineering_rule import EngineeringRule
 from atlas_core.rules.engineering_rule_engine import EngineeringRuleEngine
 from atlas_core.rules.engineering_rule_registry import EngineeringRuleRegistry
+from atlas_core.rules.infrastructure import (
+    BackingRule,
+    CablePathwayRule,
+    ConduitRule,
+    GroundingRule,
+    RackCoolingRule,
+    RackElevationRule,
+    RackPowerRule,
+    UPSRule,
+    register_infrastructure_rules,
+)
 from atlas_core.rules.projection import (
     ProjectionCoolingRule,
     ProjectionPowerRule,
@@ -33,6 +44,15 @@ __all__ = [
     "HearingAssistanceRule",
     "MicrophonePowerRule",
     "register_audio_rules",
+    "ConduitRule",
+    "BackingRule",
+    "RackCoolingRule",
+    "RackPowerRule",
+    "RackElevationRule",
+    "UPSRule",
+    "GroundingRule",
+    "CablePathwayRule",
+    "register_infrastructure_rules",
     "ProjectorMountRule",
     "ProjectorLensRule",
     "ProjectionPowerRule",
