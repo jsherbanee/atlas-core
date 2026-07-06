@@ -5,8 +5,10 @@ from typing import Any
 
 from atlas_core.domain.engineering_assumption import EngineeringAssumption
 from atlas_core.domain import BidPackageReview
-from atlas_core.services.engineering_assumption_service import (
-    EngineeringAssumptionService,
+from atlas_core.rules import (
+    EngineeringRuleEngine,
+    EngineeringRuleRegistry,
+    register_default_engineering_rules,
 )
 
 
@@ -51,16 +53,25 @@ class FinalEstimatorReview:
 class FinalEstimatorReviewService:
     def __init__(
         self,
-        engineering_assumption_service: EngineeringAssumptionService | None = None,
+        engineering_rule_engine: EngineeringRuleEngine | None = None,
+        engineering_rule_registry: EngineeringRuleRegistry | None = None,
     ) -> None:
-        self.engineering_assumption_service = (
-            engineering_assumption_service or EngineeringAssumptionService()
-        )
+        if engineering_rule_engine is not None:
+            self.engineering_rule_engine = engineering_rule_engine
+        else:
+            registry = engineering_rule_registry or EngineeringRuleRegistry()
+            if engineering_rule_registry is None:
+                register_default_engineering_rules(registry)
+            self.engineering_rule_engine = EngineeringRuleEngine(registry)
 
     def build(self, review: BidPackageReview) -> FinalEstimatorReview:
         readiness = getattr(review, "readiness", None)
         bid_completeness = getattr(review, "bid_completeness", None)
-        engineering_assumptions = self.engineering_assumption_service.build(review)
+        engineering_assumptions = list(
+            getattr(review, "engineering_assumptions", []) or []
+        )
+        if not engineering_assumptions:
+            engineering_assumptions = self.engineering_rule_engine.evaluate(review)
 
         readiness_status = self._value(getattr(readiness, "status", None))
         readiness_message = getattr(readiness, "message", None)

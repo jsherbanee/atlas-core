@@ -17,7 +17,7 @@ from atlas_core.rules import Resolution
 from atlas_core.utils.refactoring import serialize_item, serialize_items
 
 if TYPE_CHECKING:
-    from atlas_core.domain import DetailCallout, Keynote, Legend
+    from atlas_core.domain import DetailCallout, EngineeringAssumption, Keynote, Legend
     from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
     from atlas_core.services.bid_completeness_service import BidCompleteness
     from atlas_core.services.plan_review_readiness_service import PlanReviewReadiness
@@ -54,6 +54,7 @@ class BidPackageReview:
     scope_gaps: list[ScopeGap] = field(default_factory=list)
     estimator_risks: list[EstimatorRisk] = field(default_factory=list)
     recommendations: list[Recommendation] = field(default_factory=list)
+    engineering_assumptions: list[EngineeringAssumption] = field(default_factory=list)
     bid_completeness: BidCompleteness | None = None
     readiness: PlanReviewReadiness | None = None
     notes: list[str] = field(default_factory=list)
@@ -153,6 +154,9 @@ class BidPackageReview:
             "scope_gaps": self._serialize_items(self.scope_gaps),
             "estimator_risks": self._serialize_items(self.estimator_risks),
             "recommendations": self._serialize_items(self.recommendations),
+            "engineering_assumptions": self._serialize_items(
+                self.engineering_assumptions
+            ),
             "bid_completeness": (
                 self.bid_completeness.to_dict()
                 if self.bid_completeness is not None

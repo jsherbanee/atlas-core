@@ -30,6 +30,7 @@ from atlas_core.services.device_schedule_extraction_service import (
 )
 
 if TYPE_CHECKING:
+    from atlas_core.rules import EngineeringRuleEngine, EngineeringRuleRegistry
     from atlas_core.domain import BidPackageReview
     from atlas_core.services import (
         BidCompletenessService,
@@ -66,6 +67,8 @@ class BidPackageReviewService:
         legend_extraction_service: LegendExtractionService | None = None,
         room_detection_service: RoomDetectionService | None = None,
         detail_callout_extraction_service: DetailCalloutExtractionService | None = None,
+        engineering_rule_engine: EngineeringRuleEngine | None = None,
+        engineering_rule_registry: EngineeringRuleRegistry | None = None,
     ) -> None:
         from atlas_core.services import (
             BidCompletenessService,
@@ -73,6 +76,11 @@ class BidPackageReviewService:
             LegendExtractionService,
             PlanReviewReadinessService,
             ScopeReconciliationService,
+        )
+        from atlas_core.rules import (
+            EngineeringRuleEngine,
+            EngineeringRuleRegistry,
+            register_default_engineering_rules,
         )
 
         self.drawing_indexer = drawing_indexer or DrawingIndexerService()
@@ -127,6 +135,14 @@ class BidPackageReviewService:
             estimate_workflow_service
             or EstimateWorkflowService(manufacturer_registry=manufacturer_registry)
         )
+
+        if engineering_rule_engine is not None:
+            self.engineering_rule_engine = engineering_rule_engine
+        else:
+            registry = engineering_rule_registry or EngineeringRuleRegistry()
+            if engineering_rule_registry is None:
+                register_default_engineering_rules(registry)
+            self.engineering_rule_engine = EngineeringRuleEngine(registry)
 
     def build_review(
         self,
@@ -264,6 +280,7 @@ class BidPackageReviewService:
         review.bid_completeness = self.bid_completeness_service.assess(review)
         review.estimator_risks = self.estimator_risk_service.assess(review)
         review.confidence = self.confidence_scoring_service.score_review(review)
+        review.engineering_assumptions = self.engineering_rule_engine.evaluate(review)
         review.recommendations = self.recommendation_service.build_recommendations(
             review
         )

@@ -54,6 +54,22 @@ def test_final_review_includes_readiness_and_completeness_when_available():
     assert result.final_review.completeness_status is not None
 
 
+def test_review_and_final_review_include_engineering_assumptions():
+    result = run_review(
+        equipment=[
+            Equipment(
+                equipment_id="eq-projector",
+                description="Main projector",
+                category=EquipmentCategory.PROJECTOR,
+            )
+        ]
+    )
+
+    assert result.review.engineering_assumptions
+    assert result.final_review is not None
+    assert result.final_review.engineering_assumptions
+
+
 def test_includes_drawing_count_in_brief():
     result = run_review(
         raw_sheets=[

@@ -24,6 +24,7 @@ from atlas_core.rules.construction import (
     TravelDistanceRule,
     register_construction_rules,
 )
+from atlas_core.rules.control import ControlProgrammingRule, register_control_rules
 from atlas_core.rules.infrastructure import (
     BackingRule,
     CablePathwayRule,
@@ -62,6 +63,17 @@ from atlas_core.rules.video import (
     register_video_rules,
 )
 
+
+def register_default_engineering_rules(registry: EngineeringRuleRegistry) -> None:
+    register_projection_rules(registry)
+    register_audio_rules(registry)
+    register_infrastructure_rules(registry)
+    register_video_rules(registry)
+    register_control_rules(registry)
+    register_lighting_rules(registry)
+    register_construction_rules(registry)
+
+
 __all__ = [
     "EngineeringRule",
     "EngineeringRuleEngine",
@@ -83,6 +95,8 @@ __all__ = [
     "SafetyCertificationRule",
     "CoordinationRule",
     "register_construction_rules",
+    "ControlProgrammingRule",
+    "register_control_rules",
     "ConduitRule",
     "BackingRule",
     "RackCoolingRule",
@@ -111,6 +125,7 @@ __all__ = [
     "HouseLightingInterfaceRule",
     "EmergencyLightingCoordinationRule",
     "register_lighting_rules",
+    "register_default_engineering_rules",
     "Resolver",
     "Resolution",
     "ResolutionAction",

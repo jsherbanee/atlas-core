@@ -31,6 +31,7 @@ class EstimatorBrief:
     legend_count: int
     legend_item_count: int
     confidence: float
+    engineering_assumption_count: int = 0
     bid_completeness_score: float | None = None
     bid_completeness_status: str | None = None
     readiness_status: str | None = None
@@ -60,6 +61,9 @@ class EstimatorBriefService:
             reconciliation_issue_count=review.reconciliation_issue_count(),
             scope_gap_count=review.scope_gap_count(),
             estimator_risk_count=review.estimator_risk_count(),
+            engineering_assumption_count=len(
+                list(getattr(review, "engineering_assumptions", []) or [])
+            ),
             keynote_count=review.keynote_count(),
             legend_count=review.legend_count(),
             legend_item_count=review.legend_item_count(),

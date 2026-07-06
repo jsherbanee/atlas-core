@@ -1,6 +1,10 @@
 import json
 
-from atlas_core.domain import BidPackageReview
+from atlas_core.domain import (
+    AssumptionSeverity,
+    BidPackageReview,
+    EngineeringAssumption,
+)
 from atlas_core.services import (
     EstimatorBrief,
     FinalEstimatorReview,
@@ -14,6 +18,14 @@ def make_result() -> PlanReviewWorkflowResult:
         review_id="review-001",
         project_id="project-001",
         name="Plan Review",
+        engineering_assumptions=[
+            EngineeringAssumption(
+                assumption_id="projection_mount_missing_eq-projector",
+                category="mounting",
+                description="Projector mounting solution should be verified.",
+                severity=AssumptionSeverity.REVIEW,
+            )
+        ],
     )
     brief = EstimatorBrief(
         review_id="review-001",
@@ -41,8 +53,17 @@ def make_result() -> PlanReviewWorkflowResult:
         review_id="review-001",
         project_id="project-001",
         name="Plan Review",
+        total_assumptions=1,
         executive_summary="Bid package review summary is available.",
         next_actions=["Proceed with pricing review."],
+        engineering_assumptions=[
+            EngineeringAssumption(
+                assumption_id="projection_mount_missing_eq-projector",
+                category="mounting",
+                description="Projector mounting solution should be verified.",
+                severity=AssumptionSeverity.REVIEW,
+            )
+        ],
     )
 
     return PlanReviewWorkflowResult(
@@ -106,3 +127,13 @@ def test_output_is_valid_json(tmp_path):
 
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
+
+
+def test_includes_engineering_assumptions_in_review_and_final_review(tmp_path):
+    output_path = tmp_path / "result.json"
+
+    JsonExportService().export_plan_review_result(make_result(), output_path)
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["review"]["engineering_assumptions"]
+    assert payload["final_review"]["engineering_assumptions"]

@@ -214,6 +214,33 @@ class RecommendationService:
                 ),
             )
 
+        engineering_assumptions = list(
+            getattr(review, "engineering_assumptions", []) or []
+        )
+        high_risk_assumptions = [
+            assumption
+            for assumption in engineering_assumptions
+            if self._value(getattr(assumption, "severity", None)) == "risk"
+        ]
+        if (
+            high_risk_assumptions
+            and not review.scope_gaps
+            and not review.estimator_risks
+        ):
+            self._add_recommendation(
+                recommendations,
+                emitted,
+                Recommendation(
+                    recommendation_id="review-engineering-assumptions",
+                    message=(
+                        "Review high-risk engineering assumptions before pricing "
+                        "or submitting bid."
+                    ),
+                    priority=RecommendationPriority.HIGH,
+                    category="engineering_assumptions",
+                ),
+            )
+
         return recommendations
 
     @staticmethod

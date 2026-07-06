@@ -1,4 +1,5 @@
 from atlas_core.domain import (
+    AssumptionSeverity,
     BidPackageReview,
     DetailCallout,
     DrawingSheet,
@@ -12,6 +13,7 @@ from atlas_core.domain import (
     RoomType,
     SpecificationSection,
     SystemCategory,
+    EngineeringAssumption,
 )
 from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import (
@@ -153,6 +155,14 @@ def make_review() -> BidPackageReview:
                 ),
                 priority=RecommendationPriority.HIGH,
                 category="confidence",
+            )
+        ],
+        engineering_assumptions=[
+            EngineeringAssumption(
+                assumption_id="assumption-001",
+                category="mounting",
+                description="Mounting should be verified.",
+                severity=AssumptionSeverity.REVIEW,
             )
         ],
         keynotes=[
@@ -311,6 +321,12 @@ def test_counts_recommendations():
     assert brief.recommendation_count == 1
 
 
+def test_counts_engineering_assumptions():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.engineering_assumption_count == 1
+
+
 def test_includes_bid_completeness_fields_when_present():
     brief = EstimatorBriefService().build_brief(make_review())
 
@@ -373,6 +389,7 @@ def test_to_dict_output():
         "reconciliation_issue_count": 1,
         "scope_gap_count": 1,
         "estimator_risk_count": 1,
+        "engineering_assumption_count": 0,
         "keynote_count": 1,
         "legend_count": 1,
         "legend_item_count": 2,

@@ -431,6 +431,29 @@ def test_includes_recommendations_when_scope_gaps_exist():
     )
 
 
+def test_includes_engineering_assumptions_generated_by_rule_engine():
+    review = build_review(
+        equipment=[
+            Equipment(
+                equipment_id="eq-projector",
+                description="Projector",
+                category=EquipmentCategory.PROJECTOR,
+                room_id="room-001",
+            ),
+            Equipment(
+                equipment_id="eq-control",
+                description="Control processor",
+                category=EquipmentCategory.CONTROL_PROCESSOR,
+            ),
+        ]
+    )
+
+    ids = {assumption.assumption_id for assumption in review.engineering_assumptions}
+
+    assert "projection_mount_missing_eq-projector" in ids
+    assert "audio_programming_missing_eq-control" in ids
+
+
 def test_includes_bid_completeness():
     review = build_review(
         raw_sheets=[

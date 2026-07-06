@@ -1,6 +1,7 @@
 import pytest
 
 from atlas_core.domain import (
+    AssumptionSeverity,
     BidPackageReview,
     DetailCallout,
     DeviceSchedule,
@@ -17,6 +18,7 @@ from atlas_core.domain import (
     SpecificationDiscipline,
     SpecificationSection,
     SystemCategory,
+    EngineeringAssumption,
 )
 from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import (
@@ -114,6 +116,16 @@ def make_recommendation() -> Recommendation:
         message="Review confidence before pricing.",
         priority=RecommendationPriority.HIGH,
         category="confidence",
+    )
+
+
+def make_engineering_assumption() -> EngineeringAssumption:
+    return EngineeringAssumption(
+        assumption_id="projection_mount_missing_eq-001",
+        category="mounting",
+        description="Projector mounting solution should be verified.",
+        severity=AssumptionSeverity.REVIEW,
+        related_equipment="eq-001",
     )
 
 
@@ -390,6 +402,7 @@ def test_to_dict_output():
     scope_gap = make_scope_gap()
     estimator_risk = make_estimator_risk()
     recommendation = make_recommendation()
+    engineering_assumption = make_engineering_assumption()
     reconciliation_issue = make_reconciliation_issue()
     bid_completeness = make_bid_completeness()
     device_schedule = make_device_schedule()
@@ -413,6 +426,7 @@ def test_to_dict_output():
         scope_gaps=[scope_gap],
         estimator_risks=[estimator_risk],
         recommendations=[recommendation],
+        engineering_assumptions=[engineering_assumption],
         bid_completeness=bid_completeness,
         drawing_metadata=[DrawingMetadata(sheet_number="AV1.01", title="AV Plan")],
         device_schedules=[device_schedule],
@@ -455,6 +469,7 @@ def test_to_dict_output():
         "scope_gaps": [scope_gap.to_dict()],
         "estimator_risks": [estimator_risk.to_dict()],
         "recommendations": [recommendation.to_dict()],
+        "engineering_assumptions": [engineering_assumption.to_dict()],
         "bid_completeness": bid_completeness.to_dict(),
         "readiness": None,
         "drawing_metadata": [

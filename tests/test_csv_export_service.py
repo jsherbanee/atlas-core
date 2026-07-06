@@ -1,6 +1,7 @@
 import csv
 
 from atlas_core.domain import (
+    AssumptionSeverity,
     DetailCallout,
     DeviceSchedule,
     DeviceScheduleItem,
@@ -9,6 +10,7 @@ from atlas_core.domain import (
     Legend,
     LegendItem,
     SpecificationSection,
+    EngineeringAssumption,
 )
 from atlas_core.services import (
     CsvExportService,
@@ -315,6 +317,34 @@ def test_writes_final_review_values(tmp_path):
     assert records[0]["next_actions"] == (
         "['No drawing sheets are available.', "
         "'No specification sections are available.']"
+    )
+
+
+def test_exports_final_review_includes_engineering_assumptions(tmp_path):
+    output_path = tmp_path / "final_review.csv"
+    final_review = FinalEstimatorReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Plan Review",
+        total_assumptions=1,
+        engineering_assumptions=[
+            EngineeringAssumption(
+                assumption_id="projection_mount_missing_eq-projector",
+                category="mounting",
+                description="Projector mounting solution should be verified.",
+                severity=AssumptionSeverity.REVIEW,
+            )
+        ],
+    )
+
+    CsvExportService().export_final_estimator_review(final_review, output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["total_assumptions"] == "1"
+    assert (
+        "projection_mount_missing_eq-projector" in records[0]["engineering_assumptions"]
     )
 
 

@@ -1,4 +1,6 @@
 from atlas_core.domain import (
+    Equipment,
+    EquipmentCategory,
     BidPackageReview,
     DetailCallout,
     DeviceSchedule,
@@ -152,6 +154,24 @@ def test_includes_final_estimator_review_fields(tmp_path):
     assert "  - Review confidence is below 0.75." in content
     assert "- Engineering Assumptions:" in content
     assert "  - None" in content
+
+
+def test_includes_engineering_assumptions_from_final_review(tmp_path):
+    output_path = tmp_path / "summary.md"
+    result = make_result()
+    result.review.equipment = [
+        Equipment(
+            equipment_id="eq-projector",
+            description="Main projector",
+            category=EquipmentCategory.PROJECTOR,
+        )
+    ]
+
+    MarkdownExportService().export_plan_review_summary(result, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "- Total Engineering Assumptions:" in content
+    assert "Projector mounting solution should be verified." in content
 
 
 def test_includes_brief_counts(tmp_path):
