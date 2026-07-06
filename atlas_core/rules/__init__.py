@@ -23,6 +23,15 @@ from atlas_core.rules.infrastructure import (
     UPSRule,
     register_infrastructure_rules,
 )
+from atlas_core.rules.lighting import (
+    DMXDistributionRule,
+    EmergencyLightingCoordinationRule,
+    HouseLightingInterfaceRule,
+    LightingConsoleNetworkRule,
+    LightingFixtureSafetyCableRule,
+    LightingPowerRule,
+    register_lighting_rules,
+)
 from atlas_core.rules.projection import (
     ProjectionCoolingRule,
     ProjectionPowerRule,
@@ -73,6 +82,13 @@ __all__ = [
     "VideoWallStructureRule",
     "ProjectionScreenSupportRule",
     "register_video_rules",
+    "LightingFixtureSafetyCableRule",
+    "LightingConsoleNetworkRule",
+    "LightingPowerRule",
+    "DMXDistributionRule",
+    "HouseLightingInterfaceRule",
+    "EmergencyLightingCoordinationRule",
+    "register_lighting_rules",
     "Resolver",
     "Resolution",
     "ResolutionAction",
