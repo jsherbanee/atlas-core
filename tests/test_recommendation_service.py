@@ -1,6 +1,11 @@
 from typing import Any
 
-from atlas_core.domain import BidPackageReview, DrawingSheet, SpecificationSection
+from atlas_core.domain import (
+    BidPackageReview,
+    DetailCallout,
+    DrawingSheet,
+    SpecificationSection,
+)
 from atlas_core.services import (
     EstimatorRisk,
     ManufacturerReviewIssue,
@@ -130,6 +135,78 @@ def test_missing_specs_creates_recommendation():
     assert recommendations[0].message == (
         "No specification index is available. Upload or extract specifications "
         "before pricing."
+    )
+
+
+def test_mount_detail_callout_creates_recommendation():
+    review = make_review(
+        detail_callouts=[
+            DetailCallout(
+                callout_id="av-101-detail-5-av-701",
+                detail_number="5",
+                source_sheet_number="AV-101",
+                target_sheet_number="AV-701",
+                equipment_category="mount",
+            )
+        ]
+    )
+
+    recommendations = RecommendationService().build_recommendations(review)
+
+    assert "review-mounting-details" in recommendation_ids(recommendations)
+    assert recommendations[0].priority is RecommendationPriority.MEDIUM
+    assert recommendations[0].category == "mounting"
+    assert recommendations[0].message == (
+        "Review mounting details and include allowance for backing, structure, "
+        "anchors, power coordination, and field conditions."
+    )
+
+
+def test_rack_detail_callout_creates_recommendation():
+    review = make_review(
+        detail_callouts=[
+            DetailCallout(
+                callout_id="av-101-detail-1-av-801",
+                detail_number="1",
+                source_sheet_number="AV-101",
+                target_sheet_number="AV-801",
+                equipment_category="rack",
+            )
+        ]
+    )
+
+    recommendations = RecommendationService().build_recommendations(review)
+
+    assert "review-rack-details" in recommendation_ids(recommendations)
+    assert recommendations[0].priority is RecommendationPriority.MEDIUM
+    assert recommendations[0].category == "rack"
+    assert recommendations[0].message == (
+        "Review rack details for rack size, ventilation, power, cable pathway, "
+        "and service access."
+    )
+
+
+def test_infrastructure_detail_callout_creates_recommendation():
+    review = make_review(
+        detail_callouts=[
+            DetailCallout(
+                callout_id="av-101-detail-2-e-601",
+                detail_number="2",
+                source_sheet_number="AV-101",
+                target_sheet_number="E-601",
+                system_category="infrastructure",
+            )
+        ]
+    )
+
+    recommendations = RecommendationService().build_recommendations(review)
+
+    assert "review-infrastructure-details" in recommendation_ids(recommendations)
+    assert recommendations[0].priority is RecommendationPriority.MEDIUM
+    assert recommendations[0].category == "infrastructure"
+    assert recommendations[0].message == (
+        "Review infrastructure details for conduit, backing, power, structural "
+        "support, and scope responsibility."
     )
 
 

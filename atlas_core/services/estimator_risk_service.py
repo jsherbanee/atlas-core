@@ -93,6 +93,81 @@ class EstimatorRiskService:
                 ),
             )
 
+        detail_callouts = list(getattr(review, "detail_callouts", []))
+
+        if any(
+            self._value(getattr(callout, "equipment_category", None)) == "mount"
+            for callout in detail_callouts
+        ):
+            self._add_risk(
+                risks,
+                emitted,
+                EstimatorRisk(
+                    risk_id="mounting_detail_review",
+                    message=(
+                        "Mounting details were referenced and should be reviewed "
+                        "for backing, structure, power, and site conditions."
+                    ),
+                    risk_level=RiskLevel.MEDIUM,
+                    category="mounting",
+                ),
+            )
+
+        if any(
+            self._value(getattr(callout, "equipment_category", None)) == "rack"
+            for callout in detail_callouts
+        ):
+            self._add_risk(
+                risks,
+                emitted,
+                EstimatorRisk(
+                    risk_id="rack_detail_review",
+                    message=(
+                        "Rack details were referenced and should be reviewed for "
+                        "rack size, cooling, power, cable entry, and service access."
+                    ),
+                    risk_level=RiskLevel.MEDIUM,
+                    category="rack",
+                ),
+            )
+
+        if any(
+            self._value(getattr(callout, "system_category", None)) == "infrastructure"
+            for callout in detail_callouts
+        ):
+            self._add_risk(
+                risks,
+                emitted,
+                EstimatorRisk(
+                    risk_id="infrastructure_detail_review",
+                    message=(
+                        "Infrastructure detail references should be reviewed for "
+                        "conduit, backing, power, structural support, and scope "
+                        "responsibility."
+                    ),
+                    risk_level=RiskLevel.MEDIUM,
+                    category="infrastructure",
+                ),
+            )
+
+        if any(
+            getattr(callout, "target_sheet_number", None) is None
+            for callout in detail_callouts
+        ):
+            self._add_risk(
+                risks,
+                emitted,
+                EstimatorRisk(
+                    risk_id="incomplete_detail_reference",
+                    message=(
+                        "Detail callout is incomplete or missing a target sheet "
+                        "reference."
+                    ),
+                    risk_level=RiskLevel.LOW,
+                    category="detail_reference",
+                ),
+            )
+
         if review.confidence < 0.7:
             self._add_risk(
                 risks,

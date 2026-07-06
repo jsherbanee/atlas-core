@@ -112,6 +112,63 @@ class RecommendationService:
                 ),
             )
 
+        detail_callouts = list(getattr(review, "detail_callouts", []))
+
+        if any(
+            self._value(getattr(callout, "equipment_category", None)) == "mount"
+            for callout in detail_callouts
+        ):
+            self._add_recommendation(
+                recommendations,
+                emitted,
+                Recommendation(
+                    recommendation_id="review-mounting-details",
+                    message=(
+                        "Review mounting details and include allowance for "
+                        "backing, structure, anchors, power coordination, and "
+                        "field conditions."
+                    ),
+                    priority=RecommendationPriority.MEDIUM,
+                    category="mounting",
+                ),
+            )
+
+        if any(
+            self._value(getattr(callout, "equipment_category", None)) == "rack"
+            for callout in detail_callouts
+        ):
+            self._add_recommendation(
+                recommendations,
+                emitted,
+                Recommendation(
+                    recommendation_id="review-rack-details",
+                    message=(
+                        "Review rack details for rack size, ventilation, power, "
+                        "cable pathway, and service access."
+                    ),
+                    priority=RecommendationPriority.MEDIUM,
+                    category="rack",
+                ),
+            )
+
+        if any(
+            self._value(getattr(callout, "system_category", None)) == "infrastructure"
+            for callout in detail_callouts
+        ):
+            self._add_recommendation(
+                recommendations,
+                emitted,
+                Recommendation(
+                    recommendation_id="review-infrastructure-details",
+                    message=(
+                        "Review infrastructure details for conduit, backing, "
+                        "power, structural support, and scope responsibility."
+                    ),
+                    priority=RecommendationPriority.MEDIUM,
+                    category="infrastructure",
+                ),
+            )
+
         if review.confidence < 0.75:
             self._add_recommendation(
                 recommendations,

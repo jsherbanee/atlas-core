@@ -1,6 +1,11 @@
 from typing import Any
 
-from atlas_core.domain import BidPackageReview, Equipment, EquipmentCategory
+from atlas_core.domain import (
+    BidPackageReview,
+    DetailCallout,
+    Equipment,
+    EquipmentCategory,
+)
 from atlas_core.services import (
     EstimatorRisk,
     EstimatorRiskService,
@@ -109,6 +114,105 @@ def test_review_report_creates_medium_risk():
     assert risks[0].risk_level is RiskLevel.MEDIUM
     assert risks[0].category == "review"
     assert risks[0].message == "Review report contains estimator action items."
+
+
+def test_mount_detail_callout_creates_mounting_risk():
+    review = make_review(
+        detail_callouts=[
+            DetailCallout(
+                callout_id="av1.01-detail-5-av-701",
+                detail_number="5",
+                source_sheet_number="AV1.01",
+                target_sheet_number="AV-701",
+                equipment_category="mount",
+            )
+        ]
+    )
+
+    risks = EstimatorRiskService().assess(review)
+
+    mounting_risk = next(
+        risk for risk in risks if risk.risk_id == "mounting_detail_review"
+    )
+    assert mounting_risk.risk_level is RiskLevel.MEDIUM
+    assert mounting_risk.category == "mounting"
+    assert mounting_risk.message == (
+        "Mounting details were referenced and should be reviewed for backing, "
+        "structure, power, and site conditions."
+    )
+
+
+def test_rack_detail_callout_creates_rack_risk():
+    review = make_review(
+        detail_callouts=[
+            DetailCallout(
+                callout_id="av1.01-detail-1-av-801",
+                detail_number="1",
+                source_sheet_number="AV1.01",
+                target_sheet_number="AV-801",
+                equipment_category="rack",
+            )
+        ]
+    )
+
+    risks = EstimatorRiskService().assess(review)
+
+    rack_risk = next(risk for risk in risks if risk.risk_id == "rack_detail_review")
+    assert rack_risk.risk_level is RiskLevel.MEDIUM
+    assert rack_risk.category == "rack"
+    assert rack_risk.message == (
+        "Rack details were referenced and should be reviewed for rack size, "
+        "cooling, power, cable entry, and service access."
+    )
+
+
+def test_infrastructure_detail_callout_creates_infrastructure_risk():
+    review = make_review(
+        detail_callouts=[
+            DetailCallout(
+                callout_id="av1.01-detail-2-e-601",
+                detail_number="2",
+                source_sheet_number="AV1.01",
+                target_sheet_number="E-601",
+                system_category="infrastructure",
+            )
+        ]
+    )
+
+    risks = EstimatorRiskService().assess(review)
+
+    infrastructure_risk = next(
+        risk for risk in risks if risk.risk_id == "infrastructure_detail_review"
+    )
+    assert infrastructure_risk.risk_level is RiskLevel.MEDIUM
+    assert infrastructure_risk.category == "infrastructure"
+    assert infrastructure_risk.message == (
+        "Infrastructure detail references should be reviewed for conduit, "
+        "backing, power, structural support, and scope responsibility."
+    )
+
+
+def test_incomplete_detail_callout_creates_low_risk():
+    review = make_review(
+        detail_callouts=[
+            DetailCallout(
+                callout_id="av1.01-detail-3-missing",
+                detail_number="3",
+                source_sheet_number="AV1.01",
+            )
+        ]
+    )
+
+    risks = EstimatorRiskService().assess(review)
+
+    detail_reference_risk = next(
+        risk for risk in risks if risk.risk_id == "incomplete_detail_reference"
+    )
+    assert detail_reference_risk.risk_level is RiskLevel.LOW
+    assert detail_reference_risk.category == "detail_reference"
+    assert detail_reference_risk.message == (
+        "Detail callout is incomplete or missing a target sheet reference."
+    )
 
 
 def test_no_duplicate_risks():
