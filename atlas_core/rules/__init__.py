@@ -1,5 +1,8 @@
 """Rules and resolution helpers for Atlas Core."""
 
+from atlas_core.rules.engineering_rule import EngineeringRule
+from atlas_core.rules.engineering_rule_engine import EngineeringRuleEngine
+from atlas_core.rules.engineering_rule_registry import EngineeringRuleRegistry
 from atlas_core.rules.audio import (
     DSPProgrammingRule,
     HearingAssistanceRule,
@@ -9,9 +12,6 @@ from atlas_core.rules.audio import (
     WirelessAntennaRule,
     register_audio_rules,
 )
-from atlas_core.rules.engineering_rule import EngineeringRule
-from atlas_core.rules.engineering_rule_engine import EngineeringRuleEngine
-from atlas_core.rules.engineering_rule_registry import EngineeringRuleRegistry
 from atlas_core.rules.infrastructure import (
     BackingRule,
     CablePathwayRule,
@@ -32,6 +32,14 @@ from atlas_core.rules.projection import (
     register_projection_rules,
 )
 from atlas_core.rules.resolver import Resolution, ResolutionAction, Resolver
+from atlas_core.rules.video import (
+    CameraPowerRule,
+    DisplayMountRule,
+    PTZConnectivityRule,
+    ProjectionScreenSupportRule,
+    VideoWallStructureRule,
+    register_video_rules,
+)
 
 __all__ = [
     "EngineeringRule",
@@ -59,6 +67,12 @@ __all__ = [
     "ProjectionStructureRule",
     "ProjectionCoolingRule",
     "register_projection_rules",
+    "DisplayMountRule",
+    "PTZConnectivityRule",
+    "CameraPowerRule",
+    "VideoWallStructureRule",
+    "ProjectionScreenSupportRule",
+    "register_video_rules",
     "Resolver",
     "Resolution",
     "ResolutionAction",
