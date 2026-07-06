@@ -94,6 +94,9 @@ from atlas_core.services.device_schedule_equipment_service import (
 )
 from atlas_core.services.keynote_extraction_service import KeynoteExtractionService
 from atlas_core.services.legend_extraction_service import LegendExtractionService
+from atlas_core.services.detail_callout_extraction_service import (
+    DetailCalloutExtractionService,
+)
 from atlas_core.services.scope_reconciliation_service import (
     ReconciliationIssue,
     ReconciliationSeverity,
@@ -152,6 +155,7 @@ __all__ = [
     "JsonExportService",
     "KeynoteExtractionService",
     "LegendExtractionService",
+    "DetailCalloutExtractionService",
     "ManufacturerReviewIssue",
     "ManufacturerReviewService",
     "MarkdownExportService",
