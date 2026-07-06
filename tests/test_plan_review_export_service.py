@@ -1,5 +1,6 @@
 from atlas_core.domain import (
     BidPackageReview,
+    DetailCallout,
     DeviceSchedule,
     DeviceScheduleItem,
     DrawingSheet,
@@ -101,6 +102,15 @@ def make_result() -> PlanReviewWorkflowResult:
                     ],
                 )
             ],
+            detail_callouts=[
+                DetailCallout(
+                    callout_id="av-101-detail-5-av-701",
+                    detail_number="5",
+                    source_sheet_number="AV-101",
+                    target_sheet_number="AV-701",
+                    description="Detail 5/AV-701",
+                )
+            ],
             systems=[system],
             equipment=[equipment],
             review_report=[
@@ -187,6 +197,7 @@ def test_exports_all_plan_review_files(tmp_path):
     assert result.device_schedules_path.exists()
     assert result.keynotes_path.exists()
     assert result.legends_path.exists()
+    assert result.detail_callouts_path.exists()
     assert result.reconciliation_issues_path.exists()
     assert result.equipment_matrix_path.exists()
     assert result.review_report_path.exists()
@@ -222,6 +233,7 @@ def test_supports_custom_prefix(tmp_path):
     assert result.device_schedules_path == tmp_path / "maw_device_schedules.csv"
     assert result.keynotes_path == tmp_path / "maw_keynotes.csv"
     assert result.legends_path == tmp_path / "maw_legends.csv"
+    assert result.detail_callouts_path == tmp_path / "maw_detail_callouts.csv"
     assert (
         result.reconciliation_issues_path == tmp_path / "maw_reconciliation_issues.csv"
     )
@@ -245,6 +257,7 @@ def test_to_dict_returns_string_paths(tmp_path):
         "device_schedules_path": str(result.device_schedules_path),
         "keynotes_path": str(result.keynotes_path),
         "legends_path": str(result.legends_path),
+        "detail_callouts_path": str(result.detail_callouts_path),
         "reconciliation_issues_path": str(result.reconciliation_issues_path),
         "equipment_matrix_path": str(result.equipment_matrix_path),
         "review_report_path": str(result.review_report_path),

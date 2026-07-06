@@ -22,6 +22,7 @@ class PlanReviewExportResult:
     device_schedules_path: Path
     keynotes_path: Path
     legends_path: Path
+    detail_callouts_path: Path
     reconciliation_issues_path: Path
     equipment_matrix_path: Path
     review_report_path: Path
@@ -40,6 +41,7 @@ class PlanReviewExportResult:
             "device_schedules_path": str(self.device_schedules_path),
             "keynotes_path": str(self.keynotes_path),
             "legends_path": str(self.legends_path),
+            "detail_callouts_path": str(self.detail_callouts_path),
             "reconciliation_issues_path": str(self.reconciliation_issues_path),
             "equipment_matrix_path": str(self.equipment_matrix_path),
             "review_report_path": str(self.review_report_path),
@@ -112,6 +114,10 @@ class PlanReviewExportService:
             result.review.legends,
             output_path / f"{prefix}_legends.csv",
         )
+        detail_callouts_path = self.csv_export_service.export_detail_callouts(
+            result.review.detail_callouts,
+            output_path / f"{prefix}_detail_callouts.csv",
+        )
         reconciliation_issues_path = (
             self.csv_export_service.export_reconciliation_issues(
                 result.review.reconciliation_issues,
@@ -152,6 +158,7 @@ class PlanReviewExportService:
             device_schedules_path=device_schedules_path,
             keynotes_path=keynotes_path,
             legends_path=legends_path,
+            detail_callouts_path=detail_callouts_path,
             reconciliation_issues_path=reconciliation_issues_path,
             equipment_matrix_path=equipment_matrix_path,
             review_report_path=review_report_path,

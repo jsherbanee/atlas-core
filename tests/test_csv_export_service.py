@@ -1,6 +1,7 @@
 import csv
 
 from atlas_core.domain import (
+    DetailCallout,
     DeviceSchedule,
     DeviceScheduleItem,
     DrawingSheet,
@@ -333,6 +334,88 @@ def test_exports_keynotes_csv(tmp_path):
 
     assert written_path == output_path
     assert output_path.exists()
+
+
+def test_exports_detail_callouts_csv(tmp_path):
+    output_path = tmp_path / "plan_review" / "detail_callouts.csv"
+
+    written_path = CsvExportService().export_detail_callouts(
+        [
+            DetailCallout(
+                callout_id="av1.01-detail-5-av-701",
+                detail_number="5",
+                source_sheet_number="AV1.01",
+                target_sheet_number="AV-701",
+            )
+        ],
+        output_path,
+    )
+
+    assert written_path == output_path
+    assert output_path.exists()
+
+
+def test_writes_detail_callout_headers(tmp_path):
+    output_path = tmp_path / "detail_callouts.csv"
+
+    CsvExportService().export_detail_callouts([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader)
+
+    assert headers == list(
+        DetailCallout(
+            callout_id="callout",
+            detail_number="1",
+            source_sheet_number="AV-101",
+        )
+        .to_dict()
+        .keys()
+    )
+
+
+def test_writes_detail_callout_values(tmp_path):
+    output_path = tmp_path / "detail_callouts.csv"
+    callout = DetailCallout(
+        callout_id="av1.01-detail-5-av-701",
+        detail_number="5",
+        source_sheet_number="AV1.01",
+        target_sheet_number="AV-701",
+        description="Detail 5/AV-701",
+        system_category="infrastructure",
+        equipment_category="mount",
+        room_name="Main Lobby",
+        notes=["Coordinate bracket type."],
+        confidence=0.88,
+    )
+
+    CsvExportService().export_detail_callouts([callout], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records[0]["callout_id"] == "av1.01-detail-5-av-701"
+    assert records[0]["detail_number"] == "5"
+    assert records[0]["source_sheet_number"] == "AV1.01"
+    assert records[0]["target_sheet_number"] == "AV-701"
+    assert records[0]["description"] == "Detail 5/AV-701"
+    assert records[0]["system_category"] == "infrastructure"
+    assert records[0]["equipment_category"] == "mount"
+    assert records[0]["room_name"] == "Main Lobby"
+    assert records[0]["notes"] == "['Coordinate bracket type.']"
+    assert records[0]["confidence"] == "0.88"
+
+
+def test_handles_empty_detail_callouts(tmp_path):
+    output_path = tmp_path / "detail_callouts.csv"
+
+    CsvExportService().export_detail_callouts([], output_path)
+
+    with output_path.open(encoding="utf-8", newline="") as file:
+        records = list(csv.DictReader(file))
+
+    assert records == []
 
 
 def test_writes_keynote_headers(tmp_path):

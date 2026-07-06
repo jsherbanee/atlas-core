@@ -16,6 +16,7 @@ from atlas_core.services.final_estimator_review_service import FinalEstimatorRev
 
 if TYPE_CHECKING:
     from atlas_core.domain import (
+        DetailCallout,
         DeviceSchedule,
         DeviceScheduleItem,
         DrawingSheet,
@@ -98,6 +99,17 @@ class CsvExportService:
         return self._write_csv(
             headers=self._keynote_headers(),
             rows=[keynote.to_dict() for keynote in keynotes],
+            output_path=output_path,
+        )
+
+    def export_detail_callouts(
+        self,
+        callouts: list[DetailCallout],
+        output_path: str | Path,
+    ) -> Path:
+        return self._write_csv(
+            headers=self._detail_callout_headers(),
+            rows=[callout.to_dict() for callout in callouts],
             output_path=output_path,
         )
 
@@ -211,6 +223,20 @@ class CsvExportService:
                 keynote_id="keynote",
                 number="1",
                 description="Keynote",
+            )
+            .to_dict()
+            .keys()
+        )
+
+    @staticmethod
+    def _detail_callout_headers() -> list[str]:
+        from atlas_core.domain import DetailCallout
+
+        return list(
+            DetailCallout(
+                callout_id="callout",
+                detail_number="1",
+                source_sheet_number="AV-101",
             )
             .to_dict()
             .keys()
