@@ -110,6 +110,7 @@ from atlas_core.services.bid_completeness_service import (
 from atlas_core.services.engineering_assumption_service import (
     EngineeringAssumptionService,
 )
+from atlas_core.services.rfi_candidate_service import RFICandidateService
 from atlas_core.services.final_estimator_review_service import (
     FinalEstimatorReview,
     FinalEstimatorReviewService,
@@ -156,6 +157,7 @@ __all__ = [
     "FinalEstimatorReview",
     "FinalEstimatorReviewService",
     "EngineeringAssumptionService",
+    "RFICandidateService",
     "JsonExportService",
     "KeynoteExtractionService",
     "LegendExtractionService",

@@ -34,6 +34,7 @@ from atlas_core.domain.vendor_relationship import (
     VendorRelationshipType,
 )
 from atlas_core.domain.device_schedule import DeviceSchedule, DeviceScheduleItem
+from atlas_core.domain.rfi_candidate import RFICandidate, RFIPriority
 from atlas_core.domain.bid_package_review import BidPackageReview
 from atlas_core.domain.estimate_baseline import (
     EstimateBaseline,
@@ -60,6 +61,8 @@ __all__ = [
     "DetailCallout",
     "AssumptionSeverity",
     "EngineeringAssumption",
+    "RFICandidate",
+    "RFIPriority",
     "DrawingDiscipline",
     "DrawingSheet",
     "SpecificationDiscipline",
