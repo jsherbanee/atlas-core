@@ -17,7 +17,7 @@ from atlas_core.rules import Resolution
 from atlas_core.utils.refactoring import serialize_item, serialize_items
 
 if TYPE_CHECKING:
-    from atlas_core.domain import Keynote, Legend
+    from atlas_core.domain import DetailCallout, Keynote, Legend
     from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
     from atlas_core.services.bid_completeness_service import BidCompleteness
     from atlas_core.services.plan_review_readiness_service import PlanReviewReadiness
@@ -39,6 +39,7 @@ class BidPackageReview:
     systems: list[IntegratedSystem] = field(default_factory=list)
     equipment: list[Equipment] = field(default_factory=list)
     rooms: list[Room] = field(default_factory=list)
+    detail_callouts: list[DetailCallout] = field(default_factory=list)
     drawing_metadata: list[DrawingMetadata] = field(default_factory=list)
     device_schedules: list[DeviceSchedule] = field(default_factory=list)
     keynotes: list[Keynote] = field(default_factory=list)
@@ -101,6 +102,9 @@ class BidPackageReview:
     def room_count(self) -> int:
         return len(self.rooms)
 
+    def detail_callout_count(self) -> int:
+        return len(self.detail_callouts)
+
     def cross_reference_count(self) -> int:
         return len(self.cross_references)
 
@@ -138,6 +142,7 @@ class BidPackageReview:
             "systems": self._serialize_items(self.systems),
             "equipment": self._serialize_items(self.equipment),
             "rooms": self._serialize_items(self.rooms),
+            "detail_callouts": self._serialize_items(self.detail_callouts),
             "resolutions": self._serialize_items(self.resolutions),
             "manufacturer_review_issues": self._serialize_items(
                 self.manufacturer_review_issues

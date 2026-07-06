@@ -1,5 +1,6 @@
 from atlas_core.domain import (
     BidPackageReview,
+    DetailCallout,
     DeviceSchedule,
     DeviceScheduleItem,
     Keynote,
@@ -58,6 +59,7 @@ def make_result(
             system_count=4,
             equipment_count=5,
             room_count=1,
+            detail_callout_count=0,
             issue_count=6,
             placeholder_count=1,
             review_required_count=2,
@@ -657,3 +659,35 @@ def test_includes_legend_items(tmp_path):
     assert "- AV1.01: 2 items" in content
     assert "  - SPK: Ceiling Speaker" in content
     assert "  - CAM: PTZ Camera" in content
+
+
+def test_includes_detail_callouts_section_with_empty_message(tmp_path):
+    output_path = tmp_path / "summary.md"
+
+    MarkdownExportService().export_plan_review_summary(
+        make_result(),
+        output_path,
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "## Detail Callouts" in content
+    assert "No detail callouts extracted." in content
+
+
+def test_includes_detail_callout_items(tmp_path):
+    output_path = tmp_path / "summary.md"
+    result = make_result()
+    result.review.detail_callouts = [
+        DetailCallout(
+            callout_id="av1.01-detail-5-av-701",
+            detail_number="5",
+            source_sheet_number="AV1.01",
+            target_sheet_number="AV-701",
+            description="Detail 5/AV-701",
+        )
+    ]
+
+    MarkdownExportService().export_plan_review_summary(result, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "- AV1.01 detail 5 -> AV-701: Detail 5/AV-701" in content

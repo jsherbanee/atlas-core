@@ -279,6 +279,17 @@ class MarkdownExportService:
                 for legend_item in legend.items:
                     lines.append(f"  - {legend_item.symbol}: {legend_item.description}")
 
+        lines.extend(["", "## Detail Callouts", ""])
+
+        if not getattr(result.review, "detail_callouts", None):
+            lines.append("No detail callouts extracted.")
+        else:
+            for callout in result.review.detail_callouts:
+                lines.append(
+                    f"- {callout.source_sheet_number} detail {callout.detail_number} "
+                    f"-> {callout.target_sheet_number}: {callout.description}"
+                )
+
         return "\n".join(lines) + "\n"
 
     @staticmethod

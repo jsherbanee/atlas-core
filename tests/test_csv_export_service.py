@@ -206,6 +206,7 @@ def test_exports_estimator_brief_csv(tmp_path):
         specification_count=1,
         system_count=3,
         equipment_count=4,
+        detail_callout_count=0,
         issue_count=5,
         placeholder_count=1,
         review_required_count=2,

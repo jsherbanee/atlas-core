@@ -18,6 +18,7 @@ def make_workflow_result() -> PlanReviewWorkflowResult:
             specification_count=0,
             system_count=0,
             equipment_count=0,
+            detail_callout_count=0,
             issue_count=0,
             placeholder_count=0,
             review_required_count=0,

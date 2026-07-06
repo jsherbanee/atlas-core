@@ -9,6 +9,7 @@ from atlas_core.registry import ManufacturerRegistry
 from atlas_core.services import (
     ConfidenceScoringService,
     CrossReferenceService,
+    DetailCalloutExtractionService,
     DrawingIndexerService,
     EquipmentDetectionService,
     EstimateWorkflowService,
@@ -64,6 +65,7 @@ class BidPackageReviewService:
         keynote_extraction_service: KeynoteExtractionService | None = None,
         legend_extraction_service: LegendExtractionService | None = None,
         room_detection_service: RoomDetectionService | None = None,
+        detail_callout_extraction_service: DetailCalloutExtractionService | None = None,
     ) -> None:
         from atlas_core.services import (
             BidCompletenessService,
@@ -117,6 +119,9 @@ class BidPackageReviewService:
             legend_extraction_service or LegendExtractionService()
         )
         self.room_detection_service = room_detection_service or RoomDetectionService()
+        self.detail_callout_extraction_service = (
+            detail_callout_extraction_service or DetailCalloutExtractionService()
+        )
 
         self.estimate_workflow_service: EstimateWorkflowService = (
             estimate_workflow_service
@@ -168,6 +173,13 @@ class BidPackageReviewService:
             for sheet in drawing_sheets
             for legend in [self.legend_extraction_service.extract_from_sheet(sheet)]
             if legend is not None
+        ]
+        detail_callouts = [
+            callout
+            for sheet in drawing_sheets
+            for callout in self.detail_callout_extraction_service.extract_from_sheet(
+                sheet
+            )
         ]
         specification_sections = self.specification_indexer.index_sections(
             inputs["section_items"]
@@ -247,6 +259,7 @@ class BidPackageReviewService:
             device_schedules=device_schedules,
             keynotes=keynotes,
             legends=legends,
+            detail_callouts=detail_callouts,
         )
         review.bid_completeness = self.bid_completeness_service.assess(review)
         review.estimator_risks = self.estimator_risk_service.assess(review)
@@ -435,6 +448,7 @@ class BidPackageReviewService:
         device_schedules: list | None,
         keynotes: list | None,
         legends: list | None,
+        detail_callouts: list | None,
         specification_sections: list,
         room_items: list,
         system_items: list,
@@ -453,6 +467,7 @@ class BidPackageReviewService:
             device_schedules=device_schedules or [],
             keynotes=keynotes or [],
             legends=legends or [],
+            detail_callouts=detail_callouts or [],
             rooms=room_items,
             specification_sections=specification_sections,
             systems=system_items,

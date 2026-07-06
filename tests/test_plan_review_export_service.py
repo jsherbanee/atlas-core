@@ -146,6 +146,7 @@ def make_result() -> PlanReviewWorkflowResult:
             system_count=1,
             equipment_count=1,
             room_count=1,
+            detail_callout_count=0,
             issue_count=1,
             placeholder_count=0,
             review_required_count=1,

@@ -691,6 +691,36 @@ def test_includes_keynotes_in_review():
     assert review.keynotes[0].keynote_id == "av1.01-keynote-1"
 
 
+def test_extracts_detail_callouts_from_drawing_notes():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "AV Plan",
+                "notes": ["Detail 5/AV-701"],
+            }
+        ]
+    )
+
+    assert review.detail_callout_count() == 1
+    assert review.detail_callouts[0].detail_number == "5"
+    assert review.detail_callouts[0].target_sheet_number == "AV-701"
+
+
+def test_includes_detail_callouts_in_review():
+    review = build_review(
+        raw_sheets=[
+            {
+                "sheet_number": "AV1.01",
+                "title": "Rack Detail 1/AV-801",
+            }
+        ]
+    )
+
+    assert len(review.detail_callouts) == 1
+    assert review.detail_callouts[0].callout_id == "av1.01-detail-1-av-801"
+
+
 def test_includes_legends_in_review():
     review = build_review(
         raw_sheets=[

@@ -2,6 +2,7 @@ import pytest
 
 from atlas_core.domain import (
     BidPackageReview,
+    DetailCallout,
     DeviceSchedule,
     DrawingDiscipline,
     DrawingSheet,
@@ -171,6 +172,16 @@ def make_room() -> Room:
         name="Main Lobby",
         building_id="building-001",
         room_type=RoomType.LOBBY,
+    )
+
+
+def make_detail_callout() -> DetailCallout:
+    return DetailCallout(
+        callout_id="av1.01-detail-5-av-701",
+        detail_number="5",
+        source_sheet_number="AV1.01",
+        target_sheet_number="AV-701",
+        description="Detail 5/AV-701",
     )
 
 
@@ -364,6 +375,7 @@ def test_to_dict_output():
     equipment = make_equipment()
     resolution = make_resolution()
     room = make_room()
+    detail_callout = make_detail_callout()
     manufacturer_issue = ManufacturerReviewIssue(
         equipment_id="eq-001",
         manufacturer="Unknown",
@@ -392,6 +404,7 @@ def test_to_dict_output():
         systems=[system],
         equipment=[equipment],
         rooms=[room],
+        detail_callouts=[detail_callout],
         resolutions=[resolution],
         manufacturer_review_issues=[manufacturer_issue],
         review_report=[review_report_item],
@@ -418,6 +431,7 @@ def test_to_dict_output():
         "systems": [system.to_dict()],
         "equipment": [equipment.to_dict()],
         "rooms": [room.to_dict()],
+        "detail_callouts": [detail_callout.to_dict()],
         "resolutions": [
             {
                 "rule_id": "RULE-001",
@@ -565,3 +579,14 @@ def test_room_count():
     )
 
     assert review.room_count() == 1
+
+
+def test_detail_callout_count():
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        detail_callouts=[make_detail_callout()],
+    )
+
+    assert review.detail_callout_count() == 1

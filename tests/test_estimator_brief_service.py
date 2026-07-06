@@ -1,5 +1,6 @@
 from atlas_core.domain import (
     BidPackageReview,
+    DetailCallout,
     DrawingSheet,
     Equipment,
     EquipmentCategory,
@@ -52,6 +53,13 @@ def make_review() -> BidPackageReview:
         building_id="building-001",
         room_type=RoomType.LOBBY,
     )
+    detail_callout = DetailCallout(
+        callout_id="av1.01-detail-5-av-701",
+        detail_number="5",
+        source_sheet_number="AV1.01",
+        target_sheet_number="AV-701",
+        description="Detail 5/AV-701",
+    )
 
     return BidPackageReview(
         review_id="review-001",
@@ -80,6 +88,7 @@ def make_review() -> BidPackageReview:
         ],
         equipment=[placeholder, display],
         rooms=[room],
+        detail_callouts=[detail_callout],
         resolutions=[
             Resolution(
                 rule_id="RULE-001",
@@ -230,6 +239,12 @@ def test_counts_rooms():
     assert brief.room_count == 1
 
 
+def test_counts_detail_callouts():
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.detail_callout_count == 1
+
+
 def test_counts_issues():
     brief = EstimatorBriefService().build_brief(make_review())
 
@@ -322,6 +337,7 @@ def test_to_dict_output():
         system_count=1,
         equipment_count=2,
         room_count=1,
+        detail_callout_count=1,
         issue_count=5,
         placeholder_count=1,
         review_required_count=2,
@@ -349,6 +365,7 @@ def test_to_dict_output():
         "system_count": 1,
         "equipment_count": 2,
         "room_count": 1,
+        "detail_callout_count": 1,
         "issue_count": 5,
         "placeholder_count": 1,
         "review_required_count": 2,
