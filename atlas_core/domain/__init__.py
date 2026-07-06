@@ -41,6 +41,7 @@ from atlas_core.domain.estimate_baseline import (
 )
 from atlas_core.domain.keynote import Keynote
 from atlas_core.domain.legend import Legend, LegendItem
+from atlas_core.domain.detail_callout import DetailCallout
 
 __all__ = [
     "BidPackageReview",
@@ -52,6 +53,7 @@ __all__ = [
     "Keynote",
     "Legend",
     "LegendItem",
+    "DetailCallout",
     "DrawingDiscipline",
     "DrawingSheet",
     "SpecificationDiscipline",
