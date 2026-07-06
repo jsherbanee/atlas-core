@@ -1,9 +1,13 @@
 """Final estimator review helpers for Atlas Core services."""
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any
 
+from atlas_core.domain.engineering_assumption import EngineeringAssumption
 from atlas_core.domain import BidPackageReview
+from atlas_core.services.engineering_assumption_service import (
+    EngineeringAssumptionService,
+)
 
 
 @dataclass
@@ -18,17 +22,45 @@ class FinalEstimatorReview:
     confidence: float = 0.75
     total_issues: int = 0
     total_recommendations: int = 0
+    total_assumptions: int = 0
     executive_summary: str = ""
     next_actions: list[str] = field(default_factory=list)
+    engineering_assumptions: list[EngineeringAssumption] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {
+            "review_id": self.review_id,
+            "project_id": self.project_id,
+            "name": self.name,
+            "readiness_status": self.readiness_status,
+            "readiness_message": self.readiness_message,
+            "completeness_status": self.completeness_status,
+            "completeness_score": self.completeness_score,
+            "confidence": self.confidence,
+            "total_issues": self.total_issues,
+            "total_recommendations": self.total_recommendations,
+            "total_assumptions": self.total_assumptions,
+            "executive_summary": self.executive_summary,
+            "next_actions": list(self.next_actions),
+            "engineering_assumptions": [
+                assumption.to_dict() for assumption in self.engineering_assumptions
+            ],
+        }
 
 
 class FinalEstimatorReviewService:
+    def __init__(
+        self,
+        engineering_assumption_service: EngineeringAssumptionService | None = None,
+    ) -> None:
+        self.engineering_assumption_service = (
+            engineering_assumption_service or EngineeringAssumptionService()
+        )
+
     def build(self, review: BidPackageReview) -> FinalEstimatorReview:
         readiness = getattr(review, "readiness", None)
         bid_completeness = getattr(review, "bid_completeness", None)
+        engineering_assumptions = self.engineering_assumption_service.build(review)
 
         readiness_status = self._value(getattr(readiness, "status", None))
         readiness_message = getattr(readiness, "message", None)
@@ -48,8 +80,10 @@ class FinalEstimatorReviewService:
             confidence=review.confidence,
             total_issues=review.issue_count(),
             total_recommendations=review.recommendation_count(),
+            total_assumptions=len(engineering_assumptions),
             executive_summary=self._executive_summary(readiness_status),
-            next_actions=self._next_actions(review),
+            next_actions=self._next_actions(review, engineering_assumptions),
+            engineering_assumptions=engineering_assumptions,
         )
 
     @classmethod
@@ -64,7 +98,11 @@ class FinalEstimatorReviewService:
         return "Bid package review summary is available."
 
     @classmethod
-    def _next_actions(cls, review: BidPackageReview) -> list[str]:
+    def _next_actions(
+        cls,
+        review: BidPackageReview,
+        engineering_assumptions: list[EngineeringAssumption],
+    ) -> list[str]:
         actions: list[str] = []
         emitted: set[str] = set()
 
@@ -81,6 +119,9 @@ class FinalEstimatorReviewService:
             if cls._value(getattr(scope_gap, "severity", None)) != "high":
                 continue
             cls._add_action(actions, emitted, scope_gap.suggested_action)
+
+        for assumption in engineering_assumptions:
+            cls._add_action(actions, emitted, assumption.description)
 
         if not actions:
             return ["Proceed with pricing review."]

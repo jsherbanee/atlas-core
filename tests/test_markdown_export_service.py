@@ -146,9 +146,12 @@ def test_includes_final_estimator_review_fields(tmp_path):
     assert "- Confidence: 75%" in content
     assert "- Total Issues: 0" in content
     assert "- Total Recommendations: 0" in content
+    assert "- Total Engineering Assumptions: 0" in content
     assert "- Next Actions:" in content
     assert "  - No systems were detected." in content
     assert "  - Review confidence is below 0.75." in content
+    assert "- Engineering Assumptions:" in content
+    assert "  - None" in content
 
 
 def test_includes_brief_counts(tmp_path):

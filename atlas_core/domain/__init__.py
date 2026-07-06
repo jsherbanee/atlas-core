@@ -42,6 +42,10 @@ from atlas_core.domain.estimate_baseline import (
 from atlas_core.domain.keynote import Keynote
 from atlas_core.domain.legend import Legend, LegendItem
 from atlas_core.domain.detail_callout import DetailCallout
+from atlas_core.domain.engineering_assumption import (
+    AssumptionSeverity,
+    EngineeringAssumption,
+)
 
 __all__ = [
     "BidPackageReview",
@@ -54,6 +58,8 @@ __all__ = [
     "Legend",
     "LegendItem",
     "DetailCallout",
+    "AssumptionSeverity",
+    "EngineeringAssumption",
     "DrawingDiscipline",
     "DrawingSheet",
     "SpecificationDiscipline",

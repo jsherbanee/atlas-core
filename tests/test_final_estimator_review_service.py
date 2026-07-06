@@ -1,4 +1,5 @@
 from atlas_core.domain import (
+    AssumptionSeverity,
     BidPackageReview,
     Equipment,
     EquipmentCategory,
@@ -20,18 +21,22 @@ def make_review(
     bid_completeness: BidCompleteness | None = None,
     recommendations: list[Recommendation] | None = None,
     scope_gaps: list[ScopeGap] | None = None,
+    equipment: list[Equipment] | None = None,
 ) -> BidPackageReview:
     return BidPackageReview(
         review_id="review-001",
         project_id="project-001",
         name="Bid Package Review",
-        equipment=[
-            Equipment(
-                equipment_id="eq-001",
-                description="Display",
-                category=EquipmentCategory.DISPLAY,
-            )
-        ],
+        equipment=list(
+            equipment
+            or [
+                Equipment(
+                    equipment_id="eq-001",
+                    description="Display",
+                    category=EquipmentCategory.DISPLAY,
+                )
+            ]
+        ),
         readiness=readiness,
         bid_completeness=bid_completeness,
         recommendations=list(recommendations or []),
@@ -76,6 +81,7 @@ def test_builds_final_review():
     assert final_review.confidence == 0.82
     assert final_review.total_issues == review.issue_count()
     assert final_review.total_recommendations == review.recommendation_count()
+    assert final_review.total_assumptions == len(final_review.engineering_assumptions)
 
 
 def test_ready_summary():
@@ -203,6 +209,31 @@ def test_avoids_duplicate_next_actions():
     assert final_review.next_actions.count(action) == 1
 
 
+def test_includes_engineering_assumptions_in_output_and_actions():
+    review = make_review(
+        equipment=[
+            Equipment(
+                equipment_id="eq-projector",
+                description="Main projector",
+                category=EquipmentCategory.PROJECTOR,
+            )
+        ]
+    )
+
+    final_review = build(review)
+
+    assert final_review.total_assumptions > 0
+    assert final_review.engineering_assumptions
+
+    projector_assumption = next(
+        assumption
+        for assumption in final_review.engineering_assumptions
+        if assumption.assumption_id == "projector_mounting_detail_missing"
+    )
+    assert projector_assumption.severity is AssumptionSeverity.REVIEW
+    assert projector_assumption.description in final_review.next_actions
+
+
 def test_to_dict_output():
     final_review = FinalEstimatorReview(
         review_id="review-001",
@@ -215,8 +246,10 @@ def test_to_dict_output():
         confidence=0.82,
         total_issues=3,
         total_recommendations=2,
+        total_assumptions=1,
         executive_summary="Bid package requires estimator review before pricing.",
         next_actions=["Review confidence before pricing."],
+        engineering_assumptions=[],
     )
 
     assert final_review.to_dict() == {
@@ -230,6 +263,8 @@ def test_to_dict_output():
         "confidence": 0.82,
         "total_issues": 3,
         "total_recommendations": 2,
+        "total_assumptions": 1,
         "executive_summary": "Bid package requires estimator review before pricing.",
         "next_actions": ["Review confidence before pricing."],
+        "engineering_assumptions": [],
     }

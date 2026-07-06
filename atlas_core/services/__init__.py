@@ -107,6 +107,9 @@ from atlas_core.services.bid_completeness_service import (
     BidCompletenessService,
     CompletenessStatus,
 )
+from atlas_core.services.engineering_assumption_service import (
+    EngineeringAssumptionService,
+)
 from atlas_core.services.final_estimator_review_service import (
     FinalEstimatorReview,
     FinalEstimatorReviewService,
@@ -152,6 +155,7 @@ __all__ = [
     "EstimateWorkflowService",
     "FinalEstimatorReview",
     "FinalEstimatorReviewService",
+    "EngineeringAssumptionService",
     "JsonExportService",
     "KeynoteExtractionService",
     "LegendExtractionService",

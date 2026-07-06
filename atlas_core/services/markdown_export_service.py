@@ -57,12 +57,24 @@ class MarkdownExportService:
                     f"- Confidence: {self._confidence_percentage(final_review.confidence)}",
                     f"- Total Issues: {final_review.total_issues}",
                     f"- Total Recommendations: {final_review.total_recommendations}",
+                    f"- Total Engineering Assumptions: {final_review.total_assumptions}",
                     "- Next Actions:",
                 ]
             )
 
             for action in final_review.next_actions:
                 lines.append(f"  - {action}")
+
+            lines.append("- Engineering Assumptions:")
+            if final_review.engineering_assumptions:
+                for assumption in final_review.engineering_assumptions:
+                    lines.append(
+                        "  - "
+                        f"[{getattr(assumption.severity, 'value', assumption.severity)}] "
+                        f"{assumption.description}"
+                    )
+            else:
+                lines.append("  - None")
         else:
             lines.append("No final estimator review available.")
 
