@@ -22,6 +22,7 @@ Finalize and harden the Phase 2 Bid Intelligence baseline before any downstream 
 - Estimator Brief Enhancements (deterministic executive summary, prioritized reviewer actions, and evidence traceability)
 
 ## Baseline Candidate Notes
+- Conceptual label: phase-2-bid-intelligence-baseline-candidate (not a Git tag yet).
 - Phase 2 snapshot-style tests cover representative MAW plan review and revision comparison outputs.
 - MAW remains canonical sample/reference data only (not hardcoded product logic in core services).
 - Phase 3+ workflows remain out of active orchestration scope for this baseline.

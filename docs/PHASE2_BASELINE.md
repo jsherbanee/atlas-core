@@ -1,5 +1,12 @@
 # Phase 2 Bid Intelligence Baseline Candidate
 
+## Conceptual Label
+- phase-2-bid-intelligence-baseline-candidate
+
+This is a conceptual milestone label for communication and planning.
+It is not a Git tag at this time.
+Treat it as a versioned Git tag only when serialized outputs are intentionally managed as versioned contracts.
+
 ## Scope
 This baseline candidate covers deterministic bid intelligence and estimator-readiness workflows only.
 
