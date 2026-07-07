@@ -178,6 +178,7 @@ def test_build_reference_project_context_uses_real_intake_when_available(
     assert context["import_summary"]["schedule_count"] == 1
     assert "total_files" in context["import_summary"]
     assert "documents_requiring_ocr" in context["import_summary"]
+    assert "pages_with_ocr_text" in context["import_summary"]
     assert isinstance(context["import_summary"].get("file_diagnostics"), list)
 
 

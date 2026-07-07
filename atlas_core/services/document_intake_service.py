@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 import re
 import uuid
-from typing import Any
+from typing import Any, Protocol
 import zipfile
 from xml.etree import ElementTree
 
@@ -59,6 +59,62 @@ class UploadSessionResult:
     warnings: list[str]
 
 
+class LocalOcrEngine(Protocol):
+    def is_available(self) -> bool: ...
+
+    def ocr_pdf_pages(
+        self,
+        pdf_path: Path,
+        page_numbers: list[int],
+    ) -> tuple[dict[int, str], list[str]]: ...
+
+    def ocr_image_file(self, image_path: Path) -> tuple[str, list[str]]: ...
+
+
+class NoOpLocalOcrEngine:
+    def is_available(self) -> bool:
+        return False
+
+    def ocr_pdf_pages(
+        self,
+        pdf_path: Path,
+        page_numbers: list[int],
+    ) -> tuple[dict[int, str], list[str]]:
+        _ = (pdf_path, page_numbers)
+        return {}, []
+
+    def ocr_image_file(self, image_path: Path) -> tuple[str, list[str]]:
+        _ = image_path
+        return "", []
+
+
+def _extraction_mode(
+    *,
+    status: str,
+    pages_with_embedded_text: int,
+    pages_with_ocr_text: int,
+) -> str:
+    if status == "failed":
+        return "ocr_failed"
+
+    if pages_with_ocr_text > 0 and pages_with_embedded_text > 0:
+        return "mixed_embedded_and_ocr"
+
+    if pages_with_ocr_text > 0:
+        return "ocr_derived_text"
+
+    if pages_with_embedded_text > 0:
+        return "embedded_text"
+
+    if status == "requires_ocr":
+        return "requires_ocr"
+
+    if status == "unsupported":
+        return "unsupported"
+
+    return "unknown"
+
+
 class DocumentIntakeService:
     ENGINE_VERSION = "document-intake-service/1.0.0"
 
@@ -79,10 +135,14 @@ class DocumentIntakeService:
     def __init__(
         self,
         pdf_text_extraction_service: PdfTextExtractionService | None = None,
+        local_ocr_engine: LocalOcrEngine | None = None,
+        enable_local_ocr: bool = False,
     ) -> None:
         self.pdf_text_extraction_service = (
             pdf_text_extraction_service or PdfTextExtractionService()
         )
+        self.local_ocr_engine = local_ocr_engine or NoOpLocalOcrEngine()
+        self.enable_local_ocr = enable_local_ocr
 
     def discover_package(self, package_path: str | Path) -> PackageDiscoveryResult:
         root = Path(package_path)
@@ -296,8 +356,11 @@ class DocumentIntakeService:
                         ),
                         "document_group": "schedules",
                         "status": "unsupported",
+                        "extraction_mode": "unsupported",
+                        "ocr_attempted": False,
                         "total_pages": None,
                         "pages_with_embedded_text": 0,
+                        "pages_with_ocr_text": 0,
                         "pages_without_embedded_text": 0,
                         "requires_ocr": False,
                         "warnings": [warning],
@@ -354,8 +417,11 @@ class DocumentIntakeService:
                     "file_path": str(unsupported_file),
                     "document_group": "unsupported",
                     "status": "unsupported",
+                    "extraction_mode": "unsupported",
+                    "ocr_attempted": False,
                     "total_pages": None,
                     "pages_with_embedded_text": 0,
+                    "pages_with_ocr_text": 0,
                     "pages_without_embedded_text": 0,
                     "requires_ocr": False,
                     "warnings": [f"{unsupported_file.name}: unsupported file format."],
@@ -454,13 +520,49 @@ class DocumentIntakeService:
         warnings: list[str] = []
         pages = self.pdf_text_extraction_service.extract_pages(pdf_path)
         page_records: list[dict[str, Any]] = []
+        missing_text_pages = [page.page_number for page in pages if not page.has_text]
         if pages and not any(page.has_text for page in pages):
             warnings.append(
                 f"{pdf_path.name}: no embedded text found. OCR is required for extraction."
             )
 
+        ocr_page_text: dict[int, str] = {}
+        if (
+            self.enable_local_ocr
+            and self.local_ocr_engine.is_available()
+            and missing_text_pages
+        ):
+            extracted_text_map, ocr_warnings = self.local_ocr_engine.ocr_pdf_pages(
+                pdf_path,
+                missing_text_pages,
+            )
+            ocr_page_text = dict(extracted_text_map)
+            warnings.extend(ocr_warnings)
+            if not ocr_page_text:
+                warnings.append(
+                    f"{pdf_path.name}: OCR attempted but no text was extracted from non-embedded pages."
+                )
+            else:
+                warnings.append(
+                    f"{pdf_path.name}: OCR-derived text extracted for {len(ocr_page_text)} page(s); verify quality before downstream decisions."
+                )
+
         for page in pages:
             record = page.to_dict()
+            if not record.get("has_text") and page.page_number in ocr_page_text:
+                ocr_text = str(ocr_page_text.get(page.page_number) or "").strip()
+                if ocr_text:
+                    record["text"] = ocr_text
+                    record["has_text"] = True
+                    record["ocr_derived"] = True
+                    record["text_source"] = "ocr"
+                else:
+                    record["ocr_derived"] = False
+                    record["text_source"] = "none"
+            else:
+                record["ocr_derived"] = False
+                record["text_source"] = "embedded"
+
             record["document_group"] = group_name
             record["source_path"] = str(pdf_path)
             page_records.append(record)
@@ -488,8 +590,11 @@ class DocumentIntakeService:
                 [],
                 {
                     "status": "extracted",
+                    "extraction_mode": "embedded_text",
+                    "ocr_attempted": False,
                     "total_pages": None,
                     "pages_with_embedded_text": 0,
+                    "pages_with_ocr_text": 0,
                     "pages_without_embedded_text": 0,
                     "requires_ocr": False,
                     "warnings": [],
@@ -511,8 +616,11 @@ class DocumentIntakeService:
                     [warning],
                     {
                         "status": "unsupported",
+                        "extraction_mode": "unsupported",
+                        "ocr_attempted": False,
                         "total_pages": 1,
                         "pages_with_embedded_text": 0,
+                        "pages_with_ocr_text": 0,
                         "pages_without_embedded_text": 1,
                         "requires_ocr": False,
                         "warnings": [warning],
@@ -526,13 +634,53 @@ class DocumentIntakeService:
 
         if suffix in self._IMAGE_EXTENSIONS:
             warning = f"{file_path.name}: This image contains no extractable embedded text. OCR support is required."
+            if self.enable_local_ocr and self.local_ocr_engine.is_available():
+                ocr_text, ocr_warnings = self.local_ocr_engine.ocr_image_file(file_path)
+                warnings = [*ocr_warnings]
+                if ocr_text.strip():
+                    pages, page_warnings = self._single_page_record(
+                        file_path,
+                        group_name,
+                        ocr_text,
+                        text_source="ocr",
+                    )
+                    status = self._file_status_from_pages(
+                        pages,
+                        [*warnings, *page_warnings],
+                    )
+                    status["ocr_attempted"] = True
+                    status["extraction_mode"] = "ocr_derived_text"
+                    status["status"] = "extracted"
+                    return pages, [*warnings, *page_warnings], status
+
+                warnings.append(
+                    f"{file_path.name}: OCR attempted but failed to extract usable text."
+                )
+                return (
+                    [],
+                    warnings,
+                    {
+                        "status": "failed",
+                        "extraction_mode": "ocr_failed",
+                        "ocr_attempted": True,
+                        "total_pages": 1,
+                        "pages_with_embedded_text": 0,
+                        "pages_without_embedded_text": 1,
+                        "requires_ocr": True,
+                        "warnings": warnings,
+                    },
+                )
+
             return (
                 [],
                 [warning],
                 {
                     "status": "requires_ocr",
+                    "extraction_mode": "requires_ocr",
+                    "ocr_attempted": False,
                     "total_pages": 1,
                     "pages_with_embedded_text": 0,
+                    "pages_with_ocr_text": 0,
                     "pages_without_embedded_text": 1,
                     "requires_ocr": True,
                     "warnings": [warning],
@@ -545,8 +693,11 @@ class DocumentIntakeService:
             [warning],
             {
                 "status": "unsupported",
+                "extraction_mode": "unsupported",
+                "ocr_attempted": False,
                 "total_pages": None,
                 "pages_with_embedded_text": 0,
+                "pages_with_ocr_text": 0,
                 "pages_without_embedded_text": 0,
                 "requires_ocr": False,
                 "warnings": [warning],
@@ -558,11 +709,14 @@ class DocumentIntakeService:
         file_path: Path,
         group_name: str,
         text: str,
+        text_source: str = "embedded",
     ) -> tuple[list[dict[str, Any]], list[str]]:
         record = {
             "page_number": 1,
             "text": text,
             "has_text": bool(text.strip()),
+            "ocr_derived": text_source == "ocr",
+            "text_source": text_source,
             "document_group": group_name,
             "source_path": str(file_path),
             "source_file": str(file_path),
@@ -583,6 +737,8 @@ class DocumentIntakeService:
         total_pages = len(pages)
         pages_with_text = sum(1 for page in pages if bool(page.get("has_text")))
         pages_without_text = max(total_pages - pages_with_text, 0)
+        pages_with_ocr_text = sum(1 for page in pages if bool(page.get("ocr_derived")))
+        pages_with_embedded_text = max(pages_with_text - pages_with_ocr_text, 0)
 
         if total_pages == 0:
             status = "failed"
@@ -595,8 +751,15 @@ class DocumentIntakeService:
 
         return {
             "status": status,
+            "extraction_mode": _extraction_mode(
+                status=status,
+                pages_with_embedded_text=pages_with_embedded_text,
+                pages_with_ocr_text=pages_with_ocr_text,
+            ),
+            "ocr_attempted": pages_with_ocr_text > 0,
             "total_pages": total_pages,
-            "pages_with_embedded_text": pages_with_text,
+            "pages_with_embedded_text": pages_with_embedded_text,
+            "pages_with_ocr_text": pages_with_ocr_text,
             "pages_without_embedded_text": pages_without_text,
             "requires_ocr": status == "requires_ocr",
             "warnings": list(warnings),
@@ -615,6 +778,9 @@ class DocumentIntakeService:
         pages_with_embedded_text = sum(
             int(item.get("pages_with_embedded_text") or 0) for item in file_diagnostics
         )
+        pages_with_ocr_text = sum(
+            int(item.get("pages_with_ocr_text") or 0) for item in file_diagnostics
+        )
         pages_without_embedded_text = sum(
             int(item.get("pages_without_embedded_text") or 0)
             for item in file_diagnostics
@@ -627,6 +793,7 @@ class DocumentIntakeService:
             "total_files": len(file_diagnostics),
             "total_pages": total_pages,
             "pages_with_embedded_text": pages_with_embedded_text,
+            "pages_with_ocr_text": pages_with_ocr_text,
             "pages_without_embedded_text": pages_without_embedded_text,
             "documents_requiring_ocr": documents_requiring_ocr,
             "extraction_warning_count": len(sorted(set(warnings))),

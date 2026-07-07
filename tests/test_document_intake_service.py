@@ -14,6 +14,7 @@ from pypdf import PdfWriter
 
 from atlas_core.services.document_intake_service import (
     DocumentIntakeService,
+    LocalOcrEngine,
     UploadedIntakeFile,
 )
 
@@ -261,6 +262,93 @@ def test_image_only_intake_requires_ocr_without_fabricated_entities(
     assert snapshot.equipment_candidates == []
     assert snapshot.import_summary["documents_requiring_ocr"] >= 1
     assert any("OCR support is required" in warning for warning in snapshot.warnings)
+
+
+def test_optional_local_ocr_marks_pdf_text_as_ocr_derived(tmp_path: Path) -> None:
+    package = _build_package(tmp_path)
+
+    class _NoEmbeddedExtractor(PdfTextExtractionService):
+        def extract_pages(self, pdf_path: str | Path) -> list[ExtractedPdfPage]:
+            return [
+                ExtractedPdfPage(
+                    page_number=1,
+                    text="",
+                    source_file=Path(pdf_path).name,
+                )
+            ]
+
+    class _FakeLocalOcr(LocalOcrEngine):
+        def is_available(self) -> bool:
+            return True
+
+        def ocr_pdf_pages(
+            self,
+            pdf_path: Path,
+            page_numbers: list[int],
+        ) -> tuple[dict[int, str], list[str]]:
+            _ = pdf_path
+            return {page_number: "OCR PAGE TEXT" for page_number in page_numbers}, []
+
+        def ocr_image_file(self, image_path: Path) -> tuple[str, list[str]]:
+            _ = image_path
+            return "", []
+
+    service = DocumentIntakeService(
+        pdf_text_extraction_service=_NoEmbeddedExtractor(),
+        local_ocr_engine=_FakeLocalOcr(),
+        enable_local_ocr=True,
+    )
+    snapshot = service.build_snapshot(package)
+
+    assert snapshot.import_summary["pages_with_ocr_text"] >= 1
+    diagnostics = list(snapshot.import_summary.get("file_diagnostics") or [])
+    drawing_diag = [
+        item for item in diagnostics if item.get("file_name") == "AV-101 Audio Plan.pdf"
+    ]
+    assert drawing_diag
+    assert drawing_diag[0]["extraction_mode"] in {
+        "ocr_derived_text",
+        "mixed_embedded_and_ocr",
+    }
+
+
+def test_optional_local_ocr_failure_is_reported_for_images(tmp_path: Path) -> None:
+    package = tmp_path / "ocr_failure_project"
+    (package / "drawings").mkdir(parents=True)
+    (package / "specifications").mkdir(parents=True)
+    (package / "schedules").mkdir(parents=True)
+    (package / "addenda").mkdir(parents=True)
+    (package / "images").mkdir(parents=True)
+    (package / "images" / "sheet-scan.png").write_bytes(b"scan")
+
+    class _FakeLocalOcr(LocalOcrEngine):
+        def is_available(self) -> bool:
+            return True
+
+        def ocr_pdf_pages(
+            self,
+            pdf_path: Path,
+            page_numbers: list[int],
+        ) -> tuple[dict[int, str], list[str]]:
+            _ = (pdf_path, page_numbers)
+            return {}, []
+
+        def ocr_image_file(self, image_path: Path) -> tuple[str, list[str]]:
+            _ = image_path
+            return "", []
+
+    snapshot = DocumentIntakeService(
+        local_ocr_engine=_FakeLocalOcr(),
+        enable_local_ocr=True,
+    ).build_snapshot(package)
+
+    diagnostics = list(snapshot.import_summary.get("file_diagnostics") or [])
+    image_diag = [
+        item for item in diagnostics if item.get("file_name") == "sheet-scan.png"
+    ]
+    assert image_diag
+    assert image_diag[0]["extraction_mode"] == "ocr_failed"
+    assert image_diag[0]["status"] == "failed"
 
 
 def _zip_bytes(files: dict[str, bytes]) -> bytes:

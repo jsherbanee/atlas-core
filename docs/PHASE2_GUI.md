@@ -79,12 +79,20 @@ If expected folders are missing, Atlas shows a warning and still attempts determ
 
 ## Deterministic Extraction Rules
 - PDF: extract embedded text.
+- PDF (optional local OCR): when enabled, Atlas attempts local OCR on PDF pages without embedded text.
 - DOCX: extract paragraphs/headings/tables from document XML text runs.
 - DOC: best-effort decode; warning requests DOCX/PDF for reliable extraction.
 - XLSX/CSV: extract schedule-style rows.
 - XLS: unsupported in deterministic parser; warning requests XLSX/CSV.
-- Images (JPG/JPEG/PNG/TIFF): no OCR fabrication; warning emitted when no extractable text is available.
+- Images (JPG/JPEG/PNG/TIFF): optional local OCR can be attempted; otherwise warning emitted when no extractable text is available.
 - ZIP: automatically unpacked recursively and classified.
+
+## Optional Local OCR
+- Local OCR is optional and disabled by default.
+- Quality gate and test runs do not require system OCR binaries.
+- OCR-derived text is explicitly marked in diagnostics as `ocr_derived_text`.
+- OCR failures are explicitly marked as `ocr_failed`.
+- No cloud OCR or LLM interpretation is used.
 
 ## Snapshot Mode
 For existing local intake snapshots, the sidebar includes `Use Existing Intake Snapshot` in uploaded mode.
@@ -115,8 +123,10 @@ Atlas Intake surfaces the following diagnostics in the Import Summary:
 - total files
 - total pages (where page counts are available)
 - pages with embedded text
+- pages with OCR-derived text
 - pages without embedded text
 - documents requiring OCR
 - extraction warning count
 
 When `documents requiring OCR` is non-zero, Atlas displays guidance that OCR is needed before text-rich project intelligence can be extracted.
+Per-file diagnostics include extraction mode to distinguish embedded text extraction, OCR-derived extraction, and OCR failures.

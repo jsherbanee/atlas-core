@@ -85,6 +85,7 @@ Import summary includes:
 - total files
 - total pages (if available)
 - pages with embedded text
+- pages with OCR-derived text
 - pages without embedded text
 - documents requiring OCR
 - drawing count
@@ -95,6 +96,12 @@ Import summary includes:
 - unsupported file count
 - extraction warnings
 - per-file extraction status (`extracted`, `partial`, `requires_ocr`, `unsupported`, `failed`)
+
+Local OCR support:
+- Optional and local-only for PDF/image files without embedded text.
+- Disabled by default so quality gate does not require local OCR binaries.
+- OCR-derived text is explicitly marked in diagnostics and warnings.
+- OCR failures are explicitly surfaced; Atlas does not fabricate sheet/spec/equipment records.
 
 Expected package structure:
 - examples/music_academy_of_the_west/drawings/*.pdf

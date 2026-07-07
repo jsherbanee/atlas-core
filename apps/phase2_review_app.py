@@ -194,6 +194,10 @@ def main() -> None:
                 "value": import_summary.get("pages_with_embedded_text", 0),
             },
             {
+                "metric": "pages with OCR-derived text",
+                "value": import_summary.get("pages_with_ocr_text", 0),
+            },
+            {
                 "metric": "pages without embedded text",
                 "value": import_summary.get("pages_without_embedded_text", 0),
             },
@@ -240,8 +244,11 @@ def main() -> None:
                         "file": item.get("file_name"),
                         "group": item.get("document_group"),
                         "status": item.get("status"),
+                        "mode": item.get("extraction_mode"),
+                        "ocr_attempted": item.get("ocr_attempted"),
                         "pages": item.get("total_pages"),
                         "pages_with_text": item.get("pages_with_embedded_text"),
+                        "pages_with_ocr_text": item.get("pages_with_ocr_text"),
                         "pages_without_text": item.get("pages_without_embedded_text"),
                     }
                     for item in file_diagnostics
