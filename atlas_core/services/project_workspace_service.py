@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import json
 import re
 from pathlib import Path
 from typing import Any
 
-from atlas_core.domain import Project
+from atlas_core.domain import Project, ProjectStatus
 
 
 @dataclass
@@ -34,7 +34,9 @@ class ProjectWorkspaceRecord:
         self.workspace_id = self._normalize_required_text(
             "workspace_id", self.workspace_id
         )
-        self.source_mode = self._normalize_required_text("source_mode", self.source_mode)
+        self.source_mode = self._normalize_required_text(
+            "source_mode", self.source_mode
+        )
         self.source_label = self._normalize_required_text(
             "source_label", self.source_label
         )
@@ -43,15 +45,21 @@ class ProjectWorkspaceRecord:
             self.intake_snapshot_path
         )
         self.package_location = self._normalize_optional_text(self.package_location)
-        self.warnings = [self._normalize_required_text("warning", warning) for warning in self.warnings]
+        self.warnings = [
+            self._normalize_required_text("warning", warning)
+            for warning in self.warnings
+        ]
         self.metadata = dict(self.metadata)
         self.import_summary = dict(self.import_summary)
         self.project_profile = dict(self.project_profile)
         self.review_summary = dict(self.review_summary)
-        self.created_at = self._normalize_optional_text(self.created_at) or datetime.now(
-            UTC
-        ).isoformat()
-        self.updated_at = self._normalize_optional_text(self.updated_at) or self.created_at
+        self.created_at = (
+            self._normalize_optional_text(self.created_at)
+            or datetime.now(UTC).isoformat()
+        )
+        self.updated_at = (
+            self._normalize_optional_text(self.updated_at) or self.created_at
+        )
         self.last_opened_at = self._normalize_optional_text(self.last_opened_at)
 
         if not isinstance(self.project, Project):
@@ -89,7 +97,9 @@ class ProjectWorkspaceRecord:
     def from_dict(cls, payload: dict[str, Any]) -> "ProjectWorkspaceRecord":
         project_payload = payload.get("project") or {}
         return cls(
-            workspace_id=str(payload.get("workspace_id") or project_payload.get("project_id") or ""),
+            workspace_id=str(
+                payload.get("workspace_id") or project_payload.get("project_id") or ""
+            ),
             project=Project.from_dict(project_payload),
             source_mode=str(payload.get("source_mode") or "manual"),
             source_label=str(payload.get("source_label") or "Manual Project"),
@@ -126,7 +136,9 @@ class ProjectWorkspaceRecord:
 
 
 class ProjectWorkspaceService:
-    def __init__(self, workspace_root: str | Path = "outputs/project_workspaces") -> None:
+    def __init__(
+        self, workspace_root: str | Path = "outputs/project_workspaces"
+    ) -> None:
         self.workspace_root = Path(workspace_root)
         self.workspace_root.mkdir(parents=True, exist_ok=True)
 
@@ -169,7 +181,7 @@ class ProjectWorkspaceService:
         client: str,
         location: str | None = None,
         bid_date: str | None = None,
-        status: Any = None,
+        status: ProjectStatus | None = None,
     ) -> ProjectWorkspaceRecord:
         project = Project(
             project_id=project_id,
@@ -177,7 +189,7 @@ class ProjectWorkspaceService:
             client=client,
             location=location,
             bid_date=bid_date,
-            status=status or "intake",
+            status=status or ProjectStatus.INTAKE,
         )
         return ProjectWorkspaceRecord(
             workspace_id=project.project_id,

@@ -173,9 +173,9 @@ class Project:
             buildings=[str(item) for item in list(payload.get("buildings") or [])],
             google_drive_folder=payload.get("google_drive_folder"),
             output_folder=payload.get("output_folder"),
-            target_margin=0.28
-            if target_margin_value is None
-            else float(target_margin_value),
+            target_margin=(
+                0.28 if target_margin_value is None else float(target_margin_value)
+            ),
             cslb_scope=str(payload.get("cslb_scope") or "C7"),
             notes=[str(item) for item in list(payload.get("notes") or [])],
             lifecycle_events=list(payload.get("lifecycle_events") or []),

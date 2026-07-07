@@ -40,7 +40,7 @@ class ProjectLifecycleEvent:
     def from_dict(cls, payload: dict[str, Any]) -> "ProjectLifecycleEvent":
         return cls(
             from_status=payload.get("from_status"),
-            to_status=payload.get("to_status"),
+            to_status=payload.get("to_status") or ProjectStatus.INTAKE,
             note=payload.get("note"),
             changed_by=payload.get("changed_by"),
             changed_at=str(payload.get("changed_at") or datetime.now(UTC).isoformat()),

@@ -1,418 +1,566 @@
 # Atlas Domain Model
 
 ## 1. Purpose
-This document defines the enduring Atlas business entities, lifecycle relationships, and module boundaries independent of implementation details.
+This document defines Atlas business architecture as enduring business entities, relationships, lifecycle transitions, and module boundaries.
 
-The intent is to keep Atlas architecture aligned to long-lived project lifecycle objects so current Phase 2 bid intelligence work remains reusable and does not become isolated or throwaway.
+It is intentionally implementation-agnostic. It defines long-lived business objects that must remain valid across phases, even when services and interfaces evolve.
 
-## 2. Product Scope
-Atlas is a project lifecycle operating system for systems integration companies working across commercial AV, theatrical, themed entertainment, and related integration disciplines.
+## 2. Atlas Vision
+Atlas is a complete project lifecycle platform for commercial AV, theatrical, themed entertainment, and systems integration companies.
 
-Target scope includes:
-- opportunity tracking
-- bid intelligence
-- estimating
-- proposal support
-- awarded project conversion
-- procurement
-- financial tracking
-- construction and installation
-- commissioning
-- closeout
-- warranty and service
-- knowledge reuse
+Atlas scope spans:
+- Lead
+- Opportunity
+- Bid Intelligence
+- Estimating
+- Proposal
+- Award
+- Engineering
+- Procurement
+- Financials
+- Construction
+- Commissioning
+- Closeout
+- Warranty
+- Service
+- Knowledge Management
 
-## 3. Lifecycle Model
-Atlas lifecycle stages:
-1. Lead
-2. Opportunity
-3. Bid Package
-4. Estimate
-5. Proposal
-6. Award
-7. Project
-8. Engineering
-9. Procurement
-10. Receiving
-11. Installation
-12. Commissioning
-13. Closeout
-14. Warranty
-15. Service
-16. Knowledge Archive
+## 3. Lifecycle Diagram
+```text
+Lead [Future]
+	|
+	v
+Opportunity [Implemented]
+	|
+	v
+Bid Package [Implemented]
+	|
+	v
+Estimate [Implemented - advisory]
+	|
+	v
+Proposal [In Progress - estimator brief support]
+	|
+	v
+Award [Future]
+	|
+	v
+Project [In Progress - workspace prototype]
+	|
+	v
+Engineering [Future]
+	|
+	v
+Procurement [Future]
+	|
+	v
+Receiving [Future]
+	|
+	v
+Installation [Future]
+	|
+	v
+Commissioning [Future]
+	|
+	v
+Closeout [Future]
+	|
+	v
+Warranty [Future]
+	|
+	v
+Service [Future]
+	|
+	v
+Knowledge Archive [Future]
+```
 
-Current implementation status by stage:
-- Implemented or baseline candidate: Opportunity, Bid Package, Estimate (advisory), partial Proposal support through estimator brief outputs.
-- Partial prototype support: Project workspace shell and local persistence for review workflows.
-- Planned future phases: Award conversion, Project execution, Engineering execution, Procurement, Receiving, Installation, Commissioning, Closeout, Warranty, Service, Knowledge Archive.
+Status legend:
+- Implemented: available in active Phase 2 baseline path.
+- In Progress: partially represented in current architecture or workspace prototype.
+- Future: intentionally deferred to later phases.
 
-## 4. Core Domain Objects
+## 4. Business Objects
 
 ### Organization
-- Purpose: Represents customer, owner, integrator, consultant, contractor, vendor, or manufacturer business entities.
-- Key relationships: has many Contact, Opportunity, Project, Contract, Purchase Order, Sales Order.
-- Lifecycle role: Persistent legal and business context across all stages.
+- Purpose: Business party container for owners, integrators, vendors, and manufacturers.
+- Relationships: has many Contact, Opportunity, Project, Contract, Purchase Order.
+- Lifecycle Role: Persistent legal and operational identity across all phases.
 
 ### Contact
-- Purpose: Person-level stakeholder and communication identity.
-- Key relationships: belongs to Organization; linked to Opportunity, Project, RFI, Issue, Service Ticket.
-- Lifecycle role: Maintains continuity of communication and responsibility.
+- Purpose: Person-level stakeholder identity.
+- Relationships: belongs to Organization; linked to Opportunity, Project, RFI, Service Ticket.
+- Lifecycle Role: Maintains continuity of communication and accountability.
 
 ### Opportunity
-- Purpose: Pre-award commercial pursuit.
-- Key relationships: references Organization, Contact, Bid Package, Estimate, Proposal.
-- Lifecycle role: Entry point from Lead through Award decision.
+- Purpose: Pre-award pursuit record.
+- Relationships: linked to Organization, Contact, Bid Package, Estimate, Proposal.
+- Lifecycle Role: Commercial entry point prior to award.
 
 ### Project
-- Purpose: Post-award operational container for execution and financial controls.
-- Key relationships: derived from Opportunity; owns Project Phase, Contract, Budget, Forecast, Asset, Warranty.
-- Lifecycle role: Core long-lived object from Award through Service.
+- Purpose: Post-award execution container.
+- Relationships: derived from Opportunity; owns Project Phase, Contract, Budget, Forecast, Asset.
+- Lifecycle Role: Master execution object from award through service.
 
 ### Project Phase
-- Purpose: Tracks lifecycle segment state and gates for a Project.
-- Key relationships: belongs to Project; references phase-specific records such as Engineering, Procurement, Installation.
-- Lifecycle role: Governs transitions and status accountability.
+- Purpose: Tracks lifecycle stage state for a Project.
+- Relationships: belongs to Project; references phase records in engineering, procurement, construction, and closeout.
+- Lifecycle Role: Governs stage progression and controls.
+
+### Project Workspace
+- Purpose: User-facing project context for review and operations.
+- Relationships: linked to Project, Bid Package, Document, Evidence, Estimate.
+- Lifecycle Role: Operational lens for project-centric work, independent of single-document workflows.
 
 ### Bid Package
-- Purpose: Normalized intake of drawings, specifications, schedules, addenda, and metadata.
-- Key relationships: linked to Opportunity, Document, Drawing, Specification, Addendum, RFI Candidate.
-- Lifecycle role: Source package for bid intelligence.
+- Purpose: Intake bundle of bid source artifacts.
+- Relationships: contains Document, Drawing, Specification, Addendum, Schedule.
+- Lifecycle Role: Primary input package for bid intelligence.
 
 ### Document
-- Purpose: Generic managed file and metadata wrapper.
-- Key relationships: parent of Drawing, Specification, Addendum; linked to Evidence.
-- Lifecycle role: Canonical reference artifact with traceable provenance.
+- Purpose: Canonical document record and metadata envelope.
+- Relationships: parent of Drawing, Specification, Addendum, Schedule; linked to Evidence.
+- Lifecycle Role: Durable source artifact across project lifecycle.
 
 ### Drawing
-- Purpose: Structured drawing sheet representation.
-- Key relationships: belongs to Document and Bid Package; references Room or Area, System, Equipment, Cable or Pathway.
-- Lifecycle role: Drives scope interpretation from bid through field execution.
+- Purpose: Structured drawing sheet record.
+- Relationships: belongs to Document and Bid Package; references Room, Area, System, Equipment.
+- Lifecycle Role: Source of spatial and system scope.
 
 ### Specification
-- Purpose: Structured specification section representation.
-- Key relationships: belongs to Document and Bid Package; references Product, Equipment, Contract terms.
-- Lifecycle role: Defines requirements and compliance basis.
+- Purpose: Structured requirements and standards record.
+- Relationships: belongs to Document and Bid Package; references Product, Equipment, Contract constraints.
+- Lifecycle Role: Compliance and scope authority.
 
 ### Addendum
-- Purpose: Revision layer over bid and contract documentation.
-- Key relationships: belongs to Document and Bid Package; affects Estimate, Proposal, Contract, Change Order.
-- Lifecycle role: Controls formal scope and risk changes.
+- Purpose: Formal bid or contract revision artifact.
+- Relationships: belongs to Document and Bid Package; affects Estimate, Proposal, Contract, Change Order.
+- Lifecycle Role: Controlled scope and risk change input.
 
-### RFI
-- Purpose: Formal request for clarification.
-- Key relationships: linked to Project or Opportunity, Drawing, Specification, Issue.
-- Lifecycle role: Converts ambiguity into controlled responses.
-
-### RFI Candidate
-- Purpose: Advisory candidate generated by intelligence for estimator review.
-- Key relationships: derived from Bid Package evidence; may promote to RFI.
-- Lifecycle role: Phase 2 advisory risk surfacing.
-
-### Estimate
-- Purpose: Quantified pre-award scope and cost model.
-- Key relationships: belongs to Opportunity; contains Estimate Line and Labor Estimate; informs Proposal.
-- Lifecycle role: Commercial decision baseline before award.
-
-### Estimate Line
-- Purpose: Atomic estimate scope and cost entry.
-- Key relationships: belongs to Estimate; references Equipment, Product, System, Room or Area.
-- Lifecycle role: Unit of pricing continuity into downstream controls.
-
-### Labor Estimate
-- Purpose: Structured labor hour and risk estimate.
-- Key relationships: belongs to Estimate; linked to System, Room or Area, Estimate Line.
-- Lifecycle role: Capacity and cost planning input.
-
-### Proposal
-- Purpose: Customer-facing commercial scope and pricing package.
-- Key relationships: derived from Estimate and Opportunity; references Contract terms.
-- Lifecycle role: Offer that can convert to Award.
-
-### Contract
-- Purpose: Awarded legal and commercial agreement.
-- Key relationships: linked to Proposal, Project, Change Order, Invoice.
-- Lifecycle role: Authoritative basis for execution and billing.
-
-### Change Order
-- Purpose: Controlled change to contract scope and value.
-- Key relationships: belongs to Contract and Project; references Estimate Line, Issue, RFI.
-- Lifecycle role: Governs in-flight scope and financial adjustments.
-
-### Sales Order
-- Purpose: Internal order record for customer-facing deliverables.
-- Key relationships: linked to Contract, Project, Invoice.
-- Lifecycle role: Bridges contract scope into fulfillment and billing.
-
-### Purchase Order
-- Purpose: Vendor procurement commitment.
-- Key relationships: linked to Vendor, Product, Equipment, Shipment, Vendor Bill.
-- Lifecycle role: Authoritative buy-side procurement instrument.
-
-### Vendor
-- Purpose: External supplier or subcontractor party.
-- Key relationships: linked to Organization, Purchase Order, Vendor Bill, Payment, Shipment.
-- Lifecycle role: Procurement and payable execution counterparty.
-
-### Manufacturer
-- Purpose: Product origin and compliance source.
-- Key relationships: linked to Product, Equipment, Submittal, Warranty.
-- Lifecycle role: Material and technical authority.
-
-### Product
-- Purpose: Catalog-level purchasable or installable item definition.
-- Key relationships: linked to Manufacturer, Estimate Line, Purchase Order, Asset.
-- Lifecycle role: Standardized item identity through lifecycle.
+### Schedule
+- Purpose: Structured schedule data (device, equipment, matrix, and similar).
+- Relationships: belongs to Document and Bid Package; references Equipment, System, Room, Area.
+- Lifecycle Role: Quantitative scope bridge from documents into estimate and execution.
 
 ### Equipment
-- Purpose: Project-specific equipment instance or scoped item.
-- Key relationships: linked to Product, System, Room or Area, Estimate Line, Asset.
-- Lifecycle role: Travels from design intent through installed reality.
+- Purpose: Scoped item record for products and devices.
+- Relationships: linked to Product, System, Room, Area, Estimate Line, Asset.
+- Lifecycle Role: Survives from bid identification to installed serviceable asset.
 
 ### System
-- Purpose: Functional grouping of equipment and pathways.
-- Key relationships: linked to Equipment, Room or Area, Drawing, Commissioning Record.
-- Lifecycle role: Engineering and commissioning backbone.
+- Purpose: Functional grouping for integrated equipment and pathways.
+- Relationships: contains Equipment; linked to Drawing, Room, Area, Commissioning Record.
+- Lifecycle Role: Engineering and commissioning backbone.
 
-### Room / Area
-- Purpose: Physical location context for scope.
-- Key relationships: linked to Drawing, Equipment, System, Installation tasks, Asset.
-- Lifecycle role: Spatial anchor for quantity, logistics, and acceptance.
+### Room
+- Purpose: Named physical room location.
+- Relationships: linked to Drawing, Equipment, System, Asset, Punch Item.
+- Lifecycle Role: Physical scope anchor for install and acceptance.
 
-### Cable / Pathway
-- Purpose: Physical infrastructure and routing records.
-- Key relationships: linked to System, Room or Area, Installation, Commissioning Record.
-- Lifecycle role: Construction and performance dependency.
+### Area
+- Purpose: Broader physical area or zone grouping.
+- Relationships: linked to Room, System, Equipment, Construction records.
+- Lifecycle Role: Field planning and execution grouping.
 
-### Submittal
-- Purpose: Technical approval package for products and systems.
-- Key relationships: linked to Product, Equipment, Contract, Issue.
-- Lifecycle role: Approval gate before procurement and installation.
+### Evidence
+- Purpose: Source trace record tying outputs to origin documents or records.
+- Relationships: linked to Document, Engineering Assumption, RFI Candidate, Estimate, Issue, Knowledge Record.
+- Lifecycle Role: Required auditability layer for advisory and execution decisions.
+
+### Engineering Assumption
+- Purpose: Deterministic assumption generated from bid analysis.
+- Relationships: linked to Bid Package, Evidence, Estimate, RFI Candidate.
+- Lifecycle Role: Advisory planning signal prior to final design and procurement.
+
+### RFI Candidate
+- Purpose: Candidate clarification item surfaced by intelligence workflows.
+- Relationships: derived from Evidence and Bid Package; may promote to RFI.
+- Lifecycle Role: Advisory risk reduction before formal question issuance.
+
+### RFI
+- Purpose: Formal clarification transaction.
+- Relationships: linked to Project, Drawing, Specification, Issue, Change Order.
+- Lifecycle Role: Converts ambiguity into approved direction.
+
+### Estimate
+- Purpose: Costed pre-award model of scope.
+- Relationships: contains Estimate Line and Labor Estimate; informs Proposal.
+- Lifecycle Role: Primary commercial model before award.
+
+### Estimate Line
+- Purpose: Atomic estimate scope/cost entry.
+- Relationships: belongs to Estimate; references Equipment, Product, System, Room, Area.
+- Lifecycle Role: Unit of continuity for downstream order and financial mapping.
+
+### Labor Estimate
+- Purpose: Labor hours and confidence model.
+- Relationships: belongs to Estimate; linked to Estimate Line and System.
+- Lifecycle Role: Capacity and labor cost planning input.
+
+### Proposal
+- Purpose: Offer package presented to customer.
+- Relationships: derived from Opportunity and Estimate; precedes Contract.
+- Lifecycle Role: Commercial conversion artifact.
+
+### Contract
+- Purpose: Awarded legal agreement.
+- Relationships: linked to Proposal, Project, Change Order, Invoice, Sales Order.
+- Lifecycle Role: Authoritative execution and billing basis.
+
+### Sales Order
+- Purpose: Internal sell-side fulfillment order.
+- Relationships: linked to Contract, Project, Invoice, Receipt.
+- Lifecycle Role: Revenue fulfillment bridge.
+
+### Purchase Order
+- Purpose: Buy-side procurement commitment.
+- Relationships: linked to Vendor, Product, Equipment, Shipment, Vendor Bill.
+- Lifecycle Role: Procurement execution authority.
+
+### Vendor
+- Purpose: External supplier or subcontractor record.
+- Relationships: linked to Organization, Purchase Order, Vendor Bill, Payment, Shipment.
+- Lifecycle Role: Buy-side execution counterparty.
+
+### Manufacturer
+- Purpose: Product source and compliance origin.
+- Relationships: linked to Product, Equipment, Submittal, Warranty.
+- Lifecycle Role: Product authority and support source.
+
+### Product
+- Purpose: Catalog-level product definition.
+- Relationships: linked to Manufacturer, Equipment, Estimate Line, Purchase Order, Asset.
+- Lifecycle Role: Stable identity from design through service.
 
 ### Shipment
-- Purpose: Vendor delivery record.
-- Key relationships: linked to Purchase Order, Vendor, Receiving Record.
-- Lifecycle role: Procurement logistics and lead-time tracking.
+- Purpose: Delivery movement record for procured goods.
+- Relationships: linked to Purchase Order, Vendor, Receiving Record.
+- Lifecycle Role: Logistics traceability event.
 
 ### Receiving Record
-- Purpose: Receipt confirmation and condition audit.
-- Key relationships: linked to Shipment, Purchase Order, Asset.
-- Lifecycle role: Inventory and readiness checkpoint.
+- Purpose: Receipt verification and condition capture.
+- Relationships: linked to Shipment, Purchase Order, Asset.
+- Lifecycle Role: Inventory acceptance control.
 
 ### Invoice
 - Purpose: Customer billing record.
-- Key relationships: linked to Contract, Sales Order, Receipt, Payment.
-- Lifecycle role: Revenue realization and receivable control.
+- Relationships: linked to Contract, Sales Order, Payment, Receipt.
+- Lifecycle Role: Revenue realization.
 
 ### Vendor Bill
 - Purpose: Supplier payable record.
-- Key relationships: linked to Purchase Order, Vendor, Payment.
-- Lifecycle role: Cost realization and payable control.
+- Relationships: linked to Vendor, Purchase Order, Payment.
+- Lifecycle Role: Cost recognition for payables.
 
 ### Payment
-- Purpose: Money movement record for payables or receivables.
-- Key relationships: linked to Vendor Bill or Invoice, Organization, Receipt.
-- Lifecycle role: Financial settlement event.
+- Purpose: Monetary settlement record.
+- Relationships: linked to Invoice or Vendor Bill; linked to Receipt.
+- Lifecycle Role: Financial settlement event.
 
 ### Receipt
-- Purpose: Financial receipt confirmation and allocation record.
-- Key relationships: linked to Invoice, Payment, Project.
-- Lifecycle role: Cash application and audit trace.
+- Purpose: Allocation record confirming funds receipt.
+- Relationships: linked to Invoice, Payment, Sales Order, Project.
+- Lifecycle Role: Receivable closure and audit trace.
 
 ### Budget
-- Purpose: Approved financial plan by project and phase.
-- Key relationships: linked to Project, Forecast, Estimate.
-- Lifecycle role: Financial governance baseline.
+- Purpose: Approved project financial plan.
+- Relationships: linked to Project, Forecast, Estimate.
+- Lifecycle Role: Financial governance baseline.
 
 ### Forecast
-- Purpose: Forward-looking cost and revenue projection.
-- Key relationships: linked to Project, Budget, Issue, Change Order.
-- Lifecycle role: Predictive project control.
+- Purpose: Forward projection of cost, margin, and cash outcomes.
+- Relationships: linked to Project, Budget, Change Order, Issue.
+- Lifecycle Role: Ongoing project control and risk prediction.
+
+### Change Order
+- Purpose: Controlled scope and value adjustment.
+- Relationships: linked to Contract, Project, RFI, Issue, Forecast.
+- Lifecycle Role: Formal change mechanism after award.
 
 ### Issue
-- Purpose: Trackable risk, blocker, or nonconformance.
-- Key relationships: linked to RFI, Submittal, Installation, Commissioning Record, Punch Item.
-- Lifecycle role: Execution quality and risk resolution management.
+- Purpose: Trackable blocker, risk, or defect.
+- Relationships: linked to RFI, Submittal, Punch Item, Commissioning Record.
+- Lifecycle Role: Execution quality and risk management.
 
 ### Punch Item
-- Purpose: Outstanding completion defect or verification item.
-- Key relationships: linked to Project, Room or Area, Commissioning Record, Closeout Package.
-- Lifecycle role: Pre-closeout completion control.
+- Purpose: Outstanding completion defect or action item.
+- Relationships: linked to Project, Room, Area, Issue, Closeout Package.
+- Lifecycle Role: Pre-closeout completion control.
 
 ### Commissioning Record
-- Purpose: Test and acceptance evidence for systems and devices.
-- Key relationships: linked to System, Equipment, Issue, Punch Item, Asset.
-- Lifecycle role: Operational verification gate.
+- Purpose: Verification and acceptance test record.
+- Relationships: linked to System, Equipment, Asset, Issue, Punch Item.
+- Lifecycle Role: Operational readiness gate.
 
 ### Closeout Package
-- Purpose: Final handover bundle (as-builts, manuals, training, acceptance).
-- Key relationships: linked to Project, Asset, Warranty, Commissioning Record.
-- Lifecycle role: Completion and turnover record.
+- Purpose: Turnover bundle of final project artifacts.
+- Relationships: linked to Project, Commissioning Record, Asset, Warranty.
+- Lifecycle Role: Completion and handover record.
 
 ### Warranty
 - Purpose: Coverage terms and obligations.
-- Key relationships: linked to Contract, Product, Manufacturer, Asset, Service Ticket.
-- Lifecycle role: Post-closeout support entitlement.
-
-### Service Ticket
-- Purpose: Operational support work item.
-- Key relationships: linked to Asset, Warranty, Organization, Contact, Knowledge Record.
-- Lifecycle role: Service execution and feedback loop.
+- Relationships: linked to Contract, Product, Manufacturer, Asset, Service Ticket.
+- Lifecycle Role: Post-closeout entitlement and risk transfer.
 
 ### Asset
-- Purpose: Installed, identified, and supportable field instance.
-- Key relationships: derived from Equipment and Product; linked to Commissioning Record, Warranty, Service Ticket.
-- Lifecycle role: Long-term operations anchor.
+- Purpose: Installed and maintainable operational instance.
+- Relationships: derived from Equipment and Product; linked to Commissioning Record, Warranty, Service Ticket.
+- Lifecycle Role: Long-lived field object through service lifecycle.
 
-### Evidence
-- Purpose: Source trace object linking claims to documents, pages, and records.
-- Key relationships: linked to Document, RFI Candidate, Estimate, Issue, Commissioning Record, Knowledge Record.
-- Lifecycle role: Auditability and trust preservation.
+### Service Ticket
+- Purpose: Post-install service work record.
+- Relationships: linked to Asset, Warranty, Contact, Issue, Knowledge Record.
+- Lifecycle Role: Service execution and customer support flow.
 
 ### Knowledge Record
-- Purpose: Reusable organizational memory of outcomes, risks, resolutions, and performance.
-- Key relationships: linked to Project, Service Ticket, Issue, Evidence, Asset.
-- Lifecycle role: Knowledge Archive and continuous improvement.
+- Purpose: Reusable knowledge from project and service outcomes.
+- Relationships: linked to Project, Evidence, Issue, Service Ticket, Asset.
+- Lifecycle Role: Knowledge archive and continuous improvement engine.
 
-## 5. Object Continuity
-Atlas objects should persist across lifecycle stages instead of being recreated as disconnected records.
+## 5. Object Relationships
+```text
+Organization
+	|
+	+-- Contact
+	|
+	+-- Opportunity
+			 |
+			 +-- Bid Package
+			 |    +-- Document
+			 |    |    +-- Drawing
+			 |    |    +-- Specification
+			 |    |    +-- Addendum
+			 |    |    +-- Schedule
+			 |    +-- Evidence
+			 |    +-- Engineering Assumption
+			 |    +-- RFI Candidate
+			 |
+			 +-- Estimate
+						+-- Estimate Line
+						+-- Labor Estimate
+						+-- Proposal
+
+Award
+	|
+	v
+Project
+	+-- Project Phase
+	+-- Project Workspace
+	+-- Systems
+	+-- Equipment
+	+-- Financials
+	|    +-- Contract
+	|    +-- Sales Order
+	|    +-- Invoice
+	|    +-- Vendor Bill
+	|    +-- Payment
+	|    +-- Receipt
+	|    +-- Budget
+	|    +-- Forecast
+	+-- Procurement
+	|    +-- Purchase Order
+	|    +-- Vendor
+	|    +-- Manufacturer
+	|    +-- Product
+	|    +-- Shipment
+	|    +-- Receiving Record
+	+-- Construction
+	|    +-- Room
+	|    +-- Area
+	|    +-- Issue
+	|    +-- Punch Item
+	+-- Commissioning Record
+	+-- Closeout Package
+	+-- Warranty
+	+-- Asset
+	+-- Service Ticket
+	+-- Knowledge Record
+```
+
+## 6. Object Continuity
+Objects should evolve through lifecycle stages rather than being recreated as disconnected data.
 
 Continuity example:
-An Equipment item identified during bid intelligence may evolve into:
-1. estimate line input
-2. proposal scope item
-3. purchase order line item
-4. received inventory item
-5. installed asset reference
-6. commissioned device record
-7. warranty and service asset
+```text
+Equipment
+	|
+	v
+Estimate Line
+	|
+	v
+Purchase Order
+	|
+	v
+Receiving
+	|
+	v
+Installed Asset
+	|
+	v
+Commissioning
+	|
+	v
+Warranty
+	|
+	v
+Service
+```
 
-Continuity rules:
-- Preserve stable IDs where possible.
-- Keep source evidence references attached during transitions.
-- Promote advisory objects to execution objects through explicit conversion events.
+Same object. Different lifecycle stage.
 
-## 6. Module Boundaries
+## 7. Services vs Business Objects
+
+### Business Objects
+Business objects are persistent records that survive lifecycle transitions.
+
+Examples:
+- Project
+- Equipment
+- Estimate
+- Purchase Order
+- Asset
+- Service Ticket
+- Knowledge Record
+
+### Services
+Services execute workflows on top of business objects and should not replace durable object identity.
+
+Service examples:
+- Atlas Intake
+- Bid Intelligence
+- Estimator Review
+- Revision Comparison
+- Knowledge Graph
+- Reporting
+- Search
+
+Services operate on business objects and emit derived outputs, but authoritative records remain in business object stores.
+
+## 8. Atlas Modules
 
 ### Atlas Intake
-- Purpose: Deterministic ingestion and classification of package files.
-- Primary objects: Bid Package, Document, Drawing, Specification, Addendum, Evidence.
-- Current status: implemented.
+- Purpose: Deterministic file intake and classification.
+- Primary objects: Bid Package, Document, Drawing, Specification, Addendum, Schedule, Evidence.
+- Implementation status: Implemented.
+
+### Atlas Projects
+- Purpose: Project-level workspace, lifecycle state, and continuity orchestration.
+- Primary objects: Project, Project Phase, Project Workspace.
+- Implementation status: Partial.
 
 ### Atlas Bid Intelligence
-- Purpose: Extract and evaluate bid risk and readiness insights.
-- Primary objects: Bid Package, RFI Candidate, Engineering Assumption, Evidence.
-- Current status: implemented.
+- Purpose: Risk, readiness, and advisory analysis during bidding.
+- Primary objects: Bid Package, Engineering Assumption, RFI Candidate, Evidence.
+- Implementation status: Implemented.
 
 ### Atlas Estimating
-- Purpose: Produce and refine estimate and labor intelligence.
+- Purpose: Scope-cost modeling and labor estimation.
 - Primary objects: Estimate, Estimate Line, Labor Estimate, Equipment, System.
-- Current status: partial.
+- Implementation status: Partial.
 
 ### Atlas Engineering
-- Purpose: Manage post-award technical development and approvals.
-- Primary objects: Project, Project Phase, System, Submittal, Issue.
-- Current status: planned.
+- Purpose: Technical development and approvals after award.
+- Primary objects: Project Phase, System, Submittal, Issue.
+- Implementation status: Planned.
 
 ### Atlas Procurement
-- Purpose: Control buy-side execution from approved scope.
-- Primary objects: Purchase Order, Vendor, Product, Shipment, Receiving Record.
-- Current status: planned.
+- Purpose: Buy-side execution and supply coordination.
+- Primary objects: Purchase Order, Vendor, Manufacturer, Product, Shipment, Receiving Record.
+- Implementation status: Planned.
 
 ### Atlas Financials
-- Purpose: Track project commercial and accounting records.
+- Purpose: Commercial and accounting records.
 - Primary objects: Contract, Sales Order, Invoice, Vendor Bill, Payment, Receipt, Budget, Forecast.
-- Current status: planned.
+- Implementation status: Planned.
 
 ### Atlas Construction
-- Purpose: Track field execution, installation, and punch resolution.
-- Primary objects: Project, Room or Area, Cable or Pathway, Issue, Punch Item, Asset.
-- Current status: planned.
+- Purpose: Field execution and installation controls.
+- Primary objects: Project, Room, Area, Equipment, Issue, Punch Item.
+- Implementation status: Planned.
 
 ### Atlas Closeout
-- Purpose: Manage turnover and final acceptance artifacts.
+- Purpose: Turnover and completion package management.
 - Primary objects: Closeout Package, Commissioning Record, Asset, Warranty.
-- Current status: planned.
+- Implementation status: Planned.
 
 ### Atlas Service
-- Purpose: Support post-turnover operational lifecycle.
-- Primary objects: Service Ticket, Warranty, Asset, Knowledge Record.
-- Current status: planned.
+- Purpose: Post-closeout support operations.
+- Primary objects: Service Ticket, Asset, Warranty, Knowledge Record.
+- Implementation status: Planned.
 
 ### Atlas Knowledge Graph
-- Purpose: Capture reusable intelligence and outcomes across projects.
-- Primary objects: Knowledge Record, Evidence, Asset, Issue, Service Ticket.
-- Current status: planned.
+- Purpose: Cross-project knowledge reuse and linkage.
+- Primary objects: Knowledge Record, Evidence, Asset, Issue.
+- Implementation status: Planned.
 
 ### Atlas Reporting
 - Purpose: Cross-module analytics, dashboards, and exports.
 - Primary objects: Estimate, Forecast, Issue, Service Ticket, Knowledge Record.
-- Current status: partial.
+- Implementation status: Partial.
 
 ### Atlas Administration
-- Purpose: Tenant, policy, configuration, and permissions management.
-- Primary objects: Organization, Contact, role and policy records.
-- Current status: deferred.
+- Purpose: Tenant configuration, policies, and access management.
+- Primary objects: Organization, Contact, workspace policy objects.
+- Implementation status: Deferred.
 
-## 7. Phase 2 Boundary
-Active implementation remains Phase 2 Bid Intelligence only.
+## 9. Phase Boundaries
+Current implementation remains Phase 2 Bid Intelligence.
 
-Implemented or baseline candidate:
-- document intake
-- resolved project snapshot
-- bid package review
-- engineering assumptions
-- RFI candidates
-- labor estimate
-- revision comparison
-- readiness scoring
-- estimator brief
-- local GUI and workspace prototype
+Implemented (Phase 2):
+- Document Intake
+- Project Snapshot
+- Bid Package Review
+- Engineering Assumptions
+- Readiness
+- Estimator Brief
+- RFI Candidates
+- Labor Estimate
+- Revision Comparison
+- Evidence
+- Workspace Prototype
 
-Explicitly deferred:
-- procurement execution
-- RFQ workflow
-- purchase orders
-- sales orders
-- invoices
-- vendor bills
-- payments
-- receiving
-- installation tracking
-- commissioning workflows
-- closeout workflows
-- service and warranty operations
+Deferred:
+- Procurement
+- Financials
+- Project Execution
+- Scheduling
+- Receiving
+- Commissioning
+- Closeout
+- Warranty
+- Service
 
-## 8. Data Ownership and Source of Truth
-Future source-of-truth expectations:
-- documents and evidence: authoritative document store and immutable evidence references
-- project metadata: project master record controlled by project administration workflows
-- estimate: estimating module with revisioned estimate records
-- contract and award: contract module after formal award conversion
-- procurement: purchase and receiving modules for buy-side execution records
-- financials: accounting-facing financial ledger records and allocations
-- installed assets: construction and commissioning outcomes that define maintainable assets
-- knowledge records: post-project and service-derived reusable knowledge corpus
+## 10. Source of Truth
+Ownership expectations:
+- Documents: canonical document and metadata records.
+- Evidence: immutable trace links between outputs and sources.
+- Project Metadata: authoritative project master profile.
+- Estimate: authoritative pre-award estimating record with revisions.
+- Financials: authoritative only after award conversion and financial execution.
+- Assets: authoritative installed and maintained device records.
+- Knowledge: reusable outcome and service intelligence records.
 
-Phase 2 clarification:
-- Phase 2 outputs are advisory intelligence for estimator decision support.
-- Phase 2 outputs are not contractual, procurement, or financial source-of-truth records.
+Clarifications:
+- Phase 2 intelligence is advisory only.
+- Financial records become authoritative only after project award and downstream execution workflows.
 
-## 9. Future Cloud Considerations
-Atlas should eventually support:
-- local project persistence
-- S3-backed document storage
-- shared project workspaces
-- role-based access
-- multi-user review
-- project history
-- audit trails
+## 11. Cloud Architecture Considerations
+Future architecture should support:
+- Local Workspace
+- Shared Workspace
+- S3 Storage
+- Project History
+- Audit Trail
+- Role-Based Access
+- Organization Workspaces
+- Remote Collaboration
 
-These capabilities are future architecture targets and are not implemented in active Phase 2 execution.
+These are architecture targets only and are not implemented in this phase.
 
-## 10. UX Implications
-The Atlas Workspace should be project-centric, not document-centric or estimate-centric.
+## 12. UX Implications
+Atlas Workspace should be project-centric rather than document-centric.
 
-Suggested long-term navigation:
+Long-term navigation should support:
 1. Home
 2. Projects
 3. Documents
@@ -426,18 +574,18 @@ Suggested long-term navigation:
 11. Reports
 12. Administration
 
-Phase 2 UI may expose only currently implemented sections, with future sections disabled or omitted.
+Phase 2 interfaces may expose only implemented sections and omit or disable future sections.
 
-## 11. Architecture Guidelines
-- Do not create isolated one-off data structures when a durable domain object exists.
-- Preserve source traceability for every advisory or execution record.
-- Keep bid intelligence advisory until explicit award conversion.
-- Keep financial records separate from estimate intelligence records.
-- Design objects to survive lifecycle transitions with stable identity and conversion mappings.
-- Avoid hardcoding reference projects such as Music Academy of the West.
-- Keep cloud storage concerns behind adapters when implemented.
+## 13. Architecture Rules
+- Business objects must survive lifecycle transitions.
+- Services should remain stateless where practical.
+- Source traceability must always be preserved.
+- Do not duplicate durable objects.
+- Do not hardcode reference projects.
+- Cloud infrastructure should remain behind adapters.
+- Maintain deterministic behavior whenever possible.
 
-## 12. Related Documents
+## Related Documents
 - [PRODUCT_VISION.md](PRODUCT_VISION.md)
 - [ROADMAP.md](ROADMAP.md)
 - [ARCHITECTURE.md](ARCHITECTURE.md)

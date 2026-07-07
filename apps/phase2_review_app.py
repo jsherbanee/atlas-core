@@ -13,13 +13,11 @@ from atlas_core.services.phase2_review_context_service import (
     build_intake_review_context,
     build_reference_project_context,
     build_uploaded_review_context,
-    discover_local_intake_snapshots,
 )
 from atlas_core.services.project_workspace_service import (
     ProjectWorkspaceRecord,
     ProjectWorkspaceService,
 )
-
 
 WORKSPACE_SECTIONS = [
     "Overview",
@@ -127,35 +125,129 @@ def _first_text(*values: Any) -> str | None:
     return None
 
 
-def _project_profile_rows(record: ProjectWorkspaceRecord, context: dict[str, Any] | None) -> list[dict[str, Any]]:
-    metadata = dict(getattr(context.get("intake_snapshot"), "metadata", {}) or {}) if context else {}
+def _project_profile_rows(
+    record: ProjectWorkspaceRecord, context: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    metadata = (
+        dict(getattr(context.get("intake_snapshot"), "metadata", {}) or {})
+        if context
+        else {}
+    )
     project = record.project
 
     rows = [
-        {"field": "Project Name", "value": _first_text(metadata.get("project_name"), metadata.get("name"), project.name) or "n/a"},
-        {"field": "Project Number", "value": _first_text(metadata.get("project_number"), metadata.get("project_id"), project.project_id) or "n/a"},
-        {"field": "Owner", "value": _first_text(metadata.get("owner"), metadata.get("client"), project.client) or "n/a"},
-        {"field": "Architect", "value": _first_text(metadata.get("architect")) or "n/a"},
-        {"field": "AV Consultant", "value": _first_text(metadata.get("av_consultant"), metadata.get("consultant_av")) or "n/a"},
-        {"field": "Electrical Engineer", "value": _first_text(metadata.get("electrical_engineer"), metadata.get("consultant_electrical")) or "n/a"},
-        {"field": "MEP", "value": _first_text(metadata.get("mep"), metadata.get("mep_consultant")) or "n/a"},
-        {"field": "Structural", "value": _first_text(metadata.get("structural"), metadata.get("structural_engineer")) or "n/a"},
-        {"field": "Campus", "value": _first_text(metadata.get("campus"), metadata.get("campus_name")) or "n/a"},
-        {"field": "Building", "value": _first_text(metadata.get("building"), metadata.get("building_name")) or "n/a"},
-        {"field": "Issue Date", "value": _first_text(metadata.get("issue_date")) or "n/a"},
-        {"field": "Bid Date", "value": _first_text(metadata.get("bid_date"), project.bid_date) or "n/a"},
-        {"field": "Revision", "value": _first_text(metadata.get("revision"), metadata.get("revision_id")) or "n/a"},
+        {
+            "field": "Project Name",
+            "value": _first_text(
+                metadata.get("project_name"), metadata.get("name"), project.name
+            )
+            or "n/a",
+        },
+        {
+            "field": "Project Number",
+            "value": _first_text(
+                metadata.get("project_number"),
+                metadata.get("project_id"),
+                project.project_id,
+            )
+            or "n/a",
+        },
+        {
+            "field": "Owner",
+            "value": _first_text(
+                metadata.get("owner"), metadata.get("client"), project.client
+            )
+            or "n/a",
+        },
+        {
+            "field": "Architect",
+            "value": _first_text(metadata.get("architect")) or "n/a",
+        },
+        {
+            "field": "AV Consultant",
+            "value": _first_text(
+                metadata.get("av_consultant"), metadata.get("consultant_av")
+            )
+            or "n/a",
+        },
+        {
+            "field": "Electrical Engineer",
+            "value": _first_text(
+                metadata.get("electrical_engineer"),
+                metadata.get("consultant_electrical"),
+            )
+            or "n/a",
+        },
+        {
+            "field": "MEP",
+            "value": _first_text(metadata.get("mep"), metadata.get("mep_consultant"))
+            or "n/a",
+        },
+        {
+            "field": "Structural",
+            "value": _first_text(
+                metadata.get("structural"), metadata.get("structural_engineer")
+            )
+            or "n/a",
+        },
+        {
+            "field": "Campus",
+            "value": _first_text(metadata.get("campus"), metadata.get("campus_name"))
+            or "n/a",
+        },
+        {
+            "field": "Building",
+            "value": _first_text(
+                metadata.get("building"), metadata.get("building_name")
+            )
+            or "n/a",
+        },
+        {
+            "field": "Issue Date",
+            "value": _first_text(metadata.get("issue_date")) or "n/a",
+        },
+        {
+            "field": "Bid Date",
+            "value": _first_text(metadata.get("bid_date"), project.bid_date) or "n/a",
+        },
+        {
+            "field": "Revision",
+            "value": _first_text(metadata.get("revision"), metadata.get("revision_id"))
+            or "n/a",
+        },
         {"field": "Addenda", "value": _normalize_text(metadata.get("addenda"))},
         {"field": "Consultants", "value": _normalize_text(metadata.get("consultants"))},
-        {"field": "Stakeholders", "value": _normalize_text(metadata.get("stakeholders"))},
-        {"field": "Project Status", "value": project.status.value if isinstance(project.status, ProjectStatus) else str(project.status)},
-        {"field": "Source Mode", "value": context.get("data_source_label", record.source_label) if context else record.source_label},
-        {"field": "Package Location", "value": record.package_location or record.source_path or "n/a"},
+        {
+            "field": "Stakeholders",
+            "value": _normalize_text(metadata.get("stakeholders")),
+        },
+        {
+            "field": "Project Status",
+            "value": (
+                project.status.value
+                if isinstance(project.status, ProjectStatus)
+                else str(project.status)
+            ),
+        },
+        {
+            "field": "Source Mode",
+            "value": (
+                context.get("data_source_label", record.source_label)
+                if context
+                else record.source_label
+            ),
+        },
+        {
+            "field": "Package Location",
+            "value": record.package_location or record.source_path or "n/a",
+        },
     ]
     return rows
 
 
-def _review_summary_rows(review: Any, brief: Any, revision: Any) -> list[dict[str, Any]]:
+def _review_summary_rows(
+    review: Any, brief: Any, revision: Any
+) -> list[dict[str, Any]]:
     if review is None:
         return []
 
@@ -171,14 +263,35 @@ def _review_summary_rows(review: Any, brief: Any, revision: Any) -> list[dict[st
         {"field": "Scope Gap Count", "value": review.scope_gap_count()},
         {"field": "Estimator Risk Count", "value": review.estimator_risk_count()},
         {"field": "Confidence", "value": review.confidence},
-        {"field": "Readiness Score", "value": getattr(getattr(review, "readiness", None), "readiness_score", None)},
-        {"field": "Readiness Level", "value": getattr(getattr(getattr(review, "readiness", None), "readiness_level", None), "value", None)},
+        {
+            "field": "Readiness Score",
+            "value": getattr(
+                getattr(review, "readiness", None), "readiness_score", None
+            ),
+        },
+        {
+            "field": "Readiness Level",
+            "value": getattr(
+                getattr(getattr(review, "readiness", None), "readiness_level", None),
+                "value",
+                None,
+            ),
+        },
         {"field": "Brief Title", "value": getattr(brief, "brief_title", None)},
-        {"field": "Revision Changes", "value": len(getattr(revision, "changes", []) or []) if revision is not None else 0},
+        {
+            "field": "Revision Changes",
+            "value": (
+                len(getattr(revision, "changes", []) or [])
+                if revision is not None
+                else 0
+            ),
+        },
     ]
 
 
-def _workspace_summary(record: ProjectWorkspaceRecord, context: dict[str, Any] | None) -> list[dict[str, Any]]:
+def _workspace_summary(
+    record: ProjectWorkspaceRecord, context: dict[str, Any] | None
+) -> list[dict[str, Any]]:
     review = context.get("review") if context else None
     brief = context.get("brief") if context else None
     revision = context.get("revision_comparison") if context else None
@@ -214,19 +327,26 @@ def _build_record_from_context(
     existing_record: ProjectWorkspaceRecord | None = None,
 ) -> ProjectWorkspaceRecord:
     snapshot = context.get("intake_snapshot")
-    metadata = dict(getattr(snapshot, "metadata", {}) or {}) if snapshot is not None else {}
+    metadata = (
+        dict(getattr(snapshot, "metadata", {}) or {}) if snapshot is not None else {}
+    )
     review = context.get("review")
     project_id = _first_text(
         metadata.get("project_id"),
         getattr(review, "project_id", None),
         context.get("sample_project_id"),
-    ) or (existing_record.project_id if existing_record is not None else "atlas-project")
-    name = _first_text(
-        metadata.get("project_name"),
-        metadata.get("name"),
-        getattr(review, "name", None),
-        context.get("sample_project_name"),
-    ) or project_id
+    ) or (
+        existing_record.project_id if existing_record is not None else "atlas-project"
+    )
+    name = (
+        _first_text(
+            metadata.get("project_name"),
+            metadata.get("name"),
+            getattr(review, "name", None),
+            context.get("sample_project_name"),
+        )
+        or project_id
+    )
     client = _first_text(metadata.get("client"), metadata.get("owner"), name) or name
 
     project = Project(
@@ -246,16 +366,32 @@ def _build_record_from_context(
             snapshot_path = str(candidate)
 
     project_profile = {
-        "project_name": _first_text(metadata.get("project_name"), metadata.get("name"), project.name),
-        "project_number": _first_text(metadata.get("project_number"), metadata.get("project_id"), project.project_id),
-        "owner": _first_text(metadata.get("owner"), metadata.get("client"), project.client),
+        "project_name": _first_text(
+            metadata.get("project_name"), metadata.get("name"), project.name
+        ),
+        "project_number": _first_text(
+            metadata.get("project_number"),
+            metadata.get("project_id"),
+            project.project_id,
+        ),
+        "owner": _first_text(
+            metadata.get("owner"), metadata.get("client"), project.client
+        ),
         "architect": _first_text(metadata.get("architect")),
-        "av_consultant": _first_text(metadata.get("av_consultant"), metadata.get("consultant_av")),
-        "electrical_engineer": _first_text(metadata.get("electrical_engineer"), metadata.get("consultant_electrical")),
+        "av_consultant": _first_text(
+            metadata.get("av_consultant"), metadata.get("consultant_av")
+        ),
+        "electrical_engineer": _first_text(
+            metadata.get("electrical_engineer"), metadata.get("consultant_electrical")
+        ),
         "mep": _first_text(metadata.get("mep"), metadata.get("mep_consultant")),
-        "structural": _first_text(metadata.get("structural"), metadata.get("structural_engineer")),
+        "structural": _first_text(
+            metadata.get("structural"), metadata.get("structural_engineer")
+        ),
         "campus": _first_text(metadata.get("campus"), metadata.get("campus_name")),
-        "building": _first_text(metadata.get("building"), metadata.get("building_name")),
+        "building": _first_text(
+            metadata.get("building"), metadata.get("building_name")
+        ),
         "issue_date": _first_text(metadata.get("issue_date")),
         "bid_date": _first_text(metadata.get("bid_date"), project.bid_date),
         "revision": _first_text(metadata.get("revision"), metadata.get("revision_id")),
@@ -265,7 +401,11 @@ def _build_record_from_context(
     }
 
     return ProjectWorkspaceRecord(
-        workspace_id=existing_record.workspace_id if existing_record is not None else project.project_id,
+        workspace_id=(
+            existing_record.workspace_id
+            if existing_record is not None
+            else project.project_id
+        ),
         project=project,
         source_mode=str(context.get("data_source_mode") or "manual"),
         source_label=str(context.get("data_source_label") or "Manual Project"),
@@ -278,8 +418,14 @@ def _build_record_from_context(
         project_profile=project_profile,
         review_summary={
             "review_id": getattr(review, "review_id", None),
-            "readiness_score": getattr(getattr(review, "readiness", None), "readiness_score", None),
-            "readiness_level": getattr(getattr(getattr(review, "readiness", None), "readiness_level", None), "value", None),
+            "readiness_score": getattr(
+                getattr(review, "readiness", None), "readiness_score", None
+            ),
+            "readiness_level": getattr(
+                getattr(getattr(review, "readiness", None), "readiness_level", None),
+                "value",
+                None,
+            ),
             "issue_count": review.issue_count() if review is not None else 0,
             "equipment_count": review.equipment_count() if review is not None else 0,
             "rfi_count": review.rfi_candidate_count() if review is not None else 0,
@@ -314,7 +460,9 @@ def _render_top_actions(st: Any) -> None:
     cols[2].button("Recent Projects", on_click=_set_home_mode("recent"))
 
 
-def _render_new_project_form(st: Any, workspace_service: ProjectWorkspaceService) -> None:
+def _render_new_project_form(
+    st: Any, workspace_service: ProjectWorkspaceService
+) -> None:
     st.markdown("### New Project")
     with st.form("new_project_form", clear_on_submit=False):
         project_id = st.text_input(
@@ -400,10 +548,14 @@ def _open_workspace_from_path(
         st.rerun()
         return
 
-    st.error("Open a workspace.json file, an intake_snapshot.json file, or a project folder.")
+    st.error(
+        "Open a workspace.json file, an intake_snapshot.json file, or a project folder."
+    )
 
 
-def _render_open_project_form(st: Any, workspace_service: ProjectWorkspaceService) -> None:
+def _render_open_project_form(
+    st: Any, workspace_service: ProjectWorkspaceService
+) -> None:
     st.markdown("### Open Project")
     path_text = st.text_input(
         "Workspace file, snapshot file, or project folder",
@@ -415,11 +567,15 @@ def _render_open_project_form(st: Any, workspace_service: ProjectWorkspaceServic
         _open_workspace_from_path(st, workspace_service, path_text)
 
 
-def _render_recent_projects(st: Any, workspace_service: ProjectWorkspaceService) -> None:
+def _render_recent_projects(
+    st: Any, workspace_service: ProjectWorkspaceService
+) -> None:
     st.markdown("### Recent Projects")
     recent = workspace_service.list_recent_workspaces()
     if not recent:
-        _empty_state(st, "No saved workspaces yet. Create a project or open a package to begin.")
+        _empty_state(
+            st, "No saved workspaces yet. Create a project or open a package to begin."
+        )
         return
 
     for record in recent:
@@ -459,7 +615,9 @@ def _render_home(st: Any, workspace_service: ProjectWorkspaceService) -> None:
 
 def _render_upload_panel(st: Any, workspace_service: ProjectWorkspaceService) -> None:
     st.subheader("Project Files")
-    st.caption("Attach a local package or ZIP to create a workspace from deterministic intake.")
+    st.caption(
+        "Attach a local package or ZIP to create a workspace from deterministic intake."
+    )
     uploaded_files = st.file_uploader(
         "Project package files",
         type=[
@@ -491,7 +649,10 @@ def _render_upload_panel(st: Any, workspace_service: ProjectWorkspaceService) ->
             st.session_state["atlas_upload_signature"] = upload_signature
 
     if st.button("Run Atlas Intake", type="primary", disabled=not uploaded_files):
-        intake_files = [UploadedIntakeFile(name=file.name, data=file.getvalue()) for file in uploaded_files]
+        intake_files = [
+            UploadedIntakeFile(name=file.name, data=file.getvalue())
+            for file in uploaded_files
+        ]
         with st.spinner("Classifying files and running deterministic review..."):
             st.session_state["atlas_uploaded_context"] = build_uploaded_review_context(
                 uploaded_files=intake_files,
@@ -528,36 +689,57 @@ def _render_workspace_shell(
     selected_section = st.sidebar.radio("Workspace", WORKSPACE_SECTIONS, index=0)
 
     st.title("Atlas")
-    st.caption("Persistent project workspace for deterministic bid intelligence review.")
+    st.caption(
+        "Persistent project workspace for deterministic bid intelligence review."
+    )
     header_cols = st.columns(3)
     header_cols[0].metric("Workspace", record.workspace_id)
     header_cols[1].metric(
         "Readiness Score",
-        f"{getattr(readiness, 'readiness_score', None):.2f}"
-        if getattr(readiness, "readiness_score", None) is not None
-        else "n/a",
+        (
+            f"{getattr(readiness, 'readiness_score', None):.2f}"
+            if getattr(readiness, "readiness_score", None) is not None
+            else "n/a"
+        ),
     )
-    header_cols[2].metric("Review Issues", str(review.issue_count()) if review is not None else "n/a")
+    header_cols[2].metric(
+        "Review Issues", str(review.issue_count()) if review is not None else "n/a"
+    )
 
     st.markdown("### Project Metadata")
-    st.dataframe(_project_profile_rows(record, context), use_container_width=True, hide_index=True)
+    st.dataframe(
+        _project_profile_rows(record, context),
+        use_container_width=True,
+        hide_index=True,
+    )
 
     st.markdown("### Workspace Summary")
-    st.dataframe(_workspace_summary(record, context), use_container_width=True, hide_index=True)
+    st.dataframe(
+        _workspace_summary(record, context), use_container_width=True, hide_index=True
+    )
 
     if selected_section == "Overview":
         st.subheader("Project Overview")
         if review is None:
-            _empty_state(st, "Create a workspace or attach a project package to populate Atlas outputs.")
+            _empty_state(
+                st,
+                "Create a workspace or attach a project package to populate Atlas outputs.",
+            )
         else:
             overview_rows = [
                 {"field": "Drawing Count", "value": review.drawing_count()},
                 {"field": "Specification Count", "value": review.specification_count()},
                 {"field": "System Count", "value": len(review.systems)},
                 {"field": "Equipment Count", "value": review.equipment_count()},
-                {"field": "Cross Reference Count", "value": review.cross_reference_count()},
+                {
+                    "field": "Cross Reference Count",
+                    "value": review.cross_reference_count(),
+                },
                 {"field": "Scope Gap Count", "value": review.scope_gap_count()},
-                {"field": "Estimator Risk Count", "value": review.estimator_risk_count()},
+                {
+                    "field": "Estimator Risk Count",
+                    "value": review.estimator_risk_count(),
+                },
                 {"field": "Confidence", "value": review.confidence},
             ]
             st.dataframe(overview_rows, use_container_width=True, hide_index=True)
@@ -586,24 +768,69 @@ def _render_workspace_shell(
             if import_summary:
                 st.dataframe(
                     [
-                        {"metric": "total files", "value": import_summary.get("total_files", 0)},
-                        {"metric": "total pages", "value": import_summary.get("total_pages", 0)},
-                        {"metric": "pages with embedded text", "value": import_summary.get("pages_with_embedded_text", 0)},
-                        {"metric": "pages with OCR-derived text", "value": import_summary.get("pages_with_ocr_text", 0)},
-                        {"metric": "pages without embedded text", "value": import_summary.get("pages_without_embedded_text", 0)},
-                        {"metric": "documents requiring OCR", "value": import_summary.get("documents_requiring_ocr", 0)},
-                        {"metric": "drawing count", "value": import_summary.get("drawing_count", 0)},
-                        {"metric": "specification count", "value": import_summary.get("specification_count", 0)},
-                        {"metric": "schedule count", "value": import_summary.get("schedule_count", 0)},
-                        {"metric": "addenda count", "value": import_summary.get("addenda_count", 0)},
-                        {"metric": "image count", "value": import_summary.get("image_count", 0)},
-                        {"metric": "unsupported file count", "value": import_summary.get("unsupported_file_count", 0)},
+                        {
+                            "metric": "total files",
+                            "value": import_summary.get("total_files", 0),
+                        },
+                        {
+                            "metric": "total pages",
+                            "value": import_summary.get("total_pages", 0),
+                        },
+                        {
+                            "metric": "pages with embedded text",
+                            "value": import_summary.get("pages_with_embedded_text", 0),
+                        },
+                        {
+                            "metric": "pages with OCR-derived text",
+                            "value": import_summary.get("pages_with_ocr_text", 0),
+                        },
+                        {
+                            "metric": "pages without embedded text",
+                            "value": import_summary.get(
+                                "pages_without_embedded_text", 0
+                            ),
+                        },
+                        {
+                            "metric": "documents requiring OCR",
+                            "value": import_summary.get("documents_requiring_ocr", 0),
+                        },
+                        {
+                            "metric": "drawing count",
+                            "value": import_summary.get("drawing_count", 0),
+                        },
+                        {
+                            "metric": "specification count",
+                            "value": import_summary.get("specification_count", 0),
+                        },
+                        {
+                            "metric": "schedule count",
+                            "value": import_summary.get("schedule_count", 0),
+                        },
+                        {
+                            "metric": "addenda count",
+                            "value": import_summary.get("addenda_count", 0),
+                        },
+                        {
+                            "metric": "image count",
+                            "value": import_summary.get("image_count", 0),
+                        },
+                        {
+                            "metric": "unsupported file count",
+                            "value": import_summary.get("unsupported_file_count", 0),
+                        },
                     ],
                     use_container_width=True,
                     hide_index=True,
                 )
 
-            discovered_files = list((context.get("intake_snapshot").discovered_files if context.get("intake_snapshot") is not None else {}).items())
+            intake_snapshot = context.get("intake_snapshot")
+            discovered_files = list(
+                (
+                    intake_snapshot.discovered_files
+                    if intake_snapshot is not None
+                    else {}
+                ).items()
+            )
             if discovered_files:
                 st.markdown("Discovered Files")
                 st.dataframe(
@@ -686,7 +913,11 @@ def _render_workspace_shell(
 
     elif selected_section == "RFI Candidates":
         st.subheader("RFI Candidates")
-        candidates = _to_rows(list(getattr(review, "rfi_candidates", []) or [])) if review is not None else []
+        candidates = (
+            _to_rows(list(getattr(review, "rfi_candidates", []) or []))
+            if review is not None
+            else []
+        )
         if candidates:
             st.dataframe(candidates, use_container_width=True, hide_index=True)
         else:
@@ -699,10 +930,22 @@ def _render_workspace_shell(
         else:
             st.dataframe(
                 [
-                    {"field": "Total Labor Hours Low", "value": getattr(labor, "total_labor_hours_low", None)},
-                    {"field": "Total Labor Hours Expected", "value": getattr(labor, "total_labor_hours_expected", None)},
-                    {"field": "Total Labor Hours High", "value": getattr(labor, "total_labor_hours_high", None)},
-                    {"field": "Confidence", "value": getattr(labor, "confidence", None)},
+                    {
+                        "field": "Total Labor Hours Low",
+                        "value": getattr(labor, "total_labor_hours_low", None),
+                    },
+                    {
+                        "field": "Total Labor Hours Expected",
+                        "value": getattr(labor, "total_labor_hours_expected", None),
+                    },
+                    {
+                        "field": "Total Labor Hours High",
+                        "value": getattr(labor, "total_labor_hours_high", None),
+                    },
+                    {
+                        "field": "Confidence",
+                        "value": getattr(labor, "confidence", None),
+                    },
                 ],
                 use_container_width=True,
                 hide_index=True,
@@ -719,13 +962,22 @@ def _render_workspace_shell(
         else:
             st.dataframe(
                 [
-                    {"field": "Baseline Revision ID", "value": revision.baseline_revision_id},
-                    {"field": "Comparison Revision ID", "value": revision.comparison_revision_id},
+                    {
+                        "field": "Baseline Revision ID",
+                        "value": revision.baseline_revision_id,
+                    },
+                    {
+                        "field": "Comparison Revision ID",
+                        "value": revision.comparison_revision_id,
+                    },
                     {"field": "Change Count", "value": len(revision.changes)},
                     {"field": "Added Items", "value": len(revision.added_items)},
                     {"field": "Removed Items", "value": len(revision.removed_items)},
                     {"field": "Modified Items", "value": len(revision.modified_items)},
-                    {"field": "Labor Impact Flags", "value": len(revision.labor_impact_flags)},
+                    {
+                        "field": "Labor Impact Flags",
+                        "value": len(revision.labor_impact_flags),
+                    },
                     {"field": "RFI Impacts", "value": len(revision.rfi_impacts)},
                     {"field": "Confidence", "value": revision.confidence},
                 ],
@@ -739,7 +991,11 @@ def _render_workspace_shell(
 
     elif selected_section == "Engineering Assumptions":
         st.subheader("Engineering Assumptions")
-        assumptions = _to_rows(list(getattr(review, "engineering_assumptions", []) or [])) if review is not None else []
+        assumptions = (
+            _to_rows(list(getattr(review, "engineering_assumptions", []) or []))
+            if review is not None
+            else []
+        )
         if assumptions:
             st.dataframe(assumptions, use_container_width=True, hide_index=True)
         else:
@@ -747,7 +1003,9 @@ def _render_workspace_shell(
 
     elif selected_section == "Evidence":
         st.subheader("Evidence")
-        brief_refs = list(getattr(brief, "evidence_refs", []) or []) if brief is not None else []
+        brief_refs = (
+            list(getattr(brief, "evidence_refs", []) or []) if brief is not None else []
+        )
         if brief_refs:
             st.markdown("Brief Evidence")
             st.dataframe(brief_refs, use_container_width=True, hide_index=True)
@@ -755,12 +1013,21 @@ def _render_workspace_shell(
             _empty_state(st, "No estimator brief evidence references available.")
 
         if context is not None:
-            source_refs = _to_rows(list(getattr(context.get("intake_snapshot"), "source_references", []) or []))
+            source_refs = _to_rows(
+                list(
+                    getattr(context.get("intake_snapshot"), "source_references", [])
+                    or []
+                )
+            )
             if source_refs:
                 st.markdown("Intake Source References")
                 st.dataframe(source_refs, use_container_width=True, hide_index=True)
 
-        readiness_refs = _to_rows(list(getattr(readiness, "evidence_refs", []) or [])) if readiness is not None else []
+        readiness_refs = (
+            _to_rows(list(getattr(readiness, "evidence_refs", []) or []))
+            if readiness is not None
+            else []
+        )
         if readiness_refs:
             st.markdown("Readiness Evidence")
             st.dataframe(readiness_refs, use_container_width=True, hide_index=True)
@@ -775,7 +1042,10 @@ def main() -> None:
     active_workspace_id = st.session_state.get("atlas_active_workspace_id")
 
     if active_workspace_id:
-        recent = {record.workspace_id: record for record in workspace_service.list_recent_workspaces(limit=200)}
+        recent = {
+            record.workspace_id: record
+            for record in workspace_service.list_recent_workspaces(limit=200)
+        }
         record = recent.get(active_workspace_id)
         if record is None:
             st.session_state["atlas_active_workspace_id"] = None
