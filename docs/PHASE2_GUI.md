@@ -9,7 +9,7 @@ This interface is local-only:
 - Local file-backed workspace persistence under `outputs/project_workspaces/`.
 - No procurement/RFQ/submittal/invoice/execution/closeout/vendor communication workflows.
 
-Atlas Workspace v1 (Sprint 5) launches into a persistent application shell.
+Atlas Workspace v1 (Sprint 6) launches into a persistent interactive engineering shell.
 
 Shell layout:
 - Header
@@ -23,7 +23,7 @@ The shell remains visible while page content changes.
 Header includes:
 - Atlas logo/title
 - Project selector
-- Global Search placeholder
+- Global Search (project-wide object search)
 - Notifications placeholder
 - Settings
 - User/profile placeholder
@@ -211,6 +211,148 @@ Executive Summary consolidates:
 - scope gaps
 - documents requiring OCR
 - recommended next actions
+
+## Interactive Engineering Review (Sprint 6)
+Sprint 6 transforms the workspace from report viewing into object exploration.
+
+First-class engineering objects:
+- Drawings
+- Specifications
+- Equipment
+- Systems
+- RFIs
+- Evidence
+
+Object workspaces now expose properties plus linked relationships so users can traverse engineering context without leaving Atlas.
+
+## Drawing Workspace
+Drawing objects display:
+- drawing number
+- title
+- revision
+- issue date
+- discipline
+- referenced equipment
+- referenced specifications
+- referenced systems
+- referenced RFIs
+- referenced evidence
+- extraction quality
+- OCR status
+- warnings
+
+If a source PDF path is available, the Drawing Workspace shows preview metadata and source path; otherwise a preview placeholder is shown.
+
+## Specification Workspace
+Specification objects display:
+- division
+- section
+- title
+- referenced drawings
+- referenced equipment
+- referenced systems
+- referenced RFIs
+- referenced evidence
+- cross references
+- extraction confidence
+
+## Equipment Browser
+Equipment Browser supports:
+- search
+- sorting
+- filtering
+- grouping
+
+Equipment attributes include:
+- manufacturer
+- model
+- description
+- system
+- room
+- drawing references
+- specification references
+- current status
+- confidence
+- potential RFIs
+
+Grouping options:
+- System
+- Manufacturer
+- Room
+- Discipline
+
+## Systems Workspace
+Systems Workspace includes:
+- Audio
+- Video
+- Control
+- Network
+- Projection
+- Lighting
+- Assistive Listening
+- Intercom
+- Paging
+
+Per-system metrics:
+- equipment count
+- drawing count
+- specification count
+- RFI count
+- readiness
+- labor
+- confidence
+
+## Evidence Workspace
+Evidence is grouped by:
+- Drawings
+- Specifications
+- Schedules
+- Images
+- Notes
+- Addenda
+
+Each evidence row displays:
+- source file
+- page
+- sheet
+- confidence
+- referenced objects or excerpt
+
+## Object Navigation
+Atlas object navigation supports relationship-driven traversal.
+
+Examples:
+- equipment → drawings/specifications/systems/RFIs
+- specification → drawings/equipment/systems/evidence
+- drawing → equipment/specifications/systems/evidence/RFIs
+
+Context panel quick navigation allows one-click movement between related workspaces.
+
+## Relationship Browsing
+Context panel now shows:
+- properties
+- relationships
+- evidence
+- warnings
+- related objects
+- quick navigation
+
+This allows Atlas to behave like a practical project knowledge graph while preserving deterministic Phase 2 review outputs.
+
+## Global Search
+Global project search now indexes:
+- drawings
+- specifications
+- equipment
+- systems
+- rooms
+- manufacturers
+- models
+- RFIs
+- evidence
+
+Search results include object type and subtitle metadata.
+Results can be navigated with keyboard arrows via selector controls and opened directly into the corresponding workspace.
 
 ## Project Files Explorer
 Project Files includes folder-based exploration:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 import hashlib
 from pathlib import Path
@@ -163,6 +164,28 @@ def _inject_styles(st: Any) -> None:
             margin-right: 4px;
             margin-top: 2px;
         }
+        .atlas-object-card {
+            border: 1px solid #dbe3ee;
+            border-radius: 12px;
+            padding: 0.55rem 0.7rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            transition: all 120ms ease-in-out;
+        }
+        .atlas-object-card:hover {
+            border-color: #93c5fd;
+            box-shadow: 0 2px 10px rgba(37, 99, 235, 0.12);
+        }
+        .atlas-object-header {
+            font-size: 0.82rem;
+            color: #334155;
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+        }
+        .atlas-loading {
+            color: #1d4ed8;
+            font-size: 0.8rem;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -254,6 +277,9 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_uploaded_context", None)
     st.session_state.setdefault("atlas_context_selection", {"kind": "project"})
     st.session_state.setdefault("atlas_file_search", "")
+    st.session_state.setdefault("atlas_global_search", "")
+    st.session_state.setdefault("atlas_global_search_index", 0)
+    st.session_state.setdefault("atlas_equipment_search", "")
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -494,7 +520,11 @@ def _render_header(
     cols[1].selectbox(
         "Layout", ["Desktop", "Tablet", "Mobile"], key="atlas_layout_mode"
     )
-    cols[2].text_input("Global Search", value="", placeholder="Search (placeholder)")
+    cols[2].text_input(
+        "Global Search",
+        key="atlas_global_search",
+        placeholder="Search drawings, specs, equipment, systems, RFIs, evidence",
+    )
     cols[3].button("Alerts", disabled=True, use_container_width=True)
     cols[4].button("Settings", use_container_width=True)
     cols[5].selectbox("Profile", ["User"], index=0)
@@ -1080,6 +1110,520 @@ def _files_by_folder(context: dict[str, Any] | None) -> dict[str, list[dict[str,
     return folder_map
 
 
+def _split_refs(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value).replace("|", ",").replace(";", ",")
+    return [item.strip() for item in text.split(",") if item.strip()]
+
+
+def _evidence_group_for_file(source_file: str) -> str:
+    suffix = Path(source_file).suffix.lower()
+    if suffix in {".dwg", ".pdf"}:
+        lower = source_file.lower()
+        if "spec" in lower:
+            return "Specifications"
+        if "schedule" in lower:
+            return "Schedules"
+        if "addenda" in lower:
+            return "Addenda"
+        return "Drawings"
+    if suffix in {".jpg", ".jpeg", ".png", ".tif", ".tiff"}:
+        return "Images"
+    if suffix in {".txt", ".rtf", ".doc", ".docx"}:
+        return "Notes"
+    return "Addenda"
+
+
+def _in_text(haystack: Any, needle: str) -> bool:
+    return needle.lower() in str(haystack or "").lower()
+
+
+def _contains_any(haystack: Any, values: list[str]) -> bool:
+    hay = str(haystack or "").lower()
+    return any(value.lower() in hay for value in values if value)
+
+
+def _workspace_objects(
+    context: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if context is None:
+        return {
+            "drawings": [],
+            "specifications": [],
+            "equipment": [],
+            "systems": [],
+            "rfis": [],
+            "evidence": [],
+            "rooms": [],
+            "manufacturers": [],
+            "models": [],
+        }
+
+    review = context.get("review")
+    snapshot = context.get("intake_snapshot")
+    readiness = getattr(review, "readiness", None) if review is not None else None
+    labor = getattr(review, "labor_estimate", None) if review is not None else None
+
+    drawing_rows = _to_rows(list(getattr(review, "drawing_sheets", []) or []))
+    spec_rows = _to_rows(list(getattr(review, "specification_sections", []) or []))
+    equipment_rows = _to_rows(list(getattr(review, "equipment", []) or []))
+    rfi_rows = _to_rows(list(getattr(review, "rfi_candidates", []) or []))
+    source_refs = _to_rows(list(getattr(snapshot, "source_references", []) or []))
+
+    evidence_rows = [
+        {
+            "source_file": _safe_text(item.get("source_file"), "Unknown"),
+            "page": item.get("page", item.get("page_number", "n/a")),
+            "sheet": _safe_text(item.get("sheet_number"), "n/a"),
+            "confidence": item.get("confidence", "n/a"),
+            "text_excerpt": _safe_text(item.get("excerpt"), "n/a"),
+            "group": _evidence_group_for_file(_safe_text(item.get("source_file"), "")),
+        }
+        for item in source_refs
+    ]
+
+    drawing_ids = [
+        _safe_text(item.get("sheet_number"), _safe_text(item.get("source_file"), ""))
+        for item in drawing_rows
+    ]
+    spec_ids = [
+        _safe_text(item.get("section_number"), _safe_text(item.get("source_file"), ""))
+        for item in spec_rows
+    ]
+    system_ids = [
+        _safe_text(item.get("system_id"), _safe_text(item.get("name"), ""))
+        for item in _to_rows(list(getattr(review, "systems", []) or []))
+    ]
+
+    drawings: list[dict[str, Any]] = []
+    for item in drawing_rows:
+        drawing_number = _safe_text(
+            item.get("sheet_number"), _safe_text(item.get("drawing_number"), "Unknown")
+        )
+        title = _safe_text(item.get("title"), "Untitled Drawing")
+        source_file = _safe_text(item.get("source_file"), "")
+        ref_equipment = [
+            eq
+            for eq in equipment_rows
+            if _contains_any(
+                eq.get("drawing_reference"), [drawing_number, source_file, title]
+            )
+        ]
+        ref_specs = [
+            spec
+            for spec in spec_rows
+            if _contains_any(
+                spec.get("drawing_reference"), [drawing_number, source_file, title]
+            )
+            or _contains_any(spec.get("source_file"), [drawing_number])
+        ]
+        ref_systems = sorted(
+            {
+                _safe_text(eq.get("system_id"), "Unknown")
+                for eq in ref_equipment
+                if _safe_text(eq.get("system_id"), "")
+            }
+        )
+        ref_rfis = [
+            rfi
+            for rfi in rfi_rows
+            if _contains_any(
+                str(rfi),
+                [drawing_number, source_file, title],
+            )
+        ]
+        ref_evidence = [
+            evidence
+            for evidence in evidence_rows
+            if _contains_any(evidence.get("source_file"), [source_file, drawing_number])
+        ]
+        warnings = _split_refs(item.get("warnings"))
+        drawings.append(
+            {
+                "drawing_number": drawing_number,
+                "title": title,
+                "revision": _safe_text(item.get("revision"), "n/a"),
+                "issue_date": _safe_text(item.get("issue_date"), "n/a"),
+                "discipline": _safe_text(item.get("discipline"), "General"),
+                "source_file": source_file,
+                "referenced_equipment": [
+                    _safe_text(
+                        eq.get("equipment_id"),
+                        _safe_text(eq.get("description"), "equipment"),
+                    )
+                    for eq in ref_equipment
+                ],
+                "referenced_specifications": [
+                    _safe_text(
+                        spec.get("section_number"),
+                        _safe_text(spec.get("source_file"), "spec"),
+                    )
+                    for spec in ref_specs
+                ],
+                "referenced_systems": ref_systems,
+                "referenced_rfis": [
+                    _safe_text(rfi.get("rfi_id"), _safe_text(rfi.get("title"), "rfi"))
+                    for rfi in ref_rfis
+                ],
+                "referenced_evidence": [
+                    f"{_safe_text(evidence.get('source_file'), 'file')} p.{evidence.get('page', 'n/a')}"
+                    for evidence in ref_evidence
+                ],
+                "extraction_quality": _safe_text(item.get("confidence"), "n/a"),
+                "ocr_status": _safe_text(item.get("ocr_status"), "unknown"),
+                "warnings": warnings,
+            }
+        )
+
+    specifications: list[dict[str, Any]] = []
+    for item in spec_rows:
+        section = _safe_text(item.get("section_number"), "Unknown")
+        title = _safe_text(item.get("title"), "Untitled Section")
+        source_file = _safe_text(item.get("source_file"), "")
+        ref_drawings = [
+            drawing
+            for drawing in drawings
+            if _contains_any(
+                item.get("drawing_reference"),
+                [drawing.get("drawing_number", ""), drawing.get("source_file", "")],
+            )
+            or _contains_any(source_file, [drawing.get("drawing_number", "")])
+        ]
+        ref_equipment = [
+            eq
+            for eq in equipment_rows
+            if _contains_any(
+                eq.get("specification_reference"),
+                [section, title, source_file],
+            )
+        ]
+        ref_systems = sorted(
+            {
+                _safe_text(eq.get("system_id"), "Unknown")
+                for eq in ref_equipment
+                if _safe_text(eq.get("system_id"), "")
+            }
+        )
+        ref_rfis = [
+            rfi
+            for rfi in rfi_rows
+            if _contains_any(str(rfi), [section, title, source_file])
+        ]
+        ref_evidence = [
+            evidence
+            for evidence in evidence_rows
+            if _contains_any(evidence.get("source_file"), [source_file, section])
+        ]
+
+        cross_refs = _split_refs(item.get("cross_references"))
+        if not cross_refs:
+            cross_refs = [
+                _safe_text(ref.get("section_number"), "")
+                for ref in ref_drawings
+                if _safe_text(ref.get("section_number"), "")
+            ]
+
+        specifications.append(
+            {
+                "division": _safe_text(item.get("division"), "n/a"),
+                "section": section,
+                "title": title,
+                "source_file": source_file,
+                "referenced_drawings": [
+                    _safe_text(drawing.get("drawing_number"), "drawing")
+                    for drawing in ref_drawings
+                ],
+                "referenced_equipment": [
+                    _safe_text(eq.get("equipment_id"), "equipment")
+                    for eq in ref_equipment
+                ],
+                "referenced_systems": ref_systems,
+                "referenced_rfis": [
+                    _safe_text(rfi.get("rfi_id"), _safe_text(rfi.get("title"), "rfi"))
+                    for rfi in ref_rfis
+                ],
+                "referenced_evidence": [
+                    f"{_safe_text(evidence.get('source_file'), 'file')} p.{evidence.get('page', 'n/a')}"
+                    for evidence in ref_evidence
+                ],
+                "cross_references": [item for item in cross_refs if item],
+                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+            }
+        )
+
+    equipment: list[dict[str, Any]] = []
+    for item in equipment_rows:
+        drawing_refs = _split_refs(item.get("drawing_reference"))
+        spec_refs = _split_refs(item.get("specification_reference"))
+        equipment_id = _safe_text(item.get("equipment_id"), "Unknown")
+        potential_rfis = [
+            rfi
+            for rfi in rfi_rows
+            if _contains_any(
+                str(rfi), [equipment_id, _safe_text(item.get("model"), "")]
+            )
+        ]
+
+        equipment.append(
+            {
+                "equipment_id": equipment_id,
+                "manufacturer": _safe_text(item.get("manufacturer"), "Unknown"),
+                "model": _safe_text(item.get("model"), "Unknown"),
+                "description": _safe_text(item.get("description"), "n/a"),
+                "system": _safe_text(item.get("system_id"), "Unknown"),
+                "room": _safe_text(
+                    _first_text(
+                        item.get("room"), item.get("room_id"), item.get("space")
+                    ),
+                    "Unknown",
+                ),
+                "discipline": _safe_text(item.get("discipline"), "General"),
+                "drawing_references": drawing_refs,
+                "specification_references": spec_refs,
+                "current_status": _safe_text(item.get("status"), "Needs Review"),
+                "confidence": _safe_text(item.get("confidence"), "n/a"),
+                "potential_rfis": [
+                    _safe_text(rfi.get("rfi_id"), _safe_text(rfi.get("title"), "rfi"))
+                    for rfi in potential_rfis
+                ],
+            }
+        )
+
+    system_map: dict[str, dict[str, Any]] = {}
+    known_systems = [
+        "Audio",
+        "Video",
+        "Control",
+        "Network",
+        "Projection",
+        "Lighting",
+        "Assistive Listening",
+        "Intercom",
+        "Paging",
+    ]
+    for name in known_systems + system_ids:
+        key = _safe_text(name, "Unknown")
+        if key not in system_map:
+            system_map[key] = {
+                "system": key,
+                "equipment_count": 0,
+                "drawing_count": 0,
+                "specification_count": 0,
+                "rfi_count": 0,
+                "readiness": _safe_text(
+                    getattr(getattr(readiness, "readiness_level", None), "value", None),
+                    "n/a",
+                ).title(),
+                "labor": _safe_text(
+                    getattr(labor, "total_labor_hours_expected", None), "n/a"
+                ),
+                "confidence": _safe_text(getattr(review, "confidence", None), "n/a"),
+            }
+
+    for item in equipment:
+        key = item["system"]
+        system_map.setdefault(
+            key,
+            {
+                "system": key,
+                "equipment_count": 0,
+                "drawing_count": 0,
+                "specification_count": 0,
+                "rfi_count": 0,
+                "readiness": "n/a",
+                "labor": "n/a",
+                "confidence": "n/a",
+            },
+        )
+        system_map[key]["equipment_count"] += 1
+        system_map[key]["drawing_count"] += len(item["drawing_references"])
+        system_map[key]["specification_count"] += len(item["specification_references"])
+        system_map[key]["rfi_count"] += len(item["potential_rfis"])
+
+    systems = [value for value in system_map.values()]
+
+    rooms = sorted({item["room"] for item in equipment if item["room"]})
+    manufacturers = sorted(
+        {item["manufacturer"] for item in equipment if item["manufacturer"]}
+    )
+    models = sorted({item["model"] for item in equipment if item["model"]})
+
+    return {
+        "drawings": drawings,
+        "specifications": specifications,
+        "equipment": equipment,
+        "systems": systems,
+        "rfis": rfi_rows,
+        "evidence": evidence_rows,
+        "rooms": [{"room": item} for item in rooms],
+        "manufacturers": [{"manufacturer": item} for item in manufacturers],
+        "models": [{"model": item} for item in models],
+        "drawing_ids": drawing_ids,
+        "spec_ids": spec_ids,
+    }
+
+
+def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    objects = _workspace_objects(context)
+    entries: list[dict[str, Any]] = []
+
+    for item in objects["drawings"]:
+        entries.append(
+            {
+                "kind": "Drawing",
+                "name": _safe_text(item.get("drawing_number"), "Drawing"),
+                "subtitle": _safe_text(item.get("title"), ""),
+                "page": "Drawings",
+                "selection_kind": "drawing",
+                "data": item,
+            }
+        )
+    for item in objects["specifications"]:
+        entries.append(
+            {
+                "kind": "Specification",
+                "name": _safe_text(item.get("section"), "Specification"),
+                "subtitle": _safe_text(item.get("title"), ""),
+                "page": "Specifications",
+                "selection_kind": "specification",
+                "data": item,
+            }
+        )
+    for item in objects["equipment"]:
+        entries.append(
+            {
+                "kind": "Equipment",
+                "name": _safe_text(item.get("equipment_id"), "Equipment"),
+                "subtitle": f"{_safe_text(item.get('manufacturer'), '')} {_safe_text(item.get('model'), '')}".strip(),
+                "page": "Equipment",
+                "selection_kind": "equipment",
+                "data": item,
+            }
+        )
+    for item in objects["systems"]:
+        entries.append(
+            {
+                "kind": "System",
+                "name": _safe_text(item.get("system"), "System"),
+                "subtitle": f"equipment {item.get('equipment_count', 0)}",
+                "page": "Systems",
+                "selection_kind": "system",
+                "data": item,
+            }
+        )
+    for item in objects["rooms"]:
+        entries.append(
+            {
+                "kind": "Room",
+                "name": _safe_text(item.get("room"), "Room"),
+                "subtitle": "equipment location",
+                "page": "Equipment",
+                "selection_kind": "room",
+                "data": item,
+            }
+        )
+    for item in objects["manufacturers"]:
+        entries.append(
+            {
+                "kind": "Manufacturer",
+                "name": _safe_text(item.get("manufacturer"), "Manufacturer"),
+                "subtitle": "equipment manufacturer",
+                "page": "Equipment",
+                "selection_kind": "manufacturer",
+                "data": item,
+            }
+        )
+    for item in objects["models"]:
+        entries.append(
+            {
+                "kind": "Model",
+                "name": _safe_text(item.get("model"), "Model"),
+                "subtitle": "equipment model",
+                "page": "Equipment",
+                "selection_kind": "model",
+                "data": item,
+            }
+        )
+    for item in objects["rfis"]:
+        entries.append(
+            {
+                "kind": "RFI",
+                "name": _safe_text(
+                    item.get("rfi_id"), _safe_text(item.get("title"), "RFI")
+                ),
+                "subtitle": _safe_text(item.get("title"), ""),
+                "page": "RFI Candidates",
+                "selection_kind": "rfi",
+                "data": item,
+            }
+        )
+    for item in objects["evidence"]:
+        entries.append(
+            {
+                "kind": "Evidence",
+                "name": _safe_text(item.get("source_file"), "Evidence"),
+                "subtitle": f"page {item.get('page', 'n/a')}",
+                "page": "Evidence",
+                "selection_kind": "evidence",
+                "data": item,
+            }
+        )
+
+    return entries
+
+
+def _render_global_search_panel(st: Any, context: dict[str, Any] | None) -> None:
+    query = str(st.session_state.get("atlas_global_search") or "").strip()
+    if not query:
+        return
+
+    entries = _global_search_entries(context)
+    filtered = [
+        item
+        for item in entries
+        if _in_text(item.get("name"), query)
+        or _in_text(item.get("subtitle"), query)
+        or _in_text(item.get("kind"), query)
+    ]
+
+    with st.expander(f"Global Search Results ({len(filtered)})", expanded=True):
+        st.caption(
+            "Use arrow keys in the result selector for keyboard navigation, then press Enter."
+        )
+        if not filtered:
+            st.info("No objects match the current project search.")
+            return
+
+        labels = [
+            f"{item['kind']}: {item['name']}  |  {item['subtitle']}"
+            for item in filtered
+        ]
+        selected_label = st.selectbox(
+            "Results", options=labels, key="atlas_search_result"
+        )
+        selected = filtered[labels.index(selected_label)]
+
+        st.markdown(
+            "<div class='atlas-object-card'>"
+            f"<div class='atlas-object-header'>Selected Result: {selected['kind']}</div>"
+            f"{selected['name']}<br/><span class='atlas-muted'>{selected['subtitle']}</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        if st.button("Open Result", key="atlas_open_search_result", type="primary"):
+            st.session_state["atlas_active_page"] = selected["page"]
+            _set_context_selection(
+                st,
+                str(selected.get("selection_kind") or "project"),
+                dict(selected.get("data") or {}),
+            )
+            st.rerun()
+
+
 def _render_upload_panel(st: Any, workspace_service: ProjectWorkspaceService) -> None:
     uploaded_files = st.file_uploader(
         "Upload package files",
@@ -1174,112 +1718,361 @@ def _render_project_files_page(
 
 
 def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
-    st.subheader("Drawings")
-    if context is None:
-        st.info("No drawing context available.")
+    st.subheader("Drawing Workspace")
+    objects = _workspace_objects(context)
+    rows = list(objects.get("drawings", []))
+    if not rows:
+        st.info("No drawing objects available.")
         return
 
-    review = context.get("review")
-    rows = _to_rows(list(getattr(review, "drawing_sheets", []) or []))
-    if rows:
-        st.dataframe(rows, use_container_width=True, hide_index=True)
-        labels = [
-            _safe_text(
-                item.get("sheet_number"), _safe_text(item.get("source_file"), "Drawing")
-            )
-            for item in rows
-        ]
-        selected = st.selectbox("Select Drawing", options=labels)
-        _set_context_selection(st, "drawing", rows[labels.index(selected)])
-        return
+    st.caption("Each drawing is a first-class object with relationship links.")
+    summary_rows = [
+        {
+            "drawing number": item["drawing_number"],
+            "title": item["title"],
+            "revision": item["revision"],
+            "issue date": item["issue_date"],
+            "discipline": item["discipline"],
+            "equipment": len(item["referenced_equipment"]),
+            "specifications": len(item["referenced_specifications"]),
+            "systems": len(item["referenced_systems"]),
+            "rfis": len(item["referenced_rfis"]),
+            "evidence": len(item["referenced_evidence"]),
+            "extraction quality": item["extraction_quality"],
+            "ocr status": item["ocr_status"],
+            "warnings": len(item["warnings"]),
+        }
+        for item in rows
+    ]
+    st.dataframe(summary_rows, use_container_width=True, hide_index=True)
 
-    discovered = list(
-        (getattr(context.get("intake_snapshot"), "discovered_files", {}) or {}).get(
-            "drawings", []
-        )
-    )
-    if discovered:
+    labels = [f"{item['drawing_number']} · {item['title']}" for item in rows]
+    selected_label = st.selectbox("Select Drawing Object", options=labels)
+    selected = rows[labels.index(selected_label)]
+    _set_context_selection(st, "drawing", selected)
+
+    detail_col, nav_col = st.columns([2.6, 1.4])
+    with detail_col:
+        st.markdown("#### Drawing Detail")
         st.dataframe(
-            [{"drawing_file": item} for item in discovered],
+            [
+                {"property": "Drawing Number", "value": selected["drawing_number"]},
+                {"property": "Title", "value": selected["title"]},
+                {"property": "Revision", "value": selected["revision"]},
+                {"property": "Issue Date", "value": selected["issue_date"]},
+                {"property": "Discipline", "value": selected["discipline"]},
+                {"property": "OCR Status", "value": selected["ocr_status"]},
+                {
+                    "property": "Extraction Quality",
+                    "value": selected["extraction_quality"],
+                },
+            ],
             use_container_width=True,
             hide_index=True,
         )
-        selected = st.selectbox("Select Drawing File", options=discovered)
-        _set_context_selection(st, "drawing", {"source_file": selected})
-    else:
-        st.info("No drawings discovered.")
+
+        st.markdown("Referenced Objects")
+        st.dataframe(
+            [
+                {
+                    "relationship": "Equipment",
+                    "objects": ", ".join(selected["referenced_equipment"]) or "n/a",
+                },
+                {
+                    "relationship": "Specifications",
+                    "objects": ", ".join(selected["referenced_specifications"])
+                    or "n/a",
+                },
+                {
+                    "relationship": "Systems",
+                    "objects": ", ".join(selected["referenced_systems"]) or "n/a",
+                },
+                {
+                    "relationship": "RFIs",
+                    "objects": ", ".join(selected["referenced_rfis"]) or "n/a",
+                },
+                {
+                    "relationship": "Evidence",
+                    "objects": ", ".join(selected["referenced_evidence"]) or "n/a",
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        source_file = _safe_text(selected.get("source_file"), "")
+        if source_file.lower().endswith(".pdf"):
+            st.markdown("#### PDF Preview")
+            st.caption(
+                "Embedded preview available when the source PDF is available locally."
+            )
+            st.code(source_file)
+        else:
+            st.markdown("#### Preview")
+            st.info(
+                "Preview placeholder: drawing metadata available, source preview not embedded."
+            )
+
+    with nav_col:
+        st.markdown("#### Quick Navigation")
+        if st.button("Open Equipment", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Equipment"
+            st.rerun()
+        if st.button("Open Specifications", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Specifications"
+            st.rerun()
+        if st.button("Open Systems", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Systems"
+            st.rerun()
+        if st.button("Open Evidence", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Evidence"
+            st.rerun()
 
 
 def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None:
-    st.subheader("Specifications")
-    if context is None:
-        st.info("No specification context available.")
+    st.subheader("Specification Workspace")
+    objects = _workspace_objects(context)
+    rows = list(objects.get("specifications", []))
+    if not rows:
+        st.info("No specification objects available.")
         return
 
-    review = context.get("review")
-    rows = _to_rows(list(getattr(review, "specification_sections", []) or []))
-    if rows:
-        st.dataframe(rows, use_container_width=True, hide_index=True)
-        labels = [
-            _safe_text(
-                item.get("section_number"),
-                _safe_text(item.get("source_file"), "Specification"),
-            )
-            for item in rows
-        ]
-        selected = st.selectbox("Select Specification", options=labels)
-        _set_context_selection(st, "specification", rows[labels.index(selected)])
-        return
-
-    discovered = list(
-        (getattr(context.get("intake_snapshot"), "discovered_files", {}) or {}).get(
-            "specifications", []
-        )
+    st.caption(
+        "Each specification section is a first-class object with linked relationships."
     )
-    if discovered:
-        st.dataframe(
-            [{"specification_file": item} for item in discovered],
-            use_container_width=True,
-            hide_index=True,
-        )
-        selected = st.selectbox("Select Specification File", options=discovered)
-        _set_context_selection(st, "specification", {"source_file": selected})
-    else:
-        st.info("No specifications discovered.")
+    st.dataframe(
+        [
+            {
+                "division": item["division"],
+                "section": item["section"],
+                "title": item["title"],
+                "drawings": len(item["referenced_drawings"]),
+                "equipment": len(item["referenced_equipment"]),
+                "systems": len(item["referenced_systems"]),
+                "rfis": len(item["referenced_rfis"]),
+                "evidence": len(item["referenced_evidence"]),
+                "cross refs": len(item["cross_references"]),
+                "extraction confidence": item["extraction_confidence"],
+            }
+            for item in rows
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    labels = [f"{item['section']} · {item['title']}" for item in rows]
+    selected_label = st.selectbox("Select Specification Object", options=labels)
+    selected = rows[labels.index(selected_label)]
+    _set_context_selection(st, "specification", selected)
+
+    st.markdown("#### Specification Detail")
+    st.dataframe(
+        [
+            {"property": "Division", "value": selected["division"]},
+            {"property": "Section", "value": selected["section"]},
+            {"property": "Title", "value": selected["title"]},
+            {
+                "property": "Cross References",
+                "value": ", ".join(selected["cross_references"]) or "n/a",
+            },
+            {
+                "property": "Extraction Confidence",
+                "value": selected["extraction_confidence"],
+            },
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("Relationships")
+    st.dataframe(
+        [
+            {
+                "relationship": "Drawings",
+                "objects": ", ".join(selected["referenced_drawings"]) or "n/a",
+            },
+            {
+                "relationship": "Equipment",
+                "objects": ", ".join(selected["referenced_equipment"]) or "n/a",
+            },
+            {
+                "relationship": "Systems",
+                "objects": ", ".join(selected["referenced_systems"]) or "n/a",
+            },
+            {
+                "relationship": "RFIs",
+                "objects": ", ".join(selected["referenced_rfis"]) or "n/a",
+            },
+            {
+                "relationship": "Evidence",
+                "objects": ", ".join(selected["referenced_evidence"]) or "n/a",
+            },
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    nav_cols = st.columns(4)
+    if nav_cols[0].button("Go to Drawings", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Drawings"
+        st.rerun()
+    if nav_cols[1].button("Go to Equipment", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Equipment"
+        st.rerun()
+    if nav_cols[2].button("Go to Systems", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Systems"
+        st.rerun()
+    if nav_cols[3].button("Go to Evidence", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Evidence"
+        st.rerun()
 
 
 def _render_equipment_page(st: Any, context: dict[str, Any] | None) -> None:
-    st.subheader("Equipment")
-    review = context.get("review") if context else None
-    rows = _to_rows(list(getattr(review, "equipment", []) or []))
+    st.subheader("Equipment Browser")
+    objects = _workspace_objects(context)
+    rows = list(objects.get("equipment", []))
     if not rows:
-        st.info("No equipment detected.")
+        st.info("No equipment objects available.")
         return
 
-    st.dataframe(rows, use_container_width=True, hide_index=True)
-    labels = [
-        f"{_safe_text(item.get('equipment_id'), 'item')} · {_safe_text(item.get('description'), '')}"
+    filter_cols = st.columns([2.0, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2])
+    search = filter_cols[0].text_input(
+        "Search",
+        key="atlas_equipment_search",
+        placeholder="manufacturer, model, description, system, room",
+    )
+    system_filter = filter_cols[1].selectbox(
+        "System",
+        options=["All"] + sorted({item["system"] for item in rows}),
+    )
+    manufacturer_filter = filter_cols[2].selectbox(
+        "Manufacturer",
+        options=["All"] + sorted({item["manufacturer"] for item in rows}),
+    )
+    room_filter = filter_cols[3].selectbox(
+        "Room",
+        options=["All"] + sorted({item["room"] for item in rows}),
+    )
+    discipline_filter = filter_cols[4].selectbox(
+        "Discipline",
+        options=["All"] + sorted({item["discipline"] for item in rows}),
+    )
+    sort_field = filter_cols[5].selectbox(
+        "Sort",
+        options=[
+            "equipment_id",
+            "manufacturer",
+            "model",
+            "system",
+            "room",
+            "current_status",
+            "confidence",
+        ],
+    )
+    group_by = filter_cols[6].selectbox(
+        "Group By",
+        options=["System", "Manufacturer", "Room", "Discipline", "None"],
+    )
+
+    filtered = [
+        item
         for item in rows
+        if (
+            not search
+            or _contains_any(
+                str(item),
+                [search],
+            )
+        )
+        and (system_filter == "All" or item["system"] == system_filter)
+        and (
+            manufacturer_filter == "All" or item["manufacturer"] == manufacturer_filter
+        )
+        and (room_filter == "All" or item["room"] == room_filter)
+        and (discipline_filter == "All" or item["discipline"] == discipline_filter)
     ]
-    selected = st.selectbox("Select Equipment", options=labels)
-    _set_context_selection(st, "equipment", rows[labels.index(selected)])
+
+    filtered.sort(key=lambda item: str(item.get(sort_field) or "").lower())
+
+    if not filtered:
+        st.info("No equipment matches current filters.")
+        return
+
+    display_rows = [
+        {
+            "equipment": item["equipment_id"],
+            "manufacturer": item["manufacturer"],
+            "model": item["model"],
+            "description": item["description"],
+            "system": item["system"],
+            "room": item["room"],
+            "drawing refs": ", ".join(item["drawing_references"]) or "n/a",
+            "spec refs": ", ".join(item["specification_references"]) or "n/a",
+            "status": item["current_status"],
+            "confidence": item["confidence"],
+            "potential rfis": len(item["potential_rfis"]),
+        }
+        for item in filtered
+    ]
+
+    if group_by != "None":
+        bucket_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        key_map = {
+            "System": "system",
+            "Manufacturer": "manufacturer",
+            "Room": "room",
+            "Discipline": "discipline",
+        }
+        group_key = key_map[group_by]
+        for row in display_rows:
+            bucket_map[str(row[group_key]).strip() or "Unassigned"].append(row)
+
+        for bucket_name in sorted(bucket_map.keys()):
+            st.markdown(f"#### {group_by}: {bucket_name}")
+            st.dataframe(
+                bucket_map[bucket_name], use_container_width=True, hide_index=True
+            )
+    else:
+        st.dataframe(display_rows, use_container_width=True, hide_index=True)
+
+    labels = [
+        f"{item['equipment_id']} · {item['manufacturer']} {item['model']}"
+        for item in filtered
+    ]
+    selected_label = st.selectbox("Select Equipment Object", options=labels)
+    selected = filtered[labels.index(selected_label)]
+    _set_context_selection(st, "equipment", selected)
 
 
 def _render_systems_page(st: Any, context: dict[str, Any] | None) -> None:
-    st.subheader("Systems")
-    review = context.get("review") if context else None
-    rows = _to_rows(list(getattr(review, "systems", []) or []))
+    st.subheader("Systems Workspace")
+    rows = list(_workspace_objects(context).get("systems", []))
     if not rows:
-        st.info("No systems detected.")
+        st.info("No systems available.")
         return
 
-    st.dataframe(rows, use_container_width=True, hide_index=True)
-    labels = [
-        f"{_safe_text(item.get('system_id'), 'system')} · {_safe_text(item.get('name'), '')}"
-        for item in rows
-    ]
-    selected = st.selectbox("Select System", options=labels)
-    _set_context_selection(st, "system", rows[labels.index(selected)])
+    st.dataframe(
+        [
+            {
+                "system": item["system"],
+                "equipment count": item["equipment_count"],
+                "drawing count": item["drawing_count"],
+                "specification count": item["specification_count"],
+                "rfi count": item["rfi_count"],
+                "readiness": item["readiness"],
+                "labor": item["labor"],
+                "confidence": item["confidence"],
+            }
+            for item in rows
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    labels = [item["system"] for item in rows]
+    selected_label = st.selectbox("Select System Object", options=labels)
+    selected = rows[labels.index(selected_label)]
+    _set_context_selection(st, "system", selected)
 
 
 def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None:
@@ -1404,24 +2197,52 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         return
 
     if page == "Evidence":
+        objects = _workspace_objects(context)
+        evidence_rows = list(objects.get("evidence", []))
+        if not evidence_rows:
+            st.info("No evidence references available.")
+            return
+
+        evidence_by_group: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for item in evidence_rows:
+            evidence_by_group[str(item.get("group") or "Other")].append(item)
+
+        st.caption(
+            "Evidence grouped by Drawings, Specifications, Schedules, Images, Notes, and Addenda."
+        )
+        for group in [
+            "Drawings",
+            "Specifications",
+            "Schedules",
+            "Images",
+            "Notes",
+            "Addenda",
+        ]:
+            rows = evidence_by_group.get(group, [])
+            st.markdown(f"#### {group}")
+            if not rows:
+                st.info("No evidence in this group.")
+                continue
+
+            st.dataframe(
+                [
+                    {
+                        "source file": item.get("source_file"),
+                        "page": item.get("page"),
+                        "sheet": item.get("sheet"),
+                        "confidence": item.get("confidence"),
+                        "referenced objects": item.get("text_excerpt"),
+                    }
+                    for item in rows
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
         brief_refs = list(getattr(brief, "evidence_refs", []) or []) if brief else []
         if brief_refs:
             st.markdown("Brief Evidence")
             st.dataframe(brief_refs, use_container_width=True, hide_index=True)
-
-        source_refs = (
-            _to_rows(
-                list(
-                    getattr(context.get("intake_snapshot"), "source_references", [])
-                    or []
-                )
-            )
-            if context
-            else []
-        )
-        if source_refs:
-            st.markdown("Source References")
-            st.dataframe(source_refs, use_container_width=True, hide_index=True)
         return
 
 
@@ -1453,143 +2274,159 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
     kind = str(selection.get("kind") or "project")
     data = dict(selection.get("data") or {})
 
-    review = context.get("review") if context else None
+    def _render_object_context(
+        title: str,
+        object_data: dict[str, Any],
+        nav_targets: list[tuple[str, str]],
+    ) -> None:
+        st.markdown(f"#### {title}")
+
+        relationship_keys = [
+            "referenced_drawings",
+            "referenced_equipment",
+            "referenced_specifications",
+            "referenced_systems",
+            "referenced_rfis",
+            "referenced_evidence",
+            "drawing_references",
+            "specification_references",
+            "potential_rfis",
+        ]
+        warning_keys = ["warnings"]
+
+        property_rows = [
+            {"property": key.replace("_", " "), "value": _safe_text(value, "n/a")}
+            for key, value in object_data.items()
+            if key not in relationship_keys + warning_keys
+            and not isinstance(value, (dict, list))
+        ]
+        if property_rows:
+            st.markdown("Properties")
+            st.dataframe(property_rows[:12], use_container_width=True, hide_index=True)
+
+        relationship_rows = [
+            {
+                "relationship": key.replace("_", " "),
+                "objects": ", ".join(
+                    [str(item) for item in list(object_data.get(key) or [])]
+                )
+                or "n/a",
+            }
+            for key in relationship_keys
+            if list(object_data.get(key) or [])
+        ]
+        if relationship_rows:
+            st.markdown("Relationships")
+            st.dataframe(relationship_rows, use_container_width=True, hide_index=True)
+
+        evidence_values = list(object_data.get("referenced_evidence") or [])
+        if evidence_values:
+            st.markdown("Evidence")
+            st.dataframe(
+                [{"evidence": str(item)} for item in evidence_values[:10]],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        warnings = list(object_data.get("warnings") or [])
+        if warnings:
+            st.markdown("Warnings")
+            st.dataframe(
+                [{"warning": str(item)} for item in warnings[:10]],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        related_rows = relationship_rows[:6]
+        if related_rows:
+            st.markdown("Related Objects")
+            st.dataframe(related_rows, use_container_width=True, hide_index=True)
+
+        st.markdown("Quick Navigation")
+        for page, label in nav_targets:
+            if st.button(
+                label, key=f"atlas_ctx_nav_{title}_{page}", use_container_width=True
+            ):
+                st.session_state["atlas_active_page"] = page
+                st.rerun()
 
     if kind == "drawing":
-        st.markdown("#### Drawing")
-        st.dataframe([data], use_container_width=True, hide_index=True)
-
-        if review is not None:
-            equipment = [
-                item
-                for item in _to_rows(list(getattr(review, "equipment", []) or []))
-                if _safe_text(item.get("drawing_reference"), "").strip()
-            ]
-            if equipment:
-                st.markdown("Equipment")
-                st.dataframe(equipment[:8], use_container_width=True, hide_index=True)
-
-            specs = _to_rows(list(getattr(review, "specification_sections", []) or []))
-            if specs:
-                st.markdown("Specifications")
-                st.dataframe(specs[:8], use_container_width=True, hide_index=True)
-
-            rfi_rows = _to_rows(list(getattr(review, "rfi_candidates", []) or []))
-            if rfi_rows:
-                st.markdown("RFIs")
-                st.dataframe(rfi_rows[:5], use_container_width=True, hide_index=True)
-
-        st.markdown("Revision History")
-        st.info("Revision history timeline is coming soon.")
-
-        source_refs = (
-            _to_rows(
-                list(
-                    getattr(context.get("intake_snapshot"), "source_references", [])
-                    or []
-                )
-            )
-            if context
-            else []
+        _render_object_context(
+            "Drawing",
+            data,
+            [
+                ("Specifications", "Go to Specifications"),
+                ("Equipment", "Go to Equipment"),
+                ("Systems", "Go to Systems"),
+                ("Evidence", "Go to Evidence"),
+                ("RFI Candidates", "Go to RFIs"),
+            ],
         )
-        if source_refs:
-            st.markdown("Evidence")
-            st.dataframe(source_refs[:8], use_container_width=True, hide_index=True)
         return
 
     if kind == "specification":
-        st.markdown("#### Specification")
-        st.dataframe([data], use_container_width=True, hide_index=True)
-
-        if review is not None:
-            drawings = _to_rows(list(getattr(review, "drawing_sheets", []) or []))
-            if drawings:
-                st.markdown("Referenced Drawings")
-                st.dataframe(drawings[:8], use_container_width=True, hide_index=True)
-
-            equipment = [
-                item
-                for item in _to_rows(list(getattr(review, "equipment", []) or []))
-                if _safe_text(item.get("specification_reference"), "").strip()
-            ]
-            if equipment:
-                st.markdown("Equipment")
-                st.dataframe(equipment[:8], use_container_width=True, hide_index=True)
-
-            systems = _to_rows(list(getattr(review, "systems", []) or []))
-            if systems:
-                st.markdown("Systems")
-                st.dataframe(systems[:8], use_container_width=True, hide_index=True)
-
-            rfi_rows = _to_rows(list(getattr(review, "rfi_candidates", []) or []))
-            if rfi_rows:
-                st.markdown("Related RFIs")
-                st.dataframe(rfi_rows[:5], use_container_width=True, hide_index=True)
+        _render_object_context(
+            "Specification",
+            data,
+            [
+                ("Drawings", "Go to Drawings"),
+                ("Equipment", "Go to Equipment"),
+                ("Systems", "Go to Systems"),
+                ("Evidence", "Go to Evidence"),
+            ],
+        )
         return
 
     if kind == "equipment":
-        st.markdown("#### Equipment")
-        st.dataframe([data], use_container_width=True, hide_index=True)
-        st.dataframe(
+        _render_object_context(
+            "Equipment",
+            data,
             [
-                {
-                    "field": "Manufacturer",
-                    "value": _safe_text(data.get("manufacturer"), "n/a"),
-                },
-                {"field": "System", "value": _safe_text(data.get("system_id"), "n/a")},
-                {
-                    "field": "Drawing Reference",
-                    "value": _safe_text(data.get("drawing_reference"), "n/a"),
-                },
-                {
-                    "field": "Specification Reference",
-                    "value": _safe_text(data.get("specification_reference"), "n/a"),
-                },
-                {
-                    "field": "Risk",
-                    "value": "Derived from readiness and estimator risk outputs",
-                },
+                ("Drawings", "Go to Drawings"),
+                ("Specifications", "Go to Specifications"),
+                ("Systems", "Go to Systems"),
+                ("RFI Candidates", "Go to RFIs"),
             ],
-            use_container_width=True,
-            hide_index=True,
+        )
+        return
+
+    if kind == "system":
+        _render_object_context(
+            "System",
+            data,
+            [
+                ("Equipment", "Go to Equipment"),
+                ("Drawings", "Go to Drawings"),
+                ("Specifications", "Go to Specifications"),
+                ("RFI Candidates", "Go to RFIs"),
+            ],
+        )
+        return
+
+    if kind == "evidence":
+        _render_object_context(
+            "Evidence",
+            data,
+            [
+                ("Drawings", "Go to Drawings"),
+                ("Specifications", "Go to Specifications"),
+                ("Evidence", "Refresh Evidence"),
+            ],
         )
         return
 
     if kind == "file":
         file_item = dict(data.get("file") or {})
         folder = _safe_text(data.get("folder"), "Unknown")
-        st.markdown(f"#### {file_item.get('filename', 'File')}")
-        st.dataframe(
+        _render_object_context(
+            f"File ({folder})",
+            file_item,
             [
-                {"field": "Folder", "value": folder},
-                {
-                    "field": "Revision",
-                    "value": _safe_text(file_item.get("revision"), "unknown"),
-                },
-                {
-                    "field": "Status",
-                    "value": _status_chip(
-                        _safe_text(file_item.get("status"), "unknown")
-                    ),
-                },
-                {"field": "Pages", "value": file_item.get("pages")},
-                {"field": "References", "value": file_item.get("references")},
-                {"field": "Warnings", "value": file_item.get("warnings")},
+                ("Project Files", "Back to Project Files"),
+                ("Drawings", "Open Drawings"),
+                ("Specifications", "Open Specifications"),
             ],
-            use_container_width=True,
-            hide_index=True,
         )
-
-        if folder == "Drawings":
-            _set_context_selection(st, "drawing", file_item)
-            st.info(
-                "Drawing context available. Select Drawings page for structured records."
-            )
-        elif folder == "Specifications":
-            _set_context_selection(st, "specification", file_item)
-            st.info(
-                "Specification context available. Select Specifications page for structured records."
-            )
         return
 
     st.markdown("#### Project")
@@ -1681,6 +2518,7 @@ def _render_shell(
     context: dict[str, Any] | None,
 ) -> None:
     _render_header(st, workspace_service, record, context)
+    _render_global_search_panel(st, context)
 
     current_page = st.session_state.get("atlas_active_page", "Home")
     st.markdown(
