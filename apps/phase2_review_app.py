@@ -6,11 +6,10 @@ import hashlib
 from typing import Any
 
 from atlas_core.services.phase2_review_context_service import (
+    build_reference_project_context,
     build_uploaded_review_context,
     build_intake_review_context,
-    build_sample_review_context,
     discover_local_intake_snapshots,
-    get_sample_projects,
 )
 from atlas_core.services.document_intake_service import UploadedIntakeFile
 
@@ -73,25 +72,18 @@ def main() -> None:
     )
 
     source_mode = st.sidebar.radio(
-        "Data Source",
-        options=["Uploaded Project", "Sample Data"],
+        "Project",
+        options=["Reference Project", "Uploaded Project"],
         index=0,
     )
 
-    if source_mode == "Sample Data":
-        sample_projects = get_sample_projects()
-        options = {project["label"]: project["id"] for project in sample_projects}
-        selected_label = st.sidebar.selectbox(
-            "Sample Project", options=list(options.keys()), index=0
-        )
-        st.sidebar.caption("Music Academy of the West remains reference project data.")
-        context = build_sample_review_context(options[selected_label])
-        context["data_source_label"] = "Reference Project"
-        context["sample_project_name"] = "Music Academy of the West"
+    if source_mode == "Reference Project":
+        st.sidebar.caption("Music Academy of the West")
+        context = build_reference_project_context()
     else:
         _render_intake_box(st)
         uploaded_files = st.file_uploader(
-            "",
+            "Project package files",
             type=[
                 "pdf",
                 "docx",
@@ -174,11 +166,18 @@ def main() -> None:
     readiness = getattr(review, "readiness", None)
     labor = getattr(review, "labor_estimate", None)
 
-    if context.get("data_source_mode") == "seed_sample_data":
+    if source_mode == "Reference Project":
         st.info("Reference Project\nMusic Academy of the West")
     else:
         project_name = str(context.get("sample_project_name") or "Uploaded Project")
         st.success(f"Uploaded Project\n{project_name}")
+
+    st.markdown("Data Source:")
+    st.write(f"- {context.get('data_source_label', 'unknown')}")
+    if context.get("data_source_mode") == "seed_fixture_fallback":
+        st.warning(
+            "This view is using curated seed fixture data, not the full drawing/specification package."
+        )
 
     package_location = str(context.get("package_location") or "")
     if package_location:
@@ -208,6 +207,12 @@ def main() -> None:
             {
                 "metric": "unsupported file count",
                 "value": import_summary.get("unsupported_file_count", 0),
+            },
+            {
+                "metric": "extraction warning count",
+                "value": import_summary.get(
+                    "extraction_warning_count", len(context.get("warnings") or [])
+                ),
             },
         ]
         st.dataframe(summary_rows, use_container_width=True, hide_index=True)

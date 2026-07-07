@@ -35,10 +35,15 @@ Excluded features in this baseline:
 - Customer-facing proposal generation.
 
 ## MAW Reference Project
-Music Academy of the West (MAW) is used as canonical sample/reference data for deterministic demos and regression tests.
+Music Academy of the West (MAW) is used as canonical reference project data for deterministic demos and regression tests.
+
+Reference behavior in Atlas GUI:
+- Preferred path: real package intake from examples/music_academy_of_the_west
+- Fallback path: curated seed fixture data only when package intake is unavailable/fails
+- GUI source labels explicitly distinguish `Real package intake` vs `Seed fixture fallback`
 
 MAW is not product logic:
-- MAW seed data is isolated in atlas_core/sample_data.
+- MAW seed data is isolated in atlas_core/sample_data as curated regression fixture data.
 - MAW-specific commands are demo CLI entry points.
 - Core services consume generic domain models and do not branch on MAW identifiers.
 
@@ -90,6 +95,7 @@ Expected package structure:
 - examples/music_academy_of_the_west/specifications/*.pdf
 - examples/music_academy_of_the_west/schedules/*.pdf|*.csv|*.xlsx
 - examples/music_academy_of_the_west/addenda/*.pdf
+- examples/music_academy_of_the_west/images/*
 - examples/music_academy_of_the_west/metadata.json
 
 ## Expected Outputs

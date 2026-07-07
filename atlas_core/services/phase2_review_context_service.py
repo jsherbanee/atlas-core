@@ -20,6 +20,15 @@ from atlas_core.services import (
 from atlas_core.services.document_intake_service import DocumentIntakeService
 from atlas_core.services.document_intake_service import UploadedIntakeFile
 
+DEFAULT_MAW_REFERENCE_PACKAGE = Path("examples/music_academy_of_the_west")
+_EXPECTED_MAW_FOLDERS = [
+    "drawings",
+    "specifications",
+    "schedules",
+    "addenda",
+    "images",
+]
+
 
 def get_sample_projects() -> list[dict[str, str]]:
     return [
@@ -29,6 +38,88 @@ def get_sample_projects() -> list[dict[str, str]]:
             "description": "Canonical sample/reference project.",
         }
     ]
+
+
+def build_reference_project_context(
+    package_path: str | Path = DEFAULT_MAW_REFERENCE_PACKAGE,
+) -> dict[str, Any]:
+    root = Path(package_path)
+    intake_service = DocumentIntakeService()
+    missing_folders = _missing_expected_folders(root)
+    if not root.exists() or not root.is_dir():
+        return _build_seed_fallback_context(
+            reason=(
+                f"Reference package not found at {root}. "
+                "Using curated seed fixture data instead of the full drawing/specification package."
+            ),
+            package_path=root,
+        )
+
+    try:
+        discovery = intake_service.discover_package(root)
+    except FileNotFoundError:
+        return _build_seed_fallback_context(
+            reason=(
+                f"Reference package not found at {root}. "
+                "Using curated seed fixture data instead of the full drawing/specification package."
+            ),
+            package_path=root,
+        )
+
+    supported_file_count = (
+        len(discovery.drawing_files)
+        + len(discovery.specification_files)
+        + len(discovery.schedule_files)
+        + len(discovery.addenda_files)
+        + len(discovery.image_files)
+    )
+    if supported_file_count == 0:
+        return _build_seed_fallback_context(
+            reason=(
+                f"No supported files were found in {root}. "
+                "Using curated seed fixture data instead of the full drawing/specification package."
+            ),
+            package_path=root,
+        )
+
+    try:
+        snapshot = intake_service.build_snapshot(root)
+        workflow_result = intake_service.run_review_from_snapshot(snapshot)
+    except Exception as exc:
+        return _build_seed_fallback_context(
+            reason=(
+                f"Reference package intake failed ({exc}). "
+                "Using curated seed fixture data instead of the full drawing/specification package."
+            ),
+            package_path=root,
+        )
+
+    warnings = list(snapshot.warnings)
+    if missing_folders:
+        warnings.insert(
+            0,
+            "Reference package is incomplete. Missing folders: "
+            + ", ".join(missing_folders),
+        )
+
+    import_summary = dict(snapshot.import_summary)
+    import_summary["extraction_warning_count"] = len(snapshot.warnings)
+
+    return {
+        "data_source_mode": "reference_project_real_intake",
+        "data_source_label": "Real package intake",
+        "sample_project_id": "maw",
+        "sample_project_name": "Music Academy of the West",
+        "review": workflow_result.review,
+        "brief": workflow_result.brief,
+        "final_review": workflow_result.final_review,
+        "revision_comparison": None,
+        "rows": workflow_result.rows,
+        "warnings": warnings,
+        "import_summary": import_summary,
+        "package_location": str(root),
+        "intake_snapshot": snapshot,
+    }
 
 
 def build_sample_review_context(sample_project_id: str = "maw") -> dict[str, Any]:
@@ -63,8 +154,8 @@ def build_sample_review_context(sample_project_id: str = "maw") -> dict[str, Any
     revision_comparison = _build_revision_comparison()
 
     return {
-        "data_source_mode": "seed_sample_data",
-        "data_source_label": "Reference Project",
+        "data_source_mode": "seed_fixture_fallback",
+        "data_source_label": "Seed fixture fallback",
         "sample_project_id": sample_project_id,
         "sample_project_name": "Music Academy of the West",
         "review": baseline_result.review,
@@ -73,6 +164,8 @@ def build_sample_review_context(sample_project_id: str = "maw") -> dict[str, Any
         "revision_comparison": revision_comparison,
         "rows": baseline_result.rows,
         "warnings": [],
+        "import_summary": {},
+        "package_location": None,
         "intake_snapshot": None,
     }
 
@@ -236,3 +329,30 @@ def _build_revision_comparison() -> Any:
         baseline_revision_id="maw-rev-0",
         comparison_revision_id="maw-rev-1",
     )
+
+
+def _build_seed_fallback_context(reason: str, package_path: Path) -> dict[str, Any]:
+    context = build_sample_review_context("maw")
+    warnings = list(context.get("warnings") or [])
+    warnings.extend(
+        [
+            reason,
+            "This view is using curated seed fixture data, not the full drawing/specification package.",
+        ]
+    )
+    context["warnings"] = warnings
+    context["package_location"] = str(package_path)
+    return context
+
+
+def _missing_expected_folders(root: Path) -> list[str]:
+    if not root.exists() or not root.is_dir():
+        return list(_EXPECTED_MAW_FOLDERS)
+
+    missing: list[str] = []
+    for folder_name in _EXPECTED_MAW_FOLDERS:
+        folder_path = root / folder_name
+        if not folder_path.exists() or not folder_path.is_dir():
+            missing.append(folder_name)
+
+    return missing

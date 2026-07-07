@@ -35,6 +35,11 @@ The GUI supports two explicit source modes.
 
 Reference Project:
 - Music Academy of the West (Reference Project)
+- Default behavior attempts real package intake from examples/music_academy_of_the_west
+- Data Source label shows `Real package intake` when loaded from full package files
+- If package is missing/incomplete/unreadable, Atlas falls back to seed fixture data
+- Data Source label shows `Seed fixture fallback` for fallback mode
+- Fallback mode explicitly warns that curated fixture data is in use
 
 Uploaded Project:
 - User-provided files or ZIP package from Atlas Intake
@@ -45,11 +50,24 @@ Uploaded Project:
 
 MAW remains reference data only and is not product-specific business logic.
 
+## MAW Package Placement
+Place the full MAW package under:
+- examples/music_academy_of_the_west/
+- examples/music_academy_of_the_west/metadata.json
+- examples/music_academy_of_the_west/drawings/
+- examples/music_academy_of_the_west/specifications/
+- examples/music_academy_of_the_west/schedules/
+- examples/music_academy_of_the_west/addenda/
+- examples/music_academy_of_the_west/images/
+
+If expected folders are missing, Atlas shows a warning and still attempts deterministic intake from available files.
+
 ## Run Instructions
 1. Install GUI dependency:
    - pip install -e .[gui]
 2. Launch app:
    - streamlit run apps/phase2_review_app.py
+3. Open `Reference Project` to verify MAW source mode.
 
 ## Upload Flow
 1. Select `Uploaded Project` in the sidebar.
@@ -87,3 +105,5 @@ This allows browsing `intake_snapshot.json` files already generated under local 
 ## Notes
 - The GUI reads deterministic outputs from existing services and sample data.
 - The app does not mutate project data.
+- Scanned/image-only PDFs can produce warnings when no embedded text is extractable.
+- Atlas does not fabricate sheet/spec/equipment extraction when text is unavailable.

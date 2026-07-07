@@ -9,6 +9,8 @@ from atlas_core.services.document_intake_service import (
     UploadedIntakeFile,
 )
 from atlas_core.services.phase2_review_context_service import (
+    DEFAULT_MAW_REFERENCE_PACKAGE,
+    build_reference_project_context,
     build_uploaded_review_context,
     build_intake_review_context,
     build_sample_review_context,
@@ -37,8 +39,8 @@ def test_build_sample_review_context_returns_phase2_outputs() -> None:
     revision = context["revision_comparison"]
 
     assert context["sample_project_id"] == "maw"
-    assert context["data_source_mode"] == "seed_sample_data"
-    assert context["data_source_label"] == "Reference Project"
+    assert context["data_source_mode"] == "seed_fixture_fallback"
+    assert context["data_source_label"] == "Seed fixture fallback"
     assert context["sample_project_name"] == "Music Academy of the West"
     assert readiness is not None
     assert readiness.readiness_score is not None
@@ -136,3 +138,78 @@ def test_build_uploaded_review_context_returns_uploaded_labels(tmp_path: Path) -
     assert context["data_source_label"] == "Uploaded Project"
     assert context["sample_project_name"] == "Uploaded Context Project"
     assert context["import_summary"]["drawing_count"] == 1
+
+
+def test_build_reference_project_context_uses_real_intake_when_available(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "music_academy_of_the_west"
+    (package / "drawings").mkdir(parents=True)
+    (package / "specifications").mkdir(parents=True)
+    (package / "schedules").mkdir(parents=True)
+    (package / "addenda").mkdir(parents=True)
+    (package / "images").mkdir(parents=True)
+    (package / "metadata.json").write_text(
+        json.dumps(
+            {
+                "project_id": "maw-real-reference",
+                "review_id": "maw-real-reference-review",
+                "project_name": "Music Academy of the West",
+            }
+        ),
+        encoding="utf-8",
+    )
+    _write_blank_pdf(package / "drawings" / "AV-101 Audio Plan.pdf")
+    _write_blank_pdf(
+        package / "specifications" / "27 41 16 Integrated Audio Systems.pdf"
+    )
+    (package / "schedules" / "audio_schedule.csv").write_text(
+        "tag,description\nSPK-1,Main ceiling speaker\n",
+        encoding="utf-8",
+    )
+
+    context = build_reference_project_context(package)
+
+    assert context["data_source_mode"] == "reference_project_real_intake"
+    assert context["data_source_label"] == "Real package intake"
+    assert context["sample_project_name"] == "Music Academy of the West"
+    assert context["import_summary"]["drawing_count"] == 1
+    assert context["import_summary"]["specification_count"] == 1
+    assert context["import_summary"]["schedule_count"] == 1
+
+
+def test_build_reference_project_context_falls_back_when_package_missing(
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing_reference_package"
+    context = build_reference_project_context(missing)
+
+    assert context["data_source_mode"] == "seed_fixture_fallback"
+    assert context["data_source_label"] == "Seed fixture fallback"
+    assert any(
+        "Reference package not found" in warning for warning in context["warnings"]
+    )
+    assert any(
+        "curated seed fixture data" in warning for warning in context["warnings"]
+    )
+
+
+def test_build_reference_project_context_warns_for_no_extractable_text(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "music_academy_of_the_west"
+    (package / "drawings").mkdir(parents=True)
+    (package / "specifications").mkdir(parents=True)
+    (package / "schedules").mkdir(parents=True)
+    (package / "addenda").mkdir(parents=True)
+    (package / "images").mkdir(parents=True)
+    _write_blank_pdf(package / "drawings" / "AV-101 Audio Plan.pdf")
+
+    context = build_reference_project_context(package)
+
+    assert context["data_source_mode"] == "reference_project_real_intake"
+    assert any("OCR is required" in warning for warning in context["warnings"])
+
+
+def test_default_maw_reference_package_path_exists() -> None:
+    assert Path(DEFAULT_MAW_REFERENCE_PACKAGE).exists()

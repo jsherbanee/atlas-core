@@ -18,6 +18,11 @@ Atlas Core is in active Phase 2 Bid Intelligence development with a stabilizatio
 ## Active Focus
 Finalize and harden the Phase 2 Bid Intelligence baseline before any downstream lifecycle expansion.
 
+Current MAW reference-project behavior:
+- Atlas attempts real package intake from examples/music_academy_of_the_west for the Reference Project view.
+- Seed fixture data is retained as regression fallback only when real package intake is unavailable.
+- GUI labels explicitly indicate whether Reference Project is using Real package intake or Seed fixture fallback.
+
 ## Latest Completed Feature
 - Estimator Brief Enhancements (deterministic executive summary, prioritized reviewer actions, and evidence traceability)
 
