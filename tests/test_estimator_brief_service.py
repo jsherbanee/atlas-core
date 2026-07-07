@@ -1,349 +1,248 @@
 from atlas_core.domain import (
     AssumptionSeverity,
     BidPackageReview,
-    DetailCallout,
-    DrawingSheet,
+    EngineeringAssumption,
     Equipment,
     EquipmentCategory,
     IntegratedSystem,
-    Keynote,
-    Legend,
-    LegendItem,
-    Room,
-    RoomType,
-    SpecificationSection,
+    LaborEstimate,
+    RFICandidate,
+    RFICandidateCategory,
+    RFICandidateSeverity,
+    RevisionChangeRecord,
+    RevisionChangeSeverity,
+    RevisionChangeType,
+    RevisionComparison,
     SystemCategory,
-    EngineeringAssumption,
 )
-from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import (
-    BidCompleteness,
-    CompletenessStatus,
-    CrossReference,
-    CrossReferenceType,
     EstimatorBrief,
     EstimatorBriefService,
-    EstimatorRisk,
-    ManufacturerReviewIssue,
-    ReconciliationIssue,
-    Recommendation,
-    RecommendationPriority,
     PlanReviewReadiness,
+    ReadinessEvidenceRef,
+    ReadinessLevel,
     ReadinessStatus,
-    ReviewReportItem,
-    RiskLevel,
-    ScopeGap,
 )
 
 
 def make_review() -> BidPackageReview:
-    placeholder = Equipment(
-        equipment_id="eq-placeholder",
-        description="Placeholder mount",
-        category=EquipmentCategory.MOUNT,
-        status="placeholder",
-        review_required=True,
-    )
-    display = Equipment(
-        equipment_id="eq-display",
-        description="Display",
-        category=EquipmentCategory.DISPLAY,
-    )
-    room = Room(
-        room_id="building-001-main-lobby",
-        name="Main Lobby",
-        building_id="building-001",
-        room_type=RoomType.LOBBY,
-    )
-    detail_callout = DetailCallout(
-        callout_id="av1.01-detail-5-av-701",
-        detail_number="5",
-        source_sheet_number="AV1.01",
-        target_sheet_number="AV-701",
-        description="Detail 5/AV-701",
-    )
-
     return BidPackageReview(
         review_id="review-001",
         project_id="project-001",
         name="Bid Package Review",
-        drawing_sheets=[
-            DrawingSheet(
-                sheet_id="av101",
-                sheet_number="AV1.01",
-                title="AV Plan",
-            )
-        ],
-        specification_sections=[
-            SpecificationSection(
-                section_id="27-41-16",
-                section_number="27 41 16",
-                title="Integrated Audio-Video Systems",
-            )
-        ],
+        drawing_sheets=[],
+        specification_sections=[],
         systems=[
             IntegratedSystem(
                 system_id="sys-001",
-                name="Display System",
-                category=SystemCategory.DISPLAY,
+                name="Performance Audio",
+                category=SystemCategory.AUDIO,
             )
         ],
-        equipment=[placeholder, display],
-        rooms=[room],
-        detail_callouts=[detail_callout],
-        resolutions=[
-            Resolution(
-                rule_id="RULE-001",
-                action=ResolutionAction.MARK_FOR_REVIEW,
-                target_id="eq-placeholder",
-                message="Review required.",
-            )
-        ],
-        manufacturer_review_issues=[
-            ManufacturerReviewIssue(
-                equipment_id="eq-display",
-                manufacturer="Unknown",
-                message="Manufacturer requires review.",
-            )
-        ],
-        review_report=[
-            ReviewReportItem(
-                source="resolver",
-                target_id="eq-placeholder",
-                message="Review required.",
-            )
-        ],
-        cross_references=[
-            CrossReference(
-                reference_type=CrossReferenceType.EQUIPMENT_TO_DRAWING,
-                source_id="eq-display",
-                target_id="av101",
-                message="Equipment references drawing.",
-            )
-        ],
-        reconciliation_issues=[
-            ReconciliationIssue(
-                issue_id="keynote_missing_equipment_category:projector",
-                message=(
-                    "Keynote references equipment category not found in "
-                    "equipment matrix."
-                ),
-                target_id="av101-keynote-k1",
-            )
-        ],
-        scope_gaps=[
-            ScopeGap(
-                gap_id="display_missing_mount",
-                target_id="eq-display",
-                message="Display is missing a mount.",
-            )
-        ],
-        estimator_risks=[
-            EstimatorRisk(
-                risk_id="scope_gaps_detected",
-                message="Scope gaps were detected and require estimator review.",
-                risk_level=RiskLevel.HIGH,
-                category="scope",
-            )
-        ],
-        recommendations=[
-            Recommendation(
-                recommendation_id="review-low-confidence",
-                message=(
-                    "Review confidence is below target threshold; estimator "
-                    "review is required."
-                ),
-                priority=RecommendationPriority.HIGH,
-                category="confidence",
+        equipment=[
+            Equipment(
+                equipment_id="eq-001",
+                description="Main speaker",
+                category=EquipmentCategory.SPEAKER,
+                quantity=2,
+                manufacturer="JBL",
+                model="CBT 70J",
+                drawing_reference="AV-401",
+                specification_reference="27 41 16",
             )
         ],
         engineering_assumptions=[
             EngineeringAssumption(
-                assumption_id="assumption-001",
-                category="mounting",
-                description="Mounting should be verified.",
-                severity=AssumptionSeverity.REVIEW,
+                assumption_id="assume-001",
+                category="coordination",
+                description="Confirm conduit pathway.",
+                severity=AssumptionSeverity.RISK,
             )
         ],
-        keynotes=[
-            Keynote(
-                keynote_id="av101-keynote-k1",
-                number="K1",
-                description="Ceiling Speaker",
-                source_sheet_number="AV1.01",
+        rfi_candidates=[
+            RFICandidate(
+                candidate_id="rfi-001",
+                project_id="project-001",
+                title="Scope ambiguity",
+                description="By others language detected.",
+                category=RFICandidateCategory.RESPONSIBILITY_GAP,
+                severity=RFICandidateSeverity.HIGH,
+                confidence=0.9,
+                detected_condition="scope_responsibility_ambiguity",
+                recommended_action="Clarify ownership.",
             )
         ],
-        legends=[
-            Legend(
-                legend_id="av1.01-legend",
-                source_sheet_number="AV1.01",
-                items=[
-                    LegendItem(
-                        legend_item_id="av1.01-legend-spk",
-                        symbol="SPK",
-                        description="Ceiling Speaker",
-                    ),
-                    LegendItem(
-                        legend_item_id="av1.01-legend-cam",
-                        symbol="CAM",
-                        description="PTZ Camera",
-                    ),
-                ],
-            )
-        ],
-        bid_completeness=BidCompleteness(
-            status=CompletenessStatus.PARTIAL,
-            score=0.7,
-            drawing_completeness=1.0,
-            specification_completeness=1.0,
-            system_completeness=0.0,
-            equipment_completeness=1.0,
-            schedule_completeness=0.5,
-            missing_items=["Missing system detection."],
+        labor_estimate=LaborEstimate(
+            project_id="project-001",
+            total_labor_hours_low=10,
+            total_labor_hours_expected=12,
+            total_labor_hours_high=14,
+            confidence=0.62,
+            warnings=["Scope ambiguity may increase labor hours."],
+        ),
+        revision_comparison=RevisionComparison(
+            project_id="project-001",
+            baseline_revision_id="rev-a",
+            comparison_revision_id="rev-b",
+            summary={"change_count": 1},
+            changes=[
+                RevisionChangeRecord(
+                    change_id="chg-001",
+                    change_type=RevisionChangeType.SPECIFICATION_CHANGED,
+                    title="Spec changed",
+                    description="Control spec update",
+                    severity=RevisionChangeSeverity.HIGH,
+                    confidence=0.9,
+                    affected_items=["eq-001"],
+                    detected_condition="specification_reference_changed",
+                    estimating_impact="Scope impact",
+                    recommended_action="Review update",
+                )
+            ],
+            confidence=0.58,
         ),
         readiness=PlanReviewReadiness(
             status=ReadinessStatus.NEEDS_REVIEW,
             message="Plan review needs estimator review before pricing.",
-            warnings=["Scope gaps require estimator review."],
+            project_id="project-001",
+            readiness_score=0.66,
+            readiness_level=ReadinessLevel.NEEDS_REVIEW,
+            section_scores={
+                "equipment_completeness": 0.8,
+                "quantity_confidence": 0.7,
+                "scope_responsibility_clarity": 0.55,
+                "drawing_spec_alignment": 0.72,
+                "assumptions_quality": 0.68,
+                "rfi_candidate_risk": 0.58,
+                "labor_estimate_confidence": 0.62,
+                "revision_stability": 0.54,
+            },
+            blocking_issues=["Critical ambiguity unresolved."],
+            warnings=["Labor estimate confidence is below preferred threshold."],
+            missing_scope_diagnostics=["Missing specification reference for eq-002."],
+            evidence_refs=[
+                ReadinessEvidenceRef(
+                    source_type="equipment",
+                    source_id="eq-002",
+                    field="specification_reference",
+                    excerpt="missing",
+                )
+            ],
+            recommendation_summary="1 blocker and 1 warning.",
+            recommended_reviewer_actions=["Resolve ambiguity."],
+            confidence=0.7,
         ),
-        confidence=0.82,
+        confidence=0.79,
     )
 
 
-def test_builds_brief_from_review():
-    brief = EstimatorBriefService().build_brief(make_review())
+def test_brief_generation_from_clean_ready_package() -> None:
+    review = make_review()
+    review.readiness = PlanReviewReadiness(
+        status=ReadinessStatus.READY,
+        message="Plan review is ready for pricing.",
+        project_id="project-001",
+        readiness_score=0.91,
+        readiness_level=ReadinessLevel.BID_READY,
+        section_scores={
+            "equipment_completeness": 1.0,
+            "quantity_confidence": 1.0,
+            "scope_responsibility_clarity": 0.95,
+            "drawing_spec_alignment": 1.0,
+            "assumptions_quality": 0.9,
+            "rfi_candidate_risk": 0.9,
+            "labor_estimate_confidence": 0.8,
+            "revision_stability": 0.9,
+        },
+        recommendation_summary="No blockers.",
+        confidence=0.9,
+    )
+    review.rfi_candidates = []
+    review.revision_comparison = None
 
-    assert brief.review_id == "review-001"
+    brief = EstimatorBriefService().build_brief(review)
+
     assert brief.project_id == "project-001"
-    assert brief.name == "Bid Package Review"
-    assert brief.confidence == 0.82
+    assert brief.brief_title == "Estimator Brief - Bid Package Review"
+    assert brief.readiness_summary is not None
+    assert brief.readiness_summary["readiness_level"] == "bid_ready"
+    assert brief.top_blockers == []
 
 
-def test_counts_drawings():
+def test_brief_generation_with_blockers() -> None:
     brief = EstimatorBriefService().build_brief(make_review())
 
-    assert brief.drawing_count == 1
+    assert brief.top_blockers is not None
+    assert "Critical ambiguity unresolved." in brief.top_blockers
+    assert brief.prioritized_reviewer_actions is not None
+    assert len(brief.prioritized_reviewer_actions) > 0
 
 
-def test_counts_specifications():
+def test_rfi_candidate_inclusion() -> None:
     brief = EstimatorBriefService().build_brief(make_review())
 
-    assert brief.specification_count == 1
+    assert brief.key_rfi_candidates is not None
+    assert brief.key_rfi_candidates[0]["candidate_id"] == "rfi-001"
 
 
-def test_counts_systems():
+def test_labor_summary_inclusion() -> None:
     brief = EstimatorBriefService().build_brief(make_review())
 
-    assert brief.system_count == 1
+    assert brief.labor_summary is not None
+    assert brief.labor_summary["available"] is True
+    assert brief.labor_summary["confidence"] == 0.62
 
 
-def test_counts_equipment():
+def test_revision_summary_inclusion() -> None:
     brief = EstimatorBriefService().build_brief(make_review())
 
-    assert brief.equipment_count == 2
+    assert brief.revision_summary is not None
+    assert brief.revision_summary["available"] is True
+    assert brief.revision_summary["high_or_critical_changes"] == 1
 
 
-def test_counts_rooms():
+def test_action_prioritization() -> None:
     brief = EstimatorBriefService().build_brief(make_review())
 
-    assert brief.room_count == 1
-
-
-def test_counts_detail_callouts():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.detail_callout_count == 1
-
-
-def test_counts_issues():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.issue_count == 6
-
-
-def test_counts_placeholder_equipment():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.placeholder_count == 1
-
-
-def test_counts_review_required_equipment_and_report_items():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.review_required_count == 2
-
-
-def test_counts_cross_references():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.cross_reference_count == 1
-
-
-def test_counts_reconciliation_issues():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.reconciliation_issue_count == 1
-
-
-def test_counts_scope_gaps():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.scope_gap_count == 1
-
-
-def test_counts_estimator_risks():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.estimator_risk_count == 1
-
-
-def test_counts_keynotes():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.keynote_count == 1
-
-
-def test_counts_legends():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.legend_count == 1
-
-
-def test_counts_legend_items():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.legend_item_count == 2
-
-
-def test_counts_recommendations():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.recommendation_count == 1
-
-
-def test_counts_engineering_assumptions():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.engineering_assumption_count == 1
-
-
-def test_includes_bid_completeness_fields_when_present():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.bid_completeness_score == 0.7
-    assert brief.bid_completeness_status == "partial"
-
-
-def test_includes_readiness_fields_when_present():
-    brief = EstimatorBriefService().build_brief(make_review())
-
-    assert brief.readiness_status == "needs_review"
-    assert (
-        brief.readiness_message == "Plan review needs estimator review before pricing."
+    actions = brief.prioritized_reviewer_actions or []
+    assert len(actions) > 1
+    priorities = [action["priority"] for action in actions]
+    assert priorities == sorted(
+        priorities,
+        key=lambda value: {"critical": 4, "high": 3, "medium": 2, "low": 1}[value],
+        reverse=True,
     )
 
 
-def test_to_dict_output():
+def test_evidence_refs_inclusion() -> None:
+    brief = EstimatorBriefService().build_brief(make_review())
+
+    assert brief.evidence_refs is not None
+    assert any(ref["source_type"] == "equipment" for ref in brief.evidence_refs)
+
+
+def test_serialization() -> None:
+    brief = EstimatorBriefService().build_brief(make_review())
+    payload = brief.to_dict()
+
+    assert payload["project_id"] == "project-001"
+    assert "brief_title" in payload
+    assert "executive_summary" in payload
+    assert "readiness_summary" in payload
+    assert "top_blockers" in payload
+    assert "top_warnings" in payload
+    assert "key_rfi_candidates" in payload
+    assert "labor_summary" in payload
+    assert "revision_summary" in payload
+    assert "assumption_summary" in payload
+    assert "missing_scope_summary" in payload
+    assert "prioritized_reviewer_actions" in payload
+    assert "evidence_refs" in payload
+    assert "confidence" in payload
+    assert "created_by_engine_version" in payload
+
+
+def test_to_dict_output_for_dataclass_instantiation() -> None:
     brief = EstimatorBrief(
         review_id="review-001",
         project_id="project-001",
@@ -351,72 +250,35 @@ def test_to_dict_output():
         drawing_count=1,
         specification_count=1,
         system_count=1,
-        equipment_count=2,
-        room_count=1,
-        detail_callout_count=1,
-        issue_count=5,
-        placeholder_count=1,
-        review_required_count=2,
-        cross_reference_count=1,
-        reconciliation_issue_count=1,
-        scope_gap_count=1,
-        estimator_risk_count=1,
-        keynote_count=1,
-        legend_count=1,
-        legend_item_count=2,
-        recommendation_count=1,
-        confidence=0.82,
-        bid_completeness_score=0.7,
-        bid_completeness_status="partial",
-        readiness_status="needs_review",
-        readiness_message="Plan review needs estimator review before pricing.",
+        equipment_count=1,
+        room_count=0,
+        detail_callout_count=0,
+        issue_count=0,
+        placeholder_count=0,
+        review_required_count=0,
+        cross_reference_count=0,
+        reconciliation_issue_count=0,
+        scope_gap_count=0,
+        estimator_risk_count=0,
+        keynote_count=0,
+        legend_count=0,
+        legend_item_count=0,
+        confidence=0.9,
+        brief_title="Estimator Brief - Bid Package Review",
+        executive_summary="Summary",
+        readiness_summary={"readiness_level": "bid_ready"},
+        top_blockers=[],
+        top_warnings=[],
+        key_rfi_candidates=[],
+        labor_summary={"available": False},
+        revision_summary={"available": False},
+        assumption_summary={"total_count": 0},
+        missing_scope_summary={"diagnostic_count": 0},
+        prioritized_reviewer_actions=[],
+        evidence_refs=[],
     )
 
-    assert brief.to_dict() == {
-        "review_id": "review-001",
-        "project_id": "project-001",
-        "name": "Bid Package Review",
-        "drawing_count": 1,
-        "specification_count": 1,
-        "system_count": 1,
-        "equipment_count": 2,
-        "room_count": 1,
-        "detail_callout_count": 1,
-        "issue_count": 5,
-        "placeholder_count": 1,
-        "review_required_count": 2,
-        "cross_reference_count": 1,
-        "reconciliation_issue_count": 1,
-        "scope_gap_count": 1,
-        "estimator_risk_count": 1,
-        "engineering_assumption_count": 0,
-        "keynote_count": 1,
-        "legend_count": 1,
-        "legend_item_count": 2,
-        "recommendation_count": 1,
-        "confidence": 0.82,
-        "bid_completeness_score": 0.7,
-        "bid_completeness_status": "partial",
-        "readiness_status": "needs_review",
-        "readiness_message": "Plan review needs estimator review before pricing.",
-    }
+    payload = brief.to_dict()
 
-
-def test_bid_completeness_fields_are_none_when_missing():
-    review = make_review()
-    review.bid_completeness = None
-
-    brief = EstimatorBriefService().build_brief(review)
-
-    assert brief.bid_completeness_score is None
-    assert brief.bid_completeness_status is None
-
-
-def test_readiness_fields_are_none_when_missing():
-    review = make_review()
-    review.readiness = None
-
-    brief = EstimatorBriefService().build_brief(review)
-
-    assert brief.readiness_status is None
-    assert brief.readiness_message is None
+    assert payload["brief_title"] == "Estimator Brief - Bid Package Review"
+    assert payload["readiness_summary"]["readiness_level"] == "bid_ready"

@@ -65,6 +65,8 @@ from atlas_core.services.detail_callout_extraction_service import (
 from atlas_core.services.bid_package_review_service import BidPackageReviewService
 from atlas_core.services.estimator_brief_service import (
     EstimatorBrief,
+    EstimatorBriefEvidenceRef,
+    EstimatorReviewerAction,
     EstimatorBriefService,
 )
 from atlas_core.services.plan_review_workflow_service import (
@@ -78,6 +80,8 @@ from atlas_core.services.plan_review_export_service import (
 )
 from atlas_core.services.plan_review_readiness_service import (
     PlanReviewReadiness,
+    ReadinessEvidenceRef,
+    ReadinessLevel,
     PlanReviewReadinessService,
     ReadinessStatus,
 )
@@ -111,6 +115,11 @@ from atlas_core.services.engineering_assumption_service import (
     EngineeringAssumptionService,
 )
 from atlas_core.services.rfi_candidate_service import RFICandidateService
+from atlas_core.services.rfi_candidate_engine import RFICandidateEngine
+from atlas_core.services.labor_service import LaborService
+from atlas_core.services.labor_estimation_engine import LaborEstimationEngine
+from atlas_core.services.revision_comparison_service import RevisionComparisonService
+from atlas_core.services.revision_comparison_engine import RevisionComparisonEngine
 from atlas_core.services.final_estimator_review_service import (
     FinalEstimatorReview,
     FinalEstimatorReviewService,
@@ -147,6 +156,8 @@ __all__ = [
     "DeviceScheduleEquipmentService",
     "EquipmentDetectionService",
     "EstimatorBrief",
+    "EstimatorBriefEvidenceRef",
+    "EstimatorReviewerAction",
     "EstimatorBriefService",
     "EstimatorRisk",
     "EstimatorRiskService",
@@ -158,6 +169,11 @@ __all__ = [
     "FinalEstimatorReviewService",
     "EngineeringAssumptionService",
     "RFICandidateService",
+    "RFICandidateEngine",
+    "LaborService",
+    "LaborEstimationEngine",
+    "RevisionComparisonService",
+    "RevisionComparisonEngine",
     "JsonExportService",
     "KeynoteExtractionService",
     "LegendExtractionService",
@@ -169,6 +185,8 @@ __all__ = [
     "PlanReviewExportService",
     "PlanReviewApplicationService",
     "PlanReviewReadiness",
+    "ReadinessEvidenceRef",
+    "ReadinessLevel",
     "PlanReviewReadinessService",
     "PlanReviewWorkflowResult",
     "PlanReviewWorkflowService",

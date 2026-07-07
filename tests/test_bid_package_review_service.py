@@ -393,6 +393,31 @@ def test_scores_review_confidence_after_content_is_populated():
     assert review.confidence == ConfidenceScoringService().score_review(review)
 
 
+def test_includes_labor_estimate_output():
+    review = build_review(
+        systems=[
+            IntegratedSystem(
+                system_id="sys-001",
+                name="Performance Audio",
+                category=SystemCategory.AUDIO,
+            )
+        ],
+        equipment=[
+            Equipment(
+                equipment_id="eq-speaker",
+                description="Ceiling speaker",
+                category=EquipmentCategory.SPEAKER,
+                quantity=2,
+                system_id="sys-001",
+            )
+        ],
+    )
+
+    assert review.labor_estimate is not None
+    assert review.labor_estimate.project_id == "project-001"
+    assert review.labor_estimate.total_labor_hours_expected > 0
+
+
 def test_includes_recommendations_when_confidence_is_low():
     review = BidPackageReviewService(
         confidence_scoring_service=LowConfidenceScoringService()
@@ -491,6 +516,10 @@ def test_includes_readiness():
 
     assert review.readiness is not None
     assert review.readiness.message
+    assert review.readiness.project_id == "project-001"
+    assert 0 <= review.readiness.readiness_score <= 1
+    assert "equipment_completeness" in review.readiness.section_scores
+    assert review.readiness.recommendation_summary
 
 
 def test_bid_completeness_is_incomplete_when_drawings_and_specs_are_missing():

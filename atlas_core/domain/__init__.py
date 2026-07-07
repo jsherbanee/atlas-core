@@ -34,7 +34,13 @@ from atlas_core.domain.vendor_relationship import (
     VendorRelationshipType,
 )
 from atlas_core.domain.device_schedule import DeviceSchedule, DeviceScheduleItem
-from atlas_core.domain.rfi_candidate import RFICandidate, RFIPriority
+from atlas_core.domain.rfi_candidate import (
+    RFICandidate,
+    RFICandidateCategory,
+    RFICandidateSeverity,
+    RFICandidateSourceRef,
+    RFICandidateStatus,
+)
 from atlas_core.domain.bid_package_review import BidPackageReview
 from atlas_core.domain.estimate_baseline import (
     EstimateBaseline,
@@ -46,6 +52,18 @@ from atlas_core.domain.detail_callout import DetailCallout
 from atlas_core.domain.engineering_assumption import (
     AssumptionSeverity,
     EngineeringAssumption,
+)
+from atlas_core.domain.labor_estimate import (
+    LaborEstimate,
+    LaborEstimateCategory,
+    LaborEstimateSourceRef,
+)
+from atlas_core.domain.revision_comparison import (
+    RevisionChangeRecord,
+    RevisionChangeSeverity,
+    RevisionChangeType,
+    RevisionComparison,
+    RevisionComparisonSourceRef,
 )
 
 __all__ = [
@@ -62,7 +80,18 @@ __all__ = [
     "AssumptionSeverity",
     "EngineeringAssumption",
     "RFICandidate",
-    "RFIPriority",
+    "RFICandidateCategory",
+    "RFICandidateSeverity",
+    "RFICandidateSourceRef",
+    "RFICandidateStatus",
+    "LaborEstimate",
+    "LaborEstimateCategory",
+    "LaborEstimateSourceRef",
+    "RevisionComparison",
+    "RevisionChangeRecord",
+    "RevisionChangeType",
+    "RevisionChangeSeverity",
+    "RevisionComparisonSourceRef",
     "DrawingDiscipline",
     "DrawingSheet",
     "SpecificationDiscipline",

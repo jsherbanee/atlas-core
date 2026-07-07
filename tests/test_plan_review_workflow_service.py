@@ -70,6 +70,23 @@ def test_review_and_final_review_include_engineering_assumptions():
     assert result.final_review.engineering_assumptions
 
 
+def test_review_includes_labor_estimate():
+    result = run_review(
+        systems=[],
+        equipment=[
+            Equipment(
+                equipment_id="eq-speaker",
+                description="Ceiling speaker",
+                category=EquipmentCategory.SPEAKER,
+                quantity=2,
+            )
+        ],
+    )
+
+    assert result.review.labor_estimate is not None
+    assert result.review.labor_estimate.total_labor_hours_expected > 0
+
+
 def test_includes_drawing_count_in_brief():
     result = run_review(
         raw_sheets=[
@@ -81,6 +98,8 @@ def test_includes_drawing_count_in_brief():
     )
 
     assert result.brief.drawing_count == 1
+    assert result.brief.readiness_summary is not None
+    assert result.brief.prioritized_reviewer_actions is not None
 
 
 def test_includes_specification_count_in_brief():

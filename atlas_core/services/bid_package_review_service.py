@@ -36,7 +36,9 @@ if TYPE_CHECKING:
         BidCompletenessService,
         KeynoteExtractionService,
         LegendExtractionService,
+        LaborService,
         PlanReviewReadinessService,
+        RFICandidateService,
         ScopeReconciliationService,
     )
 
@@ -69,12 +71,16 @@ class BidPackageReviewService:
         detail_callout_extraction_service: DetailCalloutExtractionService | None = None,
         engineering_rule_engine: EngineeringRuleEngine | None = None,
         engineering_rule_registry: EngineeringRuleRegistry | None = None,
+        rfi_candidate_service: RFICandidateService | None = None,
+        labor_service: LaborService | None = None,
     ) -> None:
         from atlas_core.services import (
             BidCompletenessService,
             KeynoteExtractionService,
             LegendExtractionService,
+            LaborService,
             PlanReviewReadinessService,
+            RFICandidateService,
             ScopeReconciliationService,
         )
         from atlas_core.rules import (
@@ -130,6 +136,8 @@ class BidPackageReviewService:
         self.detail_callout_extraction_service = (
             detail_callout_extraction_service or DetailCalloutExtractionService()
         )
+        self.rfi_candidate_service = rfi_candidate_service or RFICandidateService()
+        self.labor_service = labor_service or LaborService()
 
         self.estimate_workflow_service: EstimateWorkflowService = (
             estimate_workflow_service
@@ -281,6 +289,8 @@ class BidPackageReviewService:
         review.estimator_risks = self.estimator_risk_service.assess(review)
         review.confidence = self.confidence_scoring_service.score_review(review)
         review.engineering_assumptions = self.engineering_rule_engine.evaluate(review)
+        review.rfi_candidates = self.rfi_candidate_service.build(review)
+        review.labor_estimate = self.labor_service.build(review)
         review.recommendations = self.recommendation_service.build_recommendations(
             review
         )

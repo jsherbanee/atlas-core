@@ -10,7 +10,14 @@ from atlas_core import __version__
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     argv = list(sys.argv[1:] if argv is None else argv)
-    known_commands = {"demo-estimate", "demo-maw", "demo-maw-plan-review"}
+    known_commands = {
+        "demo-estimate",
+        "demo-maw",
+        "demo-maw-plan-review",
+        "demo-maw-rfi-candidates",
+        "demo-maw-labor-estimate",
+        "demo-maw-revision-comparison",
+    }
 
     if argv and not argv[0].startswith("-") and argv[0] not in known_commands:
         parser.print_help()
@@ -30,6 +37,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "demo-maw-plan-review":
         return _demo_maw_plan_review(args.output_dir)
+
+    if args.command == "demo-maw-rfi-candidates":
+        return _demo_maw_rfi_candidates()
+
+    if args.command == "demo-maw-labor-estimate":
+        return _demo_maw_labor_estimate()
+
+    if args.command == "demo-maw-revision-comparison":
+        return _demo_maw_revision_comparison()
 
     parser.print_help()
     return 0
@@ -68,6 +84,18 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="Write MAW plan review CSV files",
+    )
+    subparsers.add_parser(
+        "demo-maw-rfi-candidates",
+        help="Run MAW plan review and print deterministic RFI candidates",
+    )
+    subparsers.add_parser(
+        "demo-maw-labor-estimate",
+        help="Run MAW plan review and print deterministic labor estimate",
+    )
+    subparsers.add_parser(
+        "demo-maw-revision-comparison",
+        help="Compare two deterministic MAW review snapshots and print revision changes",
     )
 
     return parser
@@ -209,6 +237,22 @@ def _demo_maw_plan_review(output_dir: Path) -> int:
     export_paths = export_result.to_dict()
 
     _print_estimator_brief_summary(result.brief)
+    readiness = result.review.readiness
+    if readiness is not None:
+        print(
+            "readiness summary: "
+            f"score={readiness.readiness_score} "
+            f"level={readiness.readiness_level.value} "
+            f"blockers={len(readiness.blocking_issues)} "
+            f"warnings={len(readiness.warnings)}"
+        )
+        print("readiness section scores:")
+        for section_name, score in sorted(readiness.section_scores.items()):
+            print(f"- {section_name}: {score}")
+        print("recommended reviewer actions:")
+        for action in readiness.recommended_reviewer_actions:
+            print(f"- {action}")
+
     print(f"estimator brief csv export: {export_paths['estimator_brief_path']}")
     print(f"drawing index csv export: {export_paths['drawing_index_path']}")
     print(
@@ -221,6 +265,186 @@ def _demo_maw_plan_review(output_dir: Path) -> int:
         "plan review summary markdown export: "
         f"{export_paths['markdown_summary_path']}"
     )
+    return 0
+
+
+def _demo_maw_rfi_candidates() -> int:
+    from atlas_core.sample_data import build_maw_seed_data
+    from atlas_core.services import PlanReviewWorkflowService
+
+    seed = build_maw_seed_data()
+    raw_sheets = _maw_plan_review_raw_sheets()
+    raw_sections = _maw_plan_review_raw_sections()
+
+    review = (
+        PlanReviewWorkflowService()
+        .run_review(
+            review_id="maw-plan-review-rfi",
+            project_id="maw-demo",
+            name="MAW Music Education Center Plan Review RFI",
+            raw_sheets=raw_sheets,
+            raw_sections=raw_sections,
+            buildings=seed["buildings"],
+            rooms=seed["rooms"],
+            spaces=seed["spaces"],
+            scenes=seed["scenes"],
+            systems=seed["systems"],
+            equipment=seed["equipment"],
+        )
+        .review
+    )
+
+    print(f"rfi candidates: {len(review.rfi_candidates)}")
+    for candidate in review.rfi_candidates:
+        print(json.dumps(candidate.to_dict(), sort_keys=True))
+
+    return 0
+
+
+def _demo_maw_labor_estimate() -> int:
+    from atlas_core.sample_data import build_maw_seed_data
+    from atlas_core.services import PlanReviewWorkflowService
+
+    seed = build_maw_seed_data()
+    raw_sheets = _maw_plan_review_raw_sheets()
+    raw_sections = _maw_plan_review_raw_sections()
+
+    review = (
+        PlanReviewWorkflowService()
+        .run_review(
+            review_id="maw-plan-review-labor",
+            project_id="maw-demo",
+            name="MAW Music Education Center Plan Review Labor",
+            raw_sheets=raw_sheets,
+            raw_sections=raw_sections,
+            buildings=seed["buildings"],
+            rooms=seed["rooms"],
+            spaces=seed["spaces"],
+            scenes=seed["scenes"],
+            systems=seed["systems"],
+            equipment=seed["equipment"],
+        )
+        .review
+    )
+
+    labor_estimate = review.labor_estimate
+    if labor_estimate is None:
+        print("labor estimate: unavailable")
+        return 1
+
+    print(
+        "labor estimate totals: "
+        f"low={labor_estimate.total_labor_hours_low} "
+        f"expected={labor_estimate.total_labor_hours_expected} "
+        f"high={labor_estimate.total_labor_hours_high} "
+        f"confidence={labor_estimate.confidence}"
+    )
+    print(f"labor categories: {len(labor_estimate.labor_categories)}")
+    for category in labor_estimate.labor_categories:
+        print(json.dumps(category.to_dict(), sort_keys=True))
+
+    return 0
+
+
+def _demo_maw_revision_comparison() -> int:
+    from copy import deepcopy
+
+    from atlas_core.domain import Equipment, EquipmentCategory
+    from atlas_core.sample_data import build_maw_seed_data
+    from atlas_core.services import PlanReviewWorkflowService, RevisionComparisonService
+
+    baseline_seed = build_maw_seed_data()
+    baseline_review = (
+        PlanReviewWorkflowService()
+        .run_review(
+            review_id="maw-revision-baseline",
+            project_id="maw-demo",
+            name="MAW Revision Baseline",
+            raw_sheets=_maw_plan_review_raw_sheets(),
+            raw_sections=_maw_plan_review_raw_sections(),
+            buildings=baseline_seed["buildings"],
+            rooms=baseline_seed["rooms"],
+            spaces=baseline_seed["spaces"],
+            scenes=baseline_seed["scenes"],
+            systems=baseline_seed["systems"],
+            equipment=baseline_seed["equipment"],
+        )
+        .review
+    )
+
+    comparison_seed = build_maw_seed_data()
+    comparison_equipment = deepcopy(comparison_seed["equipment"])
+    for item in comparison_equipment:
+        if item.equipment_id == "maw-recital-speakers":
+            item.quantity = 6
+            item.assumptions.append("OFCI speaker cabling by others.")
+        elif item.equipment_id == "maw-control-processor":
+            item.model = "Core Nano Plus"
+            item.specification_reference = "27 41 26A"
+        elif item.equipment_id == "maw-classroom-display":
+            item.drawing_reference = "AV-602"
+
+    comparison_equipment = [
+        item
+        for item in comparison_equipment
+        if item.equipment_id != "maw-lobby-display"
+    ]
+    comparison_equipment.append(
+        Equipment(
+            equipment_id="maw-assistive-listening-pack",
+            description="Assistive listening receivers add alternate",
+            category=EquipmentCategory.ASSISTED_LISTENING,
+            quantity=2,
+            manufacturer="Listen Technologies",
+            model="LT-84",
+            system_id="maw-performance-audio",
+            room_id="maw-recital-hall",
+            drawing_reference="AV-403",
+            specification_reference="27 41 16",
+            assumptions=["Owner provided charging station by others."],
+        )
+    )
+
+    comparison_review = (
+        PlanReviewWorkflowService()
+        .run_review(
+            review_id="maw-revision-comparison",
+            project_id="maw-demo",
+            name="MAW Revision Comparison",
+            raw_sheets=_maw_plan_review_raw_sheets()
+            + [{"sheet_number": "AV-602", "title": "Classroom AV Revision"}],
+            raw_sections=_maw_plan_review_raw_sections()
+            + [{"section_number": "27 41 26A", "title": "Control Addendum"}],
+            buildings=comparison_seed["buildings"],
+            rooms=comparison_seed["rooms"],
+            spaces=comparison_seed["spaces"],
+            scenes=comparison_seed["scenes"],
+            systems=comparison_seed["systems"],
+            equipment=comparison_equipment,
+        )
+        .review
+    )
+
+    comparison = RevisionComparisonService().build(
+        baseline_review=baseline_review,
+        comparison_review=comparison_review,
+        baseline_revision_id="maw-rev-0",
+        comparison_revision_id="maw-rev-1",
+    )
+
+    print(
+        "revision comparison summary: "
+        f"changes={len(comparison.changes)} "
+        f"added={len(comparison.added_items)} "
+        f"removed={len(comparison.removed_items)} "
+        f"modified={len(comparison.modified_items)} "
+        f"confidence={comparison.confidence}"
+    )
+    print(f"labor impact flags: {len(comparison.labor_impact_flags)}")
+    print(f"rfi impacts: {len(comparison.rfi_impacts)}")
+    for change in comparison.changes:
+        print(json.dumps(change.to_dict(), sort_keys=True))
+
     return 0
 
 
@@ -259,6 +483,7 @@ def _maw_plan_review_raw_sections() -> list[dict[str, str]]:
 def _print_estimator_brief_summary(brief: Any) -> None:
     print(
         "estimator brief summary: "
+        f"title={brief.brief_title} "
         f"drawings={brief.drawing_count} "
         f"specifications={brief.specification_count} "
         f"systems={brief.system_count} "
@@ -268,6 +493,16 @@ def _print_estimator_brief_summary(brief: Any) -> None:
         f"review_required={brief.review_required_count} "
         f"confidence={brief.confidence}"
     )
+    print(f"executive summary: {brief.executive_summary}")
+    readiness_summary = brief.readiness_summary or {}
+    print(
+        "brief readiness: "
+        f"score={readiness_summary.get('readiness_score')} "
+        f"level={readiness_summary.get('readiness_level')}"
+    )
+    print(f"top blockers: {len(brief.top_blockers or [])}")
+    print(f"top warnings: {len(brief.top_warnings or [])}")
+    print(f"prioritized actions: {len(brief.prioritized_reviewer_actions or [])}")
 
 
 def _print_workflow_result(result: Any) -> None:

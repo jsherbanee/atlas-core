@@ -137,6 +137,12 @@ def test_demo_maw_plan_review_creates_estimator_brief_csv(tmp_path):
     assert result.returncode == 0
     assert result.stderr == ""
     assert "estimator brief summary:" in result.stdout
+    assert "executive summary:" in result.stdout
+    assert "brief readiness:" in result.stdout
+    assert "prioritized actions:" in result.stdout
+    assert "readiness summary:" in result.stdout
+    assert "readiness section scores:" in result.stdout
+    assert "recommended reviewer actions:" in result.stdout
     assert f"estimator brief csv export: {output_path}" in result.stdout
     assert output_path.exists()
 
@@ -232,6 +238,33 @@ def test_demo_maw_plan_review_markdown_summary_includes_name(tmp_path):
     )
 
 
+def test_demo_maw_rfi_candidates_runs_successfully():
+    result = run_cli("demo-maw-rfi-candidates")
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "rfi candidates:" in result.stdout
+
+
+def test_demo_maw_labor_estimate_runs_successfully():
+    result = run_cli("demo-maw-labor-estimate")
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "labor estimate totals:" in result.stdout
+    assert "labor categories:" in result.stdout
+
+
+def test_demo_maw_revision_comparison_runs_successfully():
+    result = run_cli("demo-maw-revision-comparison")
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "revision comparison summary:" in result.stdout
+    assert "labor impact flags:" in result.stdout
+    assert "rfi impacts:" in result.stdout
+
+
 def test_unknown_command_prints_help():
     result = run_cli("not-a-command")
 
@@ -239,3 +272,6 @@ def test_unknown_command_prints_help():
     assert "usage: atlas-core" in result.stdout
     assert "demo-estimate" in result.stdout
     assert "demo-maw" in result.stdout
+    assert "demo-maw-rfi-candidates" in result.stdout
+    assert "demo-maw-labor-estimate" in result.stdout
+    assert "demo-maw-revision-comparison" in result.stdout

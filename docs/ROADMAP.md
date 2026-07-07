@@ -11,22 +11,25 @@ Completed outcomes:
 Current objective:
 Build a complete bid analysis and estimating-readiness engine for commercial AV/theatrical work.
 
-Remaining Phase 2 priorities:
-- PDF ingestion
-- Drawing intelligence
-- Spec intelligence
-- Device schedules
-- Keynotes
-- Legends
-- Detail callouts
+Implemented in current baseline candidate:
+- Bid package review orchestration
+- Drawing/spec indexing
+- System and equipment detection
+- Cross-reference/scoping diagnostics
 - Scope reconciliation
-- Engineering rule engine
-- RFI candidates
-- Labor estimation
-- Addenda/revision comparison
-- Bid completeness
-- Readiness
-- Estimator brief
+- Engineering rule engine assumptions
+- RFI candidate generation
+- Labor estimation engine
+- Bid completeness scoring
+- Plan review readiness scoring
+- Estimator brief enhancements
+- Revision comparison engine
+
+Remaining Phase 2 refinements:
+- PDF ingestion and indexing robustness
+- Drawing/spec intelligence quality refinements
+- Device schedule extraction quality refinements
+- Additional deterministic regression snapshots and export validations
 
 ## Phase 3: Project Initialization (Deferred)
 Deferred until Phase 2 completion.

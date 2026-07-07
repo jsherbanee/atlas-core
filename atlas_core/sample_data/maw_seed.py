@@ -1,4 +1,8 @@
-"""MAW Music Education Center sample seed data."""
+"""MAW Music Education Center canonical reference sample seed data.
+
+This module provides deterministic sample inputs for demos and tests only.
+Core product logic must remain project-agnostic and must not branch on MAW IDs.
+"""
 
 from atlas_core.domain import (
     Building,

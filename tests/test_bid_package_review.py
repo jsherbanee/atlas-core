@@ -19,6 +19,17 @@ from atlas_core.domain import (
     SpecificationSection,
     SystemCategory,
     EngineeringAssumption,
+    LaborEstimate,
+    LaborEstimateCategory,
+    LaborEstimateSourceRef,
+    RFICandidate,
+    RFICandidateCategory,
+    RFICandidateSeverity,
+    RFICandidateSourceRef,
+    RevisionChangeRecord,
+    RevisionChangeSeverity,
+    RevisionChangeType,
+    RevisionComparison,
 )
 from atlas_core.rules import Resolution, ResolutionAction
 from atlas_core.services import (
@@ -126,6 +137,95 @@ def make_engineering_assumption() -> EngineeringAssumption:
         description="Projector mounting solution should be verified.",
         severity=AssumptionSeverity.REVIEW,
         related_equipment="eq-001",
+    )
+
+
+def make_rfi_candidate() -> RFICandidate:
+    return RFICandidate(
+        candidate_id="rfi-project-001-abc123",
+        project_id="project-001",
+        title="Missing model number for eq-001",
+        description="Equipment eq-001 has manufacturer but model is missing.",
+        category=RFICandidateCategory.MISSING_INFORMATION,
+        severity=RFICandidateSeverity.HIGH,
+        confidence=0.92,
+        source_refs=[
+            RFICandidateSourceRef(
+                source_type="equipment",
+                source_id="eq-001",
+                field="model",
+                excerpt="manufacturer=Epson",
+            )
+        ],
+        related_items=["eq-001"],
+        detected_condition="missing_model_number",
+        recommended_action="Confirm model number before pricing.",
+    )
+
+
+def make_labor_estimate() -> LaborEstimate:
+    return LaborEstimate(
+        project_id="project-001",
+        total_labor_hours_low=12.0,
+        total_labor_hours_expected=15.5,
+        total_labor_hours_high=19.8,
+        labor_categories=[
+            LaborEstimateCategory(
+                category_id="field_installation:Performance Audio",
+                category_name="field_installation",
+                system_area="Performance Audio",
+                quantity_basis="quantity_sum=2",
+                hours_low=4.2,
+                hours_expected=5.0,
+                hours_high=6.5,
+                confidence=0.78,
+                calculation_method="default_device_installation_factor",
+                source_refs=[
+                    LaborEstimateSourceRef(
+                        source_type="equipment",
+                        source_id="eq-001",
+                    )
+                ],
+                assumptions=["Assumed standard cable paths."],
+                risk_factors=["scope_responsibility_ambiguity"],
+            )
+        ],
+        assumptions=["Bid-phase labor allowance only."],
+        exclusions=["Excludes procurement workflows."],
+        confidence=0.72,
+        source_refs=[
+            LaborEstimateSourceRef(
+                source_type="bid_package_review",
+                source_id="review-001",
+            )
+        ],
+        warnings=["Scope ambiguity may increase labor hours."],
+    )
+
+
+def make_revision_comparison() -> RevisionComparison:
+    return RevisionComparison(
+        project_id="project-001",
+        baseline_revision_id="rev-a",
+        comparison_revision_id="rev-b",
+        summary={"change_count": 1},
+        changes=[
+            RevisionChangeRecord(
+                change_id="chg-001",
+                change_type=RevisionChangeType.QUANTITY_CHANGED,
+                title="Quantity changed",
+                description="Quantity changed from 1 to 2.",
+                severity=RevisionChangeSeverity.HIGH,
+                confidence=0.9,
+                affected_items=["eq-001"],
+                previous_value=1,
+                current_value=2,
+                detected_condition="equipment_quantity_changed",
+                estimating_impact="Affects estimate.",
+                recommended_action="Update quantity.",
+            )
+        ],
+        confidence=0.82,
     )
 
 
@@ -380,6 +480,17 @@ def test_recommendation_count():
     assert review.recommendation_count() == 1
 
 
+def test_rfi_candidate_count():
+    review = BidPackageReview(
+        review_id="review-001",
+        project_id="project-001",
+        name="Bid Package Review",
+        rfi_candidates=[make_rfi_candidate()],
+    )
+
+    assert review.rfi_candidate_count() == 1
+
+
 def test_to_dict_output():
     drawing_sheet = make_drawing_sheet()
     specification_section = make_specification_section()
@@ -403,6 +514,9 @@ def test_to_dict_output():
     estimator_risk = make_estimator_risk()
     recommendation = make_recommendation()
     engineering_assumption = make_engineering_assumption()
+    rfi_candidate = make_rfi_candidate()
+    labor_estimate = make_labor_estimate()
+    revision_comparison = make_revision_comparison()
     reconciliation_issue = make_reconciliation_issue()
     bid_completeness = make_bid_completeness()
     device_schedule = make_device_schedule()
@@ -427,6 +541,9 @@ def test_to_dict_output():
         estimator_risks=[estimator_risk],
         recommendations=[recommendation],
         engineering_assumptions=[engineering_assumption],
+        rfi_candidates=[rfi_candidate],
+        labor_estimate=labor_estimate,
+        revision_comparison=revision_comparison,
         bid_completeness=bid_completeness,
         drawing_metadata=[DrawingMetadata(sheet_number="AV1.01", title="AV Plan")],
         device_schedules=[device_schedule],
@@ -470,6 +587,9 @@ def test_to_dict_output():
         "estimator_risks": [estimator_risk.to_dict()],
         "recommendations": [recommendation.to_dict()],
         "engineering_assumptions": [engineering_assumption.to_dict()],
+        "rfi_candidates": [rfi_candidate.to_dict()],
+        "labor_estimate": labor_estimate.to_dict(),
+        "revision_comparison": revision_comparison.to_dict(),
         "bid_completeness": bid_completeness.to_dict(),
         "readiness": None,
         "drawing_metadata": [
@@ -491,6 +611,8 @@ def test_to_dict_output_includes_none_bid_completeness_when_missing():
     )
 
     assert review.to_dict()["bid_completeness"] is None
+    assert review.to_dict()["labor_estimate"] is None
+    assert review.to_dict()["revision_comparison"] is None
 
 
 def test_to_dict_output_includes_readiness_when_present():

@@ -1,190 +1,198 @@
 from atlas_core.domain import (
-    AssumptionSeverity,
     BidPackageReview,
-    DetailCallout,
-    EngineeringAssumption,
+    DeviceSchedule,
+    DeviceScheduleItem,
+    DrawingSheet,
     Equipment,
     EquipmentCategory,
+    RFICandidateCategory,
+    SpecificationSection,
 )
 from atlas_core.services.rfi_candidate_service import RFICandidateService
-from atlas_core.services.scope_gap_service import ScopeGap
+from atlas_core.services.scope_reconciliation_service import (
+    ReconciliationIssue,
+    ReconciliationSeverity,
+)
 
 
 def make_review(
-    scope_gaps: list[ScopeGap] | None = None,
     equipment: list[Equipment] | None = None,
-    detail_callouts: list[DetailCallout] | None = None,
-    engineering_assumptions: list[EngineeringAssumption] | None = None,
+    drawings: list[DrawingSheet] | None = None,
+    specs: list[SpecificationSection] | None = None,
+    schedules: list[DeviceSchedule] | None = None,
+    reconciliation_issues: list[ReconciliationIssue] | None = None,
 ) -> BidPackageReview:
     return BidPackageReview(
         review_id="review-001",
         project_id="project-001",
         name="Plan Review",
-        scope_gaps=list(scope_gaps or []),
         equipment=list(equipment or []),
-        detail_callouts=list(detail_callouts or []),
-        engineering_assumptions=list(engineering_assumptions or []),
+        drawing_sheets=list(drawings or []),
+        specification_sections=list(specs or []),
+        device_schedules=list(schedules or []),
+        reconciliation_issues=list(reconciliation_issues or []),
     )
 
 
-def test_high_scope_gap_creates_rfi():
-    review = make_review(
-        scope_gaps=[
-            ScopeGap(
-                gap_id="projector_missing_mount",
-                target_id="eq-projector",
-                message="Projector missing mount",
-                severity="high",
-            )
-        ]
-    )
-
-    candidates = RFICandidateService().build(review)
-
-    assert any(candidate.category == "scope_gap" for candidate in candidates)
-    assert any(candidate.priority.value == "high" for candidate in candidates)
-
-
-def test_projector_without_mount_detail_creates_rfi():
+def test_missing_model_number_creates_candidate():
     review = make_review(
         equipment=[
             Equipment(
                 equipment_id="eq-projector",
                 description="Main projector",
                 category=EquipmentCategory.PROJECTOR,
-                specification_reference="27 41 16",
+                manufacturer="Epson",
             )
         ]
     )
 
     candidates = RFICandidateService().build(review)
 
-    projector_rfi = next(
+    assert any(
+        candidate.detected_condition == "missing_model_number"
+        for candidate in candidates
+    )
+    assert any(
+        candidate.category is RFICandidateCategory.MISSING_INFORMATION
+        for candidate in candidates
+    )
+
+
+def test_ofe_ofci_cfci_by_others_ambiguity_creates_candidate():
+    review = make_review(
+        drawings=[
+            DrawingSheet(
+                sheet_id="av-101",
+                sheet_number="AV-101",
+                title="AV Plan",
+                notes=["Display by others; OFE mount and OFCI cabling."],
+            )
+        ]
+    )
+
+    candidates = RFICandidateService().build(review)
+
+    ambiguity_candidate = next(
         candidate
         for candidate in candidates
-        if candidate.rfi_id == "rfi_projector_mounting_eq-projector"
+        if candidate.detected_condition == "scope_responsibility_ambiguity"
     )
-    assert projector_rfi.priority.value == "high"
-    assert projector_rfi.category == "mounting"
+    assert ambiguity_candidate.category is RFICandidateCategory.RESPONSIBILITY_GAP
+    assert ambiguity_candidate.source_refs
 
 
-def test_display_without_mount_detail_creates_rfi():
+def test_quantity_mismatch_creates_candidate():
     review = make_review(
         equipment=[
             Equipment(
-                equipment_id="eq-display",
-                description="Main display",
-                category=EquipmentCategory.DISPLAY,
-                specification_reference="27 41 16",
+                equipment_id="eq-speaker",
+                description="Ceiling speaker",
+                category=EquipmentCategory.SPEAKER,
+                manufacturer="JBL",
+                model="CBT 70J",
+                quantity=4,
             )
-        ]
-    )
-
-    candidates = RFICandidateService().build(review)
-
-    display_rfi = next(
-        candidate
-        for candidate in candidates
-        if candidate.rfi_id == "rfi_display_mounting_eq-display"
-    )
-    assert display_rfi.priority.value == "medium"
-    assert display_rfi.category == "mounting"
-
-
-def test_drapery_creates_rfi():
-    review = make_review(
-        equipment=[
-            Equipment(
-                equipment_id="eq-drapery",
-                description="Stage drapery",
-                category=EquipmentCategory.DRAPERY,
-                specification_reference="11 61 00",
-            )
-        ]
-    )
-
-    candidates = RFICandidateService().build(review)
-
-    drapery_rfi = next(
-        candidate
-        for candidate in candidates
-        if candidate.rfi_id == "rfi_drapery_equipment_eq-drapery"
-    )
-    assert drapery_rfi.priority.value == "high"
-    assert drapery_rfi.category == "drapery"
-
-
-def test_equipment_without_specification_reference_creates_low_priority_rfi():
-    review = make_review(
-        equipment=[
-            Equipment(
-                equipment_id="eq-display",
-                description="Main display",
-                category=EquipmentCategory.DISPLAY,
-            )
-        ]
-    )
-
-    candidates = RFICandidateService().build(review)
-
-    spec_rfi = next(
-        candidate
-        for candidate in candidates
-        if candidate.rfi_id == "rfi_specification_reference_eq-display"
-    )
-    assert spec_rfi.priority.value == "low"
-    assert spec_rfi.category == "specification"
-
-
-def test_risk_engineering_assumption_creates_high_priority_rfi():
-    review = make_review(
-        engineering_assumptions=[
-            EngineeringAssumption(
-                assumption_id="assumption-001",
-                category="mounting",
-                description="Structural support should be verified.",
-                severity=AssumptionSeverity.RISK,
-                related_equipment="eq-projector",
-            )
-        ]
-    )
-
-    candidates = RFICandidateService().build(review)
-
-    assumption_rfi = next(
-        candidate
-        for candidate in candidates
-        if candidate.rfi_id == "rfi_assumption_assumption-001"
-    )
-    assert assumption_rfi.priority.value == "high"
-    assert assumption_rfi.category == "assumption"
-    assert assumption_rfi.question == "Structural support should be verified."
-
-
-def test_duplicates_are_avoided():
-    review = make_review(
-        equipment=[
-            Equipment(
-                equipment_id="eq-projector",
-                description="Main projector",
-                category=EquipmentCategory.PROJECTOR,
-                specification_reference="27 41 16",
-            ),
-            Equipment(
-                equipment_id="eq-projector",
-                description="Duplicate projector",
-                category=EquipmentCategory.PROJECTOR,
-                specification_reference="27 41 16",
-            ),
         ],
-        detail_callouts=[],
+        schedules=[
+            DeviceSchedule(
+                schedule_id="sched-001",
+                items=[
+                    DeviceScheduleItem(
+                        item_id="sched-item-1",
+                        tag="SPK-1",
+                        description="Ceiling speaker",
+                        manufacturer="JBL",
+                        model="CBT 70J",
+                        quantity=6,
+                    )
+                ],
+            )
+        ],
+        reconciliation_issues=[
+            ReconciliationIssue(
+                issue_id="qty-mismatch-1",
+                message="Quantity mismatch between drawing and schedule.",
+                severity=ReconciliationSeverity.HIGH,
+                target_id="eq-speaker",
+            )
+        ],
     )
 
     candidates = RFICandidateService().build(review)
 
-    assert [candidate.rfi_id for candidate in candidates].count(
-        "rfi_projector_mounting_eq-projector"
-    ) == 1
+    assert any(
+        candidate.detected_condition == "quantity_conflict" for candidate in candidates
+    )
+
+
+def test_drawing_spec_mismatch_creates_candidate():
+    review = make_review(
+        equipment=[
+            Equipment(
+                equipment_id="eq-display",
+                description="Main display",
+                category=EquipmentCategory.DISPLAY,
+                drawing_reference="AV-201",
+            )
+        ]
+    )
+
+    candidates = RFICandidateService().build(review)
+
+    mismatch_candidate = next(
+        candidate
+        for candidate in candidates
+        if candidate.detected_condition == "drawing_spec_cross_reference_gap"
+    )
+    assert mismatch_candidate.category is RFICandidateCategory.DRAWING_SPEC_MISMATCH
+
+
+def test_add_alternate_ambiguity_creates_candidate():
+    review = make_review(
+        specs=[
+            SpecificationSection(
+                section_id="27-41-16",
+                section_number="27 41 16",
+                title="Integrated AV Systems",
+                notes=["Add alternate: provide additional displays."],
+            )
+        ]
+    )
+
+    candidates = RFICandidateService().build(review)
+
+    assert any(
+        candidate.detected_condition == "add_alternate_ambiguity"
+        for candidate in candidates
+    )
+
+
+def test_duplicate_or_near_duplicate_candidates_are_suppressed():
+    review = make_review(
+        equipment=[
+            Equipment(
+                equipment_id="eq-projector-a",
+                description="Main projector",
+                category=EquipmentCategory.PROJECTOR,
+                manufacturer="Panasonic",
+            ),
+            Equipment(
+                equipment_id="eq-projector-b",
+                description="Main projector",
+                category=EquipmentCategory.PROJECTOR,
+                manufacturer="Panasonic",
+            ),
+        ]
+    )
+
+    candidates = RFICandidateService().build(review)
+
+    missing_model_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.detected_condition == "missing_model_number"
+    ]
+    assert len(missing_model_candidates) == 1
 
 
 def test_clean_review_returns_empty_list():
@@ -194,31 +202,35 @@ def test_clean_review_returns_empty_list():
                 equipment_id="eq-projector",
                 description="Main projector",
                 category=EquipmentCategory.PROJECTOR,
+                manufacturer="Epson",
+                model="EB-PQ2220B",
                 specification_reference="27 41 16",
+                drawing_reference="AV-201",
             ),
             Equipment(
                 equipment_id="eq-display",
                 description="Main display",
                 category=EquipmentCategory.DISPLAY,
+                manufacturer="Samsung",
+                model="QM75C",
                 specification_reference="27 41 16",
+                drawing_reference="AV-202",
             ),
         ],
-        detail_callouts=[
-            DetailCallout(
-                callout_id="callout-001",
-                detail_number="1",
-                source_sheet_number="AV-101",
-                equipment_category="mount",
-                description="Mounting detail",
+        drawings=[
+            DrawingSheet(
+                sheet_id="av-101",
+                sheet_number="AV-101",
+                title="AV Plan",
+                notes=["Mounting and power responsibilities by AV contractor."],
             )
         ],
-        scope_gaps=[],
-        engineering_assumptions=[
-            EngineeringAssumption(
-                assumption_id="assumption-001",
-                category="general",
-                description="General review note.",
-                severity=AssumptionSeverity.REVIEW,
+        specs=[
+            SpecificationSection(
+                section_id="27-41-16",
+                section_number="27 41 16",
+                title="Integrated AV Systems",
+                notes=["Basis of design and quantity are defined in this section."],
             )
         ],
     )

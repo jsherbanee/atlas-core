@@ -17,7 +17,15 @@ from atlas_core.rules import Resolution
 from atlas_core.utils.refactoring import serialize_item, serialize_items
 
 if TYPE_CHECKING:
-    from atlas_core.domain import DetailCallout, EngineeringAssumption, Keynote, Legend
+    from atlas_core.domain import (
+        DetailCallout,
+        EngineeringAssumption,
+        Keynote,
+        Legend,
+        LaborEstimate,
+        RFICandidate,
+        RevisionComparison,
+    )
     from atlas_core.services import ManufacturerReviewIssue, ReviewReportItem
     from atlas_core.services.bid_completeness_service import BidCompleteness
     from atlas_core.services.plan_review_readiness_service import PlanReviewReadiness
@@ -55,6 +63,9 @@ class BidPackageReview:
     estimator_risks: list[EstimatorRisk] = field(default_factory=list)
     recommendations: list[Recommendation] = field(default_factory=list)
     engineering_assumptions: list[EngineeringAssumption] = field(default_factory=list)
+    rfi_candidates: list[RFICandidate] = field(default_factory=list)
+    labor_estimate: LaborEstimate | None = None
+    revision_comparison: RevisionComparison | None = None
     bid_completeness: BidCompleteness | None = None
     readiness: PlanReviewReadiness | None = None
     notes: list[str] = field(default_factory=list)
@@ -121,6 +132,9 @@ class BidPackageReview:
     def recommendation_count(self) -> int:
         return len(self.recommendations)
 
+    def rfi_candidate_count(self) -> int:
+        return len(self.rfi_candidates)
+
     def issue_count(self) -> int:
         return (
             len(self.resolutions)
@@ -156,6 +170,17 @@ class BidPackageReview:
             "recommendations": self._serialize_items(self.recommendations),
             "engineering_assumptions": self._serialize_items(
                 self.engineering_assumptions
+            ),
+            "rfi_candidates": self._serialize_items(self.rfi_candidates),
+            "labor_estimate": (
+                self.labor_estimate.to_dict()
+                if self.labor_estimate is not None
+                else None
+            ),
+            "revision_comparison": (
+                self.revision_comparison.to_dict()
+                if self.revision_comparison is not None
+                else None
             ),
             "bid_completeness": (
                 self.bid_completeness.to_dict()
