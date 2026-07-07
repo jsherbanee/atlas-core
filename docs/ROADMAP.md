@@ -1,5 +1,7 @@
 # Atlas Core Roadmap
 
+Domain object continuity and lifecycle boundaries referenced in this roadmap are defined in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).
+
 ## Phase 1: Foundation (Completed)
 Completed outcomes:
 - Core domain model scaffolding

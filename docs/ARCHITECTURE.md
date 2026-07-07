@@ -1,5 +1,9 @@
 # Atlas Core Architecture
 
+## Domain Alignment
+Atlas lifecycle object definitions and cross-phase continuity rules are defined in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).
+Architecture and module design should align to that domain model so Phase 2 artifacts remain reusable in downstream phases.
+
 ## Engine-First Architecture
 Atlas Core is the engine. Future web and API layers should call Atlas Core services and contracts rather than duplicating business logic in separate code paths.
 
