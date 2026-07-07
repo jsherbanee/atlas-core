@@ -141,6 +141,14 @@ from atlas_core.services.document_intake_service import (
     UploadedIntakeFile,
     UploadSessionResult,
 )
+from atlas_core.services.engineering_insights_service import (
+    EngineeringInsight,
+    EngineeringInsightsService,
+    EngineeringIntelligenceResult,
+    ProjectHealthCategory,
+    ProjectHealthModel,
+    SystemHealth,
+)
 
 __all__ = [
     "BaselineService",
@@ -202,6 +210,12 @@ __all__ = [
     "PlanReviewWorkflowService",
     "PdfPlanReviewIntakeService",
     "DocumentIntakeService",
+    "EngineeringInsight",
+    "EngineeringInsightsService",
+    "EngineeringIntelligenceResult",
+    "ProjectHealthCategory",
+    "ProjectHealthModel",
+    "SystemHealth",
     "PackageDiscoveryResult",
     "UploadedIntakeFile",
     "UploadSessionResult",

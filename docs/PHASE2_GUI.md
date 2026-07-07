@@ -9,7 +9,7 @@ This interface is local-only:
 - Local file-backed workspace persistence under `outputs/project_workspaces/`.
 - No procurement/RFQ/submittal/invoice/execution/closeout/vendor communication workflows.
 
-Atlas Workspace v1 (Sprint 7) launches into a persistent interactive engineering shell.
+Atlas Workspace v1 (Sprint 8) launches into a persistent interactive engineering shell.
 
 Shell layout:
 - Header
@@ -460,6 +460,79 @@ Global search now supports:
 - ranking with exact matches first
 
 Search results preserve keyboard navigation behavior and cross-page navigation into object-focused views.
+
+## Engineering Intelligence (Sprint 8)
+Atlas now provides deterministic engineering decision support.
+
+Engineering Intelligence page includes:
+- top engineering insights
+- critical risks
+- coordination issues
+- high-risk systems
+- most referenced drawings
+- most referenced specifications
+- top equipment risks
+- highest confidence recommendations
+
+Insight controls:
+- severity filters
+- category filters
+- sorting
+- grouping by Severity, Category, System, Drawing, Specification
+
+## Insight Engine
+Engineering Intelligence is powered by deterministic outputs from:
+- BidPackageReview
+- Readiness
+- Estimator Brief
+- RFI Candidates
+- Labor Estimate
+- Revision Comparison
+- Knowledge Graph
+
+Each insight includes:
+- insight_id
+- category
+- severity
+- confidence
+- title
+- description
+- recommended_action
+- supporting_objects
+- evidence_refs
+- created_by_engine_version
+
+## Project Health Model
+Project Health is separate from readiness and scores engineering package quality from 0 to 100.
+
+Weighted categories:
+- engineering completeness
+- package consistency
+- cross-object coordination
+- estimating confidence
+- revision stability
+
+The dashboard shows weighted rationale for score traceability.
+
+## Systems Health
+Systems Workspace now includes deterministic system health metrics:
+- health score
+- confidence
+- equipment completeness
+- specification coverage
+- drawing coverage
+- outstanding RFIs
+- outstanding assumptions
+- labor confidence
+- warnings
+
+## Recommendations and Traceability
+Recommendations are deterministic and include explicit traceability back to source evidence and supporting objects.
+
+The interface is designed to answer:
+- what should be reviewed next
+- why it matters
+- where the observation came from
 
 ## Project Files Explorer
 Project Files includes folder-based exploration:

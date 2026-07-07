@@ -22,6 +22,10 @@ from atlas_core.services.project_workspace_service import (
     ProjectWorkspaceRecord,
     ProjectWorkspaceService,
 )
+from atlas_core.services.engineering_insights_service import (
+    EngineeringIntelligenceResult,
+    EngineeringInsightsService,
+)
 
 PROJECT_MANAGER_PAGES = [
     "Home",
@@ -40,6 +44,7 @@ PROJECT_PAGES = [
     "Specifications",
     "Equipment",
     "Systems",
+    "Engineering Intelligence",
     "Relationship Explorer",
     "Relationship Visualization",
     "Timeline",
@@ -2396,6 +2401,283 @@ def _metadata_for_selection(
     return None
 
 
+def _build_engineering_intelligence(
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> EngineeringIntelligenceResult | None:
+    if context is None:
+        return None
+
+    review = context.get("review")
+    if review is None:
+        return None
+
+    brief = context.get("brief")
+    graph = _build_knowledge_graph(record=record, context=context)
+    return EngineeringInsightsService().build(
+        review=review,
+        knowledge_graph=graph,
+        estimator_brief=brief,
+    )
+
+
+def _top_reference_counts(
+    graph: dict[str, Any],
+    node_prefix: str,
+    relationship_contains: str,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    counts: defaultdict[str, int] = defaultdict(int)
+    for edge in list(graph.get("edges", [])):
+        source = _safe_text(edge.get("source"), "")
+        relationship = _safe_text(edge.get("relationship"), "")
+        if not source.startswith(node_prefix):
+            continue
+        if relationship_contains.lower() not in relationship.lower():
+            continue
+        counts[source] += 1
+
+    ranked = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+    return [
+        {"object": item[0].split(":", 1)[1], "references": item[1]}
+        for item in ranked[:limit]
+    ]
+
+
+def _render_engineering_intelligence_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    st.subheader("Engineering Intelligence")
+    intelligence = _build_engineering_intelligence(record, context)
+    if intelligence is None:
+        st.info(
+            "Engineering insights are unavailable until a project review context is loaded."
+        )
+        return
+
+    graph = _build_knowledge_graph(record=record, context=context)
+    insights = list(intelligence.insights)
+    systems = list(intelligence.system_health)
+    recommendations = list(intelligence.recommendations)
+
+    st.markdown("#### Project Health")
+    st.dataframe(
+        [
+            {
+                "project health score": intelligence.project_health.score,
+                "created by": intelligence.project_health.created_by_engine_version,
+                "rationale": " | ".join(intelligence.project_health.rationale[:3]),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.dataframe(
+        [item.to_dict() for item in intelligence.project_health.categories],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    filter_cols = st.columns([1.2, 1.4, 1.4, 1.2, 1.2])
+    severity_filter = filter_cols[0].multiselect(
+        "Severity",
+        options=sorted({item.severity for item in insights}),
+        default=[],
+    )
+    category_filter = filter_cols[1].multiselect(
+        "Category",
+        options=sorted({item.category for item in insights}),
+        default=[],
+    )
+    sort_key = filter_cols[2].selectbox(
+        "Sort",
+        options=["priority", "severity", "confidence", "category"],
+    )
+    sort_order = filter_cols[3].selectbox("Order", options=["Descending", "Ascending"])
+    group_by = filter_cols[4].selectbox(
+        "Group By",
+        options=["Severity", "Category", "System", "Drawing", "Specification", "None"],
+    )
+
+    filtered = [
+        item
+        for item in insights
+        if (not severity_filter or item.severity in severity_filter)
+        and (not category_filter or item.category in category_filter)
+    ]
+
+    severity_rank = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+    priority_rank = {"Critical": 4, "High": 3, "Medium": 2, "Low": 1}
+
+    def _sort_value(item: Any) -> Any:
+        if sort_key == "priority":
+            return priority_rank.get(item.priority, 0)
+        if sort_key == "severity":
+            return severity_rank.get(item.severity.lower(), 0)
+        if sort_key == "confidence":
+            return item.confidence
+        return item.category
+
+    filtered.sort(key=_sort_value, reverse=sort_order == "Descending")
+
+    st.markdown("#### Top Engineering Insights")
+    if not filtered:
+        st.info("No insights match the selected filters.")
+    else:
+        rows = [
+            {
+                "priority": item.priority,
+                "severity": item.severity,
+                "category": item.category,
+                "confidence": round(item.confidence, 2),
+                "title": item.title,
+                "recommended action": item.recommended_action,
+                "supporting objects": ", ".join(item.supporting_objects[:4]),
+                "evidence refs": ", ".join(item.evidence_refs[:4]),
+            }
+            for item in filtered
+        ]
+
+        if group_by != "None":
+            grouped: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+            for row in rows:
+                if group_by == "Severity":
+                    key = _safe_text(row["severity"], "Unknown")
+                elif group_by == "Category":
+                    key = _safe_text(row["category"], "Unknown")
+                elif group_by == "System":
+                    key = next(
+                        (
+                            token
+                            for token in _split_refs(row["supporting objects"])
+                            if "sys" in token.lower() or "system" in token.lower()
+                        ),
+                        "Unassigned",
+                    )
+                elif group_by == "Drawing":
+                    key = next(
+                        (
+                            token
+                            for token in _split_refs(row["supporting objects"])
+                            if "av-" in token.lower() or "drawing" in token.lower()
+                        ),
+                        "Unassigned",
+                    )
+                else:
+                    key = next(
+                        (
+                            token
+                            for token in _split_refs(row["supporting objects"])
+                            if "27 " in token or "spec" in token.lower()
+                        ),
+                        "Unassigned",
+                    )
+                grouped[key].append(row)
+
+            for key in sorted(grouped.keys()):
+                st.markdown(f"##### {group_by}: {key}")
+                st.dataframe(grouped[key], use_container_width=True, hide_index=True)
+        else:
+            st.dataframe(rows, use_container_width=True, hide_index=True)
+
+    st.markdown("#### Critical Risks")
+    critical = [item for item in insights if item.priority == "Critical"][:8]
+    st.dataframe(
+        [
+            {
+                "title": item.title,
+                "category": item.category,
+                "confidence": round(item.confidence, 2),
+                "action": item.recommended_action,
+            }
+            for item in critical
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("#### Coordination Issues")
+    coordination = [item for item in insights if item.category == "Coordination Issue"][
+        :8
+    ]
+    st.dataframe(
+        [
+            {
+                "title": item.title,
+                "severity": item.severity,
+                "supporting objects": ", ".join(item.supporting_objects[:5]),
+            }
+            for item in coordination
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("#### High-Risk Systems")
+    risk_systems = sorted(systems, key=lambda item: item.health_score)[:8]
+    st.dataframe(
+        [
+            {
+                "system": item.system_name,
+                "health score": item.health_score,
+                "confidence": item.confidence,
+                "outstanding rfis": item.outstanding_rfis,
+                "outstanding assumptions": item.outstanding_assumptions,
+                "warnings": " | ".join(item.warnings[:2]),
+            }
+            for item in risk_systems
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("#### Most Referenced Drawings")
+    drawing_refs = _top_reference_counts(graph, "drawing:", "Drawing")
+    st.dataframe(drawing_refs, use_container_width=True, hide_index=True)
+
+    st.markdown("#### Most Referenced Specifications")
+    spec_refs = _top_reference_counts(graph, "spec:", "Specification")
+    st.dataframe(spec_refs, use_container_width=True, hide_index=True)
+
+    st.markdown("#### Top Equipment Risks")
+    equipment_risk = [
+        item
+        for item in insights
+        if "equipment" in " ".join(item.supporting_objects).lower()
+    ][:8]
+    st.dataframe(
+        [
+            {
+                "title": item.title,
+                "severity": item.severity,
+                "priority": item.priority,
+                "action": item.recommended_action,
+            }
+            for item in equipment_risk
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("#### Highest Confidence Recommendations")
+    best = sorted(recommendations, key=lambda item: item.confidence, reverse=True)[:10]
+    st.dataframe(
+        [
+            {
+                "title": item.title,
+                "confidence": round(item.confidence, 2),
+                "recommended action": item.recommended_action,
+                "traceability": ", ".join(item.evidence_refs[:3]),
+            }
+            for item in best
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
 def _render_global_search_panel(
     st: Any,
     record: ProjectWorkspaceRecord,
@@ -2943,27 +3225,56 @@ def _render_equipment_page(st: Any, context: dict[str, Any] | None) -> None:
     _set_context_selection(st, "equipment", selected)
 
 
-def _render_systems_page(st: Any, context: dict[str, Any] | None) -> None:
+def _render_systems_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
     st.subheader("Systems Workspace")
     rows = list(_workspace_objects(context).get("systems", []))
+    intelligence = _build_engineering_intelligence(record, context)
+    system_health_map = (
+        {item.system_id: item for item in list(intelligence.system_health)}
+        if intelligence is not None
+        else {}
+    )
+
+    def _system_row(item: dict[str, Any]) -> dict[str, Any]:
+        health = system_health_map.get(item["system"])
+        return {
+            "system": item["system"],
+            "equipment count": item["equipment_count"],
+            "drawing count": item["drawing_count"],
+            "specification count": item["specification_count"],
+            "rfi count": item["rfi_count"],
+            "readiness": item["readiness"],
+            "labor": item["labor"],
+            "confidence": item["confidence"],
+            "health score": health.health_score if health is not None else "n/a",
+            "equipment completeness": (
+                health.equipment_completeness if health is not None else "n/a"
+            ),
+            "specification coverage": (
+                health.specification_coverage if health is not None else "n/a"
+            ),
+            "drawing coverage": (
+                health.drawing_coverage if health is not None else "n/a"
+            ),
+            "outstanding assumptions": (
+                health.outstanding_assumptions if health is not None else "n/a"
+            ),
+            "labor confidence": (
+                health.labor_confidence if health is not None else "n/a"
+            ),
+            "warnings": " | ".join(health.warnings[:2]) if health is not None else "",
+        }
+
     if not rows:
         st.info("No systems available.")
         return
 
     st.dataframe(
-        [
-            {
-                "system": item["system"],
-                "equipment count": item["equipment_count"],
-                "drawing count": item["drawing_count"],
-                "specification count": item["specification_count"],
-                "rfi count": item["rfi_count"],
-                "readiness": item["readiness"],
-                "labor": item["labor"],
-                "confidence": item["confidence"],
-            }
-            for item in rows
-        ],
+        [_system_row(item) for item in rows],
         use_container_width=True,
         hide_index=True,
     )
@@ -3860,7 +4171,9 @@ def _render_main_content(
     elif page == "Equipment":
         _render_equipment_page(st, context)
     elif page == "Systems":
-        _render_systems_page(st, context)
+        _render_systems_page(st, record, context)
+    elif page == "Engineering Intelligence":
+        _render_engineering_intelligence_page(st, record, context)
     elif page == "Relationship Explorer":
         _render_relationship_explorer_page(st, record, context)
     elif page == "Relationship Visualization":
