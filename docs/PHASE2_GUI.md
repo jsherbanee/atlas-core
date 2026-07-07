@@ -1,7 +1,7 @@
 # Atlas
 
 ## Purpose
-Provide a local workspace interface for estimators to run Atlas Intake and inspect deterministic project review outputs.
+Provide a local project-centric workspace shell for estimators to run Atlas Intake and inspect deterministic project review outputs.
 
 This interface is local-only:
 - No authentication.
@@ -9,12 +9,27 @@ This interface is local-only:
 - Local file-backed workspace persistence under `outputs/project_workspaces/`.
 - No procurement/RFQ/submittal/invoice/execution/closeout/vendor communication workflows.
 
-Atlas launches to a Home screen with:
-- `+ New Project`
-- `Open Project`
-- `Recent Projects`
+Atlas Workspace v1 launches into a persistent application shell.
 
-The active workspace uses left navigation for the project sections.
+Shell layout:
+- Header
+- Sidebar navigation
+- Main content
+- Context panel
+- Status bar
+
+The shell remains visible while page content changes.
+
+Header includes:
+- Atlas logo/title
+- Project selector
+- Global Search placeholder
+- Notifications placeholder
+- Settings
+- User/profile placeholder
+- Atlas version
+- Project lifecycle stage
+- Project status
 
 ## Atlas Intake (Local)
 The GUI now supports local drag-and-drop intake for estimator bid packages.
@@ -38,8 +53,18 @@ Files are automatically classified into:
 
 After classification, Atlas runs deterministic intake, saves the workspace locally, and then executes the existing project review pipeline.
 
+## Project Selector
+Workspace v1 uses a project selector instead of separate home controls.
+
+Selector options include:
+- Recent Projects
+- Reference Projects
+- Create New Project
+- Open Existing Project
+- Reference Project: Music Academy of the West (`[Reference]` badge)
+
 ## Data Sources
-The GUI supports two explicit source modes.
+The workspace supports two explicit source modes.
 
 Reference Project:
 - Music Academy of the West (Reference Project)
@@ -79,11 +104,54 @@ If expected folders are missing, Atlas shows a warning and still attempts determ
    - streamlit run apps/phase2_review_app.py
 3. Open `Reference Project` to verify MAW source mode.
 
+## Navigation
+
+Project:
+- Overview
+- Executive Summary
+- Project Files
+- Drawings
+- Specifications
+- Equipment
+- Systems
+
+Bid Intelligence:
+- Readiness
+- Estimator Brief
+- RFI Candidates
+- Labor Estimate
+- Revision Comparison
+- Engineering Assumptions
+- Evidence
+
+Project Lifecycle (disabled, Coming Soon):
+- Engineering
+- Procurement
+- Financials
+- Construction
+- Closeout
+- Service
+
+Reports:
+- Reports
+- Exports
+
+Settings:
+- Project Settings
+- Application Settings
+
+## Responsive Navigation
+- Desktop: persistent sidebar
+- Tablet: collapsible sidebar with navigation popover
+- Mobile: drawer-style navigation popover
+
+The current page and selected project remain visible in all modes.
+
 ## Upload Flow
-1. Select `Uploaded Project` in the sidebar.
+1. Open `Project Files`.
 2. Drag files into Atlas Intake (single file, many files, or ZIP).
 3. Click `Run Atlas Intake`.
-4. Review import summary, warnings, and workspace sections.
+4. Review import summary, warnings, and file explorer output.
 
 ## Deterministic Extraction Rules
 - PDF: extract embedded text.
@@ -106,17 +174,62 @@ If expected folders are missing, Atlas shows a warning and still attempts determ
 For existing local intake snapshots, the sidebar includes `Use Existing Intake Snapshot` in uploaded mode.
 This allows browsing `intake_snapshot.json` files already generated under local outputs/examples folders.
 
-## Visible Sections
-- Overview
-- Executive Summary
-- Project Files
-- Readiness
-- Estimator Brief
-- RFI Candidates
-- Labor Estimate
-- Revision Comparison
-- Engineering Assumptions
-- Evidence
+## Overview (Mission Control)
+Overview displays project health at a glance:
+- project metadata (name, owner, architect/consultants, project number, dates)
+- lifecycle stage and project status
+- import status
+- readiness score and readiness level
+- confidence and top risk counts
+- recent activity
+- import summary
+- quick actions
+
+## Executive Summary
+Executive Summary consolidates:
+- overall health
+- critical risks
+- high-priority RFIs
+- labor confidence
+- scope gaps
+- documents requiring OCR
+- recommended next actions
+
+## Project Files Explorer
+Project Files includes folder-based exploration:
+- Drawings
+- Specifications
+- Schedules
+- Addenda
+- Images
+- Other
+
+Per-file rows include:
+- filename
+- revision
+- status
+- pages
+- references
+- warning count
+
+Selecting a file updates the Context Panel.
+
+## Context Panel
+The right panel is context-sensitive.
+
+Examples:
+- drawing/file selection: metadata, related equipment, RFIs, evidence hints
+- specification selection: linked equipment and systems
+- equipment selection: drawing/spec references, manufacturer, risk context
+
+## Status Bar
+The status bar is always visible and shows:
+- current project
+- lifecycle stage
+- last intake
+- last review timestamp
+- Atlas version
+- git commit (development)
 
 ## Notes
 - The GUI reads deterministic outputs from existing services and sample data.
