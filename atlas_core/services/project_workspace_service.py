@@ -173,9 +173,15 @@ class ProjectWorkspaceService:
                 project_payload,
                 metadata_payload,
                 workspace_payload,
-                project_dir,
+                storage_location,
             )
-            for _, project_payload, metadata_payload, workspace_payload, project_dir in rows
+            for (
+                _,
+                project_payload,
+                metadata_payload,
+                workspace_payload,
+                storage_location,
+            ) in rows
         ]
         records.sort(key=self._sort_key, reverse=True)
         if limit is None:
@@ -197,7 +203,7 @@ class ProjectWorkspaceService:
 
     def load_record(self, workspace_path: str | Path) -> ProjectWorkspaceRecord:
         project_payload, metadata_payload, workspace_payload, project_dir = (
-            self.manager.project_repository.load(workspace_path)
+            self.manager.project_repository.load(str(workspace_path))
         )
         return self._from_repository_payloads(
             project_payload,
@@ -212,7 +218,9 @@ class ProjectWorkspaceService:
         workspace_payload = record.to_dict()
         workspace_payload["workspace_state"] = dict(record.workspace_state)
 
-        project_root = self.manager.project_repository.project_path(record.workspace_id)
+        project_root = Path(
+            self.manager.project_repository.project_location(record.workspace_id)
+        )
         if (project_root / "project.json").exists():
             self.manager.project_repository.save(
                 record.workspace_id,
@@ -404,6 +412,23 @@ class ProjectWorkspaceService:
     def list_history(self, workspace_id: str, limit: int = 100) -> list[dict[str, Any]]:
         return self.manager.history_repository.list_events(workspace_id, limit=limit)
 
+    def read_manifest(self, workspace_id: str) -> dict[str, Any]:
+        return self.manager.read_manifest(workspace_id)
+
+    def refresh_manifest(self, workspace_id: str) -> dict[str, Any]:
+        return self.manager.refresh_manifest(workspace_id)
+
+    def export_project_bundle(self, workspace_id: str, out_path: str) -> str:
+        return self.manager.export_project_bundle(workspace_id, out_path)
+
+    def import_project_bundle(self, bundle_path: str) -> ProjectWorkspaceRecord:
+        workspace_id = self.manager.import_project_bundle(bundle_path)
+        self.log_event(workspace_id, "project_imported", {"bundle_path": bundle_path})
+        return self.load_record(workspace_id)
+
+    def project_health(self, workspace_id: str) -> dict[str, Any]:
+        return self.manager.health_check(workspace_id)
+
     def log_event(
         self,
         workspace_id: str,
@@ -412,8 +437,8 @@ class ProjectWorkspaceService:
     ) -> None:
         self.manager.log(workspace_id, event_type, payload)
 
-    def project_path(self, workspace_id: str) -> Path:
-        return self.manager.project_repository.project_path(workspace_id)
+    def project_location(self, workspace_id: str) -> str:
+        return self.manager.project_repository.project_location(workspace_id)
 
     @staticmethod
     def _metadata_payload(record: ProjectWorkspaceRecord) -> dict[str, Any]:
@@ -449,8 +474,9 @@ class ProjectWorkspaceService:
         project_payload: dict[str, Any],
         metadata_payload: dict[str, Any],
         workspace_payload: dict[str, Any],
-        project_dir: Path,
+        project_location: str,
     ) -> ProjectWorkspaceRecord:
+        project_dir = Path(project_location)
         payload = dict(workspace_payload)
         payload["project"] = project_payload
         payload["workspace_id"] = str(

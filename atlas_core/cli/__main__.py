@@ -1,6 +1,7 @@
 import argparse
 import json
 import sys
+import os
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,10 @@ def main(argv: list[str] | None = None) -> int:
         "demo-maw-revision-comparison",
         "package-intake",
         "phase2-review",
+        "project-list",
+        "project-health",
+        "project-export",
+        "project-import",
     }
 
     if argv and not argv[0].startswith("-") and argv[0] not in known_commands:
@@ -58,6 +63,18 @@ def main(argv: list[str] | None = None) -> int:
             snapshot_path=args.snapshot,
             output_dir=args.out,
         )
+
+    if args.command == "project-list":
+        return _project_list(include_archived=args.include_archived)
+
+    if args.command == "project-health":
+        return _project_health(project_id=args.project_id)
+
+    if args.command == "project-export":
+        return _project_export(project_id=args.project_id, out_path=args.out)
+
+    if args.command == "project-import":
+        return _project_import(bundle_path=args.path)
 
     parser.print_help()
     return 0
@@ -150,7 +167,116 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output folder for phase2 review exports",
     )
 
+    project_list_parser = subparsers.add_parser(
+        "project-list",
+        help="List Atlas projects from the repository",
+    )
+    project_list_parser.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="Include archived projects",
+    )
+
+    project_health_parser = subparsers.add_parser(
+        "project-health",
+        help="Run project repository health checks",
+    )
+    project_health_parser.add_argument(
+        "--project-id",
+        required=True,
+        help="Project id to validate",
+    )
+
+    project_export_parser = subparsers.add_parser(
+        "project-export",
+        help="Export project repository folder to .atlaspkg bundle",
+    )
+    project_export_parser.add_argument(
+        "--project-id",
+        required=True,
+        help="Project id to export",
+    )
+    project_export_parser.add_argument(
+        "--out",
+        type=Path,
+        required=True,
+        help="Output path for .atlaspkg bundle",
+    )
+
+    project_import_parser = subparsers.add_parser(
+        "project-import",
+        help="Import a .atlaspkg project bundle",
+    )
+    project_import_parser.add_argument(
+        "--path",
+        type=Path,
+        required=True,
+        help="Path to .atlaspkg bundle",
+    )
+
     return parser
+
+
+def _project_root() -> str:
+    return os.environ.get("ATLAS_PROJECTS_ROOT", "AtlasProjects")
+
+
+def _project_list(include_archived: bool) -> int:
+    from atlas_core.services.project_workspace_service import ProjectWorkspaceService
+
+    service = ProjectWorkspaceService(_project_root())
+    records = service.list_workspaces(include_archived=include_archived, limit=5000)
+    for record in records:
+        manifest = service.read_manifest(record.workspace_id)
+        print(
+            json.dumps(
+                {
+                    "project_id": record.workspace_id,
+                    "project_name": record.project.name,
+                    "status": record.metadata.get(
+                        "status", record.project.status.value
+                    ),
+                    "lifecycle_stage": record.metadata.get("lifecycle_stage", "intake"),
+                    "archived": record.archived,
+                    "pinned": record.pinned,
+                    "reference": record.is_reference,
+                    "updated_at": record.updated_at,
+                    "storage_location": service.project_location(record.workspace_id),
+                    "manifest_schema_version": manifest.get("schema_version"),
+                },
+                sort_keys=True,
+            )
+        )
+    return 0
+
+
+def _project_health(project_id: str) -> int:
+    from atlas_core.services.project_workspace_service import ProjectWorkspaceService
+
+    service = ProjectWorkspaceService(_project_root())
+    report = service.project_health(project_id)
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if str(report.get("status")) != "error" else 1
+
+
+def _project_export(project_id: str, out_path: Path) -> int:
+    from atlas_core.services.project_workspace_service import ProjectWorkspaceService
+
+    service = ProjectWorkspaceService(_project_root())
+    bundle_path = service.export_project_bundle(project_id, str(out_path))
+    print(f"exported bundle: {bundle_path}")
+    return 0
+
+
+def _project_import(bundle_path: Path) -> int:
+    from atlas_core.services.project_workspace_service import ProjectWorkspaceService
+
+    service = ProjectWorkspaceService(_project_root())
+    record = service.import_project_bundle(str(bundle_path))
+    print(
+        f"imported project: {record.workspace_id} ({service.project_location(record.workspace_id)})"
+    )
+    return 0
 
 
 def _package_intake(package_path: Path, output_dir: Path) -> int:

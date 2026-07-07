@@ -1,7 +1,9 @@
 # Atlas Project Repository
 
 ## Overview
-Sprint 9 introduces the Atlas Project Repository as the persistence layer for Atlas Workspace.
+Sprint 9 introduced the Atlas Project Repository as the persistence layer for Atlas Workspace.
+
+Sprint 10 hardens the repository interfaces to prepare for cloud-ready storage adapters without implementing cloud services.
 
 Goals:
 - Persist projects independently of the running session.
@@ -26,6 +28,11 @@ Contracts:
 - KnowledgeRepository
 - HistoryRepository
 
+Storage-agnostic contract behavior:
+- Callers work with project identifiers and storage locations (string references), not filesystem internals.
+- Manifest, health check, and bundle operations are contract-level repository operations.
+- Adapter implementations can map storage locations to local paths, object keys, or database references.
+
 Current adapter implementation:
 - LocalProjectRepository
 - LocalWorkspaceRepository
@@ -49,6 +56,7 @@ Directory structure:
     - project.json
     - metadata.json
     - workspace.json
+    - project_manifest.json
     - intake/
     - documents/
       - drawings/
@@ -70,6 +78,31 @@ Directory structure:
     - history/
       - events.jsonl
     - cache/
+
+## Canonical Manifest
+Each project includes project_manifest.json with deterministic storage summary fields:
+
+- project_id
+- project_name
+- owner
+- status
+- lifecycle_stage
+- created_at
+- updated_at
+- last_opened_at
+- atlas_version
+- schema_version
+- storage_version
+- document_counts
+- review_artifact_counts
+- intelligence_artifact_counts
+- history_event_count
+- checksum_summary
+
+Manifest notes:
+- schema_version currently starts at 1.0.
+- storage_version currently starts at 1.0.
+- checksum_summary includes deterministic checksums for core payloads and content trees where practical.
 
 ## Persisted Data
 project.json:
@@ -104,6 +137,9 @@ review/*.json:
 history/events.jsonl:
 - Project timeline events (project_created, documents_imported, workspace_opened, review_executed, etc.)
 
+project_manifest.json:
+- Canonical deterministic repository summary for health checks, bundle validation, and future adapter migration.
+
 ## Workspace State Persistence
 Atlas persists the following state to workspace.json:
 - last open page
@@ -129,7 +165,60 @@ Project manager actions are repository-backed:
 - Pinned Projects
 - Reference Projects
 
+Additional storage operations:
+- Export Project Bundle (.atlaspkg)
+- Import Project Bundle (.atlaspkg)
+- Project Health Check
+
 These actions are surfaced in the workspace UI and routed through ProjectWorkspaceService.
+
+## Portable Bundle Format
+Atlas supports portable bundle export/import using the .atlaspkg extension.
+
+Bundle behavior:
+- .atlaspkg is a ZIP archive with the full project directory tree.
+- Bundle preserves metadata, documents, intake, review artifacts, knowledge graph, workspace state, history, and exports.
+- Import validates bundle structure and rehydrates project manifest.
+
+CLI commands:
+- atlas-core project-export --project-id <id> --out <path>
+- atlas-core project-import --path <file.atlaspkg>
+
+## Repository Health Check
+Atlas supports deterministic project repository validation.
+
+Validation scope:
+- required files/folders exist
+- manifest readable
+- metadata readable
+- workspace readable
+- review artifacts readable if present
+- metadata referenced documents exist when declared
+- history readable
+- schema_version compatible
+
+Health report model:
+- status
+- errors
+- warnings
+- missing_files
+- orphaned_files
+- repair_recommendations
+- validated_at
+
+CLI command:
+- atlas-core project-health --project-id <id>
+
+## GUI Storage Integration
+Project Settings includes Project Repository / Storage details:
+- repository location
+- project count
+- selected project storage path
+- manifest summary
+- health status
+- last validation
+- export bundle action
+- import bundle action
 
 ## Adapter Pattern and Future Cloud Support
 Workspace code depends on contracts, not filesystem details.
@@ -141,3 +230,9 @@ Future adapters can be introduced without changing workspace/UI flow:
 - GoogleCloudRepository
 
 The repository contract boundary is the extension point; only adapter wiring should change.
+
+Cloud migration path:
+1. Implement cloud adapter classes that satisfy repository contracts.
+2. Map project_location to cloud-native references.
+3. Preserve project_manifest schema for deterministic compatibility.
+4. Keep Workspace and service-layer orchestration unchanged.

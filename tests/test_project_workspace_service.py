@@ -103,3 +103,31 @@ def test_workspace_service_project_manager_actions(tmp_path: Path) -> None:
         new_name="Project 001 Copy",
     )
     assert duplicated.project.project_id == "project-001-copy"
+
+
+def test_workspace_service_manifest_health_and_bundle(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="project-bundle",
+        name="Project Bundle",
+        client="Client",
+    )
+    service.save_record(record)
+
+    manifest = service.read_manifest("project-bundle")
+    assert manifest["project_id"] == "project-bundle"
+
+    health = service.project_health("project-bundle")
+    assert health["status"] in {"healthy", "warning"}
+
+    bundle_path = service.export_project_bundle(
+        "project-bundle",
+        str(tmp_path / "project-bundle"),
+    )
+    assert Path(bundle_path).exists()
+    assert Path(bundle_path).suffix == ".atlaspkg"
+
+    service.delete_project("project-bundle")
+    imported = service.import_project_bundle(bundle_path)
+    assert imported.workspace_id == "project-bundle"
+    assert Path(service.project_location("project-bundle")).exists()

@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +16,24 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
         [sys.executable, "-m", "atlas_core.cli", *args],
         cwd=ROOT,
         env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def run_cli_with_env(
+    args: list[str],
+    env_overrides: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-m", "atlas_core.cli", *args],
+        cwd=ROOT,
+        env={
+            **os.environ,
+            "PYTHONDONTWRITEBYTECODE": "1",
+            **env_overrides,
+        },
         capture_output=True,
         text=True,
         check=False,
@@ -58,6 +77,20 @@ def _build_intake_package(tmp_path: Path) -> Path:
     )
 
     return package
+
+
+def _create_project_for_cli(tmp_path: Path, project_id: str = "cli-project") -> Path:
+    from atlas_core.services.project_workspace_service import ProjectWorkspaceService
+
+    root = tmp_path / "AtlasProjects"
+    service = ProjectWorkspaceService(root)
+    record = service.create_manual_record(
+        project_id=project_id,
+        name="CLI Project",
+        client="CLI Client",
+    )
+    service.save_record(record)
+    return root
 
 
 def test_demo_estimate_runs_successfully():
@@ -353,3 +386,54 @@ def test_phase2_review_command_exports_outputs(tmp_path):
     assert (output_dir / "intake_snapshot.json").exists()
     assert (output_dir / "phase2_review_estimator_brief.csv").exists()
     assert (output_dir / "phase2_review_plan_review.json").exists()
+
+
+def test_project_list_command_outputs_project_rows(tmp_path: Path) -> None:
+    repository_root = _create_project_for_cli(tmp_path, "cli-list")
+    result = run_cli_with_env(
+        ["project-list"],
+        {"ATLAS_PROJECTS_ROOT": str(repository_root)},
+    )
+
+    assert result.returncode == 0
+    assert '"project_id": "cli-list"' in result.stdout
+
+
+def test_project_health_command_outputs_report(tmp_path: Path) -> None:
+    repository_root = _create_project_for_cli(tmp_path, "cli-health")
+    result = run_cli_with_env(
+        ["project-health", "--project-id", "cli-health"],
+        {"ATLAS_PROJECTS_ROOT": str(repository_root)},
+    )
+
+    assert result.returncode == 0
+    assert '"status":' in result.stdout
+    assert '"errors":' in result.stdout
+
+
+def test_project_export_and_import_commands_work(tmp_path: Path) -> None:
+    repository_root = _create_project_for_cli(tmp_path, "cli-bundle")
+    bundle_out = tmp_path / "cli-bundle.atlaspkg"
+
+    export_result = run_cli_with_env(
+        [
+            "project-export",
+            "--project-id",
+            "cli-bundle",
+            "--out",
+            str(bundle_out),
+        ],
+        {"ATLAS_PROJECTS_ROOT": str(repository_root)},
+    )
+    assert export_result.returncode == 0
+    assert bundle_out.exists()
+
+    # Delete project so import path is valid.
+    shutil.rmtree(repository_root / "cli-bundle")
+
+    import_result = run_cli_with_env(
+        ["project-import", "--path", str(bundle_out)],
+        {"ATLAS_PROJECTS_ROOT": str(repository_root)},
+    )
+    assert import_result.returncode == 0
+    assert "imported project: cli-bundle" in import_result.stdout

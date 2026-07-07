@@ -3219,7 +3219,9 @@ def _render_upload_panel(
                 build_reference_project_context(
                     updated_record.package_location
                     if updated_record.package_location is not None
-                    else workspace_service.project_path(updated_record.workspace_id)
+                    else Path(
+                        workspace_service.project_location(updated_record.workspace_id)
+                    )
                     / "documents"
                 )
             )
@@ -4265,10 +4267,124 @@ def _render_reports_page(st: Any, page: str) -> None:
         )
 
 
-def _render_settings_page(st: Any, page: str) -> None:
+def _render_settings_page(
+    st: Any,
+    page: str,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+) -> None:
     st.subheader(page)
     if page == "Project Settings":
-        st.info("Project settings scaffold is available for future expansion.")
+        manifest = workspace_service.read_manifest(record.workspace_id)
+        health = workspace_service.project_health(record.workspace_id)
+
+        st.markdown("### Project Repository / Storage")
+        st.dataframe(
+            [
+                {
+                    "field": "Repository Location",
+                    "value": str(workspace_service.workspace_root),
+                },
+                {
+                    "field": "Project Count",
+                    "value": len(
+                        workspace_service.list_workspaces(
+                            include_archived=True,
+                            limit=2000,
+                        )
+                    ),
+                },
+                {
+                    "field": "Selected Project Storage Path",
+                    "value": workspace_service.project_location(record.workspace_id),
+                },
+                {
+                    "field": "Manifest Schema Version",
+                    "value": manifest.get("schema_version", "n/a"),
+                },
+                {
+                    "field": "Manifest Storage Version",
+                    "value": manifest.get("storage_version", "n/a"),
+                },
+                {
+                    "field": "Health Status",
+                    "value": health.get("status", "unknown"),
+                },
+                {
+                    "field": "Last Validation",
+                    "value": health.get("validated_at", "n/a"),
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("Manifest Summary")
+        st.dataframe(
+            [
+                {
+                    "project_id": manifest.get("project_id", record.workspace_id),
+                    "project_name": manifest.get("project_name", record.project.name),
+                    "status": manifest.get("status", "n/a"),
+                    "lifecycle_stage": manifest.get("lifecycle_stage", "n/a"),
+                    "updated_at": manifest.get("updated_at", "n/a"),
+                    "documents": sum(
+                        int(value)
+                        for value in dict(
+                            manifest.get("document_counts") or {}
+                        ).values()
+                    ),
+                    "review_artifacts": sum(
+                        int(value)
+                        for value in dict(
+                            manifest.get("review_artifact_counts") or {}
+                        ).values()
+                    ),
+                    "history_events": manifest.get("history_event_count", 0),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        bundle_name = f"{record.workspace_id}.atlaspkg"
+        bundle_output = st.text_input(
+            "Export bundle path",
+            value=str(Path("outputs") / bundle_name),
+            key="atlas_project_export_path",
+        )
+        if st.button("Export Project Bundle", key="atlas_export_bundle_btn"):
+            written = workspace_service.export_project_bundle(
+                record.workspace_id,
+                bundle_output,
+            )
+            st.success(f"Exported bundle to {written}")
+
+        import_path = st.text_input(
+            "Import bundle path (.atlaspkg)",
+            value="",
+            key="atlas_project_import_path",
+        )
+        if st.button("Import Project Bundle", key="atlas_import_bundle_btn"):
+            imported = workspace_service.import_project_bundle(import_path)
+            st.session_state["atlas_active_workspace_id"] = imported.workspace_id
+            st.success(f"Imported project {imported.workspace_id}")
+            st.rerun()
+
+        if health.get("errors"):
+            st.markdown("Health Errors")
+            st.dataframe(
+                [{"error": item} for item in list(health.get("errors") or [])],
+                use_container_width=True,
+                hide_index=True,
+            )
+        if health.get("warnings"):
+            st.markdown("Health Warnings")
+            st.dataframe(
+                [{"warning": item} for item in list(health.get("warnings") or [])],
+                use_container_width=True,
+                hide_index=True,
+            )
     else:
         st.info("Application settings scaffold is available for future expansion.")
 
@@ -4666,7 +4782,7 @@ def _render_main_content(
     elif page in REPORT_PAGES:
         _render_reports_page(st, page)
     elif page in SETTINGS_PAGES:
-        _render_settings_page(st, page)
+        _render_settings_page(st, page, workspace_service, record)
 
 
 def _render_shell(

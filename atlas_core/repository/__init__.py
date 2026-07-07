@@ -16,6 +16,7 @@ from atlas_core.repository.local import (
     LocalReviewRepository,
     LocalWorkspaceRepository,
 )
+from atlas_core.repository.models import ProjectManifest, RepositoryHealthReport
 from atlas_core.repository.project_manager import AtlasProjectManager
 
 __all__ = [
@@ -31,5 +32,7 @@ __all__ = [
     "LocalProjectRepository",
     "LocalReviewRepository",
     "LocalWorkspaceRepository",
+    "ProjectManifest",
+    "RepositoryHealthReport",
     "AtlasProjectManager",
 ]

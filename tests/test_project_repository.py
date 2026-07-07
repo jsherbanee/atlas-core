@@ -4,9 +4,7 @@ from atlas_core.domain import Project
 from atlas_core.repository import LocalProjectRepository
 
 
-def _seed_project(
-    repo: LocalProjectRepository, project_id: str = "project-001"
-) -> Path:
+def _seed_project(repo: LocalProjectRepository, project_id: str = "project-001") -> str:
     return repo.create(
         project_id,
         {
@@ -43,11 +41,12 @@ def _seed_project(
 
 def test_local_project_repository_creates_required_layout(tmp_path: Path) -> None:
     repo = LocalProjectRepository(tmp_path / "AtlasProjects")
-    project_dir = _seed_project(repo)
+    project_dir = Path(_seed_project(repo))
 
     assert (project_dir / "project.json").exists()
     assert (project_dir / "metadata.json").exists()
     assert (project_dir / "workspace.json").exists()
+    assert (project_dir / "project_manifest.json").exists()
     assert (project_dir / "documents" / "drawings").exists()
     assert (project_dir / "documents" / "specifications").exists()
     assert (project_dir / "review" / "knowledge_graph.json").exists()
@@ -80,6 +79,30 @@ def test_local_project_repository_management_actions(tmp_path: Path) -> None:
     loaded_ids = {item[0] for item in projects}
     assert "project-001" not in loaded_ids
     assert "project-002" in loaded_ids
+
+
+def test_local_project_repository_manifest_bundle_and_health(tmp_path: Path) -> None:
+    repo = LocalProjectRepository(tmp_path / "AtlasProjects")
+    _seed_project(repo, "project-health")
+
+    manifest = repo.read_manifest("project-health")
+    assert manifest["project_id"] == "project-health"
+    assert manifest["schema_version"].startswith("1.")
+
+    bundle_path = repo.export_bundle(
+        "project-health",
+        str(tmp_path / "exports" / "project-health"),
+    )
+    assert Path(bundle_path).exists()
+    assert Path(bundle_path).suffix == ".atlaspkg"
+
+    repo.delete("project-health")
+    imported_id = repo.import_bundle(bundle_path)
+    assert imported_id == "project-health"
+
+    health = repo.health_check("project-health")
+    assert health["status"] in {"healthy", "warning"}
+    assert isinstance(health["errors"], list)
 
 
 def test_project_domain_roundtrip_still_works() -> None:

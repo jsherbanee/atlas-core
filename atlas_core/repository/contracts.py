@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Any
 
 JsonDict = dict[str, Any]
@@ -19,7 +18,7 @@ class ProjectRepository(ABC):
         project_payload: JsonDict,
         metadata_payload: JsonDict,
         workspace_payload: JsonDict,
-    ) -> Path:
+    ) -> str:
         raise NotImplementedError
 
     @abstractmethod
@@ -29,20 +28,18 @@ class ProjectRepository(ABC):
         project_payload: JsonDict,
         metadata_payload: JsonDict,
         workspace_payload: JsonDict,
-    ) -> Path:
+    ) -> str:
         raise NotImplementedError
 
     @abstractmethod
-    def load(
-        self, project_ref: str | Path
-    ) -> tuple[JsonDict, JsonDict, JsonDict, Path]:
+    def load(self, project_ref: str) -> tuple[JsonDict, JsonDict, JsonDict, str]:
         raise NotImplementedError
 
     @abstractmethod
     def list_projects(
         self,
         include_archived: bool = False,
-    ) -> list[tuple[str, JsonDict, JsonDict, JsonDict, Path]]:
+    ) -> list[tuple[str, JsonDict, JsonDict, JsonDict, str]]:
         raise NotImplementedError
 
     @abstractmethod
@@ -63,7 +60,7 @@ class ProjectRepository(ABC):
         project_id: str,
         new_project_id: str,
         new_name: str | None = None,
-    ) -> Path:
+    ) -> str:
         raise NotImplementedError
 
     @abstractmethod
@@ -75,7 +72,27 @@ class ProjectRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def project_path(self, project_id: str) -> Path:
+    def project_location(self, project_id: str) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def read_manifest(self, project_id: str) -> JsonDict:
+        raise NotImplementedError
+
+    @abstractmethod
+    def refresh_manifest(self, project_id: str) -> JsonDict:
+        raise NotImplementedError
+
+    @abstractmethod
+    def export_bundle(self, project_id: str, out_path: str) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def import_bundle(self, bundle_path: str) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def health_check(self, project_id: str) -> JsonDict:
         raise NotImplementedError
 
 
