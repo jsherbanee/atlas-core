@@ -40,6 +40,18 @@ PROJECT_PAGES = [
     "Specifications",
     "Equipment",
     "Systems",
+    "Relationship Explorer",
+    "Relationship Visualization",
+    "Timeline",
+    "Project Detail",
+    "Drawing Detail",
+    "Specification Detail",
+    "Equipment Detail",
+    "System Detail",
+    "Room Detail",
+    "Manufacturer Detail",
+    "Evidence Detail",
+    "Metadata Inspector",
 ]
 
 BID_INTELLIGENCE_PAGES = [
@@ -1575,19 +1587,906 @@ def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any
     return entries
 
 
-def _render_global_search_panel(st: Any, context: dict[str, Any] | None) -> None:
+def _timeline_events(
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    import_summary = dict(context.get("import_summary") or {}) if context else {}
+    review = context.get("review") if context else None
+    brief = context.get("brief") if context else None
+    revision = context.get("revision_comparison") if context else None
+
+    events = [
+        {
+            "event": "Project intake",
+            "timestamp": record.created_at,
+            "status": "Completed",
+            "details": _safe_text(
+                context.get("data_source_label") if context else "Manual", "Manual"
+            ),
+        },
+        {
+            "event": "Document imports",
+            "timestamp": record.updated_at,
+            "status": "Completed",
+            "details": f"{import_summary.get('total_files', 0)} files",
+        },
+        {
+            "event": "Review run",
+            "timestamp": record.updated_at,
+            "status": "Completed" if review is not None else "Pending",
+            "details": _safe_text(getattr(review, "review_id", None), "n/a"),
+        },
+        {
+            "event": "Revision comparison",
+            "timestamp": record.updated_at,
+            "status": "Completed" if revision is not None else "Not Available",
+            "details": _safe_text(
+                getattr(revision, "comparison_revision_id", None),
+                "No revision comparison",
+            ),
+        },
+        {
+            "event": "Readiness update",
+            "timestamp": record.updated_at,
+            "status": "Completed" if review is not None else "Pending",
+            "details": _safe_text(
+                getattr(
+                    getattr(
+                        getattr(review, "readiness", None), "readiness_level", None
+                    ),
+                    "value",
+                    None,
+                ),
+                "n/a",
+            ),
+        },
+        {
+            "event": "Estimator brief generation",
+            "timestamp": record.updated_at,
+            "status": "Completed" if brief is not None else "Pending",
+            "details": _safe_text(getattr(brief, "brief_title", None), "n/a"),
+        },
+        {
+            "event": "Future collaboration milestones",
+            "timestamp": "n/a",
+            "status": "Disabled",
+            "details": "Future events are intentionally disabled for local deterministic mode.",
+        },
+    ]
+    return events
+
+
+def _build_knowledge_graph(
+    record: ProjectWorkspaceRecord | None,
+    context: dict[str, Any] | None,
+) -> dict[str, Any]:
+    objects = _workspace_objects(context)
+    import_summary = dict(context.get("import_summary") or {}) if context else {}
+    review = context.get("review") if context else None
+    revision = context.get("revision_comparison") if context else None
+
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    seen_nodes: set[str] = set()
+    seen_edges: set[tuple[str, str, str]] = set()
+
+    def _add_node(
+        node_id: str,
+        node_type: str,
+        label: str,
+        page: str,
+        selection_kind: str,
+        data: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        if node_id in seen_nodes:
+            return
+        seen_nodes.add(node_id)
+        nodes.append(
+            {
+                "id": node_id,
+                "type": node_type,
+                "label": label,
+                "page": page,
+                "selection_kind": selection_kind,
+                "data": dict(data or {}),
+                "metadata": dict(metadata or {}),
+            }
+        )
+
+    def _add_edge(
+        source: str,
+        target: str,
+        relationship: str,
+        confidence: str = "n/a",
+        source_evidence: str = "n/a",
+    ) -> None:
+        edge_key = (source, target, relationship)
+        if edge_key in seen_edges:
+            return
+        seen_edges.add(edge_key)
+        edges.append(
+            {
+                "source": source,
+                "target": target,
+                "relationship": relationship,
+                "confidence": confidence,
+                "source_evidence": source_evidence,
+            }
+        )
+
+    created_at = _safe_text(getattr(record, "created_at", None), "n/a")
+    updated_at = _safe_text(getattr(record, "updated_at", None), "n/a")
+    project_record = getattr(record, "project", None)
+    project_key = _safe_text(
+        getattr(project_record, "project_id", None),
+        _safe_text(
+            context.get("sample_project_id") if context else None, "atlas-project"
+        ),
+    )
+    project_name = _safe_text(
+        getattr(project_record, "name", None),
+        _safe_text(
+            context.get("sample_project_name") if context else None, "Atlas Project"
+        ),
+    )
+    project_client = _safe_text(getattr(project_record, "client", None), "Atlas")
+
+    project_id = f"project:{project_key}"
+    _add_node(
+        project_id,
+        "Project",
+        project_name,
+        "Project Detail",
+        "project",
+        data={
+            "project_id": project_key,
+            "name": project_name,
+            "client": project_client,
+            "location": _safe_text(getattr(project_record, "location", None), "n/a"),
+            "bid_date": _safe_text(getattr(project_record, "bid_date", None), "n/a"),
+            "status": _project_stage(record) if record is not None else "Intake",
+        },
+        metadata={
+            "source_file": _safe_text(
+                context.get("package_location") if context else None, "n/a"
+            ),
+            "source_page": "n/a",
+            "sheet_number": "n/a",
+            "specification_section": "n/a",
+            "extraction_confidence": "n/a",
+            "creation_timestamp": created_at,
+            "last_update": updated_at,
+        },
+    )
+
+    for item in objects.get("drawings", []):
+        drawing_node = f"drawing:{item.get('drawing_number', 'unknown')}"
+        _add_node(
+            drawing_node,
+            "Drawing",
+            _safe_text(item.get("drawing_number"), "Drawing"),
+            "Drawing Detail",
+            "drawing",
+            data=item,
+            metadata={
+                "source_file": _safe_text(item.get("source_file"), "n/a"),
+                "source_page": "n/a",
+                "sheet_number": _safe_text(item.get("drawing_number"), "n/a"),
+                "specification_section": "n/a",
+                "extraction_confidence": _safe_text(
+                    item.get("extraction_quality"), "n/a"
+                ),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            drawing_node,
+            "Project contains Drawing",
+            "high",
+            _safe_text(item.get("source_file"), "n/a"),
+        )
+
+    for item in objects.get("specifications", []):
+        spec_node = f"spec:{item.get('section', 'unknown')}"
+        _add_node(
+            spec_node,
+            "Specification",
+            _safe_text(item.get("section"), "Specification"),
+            "Specification Detail",
+            "specification",
+            data=item,
+            metadata={
+                "source_file": _safe_text(item.get("source_file"), "n/a"),
+                "source_page": "n/a",
+                "sheet_number": "n/a",
+                "specification_section": _safe_text(item.get("section"), "n/a"),
+                "extraction_confidence": _safe_text(
+                    item.get("extraction_confidence"), "n/a"
+                ),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            spec_node,
+            "Project contains Specification",
+            "high",
+            _safe_text(item.get("source_file"), "n/a"),
+        )
+
+    for item in objects.get("equipment", []):
+        eq_node = f"equipment:{item.get('equipment_id', 'unknown')}"
+        _add_node(
+            eq_node,
+            "Equipment",
+            _safe_text(item.get("equipment_id"), "Equipment"),
+            "Equipment Detail",
+            "equipment",
+            data=item,
+            metadata={
+                "source_file": ", ".join(item.get("drawing_references", [])) or "n/a",
+                "source_page": "n/a",
+                "sheet_number": ", ".join(item.get("drawing_references", [])) or "n/a",
+                "specification_section": ", ".join(
+                    item.get("specification_references", [])
+                )
+                or "n/a",
+                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            eq_node,
+            "Project contains Equipment",
+            "high",
+            ", ".join(item.get("drawing_references", [])) or "n/a",
+        )
+
+        system_node = f"system:{item.get('system', 'unknown')}"
+        _add_node(
+            system_node,
+            "System",
+            _safe_text(item.get("system"), "System"),
+            "System Detail",
+            "system",
+            data={"system": _safe_text(item.get("system"), "Unknown")},
+            metadata={
+                "source_file": ", ".join(item.get("drawing_references", [])) or "n/a",
+                "source_page": "n/a",
+                "sheet_number": ", ".join(item.get("drawing_references", [])) or "n/a",
+                "specification_section": ", ".join(
+                    item.get("specification_references", [])
+                )
+                or "n/a",
+                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+
+        room_name = _safe_text(item.get("room"), "Unknown")
+        room_node = f"room:{room_name}"
+        _add_node(
+            room_node,
+            "Room",
+            room_name,
+            "Room Detail",
+            "room",
+            data={"room": room_name},
+            metadata={
+                "source_file": ", ".join(item.get("drawing_references", [])) or "n/a",
+                "source_page": "n/a",
+                "sheet_number": ", ".join(item.get("drawing_references", [])) or "n/a",
+                "specification_section": ", ".join(
+                    item.get("specification_references", [])
+                )
+                or "n/a",
+                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+
+        area_name = room_name.split("-")[0].strip() if room_name else "General"
+        area_node = f"area:{area_name or 'General'}"
+        _add_node(
+            area_node,
+            "Area",
+            area_name or "General",
+            "Room Detail",
+            "room",
+            data={"area": area_name or "General"},
+            metadata={
+                "source_file": _safe_text(
+                    context.get("package_location") if context else None, "n/a"
+                ),
+                "source_page": "n/a",
+                "sheet_number": "n/a",
+                "specification_section": "n/a",
+                "extraction_confidence": "n/a",
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+
+        manufacturer = _safe_text(item.get("manufacturer"), "Unknown")
+        manufacturer_node = f"manufacturer:{manufacturer}"
+        _add_node(
+            manufacturer_node,
+            "Manufacturer",
+            manufacturer,
+            "Manufacturer Detail",
+            "manufacturer",
+            data={"manufacturer": manufacturer},
+            metadata={
+                "source_file": _safe_text(
+                    context.get("package_location") if context else None, "n/a"
+                ),
+                "source_page": "n/a",
+                "sheet_number": "n/a",
+                "specification_section": "n/a",
+                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+
+        product = _safe_text(item.get("model"), "Unknown")
+        product_node = f"product:{manufacturer}:{product}"
+        _add_node(
+            product_node,
+            "Product",
+            product,
+            "Equipment Detail",
+            "model",
+            data={"manufacturer": manufacturer, "model": product},
+            metadata={
+                "source_file": ", ".join(item.get("drawing_references", [])) or "n/a",
+                "source_page": "n/a",
+                "sheet_number": ", ".join(item.get("drawing_references", [])) or "n/a",
+                "specification_section": ", ".join(
+                    item.get("specification_references", [])
+                )
+                or "n/a",
+                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+
+        _add_edge(
+            eq_node,
+            system_node,
+            "Equipment to System",
+            _safe_text(item.get("confidence"), "n/a"),
+            ", ".join(item.get("drawing_references", [])) or "n/a",
+        )
+        _add_edge(
+            system_node,
+            room_node,
+            "System to Room",
+            _safe_text(item.get("confidence"), "n/a"),
+            ", ".join(item.get("drawing_references", [])) or "n/a",
+        )
+        _add_edge(
+            room_node,
+            area_node,
+            "Room to Area",
+            "high",
+            _safe_text(context.get("package_location") if context else None, "n/a"),
+        )
+        _add_edge(
+            manufacturer_node,
+            product_node,
+            "Manufacturer to Product",
+            "high",
+            _safe_text(context.get("package_location") if context else None, "n/a"),
+        )
+        _add_edge(
+            product_node,
+            eq_node,
+            "Product to Equipment",
+            _safe_text(item.get("confidence"), "n/a"),
+            ", ".join(item.get("drawing_references", [])) or "n/a",
+        )
+
+        for drawing_ref in item.get("drawing_references", []):
+            drawing_node = f"drawing:{drawing_ref}"
+            _add_edge(
+                drawing_node,
+                eq_node,
+                "Drawing to Equipment",
+                _safe_text(item.get("confidence"), "n/a"),
+                drawing_ref,
+            )
+        for spec_ref in item.get("specification_references", []):
+            spec_node = f"spec:{spec_ref}"
+            _add_edge(
+                eq_node,
+                spec_node,
+                "Equipment to Specification",
+                _safe_text(item.get("confidence"), "n/a"),
+                spec_ref,
+            )
+
+    for item in objects.get("specifications", []):
+        spec_node = f"spec:{item.get('section', 'unknown')}"
+        for drawing_ref in item.get("referenced_drawings", []):
+            drawing_node = f"drawing:{drawing_ref}"
+            _add_edge(
+                spec_node,
+                drawing_node,
+                "Specification to Drawing",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                _safe_text(item.get("source_file"), "n/a"),
+            )
+
+    for item in objects.get("evidence", []):
+        evidence_id = f"evidence:{_safe_text(item.get('source_file'), 'file')}:{item.get('page', 'n/a')}"
+        _add_node(
+            evidence_id,
+            "Evidence",
+            f"{_safe_text(item.get('source_file'), 'Evidence')} p.{item.get('page', 'n/a')}",
+            "Evidence Detail",
+            "evidence",
+            data=item,
+            metadata={
+                "source_file": _safe_text(item.get("source_file"), "n/a"),
+                "source_page": _safe_text(item.get("page"), "n/a"),
+                "sheet_number": _safe_text(item.get("sheet"), "n/a"),
+                "specification_section": "n/a",
+                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+
+        document_id = f"document:{_safe_text(item.get('source_file'), 'unknown')}"
+        _add_node(
+            document_id,
+            "Document",
+            _safe_text(item.get("source_file"), "Document"),
+            "Evidence Detail",
+            "evidence",
+            data={"source_file": _safe_text(item.get("source_file"), "n/a")},
+            metadata={
+                "source_file": _safe_text(item.get("source_file"), "n/a"),
+                "source_page": _safe_text(item.get("page"), "n/a"),
+                "sheet_number": _safe_text(item.get("sheet"), "n/a"),
+                "specification_section": "n/a",
+                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            document_id,
+            evidence_id,
+            "Document to Evidence",
+            _safe_text(item.get("confidence"), "n/a"),
+            _safe_text(item.get("source_file"), "n/a"),
+        )
+
+        for drawing in objects.get("drawings", []):
+            if _contains_any(
+                item.get("source_file"),
+                [drawing.get("source_file", ""), drawing.get("drawing_number", "")],
+            ):
+                _add_edge(
+                    f"drawing:{drawing.get('drawing_number', 'unknown')}",
+                    evidence_id,
+                    "Drawing to Evidence",
+                    _safe_text(item.get("confidence"), "n/a"),
+                    _safe_text(item.get("source_file"), "n/a"),
+                )
+
+    for item in _to_rows(list(getattr(review, "engineering_assumptions", []) or [])):
+        assumption_id = _safe_text(
+            item.get("assumption_id"), _safe_text(item.get("title"), "assumption")
+        )
+        node_id = f"assumption:{assumption_id}"
+        _add_node(
+            node_id,
+            "Engineering Assumption",
+            assumption_id,
+            "Engineering Assumptions",
+            "assumption",
+            data=item,
+            metadata={
+                "source_file": _safe_text(item.get("source_file"), "n/a"),
+                "source_page": _safe_text(item.get("page"), "n/a"),
+                "sheet_number": _safe_text(item.get("sheet"), "n/a"),
+                "specification_section": _safe_text(item.get("section"), "n/a"),
+                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            node_id,
+            "Project to Assumption",
+            _safe_text(item.get("confidence"), "n/a"),
+            _safe_text(item.get("source_file"), "n/a"),
+        )
+
+        for evidence in objects.get("evidence", []):
+            evidence_id = f"evidence:{_safe_text(evidence.get('source_file'), 'file')}:{evidence.get('page', 'n/a')}"
+            if _contains_any(str(item), [_safe_text(evidence.get("source_file"), "")]):
+                _add_edge(
+                    evidence_id,
+                    node_id,
+                    "Evidence to Assumption",
+                    _safe_text(evidence.get("confidence"), "n/a"),
+                    _safe_text(evidence.get("source_file"), "n/a"),
+                )
+
+    for item in objects.get("rfis", []):
+        rfi_id = _safe_text(item.get("rfi_id"), _safe_text(item.get("title"), "rfi"))
+        node_id = f"rfi:{rfi_id}"
+        _add_node(
+            node_id,
+            "RFI Candidate",
+            rfi_id,
+            "RFI Candidates",
+            "rfi",
+            data=item,
+            metadata={
+                "source_file": _safe_text(item.get("source_file"), "n/a"),
+                "source_page": _safe_text(item.get("page"), "n/a"),
+                "sheet_number": _safe_text(item.get("sheet_number"), "n/a"),
+                "specification_section": _safe_text(item.get("section"), "n/a"),
+                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+
+        for equipment in objects.get("equipment", []):
+            if _contains_any(
+                str(item),
+                [equipment.get("equipment_id", ""), equipment.get("model", "")],
+            ):
+                _add_edge(
+                    node_id,
+                    f"equipment:{equipment.get('equipment_id', 'unknown')}",
+                    "RFI to Equipment",
+                    _safe_text(item.get("confidence"), "n/a"),
+                    _safe_text(item.get("source_file"), "n/a"),
+                )
+
+    labor_estimate = (
+        getattr(review, "labor_estimate", None) if review is not None else None
+    )
+    if labor_estimate is not None:
+        labor_node = "labor_estimate:current"
+        _add_node(
+            labor_node,
+            "Labor Estimate",
+            "Current Labor Estimate",
+            "Labor Estimate",
+            "labor",
+            data={
+                "total_labor_hours_expected": getattr(
+                    labor_estimate, "total_labor_hours_expected", None
+                ),
+                "confidence": getattr(labor_estimate, "confidence", None),
+            },
+            metadata={
+                "source_file": _safe_text(
+                    context.get("package_location") if context else None, "n/a"
+                ),
+                "source_page": "n/a",
+                "sheet_number": "n/a",
+                "specification_section": "n/a",
+                "extraction_confidence": _safe_text(
+                    getattr(labor_estimate, "confidence", None), "n/a"
+                ),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            labor_node,
+            "Project to Labor Estimate",
+            _safe_text(getattr(labor_estimate, "confidence", None), "n/a"),
+            _safe_text(context.get("package_location") if context else None, "n/a"),
+        )
+
+    if revision is not None:
+        revision_node = f"revision:{_safe_text(getattr(revision, 'comparison_revision_id', 'current'), 'current')}"
+        _add_node(
+            revision_node,
+            "Revision",
+            _safe_text(
+                getattr(revision, "comparison_revision_id", None), "Current Revision"
+            ),
+            "Revision Comparison",
+            "revision",
+            data={
+                "baseline_revision_id": _safe_text(
+                    getattr(revision, "baseline_revision_id", None), "n/a"
+                ),
+                "comparison_revision_id": _safe_text(
+                    getattr(revision, "comparison_revision_id", None), "n/a"
+                ),
+                "change_count": len(getattr(revision, "changes", []) or []),
+            },
+            metadata={
+                "source_file": _safe_text(
+                    context.get("package_location") if context else None, "n/a"
+                ),
+                "source_page": "n/a",
+                "sheet_number": "n/a",
+                "specification_section": "n/a",
+                "extraction_confidence": "high",
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            revision_node,
+            "Project to Revision",
+            "high",
+            _safe_text(context.get("package_location") if context else None, "n/a"),
+        )
+
+    file_diags = list(import_summary.get("file_diagnostics") or [])
+    for diag in file_diags:
+        file_name = _safe_text(diag.get("file_name"), "unknown")
+        node_id = f"document:{file_name}"
+        _add_node(
+            node_id,
+            "Document",
+            file_name,
+            "Project Files",
+            "file",
+            data=diag,
+            metadata={
+                "source_file": file_name,
+                "source_page": "n/a",
+                "sheet_number": "n/a",
+                "specification_section": "n/a",
+                "extraction_confidence": _safe_text(diag.get("status"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            node_id,
+            "Project to Document",
+            _safe_text(diag.get("status"), "n/a"),
+            file_name,
+        )
+
+    id_to_index = {node["id"]: index for index, node in enumerate(nodes)}
+    relationship_counts: defaultdict[str, int] = defaultdict(int)
+    evidence_counts: defaultdict[str, int] = defaultdict(int)
+    for edge in edges:
+        relationship_counts[edge["source"]] += 1
+        relationship_counts[edge["target"]] += 1
+        if "Evidence" in edge["relationship"]:
+            evidence_counts[edge["source"]] += 1
+            evidence_counts[edge["target"]] += 1
+
+    for node_id, count in relationship_counts.items():
+        node = nodes[id_to_index[node_id]]
+        node.setdefault("metadata", {})["relationship_count"] = count
+        node.setdefault("metadata", {})["evidence_count"] = evidence_counts[node_id]
+
+    return {"nodes": nodes, "edges": edges}
+
+
+def _node_by_id(graph: dict[str, Any], node_id: str) -> dict[str, Any] | None:
+    for node in graph.get("nodes", []):
+        if node.get("id") == node_id:
+            return node
+    return None
+
+
+def _node_label(graph: dict[str, Any], node_id: str) -> str:
+    node = _node_by_id(graph, node_id)
+    if node is None:
+        return node_id
+    return _safe_text(node.get("label"), node_id)
+
+
+def _node_relationships(
+    graph: dict[str, Any], node_id: str
+) -> dict[str, list[dict[str, Any]]]:
+    incoming = [
+        edge for edge in graph.get("edges", []) if edge.get("target") == node_id
+    ]
+    outgoing = [
+        edge for edge in graph.get("edges", []) if edge.get("source") == node_id
+    ]
+    return {"incoming": incoming, "outgoing": outgoing}
+
+
+def _relationship_subgraph(
+    graph: dict[str, Any],
+    root_node_id: str,
+    depth: int,
+) -> dict[str, Any]:
+    visited = {root_node_id}
+    frontier = {root_node_id}
+    selected_edges: list[dict[str, Any]] = []
+
+    for _ in range(max(depth, 1)):
+        next_frontier: set[str] = set()
+        for edge in graph.get("edges", []):
+            source = str(edge.get("source"))
+            target = str(edge.get("target"))
+            if source in frontier or target in frontier:
+                selected_edges.append(edge)
+                next_frontier.add(source)
+                next_frontier.add(target)
+        frontier = next_frontier - visited
+        visited.update(next_frontier)
+        if not frontier:
+            break
+
+    selected_nodes = [
+        node for node in graph.get("nodes", []) if node.get("id") in visited
+    ]
+    dedup_edges: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for edge in selected_edges:
+        key = (
+            str(edge.get("source")),
+            str(edge.get("target")),
+            str(edge.get("relationship")),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        dedup_edges.append(edge)
+
+    return {"nodes": selected_nodes, "edges": dedup_edges}
+
+
+def _metadata_for_selection(
+    graph: dict[str, Any],
+    selection: dict[str, Any],
+) -> dict[str, Any] | None:
+    kind = str(selection.get("kind") or "")
+    data = dict(selection.get("data") or {})
+    if not kind:
+        return None
+
+    candidates: list[str] = []
+    if kind == "drawing":
+        candidates.append(f"drawing:{_safe_text(data.get('drawing_number'), '')}")
+    elif kind == "specification":
+        candidates.append(f"spec:{_safe_text(data.get('section'), '')}")
+    elif kind == "equipment":
+        candidates.append(f"equipment:{_safe_text(data.get('equipment_id'), '')}")
+    elif kind == "system":
+        candidates.append(f"system:{_safe_text(data.get('system'), '')}")
+    elif kind == "room":
+        candidates.append(f"room:{_safe_text(data.get('room'), '')}")
+    elif kind == "manufacturer":
+        candidates.append(f"manufacturer:{_safe_text(data.get('manufacturer'), '')}")
+    elif kind == "evidence":
+        candidates.append(
+            f"evidence:{_safe_text(data.get('source_file'), 'file')}:{data.get('page', 'n/a')}"
+        )
+    elif kind == "project":
+        project_id = _safe_text(data.get("project_id"), "")
+        if project_id:
+            candidates.append(f"project:{project_id}")
+
+    for node_id in candidates:
+        node = _node_by_id(graph, node_id)
+        if node is not None:
+            metadata = dict(node.get("metadata") or {})
+            metadata["label"] = _safe_text(node.get("label"), "n/a")
+            metadata["type"] = _safe_text(node.get("type"), "n/a")
+            return metadata
+    return None
+
+
+def _render_global_search_panel(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
     query = str(st.session_state.get("atlas_global_search") or "").strip()
     if not query:
         return
 
     entries = _global_search_entries(context)
-    filtered = [
-        item
-        for item in entries
-        if _in_text(item.get("name"), query)
-        or _in_text(item.get("subtitle"), query)
-        or _in_text(item.get("kind"), query)
-    ]
+    kind_options = sorted(
+        {str(item.get("kind") or "") for item in entries if item.get("kind")}
+    )
+
+    with st.expander("Search Filters", expanded=False):
+        selected_types = st.multiselect(
+            "Type filters",
+            options=kind_options,
+            default=[],
+            key="atlas_search_type_filters",
+            help="Filter by object type (drawing, specification, room, system, manufacturer, model, evidence, etc.).",
+        )
+        relationship_search = st.checkbox(
+            "Enable relationship search",
+            key="atlas_relationship_search_enabled",
+            value=False,
+        )
+
+    graph = (
+        _build_knowledge_graph(record=record, context=context)
+        if context
+        else {"nodes": [], "edges": []}
+    )
+
+    def _score(item: dict[str, Any]) -> int:
+        name = _safe_text(item.get("name"), "").lower()
+        subtitle = _safe_text(item.get("subtitle"), "").lower()
+        q = query.lower()
+        if name == q:
+            return 0
+        if name.startswith(q):
+            return 1
+        if q in name:
+            return 2
+        if subtitle == q:
+            return 3
+        if q in subtitle:
+            return 4
+        if _in_text(item.get("kind"), query):
+            return 5
+        return 9
+
+    filtered = []
+    for item in entries:
+        if selected_types and str(item.get("kind")) not in selected_types:
+            continue
+
+        text_match = (
+            _in_text(item.get("name"), query)
+            or _in_text(item.get("subtitle"), query)
+            or _in_text(item.get("kind"), query)
+        )
+
+        if relationship_search and not text_match:
+            node_label = _safe_text(item.get("name"), "")
+            node_matches = [
+                node
+                for node in graph.get("nodes", [])
+                if _in_text(node.get("label"), node_label)
+            ]
+            for node in node_matches:
+                relationships = _node_relationships(
+                    graph, _safe_text(node.get("id"), "")
+                )
+                related_text = " ".join(
+                    [
+                        _safe_text(edge.get("relationship"), "")
+                        + " "
+                        + _safe_text(edge.get("source_evidence"), "")
+                        for edge in relationships.get("incoming", [])
+                        + relationships.get("outgoing", [])
+                    ]
+                )
+                if _in_text(related_text, query):
+                    text_match = True
+                    break
+
+        if text_match:
+            filtered.append(item)
+
+    filtered.sort(key=_score)
 
     with st.expander(f"Global Search Results ({len(filtered)})", expanded=True):
         st.caption(
@@ -2075,6 +2974,387 @@ def _render_systems_page(st: Any, context: dict[str, Any] | None) -> None:
     _set_context_selection(st, "system", selected)
 
 
+def _render_relationship_explorer_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    st.subheader("Relationship Explorer")
+    graph = _build_knowledge_graph(record, context)
+    nodes = list(graph.get("nodes", []))
+    if not nodes:
+        st.info("No relationship graph nodes are available yet.")
+        return
+
+    labels = [f"{node['type']}: {node['label']}" for node in nodes]
+    selected_label = st.selectbox("Select Object", options=labels)
+    selected_node = nodes[labels.index(selected_label)]
+    depth = st.slider("Recursive expansion depth", min_value=1, max_value=4, value=2)
+
+    relationships = _node_relationships(graph, _safe_text(selected_node.get("id"), ""))
+    incoming = relationships.get("incoming", [])
+    outgoing = relationships.get("outgoing", [])
+
+    st.markdown("#### Incoming Relationships")
+    if incoming:
+        st.dataframe(
+            [
+                {
+                    "from": _node_label(graph, _safe_text(edge["source"], "n/a")),
+                    "relationship": edge.get("relationship"),
+                    "confidence": edge.get("confidence"),
+                    "source evidence": edge.get("source_evidence"),
+                }
+                for edge in incoming
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No incoming relationships.")
+
+    st.markdown("#### Outgoing Relationships")
+    if outgoing:
+        st.dataframe(
+            [
+                {
+                    "to": _node_label(graph, _safe_text(edge["target"], "n/a")),
+                    "relationship": edge.get("relationship"),
+                    "confidence": edge.get("confidence"),
+                    "source evidence": edge.get("source_evidence"),
+                }
+                for edge in outgoing
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No outgoing relationships.")
+
+    subgraph = _relationship_subgraph(
+        graph, _safe_text(selected_node.get("id"), ""), depth
+    )
+    st.markdown(f"#### Expanded Relationships (Depth {depth})")
+    st.dataframe(
+        [
+            {
+                "source": _node_label(graph, _safe_text(edge["source"], "n/a")),
+                "target": _node_label(graph, _safe_text(edge["target"], "n/a")),
+                "relationship": edge.get("relationship"),
+                "confidence": edge.get("confidence"),
+                "source evidence": edge.get("source_evidence"),
+            }
+            for edge in subgraph.get("edges", [])
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+def _render_relationship_visualization_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    st.subheader("Relationship Visualization")
+    graph = _build_knowledge_graph(record, context)
+    nodes = list(graph.get("nodes", []))
+    if not nodes:
+        st.info("No relationships available for visualization.")
+        return
+
+    labels = [f"{node['type']}: {node['label']}" for node in nodes]
+    selected_label = st.selectbox("Selected Object", options=labels)
+    selected_node = nodes[labels.index(selected_label)]
+    node_id = _safe_text(selected_node.get("id"), "")
+    relationships = _node_relationships(graph, node_id)
+    connected_ids = {node_id}
+    connected_edges = list(relationships.get("incoming", [])) + list(
+        relationships.get("outgoing", [])
+    )
+    for edge in connected_edges:
+        connected_ids.add(_safe_text(edge.get("source"), ""))
+        connected_ids.add(_safe_text(edge.get("target"), ""))
+
+    connected_nodes = [node for node in nodes if node.get("id") in connected_ids]
+    id_to_label = {
+        _safe_text(node.get("id"), ""): f"{node.get('type')} {node.get('label')}"
+        for node in connected_nodes
+    }
+
+    mermaid_lines = ["graph LR"]
+    for edge in connected_edges[:40]:
+        source = _safe_text(edge.get("source"), "")
+        target = _safe_text(edge.get("target"), "")
+        source_label = id_to_label.get(source, source).replace('"', "")
+        target_label = id_to_label.get(target, target).replace('"', "")
+        rel = _safe_text(edge.get("relationship"), "linked").replace('"', "")
+        mermaid_lines.append(f'    "{source_label}" -->|"{rel}"| "{target_label}"')
+
+    st.markdown("```mermaid\n" + "\n".join(mermaid_lines) + "\n```")
+
+    st.markdown("Connected Objects")
+    st.dataframe(
+        [
+            {
+                "type": node.get("type"),
+                "label": node.get("label"),
+                "page": node.get("page"),
+            }
+            for node in connected_nodes
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    node_options = [
+        f"{node.get('type')}: {node.get('label')}" for node in connected_nodes
+    ]
+    selected_nav = st.selectbox("Navigate to Node", options=node_options)
+    target_node = connected_nodes[node_options.index(selected_nav)]
+    if st.button("Open Node", type="primary"):
+        st.session_state["atlas_active_page"] = _safe_text(
+            target_node.get("page"), "Overview"
+        )
+        _set_context_selection(
+            st,
+            _safe_text(target_node.get("selection_kind"), "project"),
+            dict(target_node.get("data") or {}),
+        )
+        st.rerun()
+
+
+def _render_timeline_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    st.subheader("Project Timeline")
+    events = _timeline_events(record, context)
+    st.dataframe(events, use_container_width=True, hide_index=True)
+
+
+def _select_first_node(graph: dict[str, Any], node_type: str) -> dict[str, Any] | None:
+    for node in graph.get("nodes", []):
+        if _safe_text(node.get("type"), "") == node_type:
+            return node
+    return None
+
+
+def _node_for_current_selection(
+    graph: dict[str, Any],
+    kind: str,
+    data: dict[str, Any],
+    fallback_type: str,
+) -> dict[str, Any] | None:
+    if kind == "drawing":
+        node_id = f"drawing:{_safe_text(data.get('drawing_number'), '')}"
+        return _node_by_id(graph, node_id)
+    if kind == "specification":
+        node_id = f"spec:{_safe_text(data.get('section'), '')}"
+        return _node_by_id(graph, node_id)
+    if kind == "equipment":
+        node_id = f"equipment:{_safe_text(data.get('equipment_id'), '')}"
+        return _node_by_id(graph, node_id)
+    if kind == "system":
+        node_id = f"system:{_safe_text(data.get('system'), '')}"
+        return _node_by_id(graph, node_id)
+    if kind == "room":
+        node_id = f"room:{_safe_text(data.get('room'), '')}"
+        return _node_by_id(graph, node_id)
+    if kind == "manufacturer":
+        node_id = f"manufacturer:{_safe_text(data.get('manufacturer'), '')}"
+        return _node_by_id(graph, node_id)
+    if kind == "evidence":
+        node_id = f"evidence:{_safe_text(data.get('source_file'), 'file')}:{data.get('page', 'n/a')}"
+        return _node_by_id(graph, node_id)
+    if kind == "project":
+        node_id = f"project:{_safe_text(data.get('project_id'), '')}"
+        return _node_by_id(graph, node_id)
+    return _select_first_node(graph, fallback_type)
+
+
+def _render_object_detail_page(
+    st: Any,
+    title: str,
+    node_type: str,
+    fallback_kind: str,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    st.subheader(title)
+    graph = _build_knowledge_graph(record, context)
+    selection = dict(st.session_state.get("atlas_context_selection") or {})
+    selected = _node_for_current_selection(
+        graph,
+        _safe_text(selection.get("kind"), fallback_kind),
+        dict(selection.get("data") or {}),
+        node_type,
+    )
+    if selected is None:
+        selected = _select_first_node(graph, node_type)
+    if selected is None:
+        st.info(f"No {node_type.lower()} objects are available.")
+        return
+
+    relationships = _node_relationships(graph, _safe_text(selected.get("id"), ""))
+    incoming = relationships.get("incoming", [])
+    outgoing = relationships.get("outgoing", [])
+    node_data = dict(selected.get("data") or {})
+    metadata = dict(selected.get("metadata") or {})
+
+    st.markdown("Properties")
+    props = [
+        {"property": key.replace("_", " "), "value": _safe_text(value, "n/a")}
+        for key, value in node_data.items()
+        if not isinstance(value, (list, dict))
+    ]
+    st.dataframe(props[:20], use_container_width=True, hide_index=True)
+
+    st.markdown("Relationships")
+    rel_rows = [
+        {
+            "direction": "Incoming",
+            "object": _node_label(graph, _safe_text(edge["source"], "n/a")),
+            "relationship": edge.get("relationship"),
+            "confidence": edge.get("confidence"),
+            "source evidence": edge.get("source_evidence"),
+        }
+        for edge in incoming
+    ] + [
+        {
+            "direction": "Outgoing",
+            "object": _node_label(graph, _safe_text(edge["target"], "n/a")),
+            "relationship": edge.get("relationship"),
+            "confidence": edge.get("confidence"),
+            "source evidence": edge.get("source_evidence"),
+        }
+        for edge in outgoing
+    ]
+    if rel_rows:
+        st.dataframe(rel_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("No relationships available.")
+
+    warnings = list(node_data.get("warnings") or [])
+    st.markdown("Warnings")
+    if warnings:
+        st.dataframe(
+            [{"warning": str(item)} for item in warnings],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No warnings for this object.")
+
+    st.markdown("Evidence")
+    evidence_rows = [
+        {
+            "source evidence": edge.get("source_evidence"),
+            "relationship": edge.get("relationship"),
+        }
+        for edge in rel_rows
+        if _safe_text(edge.get("source evidence"), "n/a") != "n/a"
+    ]
+    if evidence_rows:
+        st.dataframe(evidence_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("No evidence references attached.")
+
+    st.markdown("Traceability")
+    st.caption("Every recommendation links back to deterministic source evidence.")
+    source_file = _safe_text(metadata.get("source_file"), "n/a")
+    st.dataframe(
+        [
+            {"field": "Source file", "value": source_file},
+            {
+                "field": "Source page",
+                "value": _safe_text(metadata.get("source_page"), "n/a"),
+            },
+            {
+                "field": "Sheet number",
+                "value": _safe_text(metadata.get("sheet_number"), "n/a"),
+            },
+            {
+                "field": "Specification section",
+                "value": _safe_text(metadata.get("specification_section"), "n/a"),
+            },
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    if st.button("Open Originating Evidence", key=f"atlas_trace_{title}"):
+        st.session_state["atlas_active_page"] = "Evidence"
+        st.rerun()
+
+    st.markdown("Timeline")
+    st.dataframe(
+        _timeline_events(record, context)[:6], use_container_width=True, hide_index=True
+    )
+
+
+def _render_metadata_inspector_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    st.subheader("Metadata Inspector")
+    graph = _build_knowledge_graph(record, context)
+    selection = dict(
+        st.session_state.get("atlas_context_selection")
+        or {"kind": "project", "data": {"project_id": record.project.project_id}}
+    )
+    metadata = _metadata_for_selection(graph, selection)
+    if metadata is None:
+        st.info("Select an object to inspect metadata.")
+        return
+
+    st.dataframe(
+        [
+            {"field": "Object", "value": _safe_text(metadata.get("label"), "n/a")},
+            {"field": "Type", "value": _safe_text(metadata.get("type"), "n/a")},
+            {
+                "field": "Source file",
+                "value": _safe_text(metadata.get("source_file"), "n/a"),
+            },
+            {
+                "field": "Source page",
+                "value": _safe_text(metadata.get("source_page"), "n/a"),
+            },
+            {
+                "field": "Sheet number",
+                "value": _safe_text(metadata.get("sheet_number"), "n/a"),
+            },
+            {
+                "field": "Specification section",
+                "value": _safe_text(metadata.get("specification_section"), "n/a"),
+            },
+            {
+                "field": "Extraction confidence",
+                "value": _safe_text(metadata.get("extraction_confidence"), "n/a"),
+            },
+            {
+                "field": "Creation timestamp",
+                "value": _safe_text(metadata.get("creation_timestamp"), "n/a"),
+            },
+            {
+                "field": "Last update",
+                "value": _safe_text(metadata.get("last_update"), "n/a"),
+            },
+            {
+                "field": "Relationship count",
+                "value": _safe_text(metadata.get("relationship_count"), "0"),
+            },
+            {
+                "field": "Evidence count",
+                "value": _safe_text(metadata.get("evidence_count"), "0"),
+            },
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
 def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None:
     review = context.get("review") if context else None
     brief = context.get("brief") if context else None
@@ -2088,6 +3368,9 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         if readiness is None:
             st.info("No readiness assessment available.")
             return
+        st.caption(
+            "Traceability: readiness signals are derived from deterministic extraction outputs and linked source evidence."
+        )
         st.write(getattr(readiness, "message", ""))
         section_scores = dict(getattr(readiness, "section_scores", {}) or {})
         if section_scores:
@@ -2122,10 +3405,18 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
             st.info("No estimator brief available.")
             return
         st.markdown(f"**{brief.brief_title}**")
+        st.caption("Where did Atlas get this? See traceability references below.")
         st.write(brief.executive_summary)
         actions = list(brief.prioritized_reviewer_actions or [])
         if actions:
             st.dataframe(actions, use_container_width=True, hide_index=True)
+        evidence_refs = list(getattr(brief, "evidence_refs", []) or [])
+        if evidence_refs:
+            st.markdown("Traceability References")
+            st.dataframe(evidence_refs, use_container_width=True, hide_index=True)
+            if st.button("Open Evidence Workspace", key="atlas_brief_open_evidence"):
+                st.session_state["atlas_active_page"] = "Evidence"
+                st.rerun()
         return
 
     if page == "RFI Candidates":
@@ -2273,6 +3564,11 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
     )
     kind = str(selection.get("kind") or "project")
     data = dict(selection.get("data") or {})
+    graph = (
+        _build_knowledge_graph(record=None, context=context)
+        if context
+        else {"nodes": [], "edges": []}
+    )
 
     def _render_object_context(
         title: str,
@@ -2452,6 +3748,68 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
         hide_index=True,
     )
 
+    st.markdown("Metadata Inspector")
+    metadata = _metadata_for_selection(graph, {"kind": kind, "data": data})
+    if metadata is None and kind == "project":
+        metadata = {
+            "source_file": _safe_text(context.get("package_location"), "n/a"),
+            "source_page": "n/a",
+            "sheet_number": "n/a",
+            "specification_section": "n/a",
+            "extraction_confidence": "n/a",
+            "creation_timestamp": "n/a",
+            "last_update": "n/a",
+            "relationship_count": 0,
+            "evidence_count": 0,
+            "label": "Project",
+            "type": "Project",
+        }
+    if metadata:
+        st.dataframe(
+            [
+                {"field": "Object", "value": _safe_text(metadata.get("label"), "n/a")},
+                {"field": "Type", "value": _safe_text(metadata.get("type"), "n/a")},
+                {
+                    "field": "Source file",
+                    "value": _safe_text(metadata.get("source_file"), "n/a"),
+                },
+                {
+                    "field": "Source page",
+                    "value": _safe_text(metadata.get("source_page"), "n/a"),
+                },
+                {
+                    "field": "Sheet",
+                    "value": _safe_text(metadata.get("sheet_number"), "n/a"),
+                },
+                {
+                    "field": "Specification section",
+                    "value": _safe_text(metadata.get("specification_section"), "n/a"),
+                },
+                {
+                    "field": "Extraction confidence",
+                    "value": _safe_text(metadata.get("extraction_confidence"), "n/a"),
+                },
+                {
+                    "field": "Creation timestamp",
+                    "value": _safe_text(metadata.get("creation_timestamp"), "n/a"),
+                },
+                {
+                    "field": "Last update",
+                    "value": _safe_text(metadata.get("last_update"), "n/a"),
+                },
+                {
+                    "field": "Relationship count",
+                    "value": _safe_text(metadata.get("relationship_count"), "0"),
+                },
+                {
+                    "field": "Evidence count",
+                    "value": _safe_text(metadata.get("evidence_count"), "0"),
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
 
 def _render_status_bar(
     st: Any, record: ProjectWorkspaceRecord, context: dict[str, Any] | None
@@ -2503,6 +3861,86 @@ def _render_main_content(
         _render_equipment_page(st, context)
     elif page == "Systems":
         _render_systems_page(st, context)
+    elif page == "Relationship Explorer":
+        _render_relationship_explorer_page(st, record, context)
+    elif page == "Relationship Visualization":
+        _render_relationship_visualization_page(st, record, context)
+    elif page == "Timeline":
+        _render_timeline_page(st, record, context)
+    elif page == "Project Detail":
+        _render_object_detail_page(
+            st,
+            title="Project Detail",
+            node_type="Project",
+            fallback_kind="project",
+            record=record,
+            context=context,
+        )
+    elif page == "Drawing Detail":
+        _render_object_detail_page(
+            st,
+            title="Drawing Detail",
+            node_type="Drawing",
+            fallback_kind="drawing",
+            record=record,
+            context=context,
+        )
+    elif page == "Specification Detail":
+        _render_object_detail_page(
+            st,
+            title="Specification Detail",
+            node_type="Specification",
+            fallback_kind="specification",
+            record=record,
+            context=context,
+        )
+    elif page == "Equipment Detail":
+        _render_object_detail_page(
+            st,
+            title="Equipment Detail",
+            node_type="Equipment",
+            fallback_kind="equipment",
+            record=record,
+            context=context,
+        )
+    elif page == "System Detail":
+        _render_object_detail_page(
+            st,
+            title="System Detail",
+            node_type="System",
+            fallback_kind="system",
+            record=record,
+            context=context,
+        )
+    elif page == "Room Detail":
+        _render_object_detail_page(
+            st,
+            title="Room Detail",
+            node_type="Room",
+            fallback_kind="room",
+            record=record,
+            context=context,
+        )
+    elif page == "Manufacturer Detail":
+        _render_object_detail_page(
+            st,
+            title="Manufacturer Detail",
+            node_type="Manufacturer",
+            fallback_kind="manufacturer",
+            record=record,
+            context=context,
+        )
+    elif page == "Evidence Detail":
+        _render_object_detail_page(
+            st,
+            title="Evidence Detail",
+            node_type="Evidence",
+            fallback_kind="evidence",
+            record=record,
+            context=context,
+        )
+    elif page == "Metadata Inspector":
+        _render_metadata_inspector_page(st, record, context)
     elif page in BID_INTELLIGENCE_PAGES:
         _render_bid_page(st, page, context)
     elif page in REPORT_PAGES:
@@ -2518,7 +3956,7 @@ def _render_shell(
     context: dict[str, Any] | None,
 ) -> None:
     _render_header(st, workspace_service, record, context)
-    _render_global_search_panel(st, context)
+    _render_global_search_panel(st, record, context)
 
     current_page = st.session_state.get("atlas_active_page", "Home")
     st.markdown(

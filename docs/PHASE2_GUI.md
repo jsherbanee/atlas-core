@@ -9,7 +9,7 @@ This interface is local-only:
 - Local file-backed workspace persistence under `outputs/project_workspaces/`.
 - No procurement/RFQ/submittal/invoice/execution/closeout/vendor communication workflows.
 
-Atlas Workspace v1 (Sprint 6) launches into a persistent interactive engineering shell.
+Atlas Workspace v1 (Sprint 7) launches into a persistent interactive engineering shell.
 
 Shell layout:
 - Header
@@ -353,6 +353,113 @@ Global project search now indexes:
 
 Search results include object type and subtitle metadata.
 Results can be navigated with keyboard arrows via selector controls and opened directly into the corresponding workspace.
+
+## Atlas Knowledge Graph (Sprint 7)
+Atlas now builds a deterministic in-memory knowledge graph for each active project workspace.
+
+Supported node types:
+- Project
+- Drawing
+- Specification
+- Equipment
+- System
+- Room
+- Area
+- Manufacturer
+- Product
+- Evidence
+- Engineering Assumption
+- RFI Candidate
+- Labor Estimate
+- Revision
+- Document
+
+Deterministic relationship examples include:
+- Drawing to Equipment
+- Equipment to Specification
+- Equipment to System
+- System to Room
+- Specification to Drawing
+- Drawing to Evidence
+- RFI to Equipment
+- Evidence to Assumption
+
+No AI-generated relationships are used.
+
+## Relationship Explorer
+A dedicated Relationship Explorer page allows object-centric relationship navigation.
+
+Features:
+- object selection
+- incoming relationships
+- outgoing relationships
+- relationship type
+- confidence
+- source evidence
+- recursive expansion depth
+
+## Relationship Visualization
+Atlas includes a simple deterministic node-link relationship view.
+
+Visualization behavior:
+- selected object is the graph focus
+- connected objects are displayed with labels
+- relationship labels are shown between nodes
+- node navigation is available via connected-node selection controls
+
+## Object Detail Pages
+Major object detail pages are now available:
+- Project Detail
+- Drawing Detail
+- Specification Detail
+- Equipment Detail
+- System Detail
+- Room Detail
+- Manufacturer Detail
+- Evidence Detail
+
+Each page displays:
+- properties
+- relationships
+- warnings
+- evidence
+- timeline
+
+Each page includes traceability details and quick navigation to source evidence/originating documents.
+
+## Timeline
+Project Timeline page displays deterministic project events:
+- project intake
+- document imports
+- review runs
+- revision comparisons
+- readiness updates
+- estimator brief generation
+
+Future events remain disabled in local deterministic mode.
+
+## Metadata Inspector
+Metadata Inspector is available as both a dedicated page and context panel section.
+
+For selected objects, it displays:
+- source file
+- source page
+- sheet number
+- specification section
+- extraction confidence
+- creation timestamp
+- last update
+- relationship count
+- evidence count
+
+## Enhanced Search (Sprint 7)
+Global search now supports:
+- type filters
+- manufacturer/model/drawing/specification/room/system/evidence lookups
+- relationship search mode
+- ranking with exact matches first
+
+Search results preserve keyboard navigation behavior and cross-page navigation into object-focused views.
 
 ## Project Files Explorer
 Project Files includes folder-based exploration:
