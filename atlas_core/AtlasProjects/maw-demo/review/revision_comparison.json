@@ -1,0 +1,781 @@
+{
+  "added_items": [
+    "maw-assistive-listening-pack"
+  ],
+  "assumption_impacts": [
+    "chg-0cff3ac0d126",
+    "chg-414d98822611",
+    "chg-7cd798886669"
+  ],
+  "baseline_revision_id": "maw-rev-0",
+  "changes": [
+    {
+      "affected_items": [
+        "maw-lobby-display"
+      ],
+      "change_id": "chg-0cff3ac0d126",
+      "change_type": "assumption_changed",
+      "confidence": 0.9,
+      "current_value": null,
+      "description": "An engineering assumption was removed.",
+      "detected_condition": "assumption_removed",
+      "estimating_impact": "Removed assumption can reduce carried risk or conceal unresolved scope.",
+      "labor_impact": false,
+      "previous_value": "Display mounting solution should be verified.",
+      "recommended_action": "Confirm removal reflects resolved design intent, not missing documentation.",
+      "severity": "medium",
+      "source_refs": [
+        {
+          "excerpt": "Display mounting solution should be verified.",
+          "field": "description",
+          "source_id": "video_display_mount_missing_maw-lobby-display",
+          "source_label": null,
+          "source_type": "baseline_assumption"
+        }
+      ],
+      "title": "Engineering assumption removed: video_display_mount_missing_maw-lobby-display"
+    },
+    {
+      "affected_items": [
+        "construction_coordination_review"
+      ],
+      "change_id": "chg-414d98822611",
+      "change_type": "assumption_changed",
+      "confidence": 0.9,
+      "current_value": "Scope coordination with GC, EC, owner, network team, and other trades should be confirmed.",
+      "description": "A new engineering assumption was introduced.",
+      "detected_condition": "assumption_added",
+      "estimating_impact": "New assumption may affect inclusions, contingencies, and estimate narrative.",
+      "labor_impact": false,
+      "previous_value": null,
+      "recommended_action": "Review assumption validity and align estimate clarifications.",
+      "severity": "medium",
+      "source_refs": [
+        {
+          "excerpt": "Scope coordination with GC, EC, owner, network team, and other trades should be confirmed.",
+          "field": "description",
+          "source_id": "construction_coordination_review",
+          "source_label": null,
+          "source_type": "comparison_assumption"
+        }
+      ],
+      "title": "Engineering assumption added: construction_coordination_review"
+    },
+    {
+      "affected_items": [
+        "maw-recital-speakers"
+      ],
+      "change_id": "chg-7cd798886669",
+      "change_type": "assumption_changed",
+      "confidence": 0.9,
+      "current_value": null,
+      "description": "An engineering assumption was removed.",
+      "detected_condition": "assumption_removed",
+      "estimating_impact": "Removed assumption can reduce carried risk or conceal unresolved scope.",
+      "labor_impact": false,
+      "previous_value": "Assistive listening requirements should be verified.",
+      "recommended_action": "Confirm removal reflects resolved design intent, not missing documentation.",
+      "severity": "medium",
+      "source_refs": [
+        {
+          "excerpt": "Assistive listening requirements should be verified.",
+          "field": "description",
+          "source_id": "audio_hearing_assistance_missing",
+          "source_label": null,
+          "source_type": "baseline_assumption"
+        }
+      ],
+      "title": "Engineering assumption removed: audio_hearing_assistance_missing"
+    },
+    {
+      "affected_items": [
+        "maw-classroom-display"
+      ],
+      "change_id": "chg-57cf31a74c9c",
+      "change_type": "drawing_reference_changed",
+      "confidence": 0.95,
+      "current_value": "AV-602",
+      "description": "Drawing changed from 'AV-601' to 'AV-602'.",
+      "detected_condition": "drawing_reference_changed",
+      "estimating_impact": "Drawing reference delta may indicate revised installation context.",
+      "labor_impact": true,
+      "previous_value": "AV-601",
+      "recommended_action": "Verify revised drawing context and re-check installation assumptions.",
+      "severity": "medium",
+      "source_refs": [
+        {
+          "excerpt": "manufacturer=Sony model=FW-65BZ40L system=Classroom AV",
+          "field": "drawing_reference",
+          "source_id": "maw-classroom-display",
+          "source_label": "Classroom instructional display",
+          "source_type": "baseline_equipment"
+        },
+        {
+          "excerpt": "manufacturer=Sony model=FW-65BZ40L system=Classroom AV",
+          "field": "drawing_reference",
+          "source_id": "maw-classroom-display",
+          "source_label": "Classroom instructional display",
+          "source_type": "comparison_equipment"
+        }
+      ],
+      "title": "Drawing reference changed: maw-classroom-display"
+    },
+    {
+      "affected_items": [
+        "maw-assistive-listening-pack"
+      ],
+      "change_id": "chg-c10dfcf749b0",
+      "change_type": "item_added",
+      "confidence": 0.95,
+      "current_value": {
+        "description": "Assistive listening receivers add alternate",
+        "drawing_reference": "AV-403",
+        "manufacturer": "Listen Technologies",
+        "model": "LT-84",
+        "quantity": 2.0,
+        "specification_reference": "27 41 16",
+        "system_area": "Performance Audio"
+      },
+      "description": "Equipment maw-assistive-listening-pack was added in the comparison revision.",
+      "detected_condition": "equipment_added",
+      "estimating_impact": "Added scope likely increases pricing and installation effort.",
+      "labor_impact": true,
+      "previous_value": null,
+      "recommended_action": "Confirm quantity, basis-of-design, and included labor assumptions.",
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "manufacturer=Listen Technologies model=LT-84 system=Performance Audio",
+          "field": null,
+          "source_id": "maw-assistive-listening-pack",
+          "source_label": "Assistive listening receivers add alternate",
+          "source_type": "comparison_equipment"
+        }
+      ],
+      "title": "Equipment item added: maw-assistive-listening-pack"
+    },
+    {
+      "affected_items": [
+        "maw-recital-speakers"
+      ],
+      "change_id": "chg-65a030fcc2fe",
+      "change_type": "item_modified",
+      "confidence": 0.93,
+      "current_value": {
+        "description": "Meyer Sound recital hall loudspeakers",
+        "drawing_reference": "AV-401",
+        "manufacturer": "Meyer Sound",
+        "model": "ULTRA-X40",
+        "quantity": 6.0,
+        "specification_reference": "27 41 16",
+        "system_area": "Performance Audio"
+      },
+      "description": "Manufacturer/model/description/system or references changed between revisions.",
+      "detected_condition": "equipment_attributes_modified",
+      "estimating_impact": "Device attribute changes may alter basis-of-design pricing and substitutions.",
+      "labor_impact": true,
+      "previous_value": {
+        "description": "Meyer Sound recital hall loudspeakers",
+        "drawing_reference": "AV-401",
+        "manufacturer": "Meyer Sound",
+        "model": "ULTRA-X40",
+        "quantity": 4.0,
+        "specification_reference": "27 41 16",
+        "system_area": "Performance Audio"
+      },
+      "recommended_action": "Validate revised basis-of-design and adjust estimate line item.",
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+          "field": null,
+          "source_id": "maw-recital-speakers",
+          "source_label": "Meyer Sound recital hall loudspeakers",
+          "source_type": "baseline_equipment"
+        },
+        {
+          "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+          "field": null,
+          "source_id": "maw-recital-speakers",
+          "source_label": "Meyer Sound recital hall loudspeakers",
+          "source_type": "comparison_equipment"
+        }
+      ],
+      "title": "Equipment attributes modified: maw-recital-speakers"
+    },
+    {
+      "affected_items": [
+        "maw-control-processor"
+      ],
+      "change_id": "chg-fb2218c3f367",
+      "change_type": "item_modified",
+      "confidence": 0.93,
+      "current_value": {
+        "description": "Q-SYS control processor",
+        "drawing_reference": "AV-501",
+        "manufacturer": "QSC",
+        "model": "Core Nano Plus",
+        "quantity": 1.0,
+        "specification_reference": "27 41 26A",
+        "system_area": "AV Control"
+      },
+      "description": "Manufacturer/model/description/system or references changed between revisions.",
+      "detected_condition": "equipment_attributes_modified",
+      "estimating_impact": "Device attribute changes may alter basis-of-design pricing and substitutions.",
+      "labor_impact": true,
+      "previous_value": {
+        "description": "Q-SYS control processor",
+        "drawing_reference": "AV-501",
+        "manufacturer": "QSC",
+        "model": "Core Nano",
+        "quantity": 1.0,
+        "specification_reference": "27 41 26",
+        "system_area": "AV Control"
+      },
+      "recommended_action": "Validate revised basis-of-design and adjust estimate line item.",
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "manufacturer=QSC model=Core Nano system=AV Control",
+          "field": null,
+          "source_id": "maw-control-processor",
+          "source_label": "Q-SYS control processor",
+          "source_type": "baseline_equipment"
+        },
+        {
+          "excerpt": "manufacturer=QSC model=Core Nano Plus system=AV Control",
+          "field": null,
+          "source_id": "maw-control-processor",
+          "source_label": "Q-SYS control processor",
+          "source_type": "comparison_equipment"
+        }
+      ],
+      "title": "Equipment attributes modified: maw-control-processor"
+    },
+    {
+      "affected_items": [
+        "maw-classroom-display"
+      ],
+      "change_id": "chg-fcf92555ab45",
+      "change_type": "item_modified",
+      "confidence": 0.93,
+      "current_value": {
+        "description": "Classroom instructional display",
+        "drawing_reference": "AV-602",
+        "manufacturer": "Sony",
+        "model": "FW-65BZ40L",
+        "quantity": 1.0,
+        "specification_reference": "27 41 19",
+        "system_area": "Classroom AV"
+      },
+      "description": "Manufacturer/model/description/system or references changed between revisions.",
+      "detected_condition": "equipment_attributes_modified",
+      "estimating_impact": "Device attribute changes may alter basis-of-design pricing and substitutions.",
+      "labor_impact": true,
+      "previous_value": {
+        "description": "Classroom instructional display",
+        "drawing_reference": "AV-601",
+        "manufacturer": "Sony",
+        "model": "FW-65BZ40L",
+        "quantity": 1.0,
+        "specification_reference": "27 41 19",
+        "system_area": "Classroom AV"
+      },
+      "recommended_action": "Validate revised basis-of-design and adjust estimate line item.",
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "manufacturer=Sony model=FW-65BZ40L system=Classroom AV",
+          "field": null,
+          "source_id": "maw-classroom-display",
+          "source_label": "Classroom instructional display",
+          "source_type": "baseline_equipment"
+        },
+        {
+          "excerpt": "manufacturer=Sony model=FW-65BZ40L system=Classroom AV",
+          "field": null,
+          "source_id": "maw-classroom-display",
+          "source_label": "Classroom instructional display",
+          "source_type": "comparison_equipment"
+        }
+      ],
+      "title": "Equipment attributes modified: maw-classroom-display"
+    },
+    {
+      "affected_items": [
+        "maw-lobby-display"
+      ],
+      "change_id": "chg-7b50ef9c94e9",
+      "change_type": "item_removed",
+      "confidence": 0.95,
+      "current_value": null,
+      "description": "Equipment maw-lobby-display was removed in the comparison revision.",
+      "detected_condition": "equipment_removed",
+      "estimating_impact": "Removed scope likely reduces pricing and labor carry.",
+      "labor_impact": true,
+      "previous_value": {
+        "description": "Lobby digital signage display",
+        "drawing_reference": "AV-101",
+        "manufacturer": "Sony",
+        "model": "FW-55BZ40L",
+        "quantity": 1.0,
+        "specification_reference": "27 41 19",
+        "system_area": "Lobby Digital Signage"
+      },
+      "recommended_action": "Confirm this removal is not a document coordination omission.",
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "manufacturer=Sony model=FW-55BZ40L system=Lobby Digital Signage",
+          "field": null,
+          "source_id": "maw-lobby-display",
+          "source_label": "Lobby digital signage display",
+          "source_type": "baseline_equipment"
+        }
+      ],
+      "title": "Equipment item removed: maw-lobby-display"
+    },
+    {
+      "affected_items": [
+        "labor_estimate"
+      ],
+      "change_id": "chg-4fd97e500c79",
+      "change_type": "labor_estimate_changed",
+      "confidence": 0.9,
+      "current_value": {
+        "confidence": 0.49,
+        "total_labor_hours_expected": 59.4
+      },
+      "description": "Total expected labor hours changed from 51.31 to 59.4.",
+      "detected_condition": "labor_estimate_changed",
+      "estimating_impact": "Labor-hour delta affects estimate carry and discipline loading.",
+      "labor_impact": true,
+      "previous_value": {
+        "confidence": 0.53,
+        "total_labor_hours_expected": 51.31
+      },
+      "recommended_action": "Reconcile labor deltas against quantity, scope, and assumption changes.",
+      "severity": "medium",
+      "source_refs": [
+        {
+          "excerpt": "expected=51.31",
+          "field": "labor_estimate.total_labor_hours_expected",
+          "source_id": "maw-revision-baseline",
+          "source_label": null,
+          "source_type": "baseline_review"
+        },
+        {
+          "excerpt": "expected=59.4",
+          "field": "labor_estimate.total_labor_hours_expected",
+          "source_id": "maw-revision-comparison",
+          "source_label": null,
+          "source_type": "comparison_review"
+        }
+      ],
+      "title": "Labor estimate changed between revisions"
+    },
+    {
+      "affected_items": [
+        "maw-recital-speakers"
+      ],
+      "change_id": "chg-4a653bf64c58",
+      "change_type": "quantity_changed",
+      "confidence": 0.97,
+      "current_value": 6.0,
+      "description": "Quantity changed from 4 to 6.",
+      "detected_condition": "equipment_quantity_changed",
+      "estimating_impact": "Quantity delta affects material takeoff and labor hours.",
+      "labor_impact": true,
+      "previous_value": 4.0,
+      "recommended_action": "Update estimate quantities and re-check labor-hour ranges.",
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+          "field": "quantity",
+          "source_id": "maw-recital-speakers",
+          "source_label": "Meyer Sound recital hall loudspeakers",
+          "source_type": "baseline_equipment"
+        },
+        {
+          "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+          "field": "quantity",
+          "source_id": "maw-recital-speakers",
+          "source_label": "Meyer Sound recital hall loudspeakers",
+          "source_type": "comparison_equipment"
+        }
+      ],
+      "title": "Equipment quantity changed: maw-recital-speakers"
+    },
+    {
+      "affected_items": [
+        "maw-assistive-listening-pack",
+        "maw-recital-speakers"
+      ],
+      "change_id": "chg-20eaa7b1be5e",
+      "change_type": "rfi_candidate_changed",
+      "confidence": 0.9,
+      "current_value": {
+        "detected_condition": "scope_responsibility_ambiguity",
+        "severity": "high"
+      },
+      "description": "A new RFI candidate condition was detected.",
+      "detected_condition": "rfi_candidate_added",
+      "estimating_impact": "New ambiguity or conflict condition may change estimator clarifications.",
+      "labor_impact": true,
+      "previous_value": null,
+      "recommended_action": "Validate if this candidate requires updated assumptions or labor contingency.",
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "scope_responsibility_ambiguity",
+          "field": "detected_condition",
+          "source_id": "rfi-maw-demo-e8cc917516",
+          "source_label": null,
+          "source_type": "comparison_rfi_candidate"
+        }
+      ],
+      "title": "RFI candidate added: rfi-maw-demo-e8cc917516"
+    },
+    {
+      "affected_items": [
+        "maw-assistive-listening-pack"
+      ],
+      "change_id": "chg-b2cc18010e1d",
+      "change_type": "rfi_candidate_changed",
+      "confidence": 0.9,
+      "current_value": {
+        "detected_condition": "add_alternate_ambiguity",
+        "severity": "high"
+      },
+      "description": "A new RFI candidate condition was detected.",
+      "detected_condition": "rfi_candidate_added",
+      "estimating_impact": "New ambiguity or conflict condition may change estimator clarifications.",
+      "labor_impact": true,
+      "previous_value": null,
+      "recommended_action": "Validate if this candidate requires updated assumptions or labor contingency.",
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "add_alternate_ambiguity",
+          "field": "detected_condition",
+          "source_id": "rfi-maw-demo-ba6cd74aa3",
+          "source_label": null,
+          "source_type": "comparison_rfi_candidate"
+        }
+      ],
+      "title": "RFI candidate added: rfi-maw-demo-ba6cd74aa3"
+    },
+    {
+      "affected_items": [
+        "maw-recital-speakers"
+      ],
+      "change_id": "chg-a64bf1fb5a85",
+      "change_type": "scope_responsibility_changed",
+      "confidence": 0.9,
+      "current_value": [
+        "by others",
+        "ofci"
+      ],
+      "description": "Responsibility markers changed from [] to ['by others', 'ofci'].",
+      "detected_condition": "scope_responsibility_changed",
+      "estimating_impact": "Scope ownership ambiguity can shift inclusions and bid risk.",
+      "labor_impact": true,
+      "previous_value": [],
+      "recommended_action": "Clarify ownership matrix for labor, materials, and coordination.",
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+          "field": "assumptions",
+          "source_id": "maw-recital-speakers",
+          "source_label": "Meyer Sound recital hall loudspeakers",
+          "source_type": "baseline_equipment"
+        },
+        {
+          "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+          "field": "assumptions",
+          "source_id": "maw-recital-speakers",
+          "source_label": "Meyer Sound recital hall loudspeakers",
+          "source_type": "comparison_equipment"
+        }
+      ],
+      "title": "Scope responsibility language changed: maw-recital-speakers"
+    },
+    {
+      "affected_items": [
+        "maw-control-processor"
+      ],
+      "change_id": "chg-3ce3160456ec",
+      "change_type": "specification_changed",
+      "confidence": 0.95,
+      "current_value": "27 41 26A",
+      "description": "Specification changed from '27 41 26' to '27 41 26A'.",
+      "detected_condition": "specification_reference_changed",
+      "estimating_impact": "Spec section delta may shift compliance scope and product basis.",
+      "labor_impact": true,
+      "previous_value": "27 41 26",
+      "recommended_action": "Review new spec section requirements and update estimate assumptions.",
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "manufacturer=QSC model=Core Nano system=AV Control",
+          "field": "specification_reference",
+          "source_id": "maw-control-processor",
+          "source_label": "Q-SYS control processor",
+          "source_type": "baseline_equipment"
+        },
+        {
+          "excerpt": "manufacturer=QSC model=Core Nano Plus system=AV Control",
+          "field": "specification_reference",
+          "source_id": "maw-control-processor",
+          "source_label": "Q-SYS control processor",
+          "source_type": "comparison_equipment"
+        }
+      ],
+      "title": "Specification reference changed: maw-control-processor"
+    }
+  ],
+  "comparison_revision_id": "maw-rev-1",
+  "confidence": 0.82,
+  "created_by_engine_version": "revision-comparison-engine/1.0.0",
+  "labor_impact_flags": [
+    "chg-57cf31a74c9c",
+    "chg-c10dfcf749b0",
+    "chg-65a030fcc2fe",
+    "chg-fb2218c3f367",
+    "chg-fcf92555ab45",
+    "chg-7b50ef9c94e9",
+    "chg-4fd97e500c79",
+    "chg-4a653bf64c58",
+    "chg-20eaa7b1be5e",
+    "chg-b2cc18010e1d",
+    "chg-a64bf1fb5a85",
+    "chg-3ce3160456ec"
+  ],
+  "modified_items": [
+    "maw-classroom-display",
+    "maw-control-processor",
+    "maw-recital-speakers"
+  ],
+  "project_id": "maw-demo",
+  "quantity_changes": [
+    "chg-4a653bf64c58"
+  ],
+  "removed_items": [
+    "maw-lobby-display"
+  ],
+  "rfi_impacts": [
+    "chg-57cf31a74c9c",
+    "chg-4a653bf64c58",
+    "chg-20eaa7b1be5e",
+    "chg-b2cc18010e1d",
+    "chg-a64bf1fb5a85",
+    "chg-3ce3160456ec"
+  ],
+  "scope_changes": [
+    "chg-a64bf1fb5a85"
+  ],
+  "source_refs": [
+    {
+      "excerpt": "Assistive listening requirements should be verified.",
+      "field": "description",
+      "source_id": "audio_hearing_assistance_missing",
+      "source_label": null,
+      "source_type": "baseline_assumption"
+    },
+    {
+      "excerpt": "Display mounting solution should be verified.",
+      "field": "description",
+      "source_id": "video_display_mount_missing_maw-lobby-display",
+      "source_label": null,
+      "source_type": "baseline_assumption"
+    },
+    {
+      "excerpt": "manufacturer=Sony model=FW-65BZ40L system=Classroom AV",
+      "field": "drawing_reference",
+      "source_id": "maw-classroom-display",
+      "source_label": "Classroom instructional display",
+      "source_type": "baseline_equipment"
+    },
+    {
+      "excerpt": "manufacturer=Sony model=FW-65BZ40L system=Classroom AV",
+      "field": null,
+      "source_id": "maw-classroom-display",
+      "source_label": "Classroom instructional display",
+      "source_type": "baseline_equipment"
+    },
+    {
+      "excerpt": "manufacturer=QSC model=Core Nano system=AV Control",
+      "field": null,
+      "source_id": "maw-control-processor",
+      "source_label": "Q-SYS control processor",
+      "source_type": "baseline_equipment"
+    },
+    {
+      "excerpt": "manufacturer=QSC model=Core Nano system=AV Control",
+      "field": "specification_reference",
+      "source_id": "maw-control-processor",
+      "source_label": "Q-SYS control processor",
+      "source_type": "baseline_equipment"
+    },
+    {
+      "excerpt": "manufacturer=Sony model=FW-55BZ40L system=Lobby Digital Signage",
+      "field": null,
+      "source_id": "maw-lobby-display",
+      "source_label": "Lobby digital signage display",
+      "source_type": "baseline_equipment"
+    },
+    {
+      "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+      "field": null,
+      "source_id": "maw-recital-speakers",
+      "source_label": "Meyer Sound recital hall loudspeakers",
+      "source_type": "baseline_equipment"
+    },
+    {
+      "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+      "field": "quantity",
+      "source_id": "maw-recital-speakers",
+      "source_label": "Meyer Sound recital hall loudspeakers",
+      "source_type": "baseline_equipment"
+    },
+    {
+      "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+      "field": "assumptions",
+      "source_id": "maw-recital-speakers",
+      "source_label": "Meyer Sound recital hall loudspeakers",
+      "source_type": "baseline_equipment"
+    },
+    {
+      "excerpt": null,
+      "field": null,
+      "source_id": "maw-revision-baseline",
+      "source_label": "MAW Revision Baseline",
+      "source_type": "baseline_review"
+    },
+    {
+      "excerpt": "expected=51.31",
+      "field": "labor_estimate.total_labor_hours_expected",
+      "source_id": "maw-revision-baseline",
+      "source_label": null,
+      "source_type": "baseline_review"
+    },
+    {
+      "excerpt": "Scope coordination with GC, EC, owner, network team, and other trades should be confirmed.",
+      "field": "description",
+      "source_id": "construction_coordination_review",
+      "source_label": null,
+      "source_type": "comparison_assumption"
+    },
+    {
+      "excerpt": "manufacturer=Listen Technologies model=LT-84 system=Performance Audio",
+      "field": null,
+      "source_id": "maw-assistive-listening-pack",
+      "source_label": "Assistive listening receivers add alternate",
+      "source_type": "comparison_equipment"
+    },
+    {
+      "excerpt": "manufacturer=Sony model=FW-65BZ40L system=Classroom AV",
+      "field": "drawing_reference",
+      "source_id": "maw-classroom-display",
+      "source_label": "Classroom instructional display",
+      "source_type": "comparison_equipment"
+    },
+    {
+      "excerpt": "manufacturer=Sony model=FW-65BZ40L system=Classroom AV",
+      "field": null,
+      "source_id": "maw-classroom-display",
+      "source_label": "Classroom instructional display",
+      "source_type": "comparison_equipment"
+    },
+    {
+      "excerpt": "manufacturer=QSC model=Core Nano Plus system=AV Control",
+      "field": null,
+      "source_id": "maw-control-processor",
+      "source_label": "Q-SYS control processor",
+      "source_type": "comparison_equipment"
+    },
+    {
+      "excerpt": "manufacturer=QSC model=Core Nano Plus system=AV Control",
+      "field": "specification_reference",
+      "source_id": "maw-control-processor",
+      "source_label": "Q-SYS control processor",
+      "source_type": "comparison_equipment"
+    },
+    {
+      "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+      "field": null,
+      "source_id": "maw-recital-speakers",
+      "source_label": "Meyer Sound recital hall loudspeakers",
+      "source_type": "comparison_equipment"
+    },
+    {
+      "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+      "field": "quantity",
+      "source_id": "maw-recital-speakers",
+      "source_label": "Meyer Sound recital hall loudspeakers",
+      "source_type": "comparison_equipment"
+    },
+    {
+      "excerpt": "manufacturer=Meyer Sound model=ULTRA-X40 system=Performance Audio",
+      "field": "assumptions",
+      "source_id": "maw-recital-speakers",
+      "source_label": "Meyer Sound recital hall loudspeakers",
+      "source_type": "comparison_equipment"
+    },
+    {
+      "excerpt": null,
+      "field": null,
+      "source_id": "maw-revision-comparison",
+      "source_label": "MAW Revision Comparison",
+      "source_type": "comparison_review"
+    },
+    {
+      "excerpt": "expected=59.4",
+      "field": "labor_estimate.total_labor_hours_expected",
+      "source_id": "maw-revision-comparison",
+      "source_label": null,
+      "source_type": "comparison_review"
+    },
+    {
+      "excerpt": "add_alternate_ambiguity",
+      "field": "detected_condition",
+      "source_id": "rfi-maw-demo-ba6cd74aa3",
+      "source_label": null,
+      "source_type": "comparison_rfi_candidate"
+    },
+    {
+      "excerpt": "scope_responsibility_ambiguity",
+      "field": "detected_condition",
+      "source_id": "rfi-maw-demo-e8cc917516",
+      "source_label": null,
+      "source_type": "comparison_rfi_candidate"
+    }
+  ],
+  "summary": {
+    "added_count": 1,
+    "change_count": 15,
+    "changes_by_severity": {
+      "high": 10,
+      "medium": 5
+    },
+    "changes_by_type": {
+      "assumption_changed": 3,
+      "drawing_reference_changed": 1,
+      "item_added": 1,
+      "item_modified": 3,
+      "item_removed": 1,
+      "labor_estimate_changed": 1,
+      "quantity_changed": 1,
+      "rfi_candidate_changed": 2,
+      "scope_responsibility_changed": 1,
+      "specification_changed": 1
+    },
+    "labor_impact_count": 12,
+    "modified_count": 3,
+    "removed_count": 1,
+    "rfi_impact_count": 6
+  },
+  "warnings": []
+}

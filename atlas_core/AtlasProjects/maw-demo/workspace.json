@@ -1,0 +1,87 @@
+{
+  "archived": false,
+  "created_at": "2026-07-07T04:43:08.895468+00:00",
+  "import_summary": {},
+  "intake_snapshot_path": null,
+  "is_reference": false,
+  "last_opened_at": "2026-07-07T04:43:08.895599+00:00",
+  "metadata": {},
+  "package_location": ".",
+  "pinned": false,
+  "project": {
+    "bid_date": null,
+    "buildings": [],
+    "client": "MAW Music Education Center Plan Review",
+    "cslb_scope": "C7",
+    "google_drive_folder": null,
+    "lifecycle_events": [],
+    "location": null,
+    "name": "MAW Music Education Center Plan Review",
+    "notes": [],
+    "output_folder": null,
+    "project_id": "maw-demo",
+    "status": "intake",
+    "target_margin": 0.28
+  },
+  "project_profile": {},
+  "project_root": null,
+  "review_summary": {
+    "confidence": 0.66,
+    "issue_count": 17,
+    "readiness_level": "bid_ready_with_assumptions",
+    "readiness_score": 0.89,
+    "review_id": "maw-plan-review"
+  },
+  "source_label": "Seed fixture fallback",
+  "source_mode": "seed_fixture_fallback",
+  "source_path": ".",
+  "updated_at": "2026-07-07T04:43:08.949198+00:00",
+  "warnings": [
+    "No supported files were found in .. Using curated seed fixture data instead of the full drawing/specification package.",
+    "This view is using curated seed fixture data, not the full drawing/specification package."
+  ],
+  "workspace_id": "maw-demo",
+  "workspace_state": {
+    "context_selection": {
+      "data": {
+        "confidence": "0.83",
+        "current_status": "detected",
+        "description": "Classroom instructional display",
+        "discipline": "General",
+        "drawing_references": [
+          "AV-601"
+        ],
+        "equipment_id": "maw-classroom-display",
+        "manufacturer": "Sony",
+        "model": "FW-65BZ40L",
+        "potential_rfis": [],
+        "room": "maw-classroom",
+        "specification_references": [
+          "27 41 19"
+        ],
+        "system": "maw-classroom-av"
+      },
+      "kind": "equipment"
+    },
+    "expanded_navigation": [
+      "Bid Intelligence"
+    ],
+    "filters": {
+      "equipment_search": "",
+      "file_search": "",
+      "relationship_search": false,
+      "search_type_filters": []
+    },
+    "last_open_page": "Engineering Assumptions",
+    "search_state": {
+      "global_search": "",
+      "result_index": 0
+    },
+    "selected_drawing": null,
+    "selected_specification": null,
+    "window_preferences": {
+      "layout_mode": "Desktop",
+      "navigation_collapsed": false
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "items": [
+    {
+      "candidate_id": "rfi-maw-demo-574a6a5c1a",
+      "category": "missing_information",
+      "confidence": 0.82,
+      "created_by_engine_version": "rfi-candidate-engine/1.0.0",
+      "description": "Equipment description 'Recital hall acoustic drapery allowance' appears generic and may not be priceable without clarification.",
+      "detected_condition": "placeholder_device_description",
+      "project_id": "maw-demo",
+      "recommended_action": "Request a specific performance requirement or basis-of-design selection for this item.",
+      "related_items": [
+        "maw-recital-drapery"
+      ],
+      "severity": "medium",
+      "source_refs": [
+        {
+          "excerpt": "Recital hall acoustic drapery allowance",
+          "field": "description",
+          "source_id": "maw-recital-drapery",
+          "source_label": null,
+          "source_type": "equipment"
+        }
+      ],
+      "status": "candidate",
+      "title": "Placeholder device description for maw-recital-drapery"
+    },
+    {
+      "candidate_id": "rfi-maw-demo-7ec5369a9b",
+      "category": "add_alternate_clarification",
+      "confidence": 0.88,
+      "created_by_engine_version": "rfi-candidate-engine/1.0.0",
+      "description": "Detected add alternate/allowance language without enough pricing definition (scope, quantity, or basis of design).",
+      "detected_condition": "add_alternate_ambiguity",
+      "project_id": "maw-demo",
+      "recommended_action": "Request add alternate definition including scope limits, quantity basis, and acceptable products.",
+      "related_items": [
+        "maw-recital-drapery"
+      ],
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "Recital hall acoustic drapery allowance",
+          "field": "description",
+          "source_id": "maw-recital-drapery",
+          "source_label": null,
+          "source_type": "equipment"
+        }
+      ],
+      "status": "candidate",
+      "title": "Add alternate or allowance language needs clarification"
+    },
+    {
+      "candidate_id": "rfi-maw-demo-a24f536924",
+      "category": "add_alternate_clarification",
+      "confidence": 0.88,
+      "created_by_engine_version": "rfi-candidate-engine/1.0.0",
+      "description": "Detected add alternate/allowance language without enough pricing definition (scope, quantity, or basis of design).",
+      "detected_condition": "add_alternate_ambiguity",
+      "project_id": "maw-demo",
+      "recommended_action": "Request add alternate definition including scope limits, quantity basis, and acceptable products.",
+      "related_items": [
+        "projector_missing_mount"
+      ],
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "Projector is present, but no mount or mounting allowance was detected in the same room.",
+          "field": "message",
+          "source_id": "projector_missing_mount",
+          "source_label": "maw-recital-projector",
+          "source_type": "scope_gap"
+        }
+      ],
+      "status": "candidate",
+      "title": "Add alternate or allowance language needs clarification"
+    }
+  ]
+}

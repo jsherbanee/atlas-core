@@ -135,6 +135,15 @@ from atlas_core.services.project_workspace_service import (
     ProjectWorkspaceRecord,
     ProjectWorkspaceService,
 )
+from atlas_core.services.resolver import (
+    EngineeringResolver,
+    ResolutionConflict,
+    ResolutionEvidence,
+    ResolutionRule,
+    ResolvedObject,
+    ResolverContext,
+    ResolverResult,
+)
 from atlas_core.services.document_intake_service import (
     DocumentIntakeService,
     PackageDiscoveryResult,
@@ -240,4 +249,11 @@ __all__ = [
     "SystemDetectionService",
     "ProjectWorkspaceRecord",
     "ProjectWorkspaceService",
+    "EngineeringResolver",
+    "ResolutionConflict",
+    "ResolutionEvidence",
+    "ResolutionRule",
+    "ResolvedObject",
+    "ResolverContext",
+    "ResolverResult",
 ]

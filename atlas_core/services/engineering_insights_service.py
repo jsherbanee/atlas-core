@@ -581,6 +581,14 @@ class EngineeringInsightsService:
 
         graph_edges = len(list(knowledge_graph.get("edges", [])))
         graph_nodes = max(len(list(knowledge_graph.get("nodes", []))), 1)
+        resolver_summary = dict(knowledge_graph.get("resolver_summary") or {})
+        resolver_confidence = float(
+            resolver_summary.get("confidence", review.confidence) or review.confidence
+        )
+        resolver_conflicts = int(resolver_summary.get("conflict_count", 0) or 0)
+        resolver_manual_reviews = int(
+            resolver_summary.get("manual_review_count", 0) or 0
+        )
 
         completeness_score = max(
             0.0,
@@ -608,6 +616,10 @@ class EngineeringInsightsService:
             confidence_score = (
                 confidence_score + float(getattr(labor, "confidence", 0.0) or 0.0)
             ) / 2
+        confidence_score = (confidence_score + resolver_confidence) / 2
+        confidence_score = max(
+            0.0, min(1.0, confidence_score - (resolver_conflicts * 0.02))
+        )
 
         revision_stability = 1.0
         if revision is not None:
@@ -643,7 +655,7 @@ class EngineeringInsightsService:
                 category="Estimating Confidence",
                 weight=0.15,
                 score=max(0.0, min(1.0, confidence_score)),
-                rationale="Combines review confidence and labor confidence when available.",
+                rationale="Combines review, labor, and resolver confidence when available.",
             ),
             ProjectHealthCategory(
                 category="Revision Stability",
@@ -661,6 +673,8 @@ class EngineeringInsightsService:
         ]
         rationale.append(f"Blockers considered: {blockers}")
         rationale.append(f"Missing scope diagnostics considered: {missing_scope}")
+        rationale.append(f"Resolver conflicts considered: {resolver_conflicts}")
+        rationale.append(f"Resolver manual reviews considered: {resolver_manual_reviews}")
 
         return ProjectHealthModel(
             score=score, categories=categories, rationale=rationale

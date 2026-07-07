@@ -1,0 +1,15 @@
+{
+  "bid_date": null,
+  "buildings": [],
+  "client": "MAW Music Education Center Plan Review",
+  "cslb_scope": "C7",
+  "google_drive_folder": null,
+  "lifecycle_events": [],
+  "location": null,
+  "name": "MAW Music Education Center Plan Review",
+  "notes": [],
+  "output_folder": null,
+  "project_id": "maw-demo",
+  "status": "intake",
+  "target_margin": 0.28
+}

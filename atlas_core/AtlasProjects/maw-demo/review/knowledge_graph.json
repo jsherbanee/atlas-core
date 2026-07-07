@@ -1,0 +1,2043 @@
+{
+  "edges": [
+    {
+      "confidence": "high",
+      "relationship": "Project contains Drawing",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "drawing:AV-101"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Drawing",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "drawing:AV-401"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Drawing",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "drawing:AV-402"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Drawing",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "drawing:AV-501"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Drawing",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "drawing:AV-601"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Drawing",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "drawing:A-701"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Specification",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "spec:27 41 16"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Specification",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "spec:27 41 19"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Specification",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "spec:27 41 26"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Specification",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "spec:11 61 33"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Equipment",
+      "source": "project:maw-demo",
+      "source_evidence": "AV-401",
+      "target": "equipment:maw-recital-speakers"
+    },
+    {
+      "confidence": "0.92",
+      "relationship": "Equipment to System",
+      "source": "equipment:maw-recital-speakers",
+      "source_evidence": "AV-401",
+      "target": "system:maw-performance-audio"
+    },
+    {
+      "confidence": "0.92",
+      "relationship": "System to Room",
+      "source": "system:maw-performance-audio",
+      "source_evidence": "AV-401",
+      "target": "room:maw-recital-hall"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Room to Area",
+      "source": "room:maw-recital-hall",
+      "source_evidence": ".",
+      "target": "area:maw"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Manufacturer to Product",
+      "source": "manufacturer:Meyer Sound",
+      "source_evidence": ".",
+      "target": "product:Meyer Sound:ULTRA-X40"
+    },
+    {
+      "confidence": "0.92",
+      "relationship": "Product to Equipment",
+      "source": "product:Meyer Sound:ULTRA-X40",
+      "source_evidence": "AV-401",
+      "target": "equipment:maw-recital-speakers"
+    },
+    {
+      "confidence": "0.92",
+      "relationship": "Drawing to Equipment",
+      "source": "drawing:AV-401",
+      "source_evidence": "AV-401",
+      "target": "equipment:maw-recital-speakers"
+    },
+    {
+      "confidence": "0.92",
+      "relationship": "Equipment to Specification",
+      "source": "equipment:maw-recital-speakers",
+      "source_evidence": "27 41 16",
+      "target": "spec:27 41 16"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Equipment",
+      "source": "project:maw-demo",
+      "source_evidence": "AV-402",
+      "target": "equipment:maw-recital-projector"
+    },
+    {
+      "confidence": "0.86",
+      "relationship": "Equipment to System",
+      "source": "equipment:maw-recital-projector",
+      "source_evidence": "AV-402",
+      "target": "system:maw-projection"
+    },
+    {
+      "confidence": "0.86",
+      "relationship": "System to Room",
+      "source": "system:maw-projection",
+      "source_evidence": "AV-402",
+      "target": "room:maw-recital-hall"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Manufacturer to Product",
+      "source": "manufacturer:Epson",
+      "source_evidence": ".",
+      "target": "product:Epson:PowerLite L735U"
+    },
+    {
+      "confidence": "0.86",
+      "relationship": "Product to Equipment",
+      "source": "product:Epson:PowerLite L735U",
+      "source_evidence": "AV-402",
+      "target": "equipment:maw-recital-projector"
+    },
+    {
+      "confidence": "0.86",
+      "relationship": "Drawing to Equipment",
+      "source": "drawing:AV-402",
+      "source_evidence": "AV-402",
+      "target": "equipment:maw-recital-projector"
+    },
+    {
+      "confidence": "0.86",
+      "relationship": "Equipment to Specification",
+      "source": "equipment:maw-recital-projector",
+      "source_evidence": "27 41 19",
+      "target": "spec:27 41 19"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Equipment",
+      "source": "project:maw-demo",
+      "source_evidence": "AV-501",
+      "target": "equipment:maw-control-processor"
+    },
+    {
+      "confidence": "0.9",
+      "relationship": "Equipment to System",
+      "source": "equipment:maw-control-processor",
+      "source_evidence": "AV-501",
+      "target": "system:maw-av-control"
+    },
+    {
+      "confidence": "0.9",
+      "relationship": "System to Room",
+      "source": "system:maw-av-control",
+      "source_evidence": "AV-501",
+      "target": "room:maw-control-booth"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Room to Area",
+      "source": "room:maw-control-booth",
+      "source_evidence": ".",
+      "target": "area:maw"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Manufacturer to Product",
+      "source": "manufacturer:QSC",
+      "source_evidence": ".",
+      "target": "product:QSC:Core Nano"
+    },
+    {
+      "confidence": "0.9",
+      "relationship": "Product to Equipment",
+      "source": "product:QSC:Core Nano",
+      "source_evidence": "AV-501",
+      "target": "equipment:maw-control-processor"
+    },
+    {
+      "confidence": "0.9",
+      "relationship": "Drawing to Equipment",
+      "source": "drawing:AV-501",
+      "source_evidence": "AV-501",
+      "target": "equipment:maw-control-processor"
+    },
+    {
+      "confidence": "0.9",
+      "relationship": "Equipment to Specification",
+      "source": "equipment:maw-control-processor",
+      "source_evidence": "27 41 26",
+      "target": "spec:27 41 26"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Equipment",
+      "source": "project:maw-demo",
+      "source_evidence": "AV-601",
+      "target": "equipment:maw-classroom-display"
+    },
+    {
+      "confidence": "0.83",
+      "relationship": "Equipment to System",
+      "source": "equipment:maw-classroom-display",
+      "source_evidence": "AV-601",
+      "target": "system:maw-classroom-av"
+    },
+    {
+      "confidence": "0.83",
+      "relationship": "System to Room",
+      "source": "system:maw-classroom-av",
+      "source_evidence": "AV-601",
+      "target": "room:maw-classroom"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Room to Area",
+      "source": "room:maw-classroom",
+      "source_evidence": ".",
+      "target": "area:maw"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Manufacturer to Product",
+      "source": "manufacturer:Sony",
+      "source_evidence": ".",
+      "target": "product:Sony:FW-65BZ40L"
+    },
+    {
+      "confidence": "0.83",
+      "relationship": "Product to Equipment",
+      "source": "product:Sony:FW-65BZ40L",
+      "source_evidence": "AV-601",
+      "target": "equipment:maw-classroom-display"
+    },
+    {
+      "confidence": "0.83",
+      "relationship": "Drawing to Equipment",
+      "source": "drawing:AV-601",
+      "source_evidence": "AV-601",
+      "target": "equipment:maw-classroom-display"
+    },
+    {
+      "confidence": "0.83",
+      "relationship": "Equipment to Specification",
+      "source": "equipment:maw-classroom-display",
+      "source_evidence": "27 41 19",
+      "target": "spec:27 41 19"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Equipment",
+      "source": "project:maw-demo",
+      "source_evidence": "AV-101",
+      "target": "equipment:maw-lobby-display"
+    },
+    {
+      "confidence": "0.82",
+      "relationship": "Equipment to System",
+      "source": "equipment:maw-lobby-display",
+      "source_evidence": "AV-101",
+      "target": "system:maw-lobby-digital-signage"
+    },
+    {
+      "confidence": "0.82",
+      "relationship": "System to Room",
+      "source": "system:maw-lobby-digital-signage",
+      "source_evidence": "AV-101",
+      "target": "room:maw-lobby"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Room to Area",
+      "source": "room:maw-lobby",
+      "source_evidence": ".",
+      "target": "area:maw"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Manufacturer to Product",
+      "source": "manufacturer:Sony",
+      "source_evidence": ".",
+      "target": "product:Sony:FW-55BZ40L"
+    },
+    {
+      "confidence": "0.82",
+      "relationship": "Product to Equipment",
+      "source": "product:Sony:FW-55BZ40L",
+      "source_evidence": "AV-101",
+      "target": "equipment:maw-lobby-display"
+    },
+    {
+      "confidence": "0.82",
+      "relationship": "Drawing to Equipment",
+      "source": "drawing:AV-101",
+      "source_evidence": "AV-101",
+      "target": "equipment:maw-lobby-display"
+    },
+    {
+      "confidence": "0.82",
+      "relationship": "Equipment to Specification",
+      "source": "equipment:maw-lobby-display",
+      "source_evidence": "27 41 19",
+      "target": "spec:27 41 19"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project contains Equipment",
+      "source": "project:maw-demo",
+      "source_evidence": "A-701",
+      "target": "equipment:maw-recital-drapery"
+    },
+    {
+      "confidence": "0.68",
+      "relationship": "Equipment to System",
+      "source": "equipment:maw-recital-drapery",
+      "source_evidence": "A-701",
+      "target": "system:Unknown"
+    },
+    {
+      "confidence": "0.68",
+      "relationship": "System to Room",
+      "source": "system:Unknown",
+      "source_evidence": "A-701",
+      "target": "room:maw-recital-hall"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Manufacturer to Product",
+      "source": "manufacturer:Rose Brand",
+      "source_evidence": ".",
+      "target": "product:Rose Brand:FR Velour Traveler"
+    },
+    {
+      "confidence": "0.68",
+      "relationship": "Product to Equipment",
+      "source": "product:Rose Brand:FR Velour Traveler",
+      "source_evidence": "A-701",
+      "target": "equipment:maw-recital-drapery"
+    },
+    {
+      "confidence": "0.68",
+      "relationship": "Drawing to Equipment",
+      "source": "drawing:A-701",
+      "source_evidence": "A-701",
+      "target": "equipment:maw-recital-drapery"
+    },
+    {
+      "confidence": "0.68",
+      "relationship": "Equipment to Specification",
+      "source": "equipment:maw-recital-drapery",
+      "source_evidence": "11 61 33",
+      "target": "spec:11 61 33"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:audio_amplifier_missing_maw-recital-speakers"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:audio_hearing_assistance_missing"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:audio_programming_missing_maw-control-processor"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:construction_travel_distance_review"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:projection_cooling_missing_maw-recital-projector"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:projection_lens_missing_maw-recital-projector"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:projection_mount_missing_maw-recital-projector"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:projection_power_missing_maw-recital-projector"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:projection_structure_missing_maw-recital-projector"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:video_display_mount_missing_maw-classroom-display"
+    },
+    {
+      "confidence": "0.75",
+      "relationship": "Project to Assumption",
+      "source": "project:maw-demo",
+      "source_evidence": "n/a",
+      "target": "assumption:video_display_mount_missing_maw-lobby-display"
+    },
+    {
+      "confidence": "0.82",
+      "relationship": "RFI to Equipment",
+      "source": "rfi:Placeholder device description for maw-recital-drapery",
+      "source_evidence": "n/a",
+      "target": "equipment:maw-recital-drapery"
+    },
+    {
+      "confidence": "0.88",
+      "relationship": "RFI to Equipment",
+      "source": "rfi:Add alternate or allowance language needs clarification",
+      "source_evidence": "n/a",
+      "target": "equipment:maw-recital-drapery"
+    },
+    {
+      "confidence": "0.88",
+      "relationship": "RFI to Equipment",
+      "source": "rfi:Add alternate or allowance language needs clarification",
+      "source_evidence": "n/a",
+      "target": "equipment:maw-recital-projector"
+    },
+    {
+      "confidence": "0.53",
+      "relationship": "Project to Labor Estimate",
+      "source": "project:maw-demo",
+      "source_evidence": ".",
+      "target": "labor_estimate:current"
+    },
+    {
+      "confidence": "high",
+      "relationship": "Project to Revision",
+      "source": "project:maw-demo",
+      "source_evidence": ".",
+      "target": "revision:maw-rev-1"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "bid_date": "n/a",
+        "client": "MAW Music Education Center Plan Review",
+        "location": "n/a",
+        "name": "MAW Music Education Center Plan Review",
+        "project_id": "maw-demo",
+        "status": "Intake"
+      },
+      "id": "project:maw-demo",
+      "label": "MAW Music Education Center Plan Review",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "n/a",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 29,
+        "sheet_number": "n/a",
+        "source_file": ".",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Project Detail",
+      "selection_kind": "project",
+      "type": "Project"
+    },
+    {
+      "data": {
+        "discipline": "audiovisual",
+        "drawing_number": "AV-101",
+        "extraction_quality": "0.75",
+        "issue_date": "n/a",
+        "ocr_status": "unknown",
+        "referenced_equipment": [
+          "maw-lobby-display"
+        ],
+        "referenced_evidence": [],
+        "referenced_rfis": [],
+        "referenced_specifications": [],
+        "referenced_systems": [
+          "maw-lobby-digital-signage"
+        ],
+        "revision": "n/a",
+        "source_file": "",
+        "title": "Lobby Digital Signage",
+        "warnings": []
+      },
+      "id": "drawing:AV-101",
+      "label": "AV-101",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-101",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Drawing Detail",
+      "selection_kind": "drawing",
+      "type": "Drawing"
+    },
+    {
+      "data": {
+        "discipline": "audiovisual",
+        "drawing_number": "AV-401",
+        "extraction_quality": "0.75",
+        "issue_date": "n/a",
+        "ocr_status": "unknown",
+        "referenced_equipment": [
+          "maw-recital-speakers"
+        ],
+        "referenced_evidence": [],
+        "referenced_rfis": [],
+        "referenced_specifications": [],
+        "referenced_systems": [
+          "maw-performance-audio"
+        ],
+        "revision": "n/a",
+        "source_file": "",
+        "title": "Recital Hall Audio Plan",
+        "warnings": []
+      },
+      "id": "drawing:AV-401",
+      "label": "AV-401",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-401",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Drawing Detail",
+      "selection_kind": "drawing",
+      "type": "Drawing"
+    },
+    {
+      "data": {
+        "discipline": "audiovisual",
+        "drawing_number": "AV-402",
+        "extraction_quality": "0.75",
+        "issue_date": "n/a",
+        "ocr_status": "unknown",
+        "referenced_equipment": [
+          "maw-recital-projector"
+        ],
+        "referenced_evidence": [],
+        "referenced_rfis": [],
+        "referenced_specifications": [],
+        "referenced_systems": [
+          "maw-projection"
+        ],
+        "revision": "n/a",
+        "source_file": "",
+        "title": "Recital Hall Projection Plan",
+        "warnings": []
+      },
+      "id": "drawing:AV-402",
+      "label": "AV-402",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-402",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Drawing Detail",
+      "selection_kind": "drawing",
+      "type": "Drawing"
+    },
+    {
+      "data": {
+        "discipline": "audiovisual",
+        "drawing_number": "AV-501",
+        "extraction_quality": "0.75",
+        "issue_date": "n/a",
+        "ocr_status": "unknown",
+        "referenced_equipment": [
+          "maw-control-processor"
+        ],
+        "referenced_evidence": [],
+        "referenced_rfis": [],
+        "referenced_specifications": [],
+        "referenced_systems": [
+          "maw-av-control"
+        ],
+        "revision": "n/a",
+        "source_file": "",
+        "title": "AV Control Details",
+        "warnings": []
+      },
+      "id": "drawing:AV-501",
+      "label": "AV-501",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-501",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Drawing Detail",
+      "selection_kind": "drawing",
+      "type": "Drawing"
+    },
+    {
+      "data": {
+        "discipline": "audiovisual",
+        "drawing_number": "AV-601",
+        "extraction_quality": "0.75",
+        "issue_date": "n/a",
+        "ocr_status": "unknown",
+        "referenced_equipment": [
+          "maw-classroom-display"
+        ],
+        "referenced_evidence": [],
+        "referenced_rfis": [],
+        "referenced_specifications": [],
+        "referenced_systems": [
+          "maw-classroom-av"
+        ],
+        "revision": "n/a",
+        "source_file": "",
+        "title": "Classroom AV Plan",
+        "warnings": []
+      },
+      "id": "drawing:AV-601",
+      "label": "AV-601",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-601",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Drawing Detail",
+      "selection_kind": "drawing",
+      "type": "Drawing"
+    },
+    {
+      "data": {
+        "discipline": "architectural",
+        "drawing_number": "A-701",
+        "extraction_quality": "0.75",
+        "issue_date": "n/a",
+        "ocr_status": "unknown",
+        "referenced_equipment": [
+          "maw-recital-drapery"
+        ],
+        "referenced_evidence": [],
+        "referenced_rfis": [],
+        "referenced_specifications": [],
+        "referenced_systems": [],
+        "revision": "n/a",
+        "source_file": "",
+        "title": "Drapery and Interior Details",
+        "warnings": []
+      },
+      "id": "drawing:A-701",
+      "label": "A-701",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "A-701",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Drawing Detail",
+      "selection_kind": "drawing",
+      "type": "Drawing"
+    },
+    {
+      "data": {
+        "cross_references": [],
+        "division": "n/a",
+        "extraction_confidence": "0.75",
+        "referenced_drawings": [],
+        "referenced_equipment": [
+          "maw-recital-speakers"
+        ],
+        "referenced_evidence": [],
+        "referenced_rfis": [],
+        "referenced_systems": [
+          "maw-performance-audio"
+        ],
+        "section": "27 41 16",
+        "source_file": "",
+        "title": "Integrated Audio Systems"
+      },
+      "id": "spec:27 41 16",
+      "label": "27 41 16",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "27 41 16"
+      },
+      "page": "Specification Detail",
+      "selection_kind": "specification",
+      "type": "Specification"
+    },
+    {
+      "data": {
+        "cross_references": [],
+        "division": "n/a",
+        "extraction_confidence": "0.75",
+        "referenced_drawings": [],
+        "referenced_equipment": [
+          "maw-recital-projector",
+          "maw-classroom-display",
+          "maw-lobby-display"
+        ],
+        "referenced_evidence": [],
+        "referenced_rfis": [],
+        "referenced_systems": [
+          "maw-classroom-av",
+          "maw-lobby-digital-signage",
+          "maw-projection"
+        ],
+        "section": "27 41 19",
+        "source_file": "",
+        "title": "Video Display and Projection Systems"
+      },
+      "id": "spec:27 41 19",
+      "label": "27 41 19",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 4,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "Specification Detail",
+      "selection_kind": "specification",
+      "type": "Specification"
+    },
+    {
+      "data": {
+        "cross_references": [],
+        "division": "n/a",
+        "extraction_confidence": "0.75",
+        "referenced_drawings": [],
+        "referenced_equipment": [
+          "maw-control-processor"
+        ],
+        "referenced_evidence": [],
+        "referenced_rfis": [],
+        "referenced_systems": [
+          "maw-av-control"
+        ],
+        "section": "27 41 26",
+        "source_file": "",
+        "title": "AV Control Systems"
+      },
+      "id": "spec:27 41 26",
+      "label": "27 41 26",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "27 41 26"
+      },
+      "page": "Specification Detail",
+      "selection_kind": "specification",
+      "type": "Specification"
+    },
+    {
+      "data": {
+        "cross_references": [],
+        "division": "n/a",
+        "extraction_confidence": "0.75",
+        "referenced_drawings": [],
+        "referenced_equipment": [
+          "maw-recital-drapery"
+        ],
+        "referenced_evidence": [],
+        "referenced_rfis": [],
+        "referenced_systems": [],
+        "section": "11 61 33",
+        "source_file": "",
+        "title": "Stage Curtains and Drapery"
+      },
+      "id": "spec:11 61 33",
+      "label": "11 61 33",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "11 61 33"
+      },
+      "page": "Specification Detail",
+      "selection_kind": "specification",
+      "type": "Specification"
+    },
+    {
+      "data": {
+        "confidence": "0.92",
+        "current_status": "detected",
+        "description": "Meyer Sound recital hall loudspeakers",
+        "discipline": "General",
+        "drawing_references": [
+          "AV-401"
+        ],
+        "equipment_id": "maw-recital-speakers",
+        "manufacturer": "Meyer Sound",
+        "model": "ULTRA-X40",
+        "potential_rfis": [],
+        "room": "maw-recital-hall",
+        "specification_references": [
+          "27 41 16"
+        ],
+        "system": "maw-performance-audio"
+      },
+      "id": "equipment:maw-recital-speakers",
+      "label": "maw-recital-speakers",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.92",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 5,
+        "sheet_number": "AV-401",
+        "source_file": "AV-401",
+        "source_page": "n/a",
+        "specification_section": "27 41 16"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "equipment",
+      "type": "Equipment"
+    },
+    {
+      "data": {
+        "system": "maw-performance-audio"
+      },
+      "id": "system:maw-performance-audio",
+      "label": "maw-performance-audio",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.92",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-401",
+        "source_file": "AV-401",
+        "source_page": "n/a",
+        "specification_section": "27 41 16"
+      },
+      "page": "System Detail",
+      "selection_kind": "system",
+      "type": "System"
+    },
+    {
+      "data": {
+        "room": "maw-recital-hall"
+      },
+      "id": "room:maw-recital-hall",
+      "label": "maw-recital-hall",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.92",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 4,
+        "sheet_number": "AV-401",
+        "source_file": "AV-401",
+        "source_page": "n/a",
+        "specification_section": "27 41 16"
+      },
+      "page": "Room Detail",
+      "selection_kind": "room",
+      "type": "Room"
+    },
+    {
+      "data": {
+        "area": "maw"
+      },
+      "id": "area:maw",
+      "label": "maw",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "n/a",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 4,
+        "sheet_number": "n/a",
+        "source_file": ".",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Room Detail",
+      "selection_kind": "room",
+      "type": "Area"
+    },
+    {
+      "data": {
+        "manufacturer": "Meyer Sound"
+      },
+      "id": "manufacturer:Meyer Sound",
+      "label": "Meyer Sound",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.92",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": ".",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Manufacturer Detail",
+      "selection_kind": "manufacturer",
+      "type": "Manufacturer"
+    },
+    {
+      "data": {
+        "manufacturer": "Meyer Sound",
+        "model": "ULTRA-X40"
+      },
+      "id": "product:Meyer Sound:ULTRA-X40",
+      "label": "ULTRA-X40",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.92",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-401",
+        "source_file": "AV-401",
+        "source_page": "n/a",
+        "specification_section": "27 41 16"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "model",
+      "type": "Product"
+    },
+    {
+      "data": {
+        "confidence": "0.86",
+        "current_status": "detected",
+        "description": "Recital hall laser projector",
+        "discipline": "General",
+        "drawing_references": [
+          "AV-402"
+        ],
+        "equipment_id": "maw-recital-projector",
+        "manufacturer": "Epson",
+        "model": "PowerLite L735U",
+        "potential_rfis": [
+          "Add alternate or allowance language needs clarification"
+        ],
+        "room": "maw-recital-hall",
+        "specification_references": [
+          "27 41 19"
+        ],
+        "system": "maw-projection"
+      },
+      "id": "equipment:maw-recital-projector",
+      "label": "maw-recital-projector",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.86",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 6,
+        "sheet_number": "AV-402",
+        "source_file": "AV-402",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "equipment",
+      "type": "Equipment"
+    },
+    {
+      "data": {
+        "system": "maw-projection"
+      },
+      "id": "system:maw-projection",
+      "label": "maw-projection",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.86",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-402",
+        "source_file": "AV-402",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "System Detail",
+      "selection_kind": "system",
+      "type": "System"
+    },
+    {
+      "data": {
+        "manufacturer": "Epson"
+      },
+      "id": "manufacturer:Epson",
+      "label": "Epson",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.86",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": ".",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Manufacturer Detail",
+      "selection_kind": "manufacturer",
+      "type": "Manufacturer"
+    },
+    {
+      "data": {
+        "manufacturer": "Epson",
+        "model": "PowerLite L735U"
+      },
+      "id": "product:Epson:PowerLite L735U",
+      "label": "PowerLite L735U",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.86",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-402",
+        "source_file": "AV-402",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "model",
+      "type": "Product"
+    },
+    {
+      "data": {
+        "confidence": "0.9",
+        "current_status": "detected",
+        "description": "Q-SYS control processor",
+        "discipline": "General",
+        "drawing_references": [
+          "AV-501"
+        ],
+        "equipment_id": "maw-control-processor",
+        "manufacturer": "QSC",
+        "model": "Core Nano",
+        "potential_rfis": [],
+        "room": "maw-control-booth",
+        "specification_references": [
+          "27 41 26"
+        ],
+        "system": "maw-av-control"
+      },
+      "id": "equipment:maw-control-processor",
+      "label": "maw-control-processor",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.9",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 5,
+        "sheet_number": "AV-501",
+        "source_file": "AV-501",
+        "source_page": "n/a",
+        "specification_section": "27 41 26"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "equipment",
+      "type": "Equipment"
+    },
+    {
+      "data": {
+        "system": "maw-av-control"
+      },
+      "id": "system:maw-av-control",
+      "label": "maw-av-control",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.9",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-501",
+        "source_file": "AV-501",
+        "source_page": "n/a",
+        "specification_section": "27 41 26"
+      },
+      "page": "System Detail",
+      "selection_kind": "system",
+      "type": "System"
+    },
+    {
+      "data": {
+        "room": "maw-control-booth"
+      },
+      "id": "room:maw-control-booth",
+      "label": "maw-control-booth",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.9",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-501",
+        "source_file": "AV-501",
+        "source_page": "n/a",
+        "specification_section": "27 41 26"
+      },
+      "page": "Room Detail",
+      "selection_kind": "room",
+      "type": "Room"
+    },
+    {
+      "data": {
+        "manufacturer": "QSC"
+      },
+      "id": "manufacturer:QSC",
+      "label": "QSC",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.9",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": ".",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Manufacturer Detail",
+      "selection_kind": "manufacturer",
+      "type": "Manufacturer"
+    },
+    {
+      "data": {
+        "manufacturer": "QSC",
+        "model": "Core Nano"
+      },
+      "id": "product:QSC:Core Nano",
+      "label": "Core Nano",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.9",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-501",
+        "source_file": "AV-501",
+        "source_page": "n/a",
+        "specification_section": "27 41 26"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "model",
+      "type": "Product"
+    },
+    {
+      "data": {
+        "confidence": "0.83",
+        "current_status": "detected",
+        "description": "Classroom instructional display",
+        "discipline": "General",
+        "drawing_references": [
+          "AV-601"
+        ],
+        "equipment_id": "maw-classroom-display",
+        "manufacturer": "Sony",
+        "model": "FW-65BZ40L",
+        "potential_rfis": [],
+        "room": "maw-classroom",
+        "specification_references": [
+          "27 41 19"
+        ],
+        "system": "maw-classroom-av"
+      },
+      "id": "equipment:maw-classroom-display",
+      "label": "maw-classroom-display",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.83",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 5,
+        "sheet_number": "AV-601",
+        "source_file": "AV-601",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "equipment",
+      "type": "Equipment"
+    },
+    {
+      "data": {
+        "system": "maw-classroom-av"
+      },
+      "id": "system:maw-classroom-av",
+      "label": "maw-classroom-av",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.83",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-601",
+        "source_file": "AV-601",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "System Detail",
+      "selection_kind": "system",
+      "type": "System"
+    },
+    {
+      "data": {
+        "room": "maw-classroom"
+      },
+      "id": "room:maw-classroom",
+      "label": "maw-classroom",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.83",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-601",
+        "source_file": "AV-601",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "Room Detail",
+      "selection_kind": "room",
+      "type": "Room"
+    },
+    {
+      "data": {
+        "manufacturer": "Sony"
+      },
+      "id": "manufacturer:Sony",
+      "label": "Sony",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.83",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "n/a",
+        "source_file": ".",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Manufacturer Detail",
+      "selection_kind": "manufacturer",
+      "type": "Manufacturer"
+    },
+    {
+      "data": {
+        "manufacturer": "Sony",
+        "model": "FW-65BZ40L"
+      },
+      "id": "product:Sony:FW-65BZ40L",
+      "label": "FW-65BZ40L",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.83",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-601",
+        "source_file": "AV-601",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "model",
+      "type": "Product"
+    },
+    {
+      "data": {
+        "confidence": "0.82",
+        "current_status": "detected",
+        "description": "Lobby digital signage display",
+        "discipline": "General",
+        "drawing_references": [
+          "AV-101"
+        ],
+        "equipment_id": "maw-lobby-display",
+        "manufacturer": "Sony",
+        "model": "FW-55BZ40L",
+        "potential_rfis": [],
+        "room": "maw-lobby",
+        "specification_references": [
+          "27 41 19"
+        ],
+        "system": "maw-lobby-digital-signage"
+      },
+      "id": "equipment:maw-lobby-display",
+      "label": "maw-lobby-display",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.82",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 5,
+        "sheet_number": "AV-101",
+        "source_file": "AV-101",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "equipment",
+      "type": "Equipment"
+    },
+    {
+      "data": {
+        "system": "maw-lobby-digital-signage"
+      },
+      "id": "system:maw-lobby-digital-signage",
+      "label": "maw-lobby-digital-signage",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.82",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-101",
+        "source_file": "AV-101",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "System Detail",
+      "selection_kind": "system",
+      "type": "System"
+    },
+    {
+      "data": {
+        "room": "maw-lobby"
+      },
+      "id": "room:maw-lobby",
+      "label": "maw-lobby",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.82",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-101",
+        "source_file": "AV-101",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "Room Detail",
+      "selection_kind": "room",
+      "type": "Room"
+    },
+    {
+      "data": {
+        "manufacturer": "Sony",
+        "model": "FW-55BZ40L"
+      },
+      "id": "product:Sony:FW-55BZ40L",
+      "label": "FW-55BZ40L",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.82",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "AV-101",
+        "source_file": "AV-101",
+        "source_page": "n/a",
+        "specification_section": "27 41 19"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "model",
+      "type": "Product"
+    },
+    {
+      "data": {
+        "confidence": "0.68",
+        "current_status": "detected",
+        "description": "Recital hall acoustic drapery allowance",
+        "discipline": "General",
+        "drawing_references": [
+          "A-701"
+        ],
+        "equipment_id": "maw-recital-drapery",
+        "manufacturer": "Rose Brand",
+        "model": "FR Velour Traveler",
+        "potential_rfis": [
+          "Placeholder device description for maw-recital-drapery",
+          "Add alternate or allowance language needs clarification"
+        ],
+        "room": "maw-recital-hall",
+        "specification_references": [
+          "11 61 33"
+        ],
+        "system": "Unknown"
+      },
+      "id": "equipment:maw-recital-drapery",
+      "label": "maw-recital-drapery",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.68",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 7,
+        "sheet_number": "A-701",
+        "source_file": "A-701",
+        "source_page": "n/a",
+        "specification_section": "11 61 33"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "equipment",
+      "type": "Equipment"
+    },
+    {
+      "data": {
+        "system": "Unknown"
+      },
+      "id": "system:Unknown",
+      "label": "Unknown",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.68",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "A-701",
+        "source_file": "A-701",
+        "source_page": "n/a",
+        "specification_section": "11 61 33"
+      },
+      "page": "System Detail",
+      "selection_kind": "system",
+      "type": "System"
+    },
+    {
+      "data": {
+        "manufacturer": "Rose Brand"
+      },
+      "id": "manufacturer:Rose Brand",
+      "label": "Rose Brand",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.68",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": ".",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Manufacturer Detail",
+      "selection_kind": "manufacturer",
+      "type": "Manufacturer"
+    },
+    {
+      "data": {
+        "manufacturer": "Rose Brand",
+        "model": "FR Velour Traveler"
+      },
+      "id": "product:Rose Brand:FR Velour Traveler",
+      "label": "FR Velour Traveler",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.68",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "A-701",
+        "source_file": "A-701",
+        "source_page": "n/a",
+        "specification_section": "11 61 33"
+      },
+      "page": "Equipment Detail",
+      "selection_kind": "model",
+      "type": "Product"
+    },
+    {
+      "data": {
+        "assumption_id": "audio_amplifier_missing_maw-recital-speakers",
+        "category": "audio",
+        "confidence": 0.75,
+        "description": "Speaker amplifier capacity should be verified.",
+        "related_equipment": "maw-recital-speakers",
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "risk",
+        "source": "atlas"
+      },
+      "id": "assumption:audio_amplifier_missing_maw-recital-speakers",
+      "label": "audio_amplifier_missing_maw-recital-speakers",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "assumption_id": "audio_hearing_assistance_missing",
+        "category": "compliance",
+        "confidence": 0.75,
+        "description": "Assistive listening requirements should be verified.",
+        "related_equipment": "maw-recital-speakers",
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "review",
+        "source": "atlas"
+      },
+      "id": "assumption:audio_hearing_assistance_missing",
+      "label": "audio_hearing_assistance_missing",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "assumption_id": "audio_programming_missing_maw-control-processor",
+        "category": "programming",
+        "confidence": 0.75,
+        "description": "DSP programming scope should be verified.",
+        "related_equipment": "maw-control-processor",
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "review",
+        "source": "atlas"
+      },
+      "id": "assumption:audio_programming_missing_maw-control-processor",
+      "label": "audio_programming_missing_maw-control-processor",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "assumption_id": "construction_travel_distance_review",
+        "category": "travel",
+        "confidence": 0.75,
+        "description": "Travel distance, lodging, mileage, and per diem requirements should be reviewed.",
+        "related_equipment": null,
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "review",
+        "source": "atlas"
+      },
+      "id": "assumption:construction_travel_distance_review",
+      "label": "construction_travel_distance_review",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "assumption_id": "projection_cooling_missing_maw-recital-projector",
+        "category": "cooling",
+        "confidence": 0.75,
+        "description": "Projector cooling and ventilation should be verified.",
+        "related_equipment": "maw-recital-projector",
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "review",
+        "source": "atlas"
+      },
+      "id": "assumption:projection_cooling_missing_maw-recital-projector",
+      "label": "projection_cooling_missing_maw-recital-projector",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "assumption_id": "projection_lens_missing_maw-recital-projector",
+        "category": "optics",
+        "confidence": 0.75,
+        "description": "Projector lens type and throw distance should be verified.",
+        "related_equipment": "maw-recital-projector",
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "review",
+        "source": "atlas"
+      },
+      "id": "assumption:projection_lens_missing_maw-recital-projector",
+      "label": "projection_lens_missing_maw-recital-projector",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "assumption_id": "projection_mount_missing_maw-recital-projector",
+        "category": "mounting",
+        "confidence": 0.75,
+        "description": "Projector mounting solution should be verified.",
+        "related_equipment": "maw-recital-projector",
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "review",
+        "source": "atlas"
+      },
+      "id": "assumption:projection_mount_missing_maw-recital-projector",
+      "label": "projection_mount_missing_maw-recital-projector",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "assumption_id": "projection_power_missing_maw-recital-projector",
+        "category": "power",
+        "confidence": 0.75,
+        "description": "Projector power requirements should be verified.",
+        "related_equipment": "maw-recital-projector",
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "review",
+        "source": "atlas"
+      },
+      "id": "assumption:projection_power_missing_maw-recital-projector",
+      "label": "projection_power_missing_maw-recital-projector",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "assumption_id": "projection_structure_missing_maw-recital-projector",
+        "category": "structure",
+        "confidence": 0.75,
+        "description": "Projector structural support and backing should be verified.",
+        "related_equipment": "maw-recital-projector",
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "risk",
+        "source": "atlas"
+      },
+      "id": "assumption:projection_structure_missing_maw-recital-projector",
+      "label": "projection_structure_missing_maw-recital-projector",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "assumption_id": "video_display_mount_missing_maw-classroom-display",
+        "category": "mounting",
+        "confidence": 0.75,
+        "description": "Display mounting solution should be verified.",
+        "related_equipment": "maw-classroom-display",
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "review",
+        "source": "atlas"
+      },
+      "id": "assumption:video_display_mount_missing_maw-classroom-display",
+      "label": "video_display_mount_missing_maw-classroom-display",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "assumption_id": "video_display_mount_missing_maw-lobby-display",
+        "category": "mounting",
+        "confidence": 0.75,
+        "description": "Display mounting solution should be verified.",
+        "related_equipment": "maw-lobby-display",
+        "related_sheet": null,
+        "related_specification": null,
+        "severity": "review",
+        "source": "atlas"
+      },
+      "id": "assumption:video_display_mount_missing_maw-lobby-display",
+      "label": "video_display_mount_missing_maw-lobby-display",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.75",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Engineering Assumptions",
+      "selection_kind": "assumption",
+      "type": "Engineering Assumption"
+    },
+    {
+      "data": {
+        "candidate_id": "rfi-maw-demo-574a6a5c1a",
+        "category": "missing_information",
+        "confidence": 0.82,
+        "created_by_engine_version": "rfi-candidate-engine/1.0.0",
+        "description": "Equipment description 'Recital hall acoustic drapery allowance' appears generic and may not be priceable without clarification.",
+        "detected_condition": "placeholder_device_description",
+        "project_id": "maw-demo",
+        "recommended_action": "Request a specific performance requirement or basis-of-design selection for this item.",
+        "related_items": [
+          "maw-recital-drapery"
+        ],
+        "severity": "medium",
+        "source_refs": [
+          {
+            "excerpt": "Recital hall acoustic drapery allowance",
+            "field": "description",
+            "source_id": "maw-recital-drapery",
+            "source_label": null,
+            "source_type": "equipment"
+          }
+        ],
+        "status": "candidate",
+        "title": "Placeholder device description for maw-recital-drapery"
+      },
+      "id": "rfi:Placeholder device description for maw-recital-drapery",
+      "label": "Placeholder device description for maw-recital-drapery",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.82",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "RFI Candidates",
+      "selection_kind": "rfi",
+      "type": "RFI Candidate"
+    },
+    {
+      "data": {
+        "candidate_id": "rfi-maw-demo-7ec5369a9b",
+        "category": "add_alternate_clarification",
+        "confidence": 0.88,
+        "created_by_engine_version": "rfi-candidate-engine/1.0.0",
+        "description": "Detected add alternate/allowance language without enough pricing definition (scope, quantity, or basis of design).",
+        "detected_condition": "add_alternate_ambiguity",
+        "project_id": "maw-demo",
+        "recommended_action": "Request add alternate definition including scope limits, quantity basis, and acceptable products.",
+        "related_items": [
+          "maw-recital-drapery"
+        ],
+        "severity": "high",
+        "source_refs": [
+          {
+            "excerpt": "Recital hall acoustic drapery allowance",
+            "field": "description",
+            "source_id": "maw-recital-drapery",
+            "source_label": null,
+            "source_type": "equipment"
+          }
+        ],
+        "status": "candidate",
+        "title": "Add alternate or allowance language needs clarification"
+      },
+      "id": "rfi:Add alternate or allowance language needs clarification",
+      "label": "Add alternate or allowance language needs clarification",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.88",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 2,
+        "sheet_number": "n/a",
+        "source_file": "n/a",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "RFI Candidates",
+      "selection_kind": "rfi",
+      "type": "RFI Candidate"
+    },
+    {
+      "data": {
+        "confidence": 0.53,
+        "total_labor_hours_expected": 51.31
+      },
+      "id": "labor_estimate:current",
+      "label": "Current Labor Estimate",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "0.53",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": ".",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Labor Estimate",
+      "selection_kind": "labor",
+      "type": "Labor Estimate"
+    },
+    {
+      "data": {
+        "baseline_revision_id": "maw-rev-0",
+        "change_count": 15,
+        "comparison_revision_id": "maw-rev-1"
+      },
+      "id": "revision:maw-rev-1",
+      "label": "maw-rev-1",
+      "metadata": {
+        "creation_timestamp": "2026-07-07T04:43:08.895468+00:00",
+        "evidence_count": 0,
+        "extraction_confidence": "high",
+        "last_update": "2026-07-07T04:43:08.895599+00:00",
+        "relationship_count": 1,
+        "sheet_number": "n/a",
+        "source_file": ".",
+        "source_page": "n/a",
+        "specification_section": "n/a"
+      },
+      "page": "Revision Comparison",
+      "selection_kind": "revision",
+      "type": "Revision"
+    }
+  ]
+}

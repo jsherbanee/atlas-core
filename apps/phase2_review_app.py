@@ -24,6 +24,7 @@ from atlas_core.services.engineering_insights_service import (
     EngineeringIntelligenceResult,
     EngineeringInsightsService,
 )
+from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 
 PROJECT_MANAGER_PAGES = [
     "Home",
@@ -43,6 +44,7 @@ PROJECT_PAGES = [
     "Specifications",
     "Equipment",
     "Systems",
+    "Engineering Resolver",
     "Engineering Intelligence",
     "Relationship Explorer",
     "Relationship Visualization",
@@ -2053,6 +2055,7 @@ def _build_knowledge_graph(
     import_summary = dict(context.get("import_summary") or {}) if context else {}
     review = context.get("review") if context else None
     revision = context.get("revision_comparison") if context else None
+    resolver_result = _build_engineering_resolver(record=record, context=context)
 
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
@@ -2628,6 +2631,95 @@ def _build_knowledge_graph(
             _safe_text(context.get("package_location") if context else None, "n/a"),
         )
 
+    if resolver_result is not None:
+        summary_node = "resolver:summary"
+        _add_node(
+            summary_node,
+            "Resolver Summary",
+            "Engineering Resolver",
+            "Engineering Resolver",
+            "resolved",
+            data={
+                **dict(resolver_result.summary),
+                "confidence": resolver_result.confidence,
+            },
+            metadata={
+                "source_file": _safe_text(
+                    context.get("package_location") if context else None, "n/a"
+                ),
+                "source_page": "n/a",
+                "sheet_number": "n/a",
+                "specification_section": "n/a",
+                "extraction_confidence": _safe_text(resolver_result.confidence, "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            summary_node,
+            "Project to Resolver Summary",
+            _safe_text(resolver_result.confidence, "n/a"),
+            _safe_text(context.get("package_location") if context else None, "n/a"),
+        )
+
+        for resolved in resolver_result.resolved_objects:
+            resolved_node = f"resolved:{resolved.object_type}:{resolved.object_id}"
+            label = _safe_text(
+                resolved.canonical_values.get("name")
+                or resolved.canonical_values.get("title")
+                or resolved.object_id,
+                resolved.object_id,
+            )
+            _add_node(
+                resolved_node,
+                "Resolved Object",
+                label,
+                "Engineering Resolver",
+                "resolved",
+                data=resolved.to_dict(),
+                metadata={
+                    "source_file": _safe_text(
+                        context.get("package_location") if context else None, "n/a"
+                    ),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": "n/a",
+                    "extraction_confidence": _safe_text(
+                        resolved.confidence, "n/a"
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                    "manual_review_required": resolved.manual_review_required,
+                },
+            )
+            _add_edge(
+                summary_node,
+                resolved_node,
+                "Resolver summary to resolved object",
+                _safe_text(resolved.confidence, "n/a"),
+                ", ".join(resolved.evidence_ids) or "n/a",
+            )
+
+            original_prefix = {
+                "equipment": "equipment",
+                "system": "system",
+                "room": "room",
+                "drawing": "drawing",
+                "specification": "spec",
+                "manufacturer": "manufacturer",
+            }.get(resolved.object_type)
+            if original_prefix is not None:
+                original_node = f"{original_prefix}:{resolved.object_id}"
+                if _node_by_id({"nodes": nodes}, original_node) is not None:
+                    _add_edge(
+                        original_node,
+                        resolved_node,
+                        "Resolved to canonical object",
+                        _safe_text(resolved.confidence, "n/a"),
+                        ", ".join(resolved.evidence_ids) or "n/a",
+                    )
+
     file_diags = list(import_summary.get("file_diagnostics") or [])
     for diag in file_diags:
         file_name = _safe_text(diag.get("file_name"), "unknown")
@@ -2672,7 +2764,12 @@ def _build_knowledge_graph(
         node.setdefault("metadata", {})["relationship_count"] = count
         node.setdefault("metadata", {})["evidence_count"] = evidence_counts[node_id]
 
-    return {"nodes": nodes, "edges": edges}
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "resolver_result": resolver_result.to_dict() if resolver_result is not None else None,
+        "resolver_summary": resolver_result.summary if resolver_result is not None else {},
+    }
 
 
 def _node_by_id(graph: dict[str, Any], node_id: str) -> dict[str, Any] | None:
@@ -2765,6 +2862,10 @@ def _metadata_for_selection(
         candidates.append(f"room:{_safe_text(data.get('room'), '')}")
     elif kind == "manufacturer":
         candidates.append(f"manufacturer:{_safe_text(data.get('manufacturer'), '')}")
+    elif kind == "resolved":
+        candidates.append(
+            f"resolved:{_safe_text(data.get('object_type'), '')}:{_safe_text(data.get('object_id'), '')}"
+        )
     elif kind == "evidence":
         candidates.append(
             f"evidence:{_safe_text(data.get('source_file'), 'file')}:{data.get('page', 'n/a')}"
@@ -2801,6 +2902,22 @@ def _build_engineering_intelligence(
         review=review,
         knowledge_graph=graph,
         estimator_brief=brief,
+    )
+
+
+def _build_engineering_resolver(
+    record: ProjectWorkspaceRecord | None,
+    context: dict[str, Any] | None,
+) -> Any | None:
+    if context is None:
+        return None
+
+    review = context.get("review")
+    if review is None:
+        return None
+
+    return EngineeringResolver().resolve(
+        ResolverContext(review=review, knowledge_graph=context.get("knowledge_graph"))
     )
 
 
@@ -3059,6 +3176,66 @@ def _render_engineering_intelligence_page(
         use_container_width=True,
         hide_index=True,
     )
+
+
+def _render_engineering_resolver_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    st.subheader("Engineering Resolver")
+    resolver_result = _build_engineering_resolver(record, context)
+    if resolver_result is None:
+        st.info(
+            "Engineering resolution is unavailable until a project review context is loaded."
+        )
+        return
+
+    summary = dict(resolver_result.summary or {})
+    st.dataframe(
+        [
+            {
+                "resolved objects": summary.get("resolved_count", 0),
+                "conflicts": summary.get("conflict_count", 0),
+                "manual review required": summary.get("manual_review_count", 0),
+                "confidence": round(float(summary.get("confidence", 0.0) or 0.0), 2),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("#### Resolved Objects")
+    st.dataframe(
+        [item.to_dict() for item in resolver_result.resolved_objects],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("#### Conflicts")
+    conflict_rows = [item.to_dict() for item in resolver_result.conflicts]
+    if conflict_rows:
+        st.dataframe(conflict_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("No deterministic conflicts were detected.")
+
+    st.markdown("#### Resolution Rules")
+    st.dataframe(
+        [item.to_dict() for item in resolver_result.rules_applied],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    manual_review_rows = [
+        item.to_dict()
+        for item in resolver_result.resolved_objects
+        if item.manual_review_required
+    ]
+    st.markdown("#### Manual Review Required")
+    if manual_review_rows:
+        st.dataframe(manual_review_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("No resolved objects currently require manual review.")
 
 
 def _render_global_search_panel(
@@ -3883,6 +4060,9 @@ def _node_for_current_selection(
     if kind == "manufacturer":
         node_id = f"manufacturer:{_safe_text(data.get('manufacturer'), '')}"
         return _node_by_id(graph, node_id)
+    if kind == "resolved":
+        node_id = f"resolved:{_safe_text(data.get('object_type'), '')}:{_safe_text(data.get('object_id'), '')}"
+        return _node_by_id(graph, node_id)
     if kind == "evidence":
         node_id = f"evidence:{_safe_text(data.get('source_file'), 'file')}:{data.get('page', 'n/a')}"
         return _node_by_id(graph, node_id)
@@ -4418,9 +4598,24 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
             "referenced_evidence",
             "drawing_references",
             "specification_references",
+            "evidence_ids",
+            "conflict_ids",
+            "rules_applied",
             "potential_rfis",
         ]
         warning_keys = ["warnings"]
+
+        resolved_values = dict(object_data.get("canonical_values") or {})
+        if resolved_values:
+            st.markdown("Resolved Values")
+            st.dataframe(
+                [
+                    {"field": key.replace("_", " "), "value": _safe_text(value, "n/a")}
+                    for key, value in resolved_values.items()
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
 
         property_rows = [
             {"property": key.replace("_", " "), "value": _safe_text(value, "n/a")}
@@ -4539,6 +4734,19 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
                 ("Drawings", "Go to Drawings"),
                 ("Specifications", "Go to Specifications"),
                 ("Evidence", "Refresh Evidence"),
+            ],
+        )
+        return
+
+    if kind == "resolved":
+        _render_object_context(
+            f"Resolved {_safe_text(data.get('object_type'), 'Object')}",
+            data,
+            [
+                ("Engineering Resolver", "Go to Resolver"),
+                ("Equipment", "Go to Equipment"),
+                ("Systems", "Go to Systems"),
+                ("Specifications", "Go to Specifications"),
             ],
         )
         return
@@ -4695,6 +4903,8 @@ def _render_main_content(
         _render_equipment_page(st, context)
     elif page == "Systems":
         _render_systems_page(st, record, context)
+    elif page == "Engineering Resolver":
+        _render_engineering_resolver_page(st, record, context)
     elif page == "Engineering Intelligence":
         _render_engineering_intelligence_page(st, record, context)
     elif page == "Relationship Explorer":

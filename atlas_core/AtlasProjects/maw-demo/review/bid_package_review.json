@@ -1,0 +1,2284 @@
+{
+  "bid_completeness": {
+    "drawing_completeness": 1.0,
+    "equipment_completeness": 1.0,
+    "missing_items": [
+      "Missing device schedule, keynotes, or legend data."
+    ],
+    "schedule_completeness": 0.0,
+    "score": 0.8,
+    "specification_completeness": 1.0,
+    "status": "partial",
+    "system_completeness": 1.0
+  },
+  "confidence": 0.66,
+  "cross_references": [
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-recital-speakers references drawing AV-401.",
+      "reference_type": "equipment_to_drawing",
+      "source_id": "maw-recital-speakers",
+      "target_id": "av-401"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-recital-speakers references specification 27 41 16.",
+      "reference_type": "equipment_to_spec",
+      "source_id": "maw-recital-speakers",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-recital-projector references drawing AV-402.",
+      "reference_type": "equipment_to_drawing",
+      "source_id": "maw-recital-projector",
+      "target_id": "av-402"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-recital-projector references specification 27 41 19.",
+      "reference_type": "equipment_to_spec",
+      "source_id": "maw-recital-projector",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-control-processor references drawing AV-501.",
+      "reference_type": "equipment_to_drawing",
+      "source_id": "maw-control-processor",
+      "target_id": "av-501"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-control-processor references specification 27 41 26.",
+      "reference_type": "equipment_to_spec",
+      "source_id": "maw-control-processor",
+      "target_id": "27-41-26"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-classroom-display references drawing AV-601.",
+      "reference_type": "equipment_to_drawing",
+      "source_id": "maw-classroom-display",
+      "target_id": "av-601"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-classroom-display references specification 27 41 19.",
+      "reference_type": "equipment_to_spec",
+      "source_id": "maw-classroom-display",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-lobby-display references drawing AV-101.",
+      "reference_type": "equipment_to_drawing",
+      "source_id": "maw-lobby-display",
+      "target_id": "av-101"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-lobby-display references specification 27 41 19.",
+      "reference_type": "equipment_to_spec",
+      "source_id": "maw-lobby-display",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-recital-drapery references drawing A-701.",
+      "reference_type": "equipment_to_drawing",
+      "source_id": "maw-recital-drapery",
+      "target_id": "a-701"
+    },
+    {
+      "confidence": 0.9,
+      "message": "Equipment maw-recital-drapery references specification 11 61 33.",
+      "reference_type": "equipment_to_spec",
+      "source_id": "maw-recital-drapery",
+      "target_id": "11-61-33"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-performance-audio aligns with specification 27 41 16.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-performance-audio",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-performance-audio aligns with specification 27 41 19.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-performance-audio",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-performance-audio aligns with specification 27 41 26.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-performance-audio",
+      "target_id": "27-41-26"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-projection aligns with specification 27 41 16.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-projection",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-projection aligns with specification 27 41 19.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-projection",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-projection aligns with specification 27 41 26.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-projection",
+      "target_id": "27-41-26"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-av-control aligns with specification 27 41 16.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-av-control",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-av-control aligns with specification 27 41 19.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-av-control",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-av-control aligns with specification 27 41 26.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-av-control",
+      "target_id": "27-41-26"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-classroom-av aligns with specification 27 41 16.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-classroom-av",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-classroom-av aligns with specification 27 41 19.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-classroom-av",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-classroom-av aligns with specification 27 41 26.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-classroom-av",
+      "target_id": "27-41-26"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-lobby-digital-signage aligns with specification 27 41 16.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-lobby-digital-signage",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-lobby-digital-signage aligns with specification 27 41 19.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-lobby-digital-signage",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.75,
+      "message": "System maw-lobby-digital-signage aligns with specification 27 41 26.",
+      "reference_type": "system_to_spec",
+      "source_id": "maw-lobby-digital-signage",
+      "target_id": "27-41-26"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-101 aligns with specification 27 41 16.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-101",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-101 aligns with specification 27 41 19.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-101",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-101 aligns with specification 27 41 26.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-101",
+      "target_id": "27-41-26"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-401 aligns with specification 27 41 16.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-401",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-401 aligns with specification 27 41 19.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-401",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-401 aligns with specification 27 41 26.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-401",
+      "target_id": "27-41-26"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-402 aligns with specification 27 41 16.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-402",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-402 aligns with specification 27 41 19.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-402",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-402 aligns with specification 27 41 26.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-402",
+      "target_id": "27-41-26"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-501 aligns with specification 27 41 16.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-501",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-501 aligns with specification 27 41 19.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-501",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-501 aligns with specification 27 41 26.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-501",
+      "target_id": "27-41-26"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-601 aligns with specification 27 41 16.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-601",
+      "target_id": "27-41-16"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-601 aligns with specification 27 41 19.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-601",
+      "target_id": "27-41-19"
+    },
+    {
+      "confidence": 0.75,
+      "message": "Drawing AV-601 aligns with specification 27 41 26.",
+      "reference_type": "drawing_to_spec",
+      "source_id": "av-601",
+      "target_id": "27-41-26"
+    }
+  ],
+  "detail_callouts": [],
+  "device_schedules": [],
+  "drawing_metadata": [
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "issue_date": null,
+      "referenced_sheet_numbers": [],
+      "referenced_specification_sections": [],
+      "revision": null,
+      "room_names": [],
+      "sheet_number": "AV-101",
+      "title": "Lobby Digital Signage"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "issue_date": null,
+      "referenced_sheet_numbers": [],
+      "referenced_specification_sections": [],
+      "revision": null,
+      "room_names": [],
+      "sheet_number": "AV-401",
+      "title": "Recital Hall Audio Plan"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "issue_date": null,
+      "referenced_sheet_numbers": [],
+      "referenced_specification_sections": [],
+      "revision": null,
+      "room_names": [],
+      "sheet_number": "AV-402",
+      "title": "Recital Hall Projection Plan"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "issue_date": null,
+      "referenced_sheet_numbers": [],
+      "referenced_specification_sections": [],
+      "revision": null,
+      "room_names": [],
+      "sheet_number": "AV-501",
+      "title": "AV Control Details"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "issue_date": null,
+      "referenced_sheet_numbers": [],
+      "referenced_specification_sections": [],
+      "revision": null,
+      "room_names": [],
+      "sheet_number": "AV-601",
+      "title": "Classroom AV Plan"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "architectural",
+      "issue_date": null,
+      "referenced_sheet_numbers": [],
+      "referenced_specification_sections": [],
+      "revision": null,
+      "room_names": [],
+      "sheet_number": "A-701",
+      "title": "Drapery and Interior Details"
+    }
+  ],
+  "drawing_sheets": [
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "issue_date": null,
+      "notes": [],
+      "page_number": null,
+      "revision": null,
+      "sheet_id": "av-101",
+      "sheet_number": "AV-101",
+      "source_file": null,
+      "title": "Lobby Digital Signage"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "issue_date": null,
+      "notes": [],
+      "page_number": null,
+      "revision": null,
+      "sheet_id": "av-401",
+      "sheet_number": "AV-401",
+      "source_file": null,
+      "title": "Recital Hall Audio Plan"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "issue_date": null,
+      "notes": [],
+      "page_number": null,
+      "revision": null,
+      "sheet_id": "av-402",
+      "sheet_number": "AV-402",
+      "source_file": null,
+      "title": "Recital Hall Projection Plan"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "issue_date": null,
+      "notes": [],
+      "page_number": null,
+      "revision": null,
+      "sheet_id": "av-501",
+      "sheet_number": "AV-501",
+      "source_file": null,
+      "title": "AV Control Details"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "issue_date": null,
+      "notes": [],
+      "page_number": null,
+      "revision": null,
+      "sheet_id": "av-601",
+      "sheet_number": "AV-601",
+      "source_file": null,
+      "title": "Classroom AV Plan"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "architectural",
+      "issue_date": null,
+      "notes": [],
+      "page_number": null,
+      "revision": null,
+      "sheet_id": "a-701",
+      "sheet_number": "A-701",
+      "source_file": null,
+      "title": "Drapery and Interior Details"
+    }
+  ],
+  "engineering_assumptions": [
+    {
+      "assumption_id": "audio_amplifier_missing_maw-recital-speakers",
+      "category": "audio",
+      "confidence": 0.75,
+      "description": "Speaker amplifier capacity should be verified.",
+      "related_equipment": "maw-recital-speakers",
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "risk",
+      "source": "atlas"
+    },
+    {
+      "assumption_id": "audio_hearing_assistance_missing",
+      "category": "compliance",
+      "confidence": 0.75,
+      "description": "Assistive listening requirements should be verified.",
+      "related_equipment": "maw-recital-speakers",
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "review",
+      "source": "atlas"
+    },
+    {
+      "assumption_id": "audio_programming_missing_maw-control-processor",
+      "category": "programming",
+      "confidence": 0.75,
+      "description": "DSP programming scope should be verified.",
+      "related_equipment": "maw-control-processor",
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "review",
+      "source": "atlas"
+    },
+    {
+      "assumption_id": "construction_travel_distance_review",
+      "category": "travel",
+      "confidence": 0.75,
+      "description": "Travel distance, lodging, mileage, and per diem requirements should be reviewed.",
+      "related_equipment": null,
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "review",
+      "source": "atlas"
+    },
+    {
+      "assumption_id": "projection_cooling_missing_maw-recital-projector",
+      "category": "cooling",
+      "confidence": 0.75,
+      "description": "Projector cooling and ventilation should be verified.",
+      "related_equipment": "maw-recital-projector",
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "review",
+      "source": "atlas"
+    },
+    {
+      "assumption_id": "projection_lens_missing_maw-recital-projector",
+      "category": "optics",
+      "confidence": 0.75,
+      "description": "Projector lens type and throw distance should be verified.",
+      "related_equipment": "maw-recital-projector",
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "review",
+      "source": "atlas"
+    },
+    {
+      "assumption_id": "projection_mount_missing_maw-recital-projector",
+      "category": "mounting",
+      "confidence": 0.75,
+      "description": "Projector mounting solution should be verified.",
+      "related_equipment": "maw-recital-projector",
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "review",
+      "source": "atlas"
+    },
+    {
+      "assumption_id": "projection_power_missing_maw-recital-projector",
+      "category": "power",
+      "confidence": 0.75,
+      "description": "Projector power requirements should be verified.",
+      "related_equipment": "maw-recital-projector",
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "review",
+      "source": "atlas"
+    },
+    {
+      "assumption_id": "projection_structure_missing_maw-recital-projector",
+      "category": "structure",
+      "confidence": 0.75,
+      "description": "Projector structural support and backing should be verified.",
+      "related_equipment": "maw-recital-projector",
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "risk",
+      "source": "atlas"
+    },
+    {
+      "assumption_id": "video_display_mount_missing_maw-classroom-display",
+      "category": "mounting",
+      "confidence": 0.75,
+      "description": "Display mounting solution should be verified.",
+      "related_equipment": "maw-classroom-display",
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "review",
+      "source": "atlas"
+    },
+    {
+      "assumption_id": "video_display_mount_missing_maw-lobby-display",
+      "category": "mounting",
+      "confidence": 0.75,
+      "description": "Display mounting solution should be verified.",
+      "related_equipment": "maw-lobby-display",
+      "related_sheet": null,
+      "related_specification": null,
+      "severity": "review",
+      "source": "atlas"
+    }
+  ],
+  "equipment": [
+    {
+      "assumptions": [],
+      "budget_cost": null,
+      "building_id": null,
+      "category": "speaker",
+      "confidence": 0.92,
+      "description": "Meyer Sound recital hall loudspeakers",
+      "drawing_reference": "AV-401",
+      "equipment_id": "maw-recital-speakers",
+      "labor_template": null,
+      "manufacturer": "Meyer Sound",
+      "model": "ULTRA-X40",
+      "quantity": 4,
+      "review_required": false,
+      "room_id": "maw-recital-hall",
+      "sell_price": null,
+      "specification_reference": "27 41 16",
+      "status": "detected",
+      "system_id": "maw-performance-audio"
+    },
+    {
+      "assumptions": [],
+      "budget_cost": null,
+      "building_id": null,
+      "category": "projector",
+      "confidence": 0.86,
+      "description": "Recital hall laser projector",
+      "drawing_reference": "AV-402",
+      "equipment_id": "maw-recital-projector",
+      "labor_template": null,
+      "manufacturer": "Epson",
+      "model": "PowerLite L735U",
+      "quantity": 1,
+      "review_required": false,
+      "room_id": "maw-recital-hall",
+      "sell_price": null,
+      "specification_reference": "27 41 19",
+      "status": "detected",
+      "system_id": "maw-projection"
+    },
+    {
+      "assumptions": [],
+      "budget_cost": null,
+      "building_id": null,
+      "category": "control_processor",
+      "confidence": 0.9,
+      "description": "Q-SYS control processor",
+      "drawing_reference": "AV-501",
+      "equipment_id": "maw-control-processor",
+      "labor_template": null,
+      "manufacturer": "QSC",
+      "model": "Core Nano",
+      "quantity": 1,
+      "review_required": false,
+      "room_id": "maw-control-booth",
+      "sell_price": null,
+      "specification_reference": "27 41 26",
+      "status": "detected",
+      "system_id": "maw-av-control"
+    },
+    {
+      "assumptions": [],
+      "budget_cost": null,
+      "building_id": null,
+      "category": "display",
+      "confidence": 0.83,
+      "description": "Classroom instructional display",
+      "drawing_reference": "AV-601",
+      "equipment_id": "maw-classroom-display",
+      "labor_template": null,
+      "manufacturer": "Sony",
+      "model": "FW-65BZ40L",
+      "quantity": 1,
+      "review_required": false,
+      "room_id": "maw-classroom",
+      "sell_price": null,
+      "specification_reference": "27 41 19",
+      "status": "detected",
+      "system_id": "maw-classroom-av"
+    },
+    {
+      "assumptions": [],
+      "budget_cost": null,
+      "building_id": null,
+      "category": "display",
+      "confidence": 0.82,
+      "description": "Lobby digital signage display",
+      "drawing_reference": "AV-101",
+      "equipment_id": "maw-lobby-display",
+      "labor_template": null,
+      "manufacturer": "Sony",
+      "model": "FW-55BZ40L",
+      "quantity": 1,
+      "review_required": false,
+      "room_id": "maw-lobby",
+      "sell_price": null,
+      "specification_reference": "27 41 19",
+      "status": "detected",
+      "system_id": "maw-lobby-digital-signage"
+    },
+    {
+      "assumptions": [
+        "Drapery scope requires review of track, hardware, infrastructure, support, and site conditions."
+      ],
+      "budget_cost": null,
+      "building_id": null,
+      "category": "drapery",
+      "confidence": 0.68,
+      "description": "Recital hall acoustic drapery allowance",
+      "drawing_reference": "A-701",
+      "equipment_id": "maw-recital-drapery",
+      "labor_template": null,
+      "manufacturer": "Rose Brand",
+      "model": "FR Velour Traveler",
+      "quantity": 1,
+      "review_required": true,
+      "room_id": "maw-recital-hall",
+      "sell_price": null,
+      "specification_reference": "11 61 33",
+      "status": "detected",
+      "system_id": null
+    }
+  ],
+  "estimator_risks": [
+    {
+      "category": "scope",
+      "confidence": 0.75,
+      "message": "Scope gaps were detected and require estimator review.",
+      "risk_id": "scope_gaps_detected",
+      "risk_level": "high"
+    },
+    {
+      "category": "drapery",
+      "confidence": 0.75,
+      "message": "Drapery scope requires review of track, hardware, structure, fire rating, and site conditions.",
+      "risk_id": "drapery_scope_review",
+      "risk_level": "high"
+    },
+    {
+      "category": "review",
+      "confidence": 0.75,
+      "message": "Review report contains estimator action items.",
+      "risk_id": "review_report_action_items",
+      "risk_level": "medium"
+    }
+  ],
+  "keynotes": [],
+  "labor_estimate": {
+    "assumptions": [
+      "Hours represent bid-intelligence estimating ranges only, not project execution plans.",
+      "Labor factors are deterministic defaults and should be calibrated by estimator discipline norms.",
+      "No device schedule input detected; quantity basis is derived from resolved equipment.",
+      "RFI candidate ambiguity reduced confidence and widened high-side labor range."
+    ],
+    "confidence": 0.53,
+    "created_by_engine_version": "labor-estimation-engine/1.0.0",
+    "exclusions": [
+      "Estimate excludes procurement, RFQ workflow, submittals, invoicing, and execution planning.",
+      "Estimate excludes construction schedule sequencing and field supervision allocation."
+    ],
+    "labor_categories": [
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "cable_pull:Classroom AV",
+        "category_name": "cable_pull",
+        "confidence": 0.52,
+        "hours_expected": 0.9,
+        "hours_high": 1.13,
+        "hours_low": 0.77,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=display",
+            "field": "quantity",
+            "source_id": "maw-classroom-display",
+            "source_label": "Classroom instructional display",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Classroom AV",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Classroom AV"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "cable_pull:Lobby Digital Signage",
+        "category_name": "cable_pull",
+        "confidence": 0.52,
+        "hours_expected": 0.9,
+        "hours_high": 1.13,
+        "hours_low": 0.77,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=display",
+            "field": "quantity",
+            "source_id": "maw-lobby-display",
+            "source_label": "Lobby digital signage display",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Lobby Digital Signage",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Lobby Digital Signage"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "cable_pull:Performance Audio",
+        "category_name": "cable_pull",
+        "confidence": 0.52,
+        "hours_expected": 3.6,
+        "hours_high": 4.54,
+        "hours_low": 3.06,
+        "quantity_basis": "quantity_sum=4",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=4 category=speaker",
+            "field": "quantity",
+            "source_id": "maw-recital-speakers",
+            "source_label": "Meyer Sound recital hall loudspeakers",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Performance Audio",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Performance Audio"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "projection_and_specialty_installation_factor",
+        "category_id": "cable_pull:Projection",
+        "category_name": "cable_pull",
+        "confidence": 0.52,
+        "hours_expected": 1.1,
+        "hours_high": 1.39,
+        "hours_low": 0.94,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=projector",
+            "field": "quantity",
+            "source_id": "maw-recital-projector",
+            "source_label": "Recital hall laser projector",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Projection",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Projection"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "projection_and_specialty_installation_factor",
+        "category_id": "cable_pull:general",
+        "category_name": "cable_pull",
+        "confidence": 0.52,
+        "hours_expected": 1.1,
+        "hours_high": 1.39,
+        "hours_low": 0.94,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=drapery",
+            "field": "quantity",
+            "source_id": "maw-recital-drapery",
+            "source_label": "Recital hall acoustic drapery allowance",
+            "source_type": "equipment"
+          }
+        ],
+        "system_area": "general"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "device_mounting:Classroom AV",
+        "category_name": "device_mounting",
+        "confidence": 0.52,
+        "hours_expected": 0.6,
+        "hours_high": 0.76,
+        "hours_low": 0.51,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=display",
+            "field": "quantity",
+            "source_id": "maw-classroom-display",
+            "source_label": "Classroom instructional display",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Classroom AV",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Classroom AV"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "device_mounting:Lobby Digital Signage",
+        "category_name": "device_mounting",
+        "confidence": 0.52,
+        "hours_expected": 0.6,
+        "hours_high": 0.76,
+        "hours_low": 0.51,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=display",
+            "field": "quantity",
+            "source_id": "maw-lobby-display",
+            "source_label": "Lobby digital signage display",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Lobby Digital Signage",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Lobby Digital Signage"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "device_mounting:Performance Audio",
+        "category_name": "device_mounting",
+        "confidence": 0.52,
+        "hours_expected": 2.4,
+        "hours_high": 3.02,
+        "hours_low": 2.04,
+        "quantity_basis": "quantity_sum=4",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=4 category=speaker",
+            "field": "quantity",
+            "source_id": "maw-recital-speakers",
+            "source_label": "Meyer Sound recital hall loudspeakers",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Performance Audio",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Performance Audio"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "projection_and_specialty_installation_factor",
+        "category_id": "device_mounting:Projection",
+        "category_name": "device_mounting",
+        "confidence": 0.52,
+        "hours_expected": 1.25,
+        "hours_high": 1.58,
+        "hours_low": 1.06,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=projector",
+            "field": "quantity",
+            "source_id": "maw-recital-projector",
+            "source_label": "Recital hall laser projector",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Projection",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Projection"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "projection_and_specialty_installation_factor",
+        "category_id": "device_mounting:general",
+        "category_name": "device_mounting",
+        "confidence": 0.52,
+        "hours_expected": 1.25,
+        "hours_high": 1.58,
+        "hours_low": 1.06,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=drapery",
+            "field": "quantity",
+            "source_id": "maw-recital-drapery",
+            "source_label": "Recital hall acoustic drapery allowance",
+            "source_type": "equipment"
+          }
+        ],
+        "system_area": "general"
+      },
+      {
+        "assumptions": [
+          "Documentation category is a bid allowance for manuals, as-builts, and owner training support only."
+        ],
+        "calculation_method": "documentation_allowance_factor",
+        "category_id": "documentation_closeout_support:general",
+        "category_name": "documentation_closeout_support",
+        "confidence": 0.52,
+        "hours_expected": 1.39,
+        "hours_high": 1.75,
+        "hours_low": 1.18,
+        "quantity_basis": "quantity_sum=6",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "hours=1.39",
+            "field": null,
+            "source_id": "general",
+            "source_label": "bid_intelligence_overhead",
+            "source_type": "review"
+          }
+        ],
+        "system_area": "general"
+      },
+      {
+        "assumptions": [
+          "Engineering labor includes review coordination and assumption resolution effort."
+        ],
+        "calculation_method": "engineering_overhead_factor",
+        "category_id": "engineering:general",
+        "category_name": "engineering",
+        "confidence": 0.52,
+        "hours_expected": 10.78,
+        "hours_high": 13.58,
+        "hours_low": 9.16,
+        "quantity_basis": "quantity_sum=6",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "hours=10.78",
+            "field": null,
+            "source_id": "general",
+            "source_label": "bid_intelligence_overhead",
+            "source_type": "review"
+          }
+        ],
+        "system_area": "general"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "controls_programming_factor",
+        "category_id": "field_installation:AV Control",
+        "category_name": "field_installation",
+        "confidence": 0.52,
+        "hours_expected": 0.8,
+        "hours_high": 1.01,
+        "hours_low": 0.68,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=control_processor",
+            "field": "quantity",
+            "source_id": "maw-control-processor",
+            "source_label": "Q-SYS control processor",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "AV Control",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "AV Control"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "field_installation:Classroom AV",
+        "category_name": "field_installation",
+        "confidence": 0.52,
+        "hours_expected": 1.2,
+        "hours_high": 1.51,
+        "hours_low": 1.02,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=display",
+            "field": "quantity",
+            "source_id": "maw-classroom-display",
+            "source_label": "Classroom instructional display",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Classroom AV",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Classroom AV"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "field_installation:Lobby Digital Signage",
+        "category_name": "field_installation",
+        "confidence": 0.52,
+        "hours_expected": 1.2,
+        "hours_high": 1.51,
+        "hours_low": 1.02,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=display",
+            "field": "quantity",
+            "source_id": "maw-lobby-display",
+            "source_label": "Lobby digital signage display",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Lobby Digital Signage",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Lobby Digital Signage"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "field_installation:Performance Audio",
+        "category_name": "field_installation",
+        "confidence": 0.52,
+        "hours_expected": 4.8,
+        "hours_high": 6.05,
+        "hours_low": 4.08,
+        "quantity_basis": "quantity_sum=4",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=4 category=speaker",
+            "field": "quantity",
+            "source_id": "maw-recital-speakers",
+            "source_label": "Meyer Sound recital hall loudspeakers",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Performance Audio",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Performance Audio"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "projection_and_specialty_installation_factor",
+        "category_id": "field_installation:Projection",
+        "category_name": "field_installation",
+        "confidence": 0.52,
+        "hours_expected": 1.8,
+        "hours_high": 2.27,
+        "hours_low": 1.53,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=projector",
+            "field": "quantity",
+            "source_id": "maw-recital-projector",
+            "source_label": "Recital hall laser projector",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Projection",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Projection"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "projection_and_specialty_installation_factor",
+        "category_id": "field_installation:general",
+        "category_name": "field_installation",
+        "confidence": 0.52,
+        "hours_expected": 1.8,
+        "hours_high": 2.27,
+        "hours_low": 1.53,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=drapery",
+            "field": "quantity",
+            "source_id": "maw-recital-drapery",
+            "source_label": "Recital hall acoustic drapery allowance",
+            "source_type": "equipment"
+          }
+        ],
+        "system_area": "general"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "controls_programming_factor",
+        "category_id": "programming:AV Control",
+        "category_name": "programming",
+        "confidence": 0.52,
+        "hours_expected": 1.4,
+        "hours_high": 1.76,
+        "hours_low": 1.19,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=control_processor",
+            "field": "quantity",
+            "source_id": "maw-control-processor",
+            "source_label": "Q-SYS control processor",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "AV Control",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "AV Control"
+      },
+      {
+        "assumptions": [
+          "Project management labor includes bid-phase coordination, scope tracking, and clarifications."
+        ],
+        "calculation_method": "project_management_overhead_factor",
+        "category_id": "project_management:general",
+        "category_name": "project_management",
+        "confidence": 0.52,
+        "hours_expected": 4.29,
+        "hours_high": 5.41,
+        "hours_low": 3.65,
+        "quantity_basis": "quantity_sum=3",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "hours=4.29",
+            "field": null,
+            "source_id": "general",
+            "source_label": "bid_intelligence_overhead",
+            "source_type": "review"
+          }
+        ],
+        "system_area": "general"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "controls_programming_factor",
+        "category_id": "termination:AV Control",
+        "category_name": "termination",
+        "confidence": 0.52,
+        "hours_expected": 0.6,
+        "hours_high": 0.76,
+        "hours_low": 0.51,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=control_processor",
+            "field": "quantity",
+            "source_id": "maw-control-processor",
+            "source_label": "Q-SYS control processor",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "AV Control",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "AV Control"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "termination:Classroom AV",
+        "category_name": "termination",
+        "confidence": 0.52,
+        "hours_expected": 0.45,
+        "hours_high": 0.57,
+        "hours_low": 0.38,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=display",
+            "field": "quantity",
+            "source_id": "maw-classroom-display",
+            "source_label": "Classroom instructional display",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Classroom AV",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Classroom AV"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "termination:Lobby Digital Signage",
+        "category_name": "termination",
+        "confidence": 0.52,
+        "hours_expected": 0.45,
+        "hours_high": 0.57,
+        "hours_low": 0.38,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=display",
+            "field": "quantity",
+            "source_id": "maw-lobby-display",
+            "source_label": "Lobby digital signage display",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Lobby Digital Signage",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Lobby Digital Signage"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "termination:Performance Audio",
+        "category_name": "termination",
+        "confidence": 0.52,
+        "hours_expected": 1.8,
+        "hours_high": 2.27,
+        "hours_low": 1.53,
+        "quantity_basis": "quantity_sum=4",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=4 category=speaker",
+            "field": "quantity",
+            "source_id": "maw-recital-speakers",
+            "source_label": "Meyer Sound recital hall loudspeakers",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Performance Audio",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Performance Audio"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "projection_and_specialty_installation_factor",
+        "category_id": "termination:Projection",
+        "category_name": "termination",
+        "confidence": 0.52,
+        "hours_expected": 0.55,
+        "hours_high": 0.69,
+        "hours_low": 0.47,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=projector",
+            "field": "quantity",
+            "source_id": "maw-recital-projector",
+            "source_label": "Recital hall laser projector",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Projection",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Projection"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "projection_and_specialty_installation_factor",
+        "category_id": "termination:general",
+        "category_name": "termination",
+        "confidence": 0.52,
+        "hours_expected": 0.55,
+        "hours_high": 0.69,
+        "hours_low": 0.47,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=drapery",
+            "field": "quantity",
+            "source_id": "maw-recital-drapery",
+            "source_label": "Recital hall acoustic drapery allowance",
+            "source_type": "equipment"
+          }
+        ],
+        "system_area": "general"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "controls_programming_factor",
+        "category_id": "testing_commissioning:AV Control",
+        "category_name": "testing_commissioning",
+        "confidence": 0.52,
+        "hours_expected": 0.75,
+        "hours_high": 0.94,
+        "hours_low": 0.64,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=control_processor",
+            "field": "quantity",
+            "source_id": "maw-control-processor",
+            "source_label": "Q-SYS control processor",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "AV Control",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "AV Control"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "testing_commissioning:Classroom AV",
+        "category_name": "testing_commissioning",
+        "confidence": 0.52,
+        "hours_expected": 0.35,
+        "hours_high": 0.44,
+        "hours_low": 0.3,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=display",
+            "field": "quantity",
+            "source_id": "maw-classroom-display",
+            "source_label": "Classroom instructional display",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Classroom AV",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Classroom AV"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "testing_commissioning:Lobby Digital Signage",
+        "category_name": "testing_commissioning",
+        "confidence": 0.52,
+        "hours_expected": 0.35,
+        "hours_high": 0.44,
+        "hours_low": 0.3,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=display",
+            "field": "quantity",
+            "source_id": "maw-lobby-display",
+            "source_label": "Lobby digital signage display",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Lobby Digital Signage",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Lobby Digital Signage"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "default_device_installation_factor",
+        "category_id": "testing_commissioning:Performance Audio",
+        "category_name": "testing_commissioning",
+        "confidence": 0.52,
+        "hours_expected": 1.4,
+        "hours_high": 1.76,
+        "hours_low": 1.19,
+        "quantity_basis": "quantity_sum=4",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=4 category=speaker",
+            "field": "quantity",
+            "source_id": "maw-recital-speakers",
+            "source_label": "Meyer Sound recital hall loudspeakers",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Performance Audio",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Performance Audio"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "projection_and_specialty_installation_factor",
+        "category_id": "testing_commissioning:Projection",
+        "category_name": "testing_commissioning",
+        "confidence": 0.52,
+        "hours_expected": 0.45,
+        "hours_high": 0.57,
+        "hours_low": 0.38,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=projector",
+            "field": "quantity",
+            "source_id": "maw-recital-projector",
+            "source_label": "Recital hall laser projector",
+            "source_type": "equipment"
+          },
+          {
+            "excerpt": null,
+            "field": null,
+            "source_id": "Projection",
+            "source_label": null,
+            "source_type": "system"
+          }
+        ],
+        "system_area": "Projection"
+      },
+      {
+        "assumptions": [],
+        "calculation_method": "projection_and_specialty_installation_factor",
+        "category_id": "testing_commissioning:general",
+        "category_name": "testing_commissioning",
+        "confidence": 0.52,
+        "hours_expected": 0.45,
+        "hours_high": 0.57,
+        "hours_low": 0.38,
+        "quantity_basis": "quantity_sum=1",
+        "risk_factors": [
+          "add_alternate_ambiguity"
+        ],
+        "source_refs": [
+          {
+            "excerpt": "quantity=1 category=drapery",
+            "field": "quantity",
+            "source_id": "maw-recital-drapery",
+            "source_label": "Recital hall acoustic drapery allowance",
+            "source_type": "equipment"
+          }
+        ],
+        "system_area": "general"
+      }
+    ],
+    "project_id": "maw-demo",
+    "source_refs": [
+      {
+        "excerpt": null,
+        "field": null,
+        "source_id": "maw-plan-review",
+        "source_label": "MAW Music Education Center Plan Review",
+        "source_type": "bid_package_review"
+      },
+      {
+        "excerpt": "quantity=1 category=display",
+        "field": "quantity",
+        "source_id": "maw-classroom-display",
+        "source_label": "Classroom instructional display",
+        "source_type": "equipment"
+      },
+      {
+        "excerpt": "quantity=1 category=control_processor",
+        "field": "quantity",
+        "source_id": "maw-control-processor",
+        "source_label": "Q-SYS control processor",
+        "source_type": "equipment"
+      },
+      {
+        "excerpt": "quantity=1 category=display",
+        "field": "quantity",
+        "source_id": "maw-lobby-display",
+        "source_label": "Lobby digital signage display",
+        "source_type": "equipment"
+      },
+      {
+        "excerpt": "quantity=1 category=drapery",
+        "field": "quantity",
+        "source_id": "maw-recital-drapery",
+        "source_label": "Recital hall acoustic drapery allowance",
+        "source_type": "equipment"
+      },
+      {
+        "excerpt": "quantity=1 category=projector",
+        "field": "quantity",
+        "source_id": "maw-recital-projector",
+        "source_label": "Recital hall laser projector",
+        "source_type": "equipment"
+      },
+      {
+        "excerpt": "quantity=4 category=speaker",
+        "field": "quantity",
+        "source_id": "maw-recital-speakers",
+        "source_label": "Meyer Sound recital hall loudspeakers",
+        "source_type": "equipment"
+      },
+      {
+        "excerpt": "hours=4.29",
+        "field": null,
+        "source_id": "general",
+        "source_label": "bid_intelligence_overhead",
+        "source_type": "review"
+      },
+      {
+        "excerpt": null,
+        "field": null,
+        "source_id": "rfi-maw-demo-574a6a5c1a",
+        "source_label": "placeholder_device_description",
+        "source_type": "rfi_candidate"
+      },
+      {
+        "excerpt": null,
+        "field": null,
+        "source_id": "rfi-maw-demo-7ec5369a9b",
+        "source_label": "add_alternate_ambiguity",
+        "source_type": "rfi_candidate"
+      },
+      {
+        "excerpt": null,
+        "field": null,
+        "source_id": "rfi-maw-demo-a24f536924",
+        "source_label": "add_alternate_ambiguity",
+        "source_type": "rfi_candidate"
+      },
+      {
+        "excerpt": null,
+        "field": null,
+        "source_id": "AV Control",
+        "source_label": null,
+        "source_type": "system"
+      },
+      {
+        "excerpt": null,
+        "field": null,
+        "source_id": "Classroom AV",
+        "source_label": null,
+        "source_type": "system"
+      },
+      {
+        "excerpt": null,
+        "field": null,
+        "source_id": "Lobby Digital Signage",
+        "source_label": null,
+        "source_type": "system"
+      },
+      {
+        "excerpt": null,
+        "field": null,
+        "source_id": "Performance Audio",
+        "source_label": null,
+        "source_type": "system"
+      },
+      {
+        "excerpt": null,
+        "field": null,
+        "source_id": "Projection",
+        "source_label": null,
+        "source_type": "system"
+      }
+    ],
+    "total_labor_hours_expected": 51.31,
+    "total_labor_hours_high": 64.67,
+    "total_labor_hours_low": 43.63,
+    "warnings": [
+      "Add alternate language ambiguity detected; labor range may shift with clarifications."
+    ]
+  },
+  "legends": [],
+  "manufacturer_review_issues": [],
+  "name": "MAW Music Education Center Plan Review",
+  "notes": [],
+  "project_id": "maw-demo",
+  "readiness": {
+    "blockers": [],
+    "blocking_issues": [],
+    "confidence": 0.73,
+    "created_by_engine_version": "plan-review-readiness-service/2.0.0",
+    "evidence_refs": [],
+    "message": "Plan review is bid-ready with explicit assumptions.",
+    "missing_scope_diagnostics": [],
+    "project_id": "maw-demo",
+    "readiness_level": "bid_ready_with_assumptions",
+    "readiness_score": 0.89,
+    "recommendation_summary": "0 blockers, 6 warnings, and 2 recommended actions based on deterministic scoring.",
+    "recommended_reviewer_actions": [
+      "Document reviewer sign-off for warnings prior to submission.",
+      "Re-run labor assumptions with estimator calibration notes."
+    ],
+    "section_scores": {
+      "assumptions_quality": 0.76,
+      "drawing_spec_alignment": 1.0,
+      "equipment_completeness": 1.0,
+      "labor_estimate_confidence": 0.53,
+      "quantity_confidence": 1.0,
+      "revision_stability": 1.0,
+      "rfi_candidate_risk": 0.78,
+      "scope_responsibility_clarity": 1.0
+    },
+    "status": "ready",
+    "warnings": [
+      "High estimator risks require estimator review.",
+      "High-priority recommendations require estimator review.",
+      "Labor estimate confidence is below preferred threshold.",
+      "Missing device schedule, keynotes, or legend data.",
+      "Review confidence is below 0.75.",
+      "Scope gaps require estimator review."
+    ]
+  },
+  "recommendations": [
+    {
+      "category": "scope_gap",
+      "message": "Add amplifier channel capacity review and placeholder amplifier.",
+      "priority": "high",
+      "recommendation_id": "scope-gap-speaker_missing_amplifier-maw-recital-speakers",
+      "target_id": "maw-recital-speakers"
+    },
+    {
+      "category": "scope_gap",
+      "message": "Add projector mount, lens/throw review, power coordination, and structural review allowance.",
+      "priority": "high",
+      "recommendation_id": "scope-gap-projector_missing_mount-maw-recital-projector",
+      "target_id": "maw-recital-projector"
+    },
+    {
+      "category": "risk",
+      "message": "Review estimator risks before pricing or submitting bid.",
+      "priority": "medium",
+      "recommendation_id": "review-estimator-risks",
+      "target_id": null
+    },
+    {
+      "category": "confidence",
+      "message": "Review confidence is below target threshold; estimator review is required.",
+      "priority": "high",
+      "recommendation_id": "review-low-confidence",
+      "target_id": null
+    }
+  ],
+  "reconciliation_issues": [],
+  "resolutions": [
+    {
+      "action": "add_placeholder",
+      "confidence": 0.75,
+      "message": "Passive speakers require an amplifier. No amplifier was detected in this system.",
+      "rule_id": "RULE-001",
+      "source_building_id": "maw-music-education-center",
+      "source_room_id": "maw-recital-hall",
+      "source_system_id": "maw-performance-audio",
+      "suggested_category": "amplifier",
+      "suggested_description": null,
+      "suggested_manufacturer": null,
+      "suggested_model": null,
+      "target_id": "maw-recital-speakers"
+    },
+    {
+      "action": "add_placeholder",
+      "confidence": 0.75,
+      "message": "Projector requires mounting hardware and review of throw, lens, power, and structure.",
+      "rule_id": "RULE-003",
+      "source_building_id": "maw-music-education-center",
+      "source_room_id": "maw-recital-hall",
+      "source_system_id": "maw-projection",
+      "suggested_category": "mount",
+      "suggested_description": null,
+      "suggested_manufacturer": "Chief",
+      "suggested_model": null,
+      "target_id": "maw-recital-projector"
+    },
+    {
+      "action": "add_placeholder",
+      "confidence": 0.75,
+      "message": "Display requires a mount or mounting allowance. No mount was detected in this room.",
+      "rule_id": "RULE-002",
+      "source_building_id": "maw-music-education-center",
+      "source_room_id": "maw-classroom",
+      "source_system_id": "maw-classroom-av",
+      "suggested_category": "mount",
+      "suggested_description": null,
+      "suggested_manufacturer": "Chief",
+      "suggested_model": null,
+      "target_id": "maw-classroom-display"
+    },
+    {
+      "action": "add_placeholder",
+      "confidence": 0.75,
+      "message": "Display requires a mount or mounting allowance. No mount was detected in this room.",
+      "rule_id": "RULE-002",
+      "source_building_id": "maw-music-education-center",
+      "source_room_id": "maw-lobby",
+      "source_system_id": "maw-lobby-digital-signage",
+      "suggested_category": "mount",
+      "suggested_description": null,
+      "suggested_manufacturer": "Chief",
+      "suggested_model": null,
+      "target_id": "maw-lobby-display"
+    },
+    {
+      "action": "mark_for_review",
+      "confidence": 0.75,
+      "message": "Drapery scope requires review of track, hardware, infrastructure, support, and site conditions.",
+      "rule_id": "RULE-004",
+      "source_building_id": null,
+      "source_room_id": "maw-recital-hall",
+      "source_system_id": null,
+      "suggested_category": null,
+      "suggested_description": null,
+      "suggested_manufacturer": null,
+      "suggested_model": null,
+      "target_id": "maw-recital-drapery"
+    }
+  ],
+  "review_id": "maw-plan-review",
+  "review_report": [
+    {
+      "manufacturer": null,
+      "message": "Passive speakers require an amplifier. No amplifier was detected in this system.",
+      "rule_id": "RULE-001",
+      "severity": "review",
+      "source": "resolver",
+      "target_id": "maw-recital-speakers"
+    },
+    {
+      "manufacturer": null,
+      "message": "Projector requires mounting hardware and review of throw, lens, power, and structure.",
+      "rule_id": "RULE-003",
+      "severity": "review",
+      "source": "resolver",
+      "target_id": "maw-recital-projector"
+    },
+    {
+      "manufacturer": null,
+      "message": "Display requires a mount or mounting allowance. No mount was detected in this room.",
+      "rule_id": "RULE-002",
+      "severity": "review",
+      "source": "resolver",
+      "target_id": "maw-classroom-display"
+    },
+    {
+      "manufacturer": null,
+      "message": "Display requires a mount or mounting allowance. No mount was detected in this room.",
+      "rule_id": "RULE-002",
+      "severity": "review",
+      "source": "resolver",
+      "target_id": "maw-lobby-display"
+    },
+    {
+      "manufacturer": null,
+      "message": "Drapery scope requires review of track, hardware, infrastructure, support, and site conditions.",
+      "rule_id": "RULE-004",
+      "severity": "review",
+      "source": "resolver",
+      "target_id": "maw-recital-drapery"
+    }
+  ],
+  "revision_comparison": null,
+  "rfi_candidates": [
+    {
+      "candidate_id": "rfi-maw-demo-574a6a5c1a",
+      "category": "missing_information",
+      "confidence": 0.82,
+      "created_by_engine_version": "rfi-candidate-engine/1.0.0",
+      "description": "Equipment description 'Recital hall acoustic drapery allowance' appears generic and may not be priceable without clarification.",
+      "detected_condition": "placeholder_device_description",
+      "project_id": "maw-demo",
+      "recommended_action": "Request a specific performance requirement or basis-of-design selection for this item.",
+      "related_items": [
+        "maw-recital-drapery"
+      ],
+      "severity": "medium",
+      "source_refs": [
+        {
+          "excerpt": "Recital hall acoustic drapery allowance",
+          "field": "description",
+          "source_id": "maw-recital-drapery",
+          "source_label": null,
+          "source_type": "equipment"
+        }
+      ],
+      "status": "candidate",
+      "title": "Placeholder device description for maw-recital-drapery"
+    },
+    {
+      "candidate_id": "rfi-maw-demo-7ec5369a9b",
+      "category": "add_alternate_clarification",
+      "confidence": 0.88,
+      "created_by_engine_version": "rfi-candidate-engine/1.0.0",
+      "description": "Detected add alternate/allowance language without enough pricing definition (scope, quantity, or basis of design).",
+      "detected_condition": "add_alternate_ambiguity",
+      "project_id": "maw-demo",
+      "recommended_action": "Request add alternate definition including scope limits, quantity basis, and acceptable products.",
+      "related_items": [
+        "maw-recital-drapery"
+      ],
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "Recital hall acoustic drapery allowance",
+          "field": "description",
+          "source_id": "maw-recital-drapery",
+          "source_label": null,
+          "source_type": "equipment"
+        }
+      ],
+      "status": "candidate",
+      "title": "Add alternate or allowance language needs clarification"
+    },
+    {
+      "candidate_id": "rfi-maw-demo-a24f536924",
+      "category": "add_alternate_clarification",
+      "confidence": 0.88,
+      "created_by_engine_version": "rfi-candidate-engine/1.0.0",
+      "description": "Detected add alternate/allowance language without enough pricing definition (scope, quantity, or basis of design).",
+      "detected_condition": "add_alternate_ambiguity",
+      "project_id": "maw-demo",
+      "recommended_action": "Request add alternate definition including scope limits, quantity basis, and acceptable products.",
+      "related_items": [
+        "projector_missing_mount"
+      ],
+      "severity": "high",
+      "source_refs": [
+        {
+          "excerpt": "Projector is present, but no mount or mounting allowance was detected in the same room.",
+          "field": "message",
+          "source_id": "projector_missing_mount",
+          "source_label": "maw-recital-projector",
+          "source_type": "scope_gap"
+        }
+      ],
+      "status": "candidate",
+      "title": "Add alternate or allowance language needs clarification"
+    }
+  ],
+  "rooms": [
+    {
+      "building_id": "maw-music-education-center",
+      "confidence": 0.95,
+      "name": "Recital Hall",
+      "notes": [],
+      "room_id": "maw-recital-hall",
+      "room_number": "101",
+      "room_type": "performance",
+      "space_ids": [],
+      "system_ids": []
+    },
+    {
+      "building_id": "maw-music-education-center",
+      "confidence": 0.9,
+      "name": "Control Booth",
+      "notes": [],
+      "room_id": "maw-control-booth",
+      "room_number": "101B",
+      "room_type": "control_room",
+      "space_ids": [],
+      "system_ids": []
+    },
+    {
+      "building_id": "maw-music-education-center",
+      "confidence": 0.9,
+      "name": "Classroom",
+      "notes": [],
+      "room_id": "maw-classroom",
+      "room_number": "204",
+      "room_type": "classroom",
+      "space_ids": [],
+      "system_ids": []
+    },
+    {
+      "building_id": "maw-music-education-center",
+      "confidence": 0.9,
+      "name": "Lobby",
+      "notes": [],
+      "room_id": "maw-lobby",
+      "room_number": "100",
+      "room_type": "lobby",
+      "space_ids": [],
+      "system_ids": []
+    }
+  ],
+  "scope_gaps": [
+    {
+      "confidence": 0.75,
+      "gap_id": "speaker_missing_amplifier",
+      "message": "Speaker equipment is present, but no amplifier was detected in the same system.",
+      "severity": "high",
+      "suggested_action": "Add amplifier channel capacity review and placeholder amplifier.",
+      "target_id": "maw-recital-speakers"
+    },
+    {
+      "confidence": 0.75,
+      "gap_id": "projector_missing_mount",
+      "message": "Projector is present, but no mount or mounting allowance was detected in the same room.",
+      "severity": "high",
+      "suggested_action": "Add projector mount, lens/throw review, power coordination, and structural review allowance.",
+      "target_id": "maw-recital-projector"
+    },
+    {
+      "confidence": 0.75,
+      "gap_id": "display_missing_mount",
+      "message": "Display is present, but no display mount was detected in the same room.",
+      "severity": "medium",
+      "suggested_action": "Add display mount and wall backing/PAC box review allowance.",
+      "target_id": "maw-classroom-display"
+    },
+    {
+      "confidence": 0.75,
+      "gap_id": "display_missing_mount",
+      "message": "Display is present, but no display mount was detected in the same room.",
+      "severity": "medium",
+      "suggested_action": "Add display mount and wall backing/PAC box review allowance.",
+      "target_id": "maw-lobby-display"
+    }
+  ],
+  "specification_sections": [
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "manufacturers": [],
+      "notes": [],
+      "page_end": null,
+      "page_start": null,
+      "section_id": "27-41-16",
+      "section_number": "27 41 16",
+      "source_file": null,
+      "title": "Integrated Audio Systems"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "manufacturers": [],
+      "notes": [],
+      "page_end": null,
+      "page_start": null,
+      "section_id": "27-41-19",
+      "section_number": "27 41 19",
+      "source_file": null,
+      "title": "Video Display and Projection Systems"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "audiovisual",
+      "manufacturers": [],
+      "notes": [],
+      "page_end": null,
+      "page_start": null,
+      "section_id": "27-41-26",
+      "section_number": "27 41 26",
+      "source_file": null,
+      "title": "AV Control Systems"
+    },
+    {
+      "confidence": 0.75,
+      "discipline": "theatrical",
+      "manufacturers": [],
+      "notes": [],
+      "page_end": null,
+      "page_start": null,
+      "section_id": "11-61-33",
+      "section_number": "11 61 33",
+      "source_file": null,
+      "title": "Stage Curtains and Drapery"
+    }
+  ],
+  "systems": [
+    {
+      "assumptions": [],
+      "building_id": "maw-music-education-center",
+      "category": "audio",
+      "complexity": "medium",
+      "confidence": 0.9,
+      "description": "Main recital hall reinforcement and playback system.",
+      "equipment_ids": [],
+      "manufacturers": [
+        "Meyer Sound",
+        "QSC"
+      ],
+      "name": "Performance Audio",
+      "review_required": false,
+      "room_id": "maw-recital-hall",
+      "system_id": "maw-performance-audio"
+    },
+    {
+      "assumptions": [],
+      "building_id": "maw-music-education-center",
+      "category": "projection",
+      "complexity": "medium",
+      "confidence": 0.86,
+      "description": "Laser projection system for recital hall presentations.",
+      "equipment_ids": [],
+      "manufacturers": [
+        "Epson"
+      ],
+      "name": "Projection",
+      "review_required": false,
+      "room_id": "maw-recital-hall",
+      "system_id": "maw-projection"
+    },
+    {
+      "assumptions": [],
+      "building_id": "maw-music-education-center",
+      "category": "control",
+      "complexity": "medium",
+      "confidence": 0.88,
+      "description": "Central control processor and user interface logic.",
+      "equipment_ids": [],
+      "manufacturers": [
+        "QSC"
+      ],
+      "name": "AV Control",
+      "review_required": false,
+      "room_id": "maw-control-booth",
+      "system_id": "maw-av-control"
+    },
+    {
+      "assumptions": [],
+      "building_id": "maw-music-education-center",
+      "category": "video",
+      "complexity": "medium",
+      "confidence": 0.84,
+      "description": "Instructional display and source routing.",
+      "equipment_ids": [],
+      "manufacturers": [
+        "Sony",
+        "QSC"
+      ],
+      "name": "Classroom AV",
+      "review_required": false,
+      "room_id": "maw-classroom",
+      "system_id": "maw-classroom-av"
+    },
+    {
+      "assumptions": [],
+      "building_id": "maw-music-education-center",
+      "category": "display",
+      "complexity": "medium",
+      "confidence": 0.82,
+      "description": "Public-facing event and wayfinding display.",
+      "equipment_ids": [],
+      "manufacturers": [
+        "Sony"
+      ],
+      "name": "Lobby Digital Signage",
+      "review_required": false,
+      "room_id": "maw-lobby",
+      "system_id": "maw-lobby-digital-signage"
+    }
+  ]
+}

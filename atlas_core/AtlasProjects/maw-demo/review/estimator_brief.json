@@ -1,0 +1,263 @@
+{
+  "assumption_summary": {
+    "informational_count": 0,
+    "review_count": 9,
+    "risk_count": 2,
+    "total_count": 11
+  },
+  "bid_completeness_score": 0.8,
+  "bid_completeness_status": "partial",
+  "brief_title": "Estimator Brief - MAW Music Education Center Plan Review",
+  "confidence": 0.66,
+  "created_by_engine_version": "estimator-brief-service/2.0.0",
+  "cross_reference_count": 42,
+  "detail_callout_count": 0,
+  "drawing_count": 6,
+  "engineering_assumption_count": 11,
+  "equipment_count": 6,
+  "estimator_risk_count": 3,
+  "evidence_refs": [
+    {
+      "excerpt": "confidence=0.53",
+      "field": "confidence",
+      "source_id": "maw-plan-review",
+      "source_type": "labor_estimate"
+    },
+    {
+      "excerpt": "ready",
+      "field": "status",
+      "source_id": "maw-plan-review",
+      "source_type": "readiness"
+    },
+    {
+      "excerpt": "MAW Music Education Center Plan Review",
+      "field": null,
+      "source_id": "maw-plan-review",
+      "source_type": "review"
+    },
+    {
+      "excerpt": "placeholder_device_description",
+      "field": "detected_condition",
+      "source_id": "rfi-maw-demo-574a6a5c1a",
+      "source_type": "rfi_candidate"
+    },
+    {
+      "excerpt": "add_alternate_ambiguity",
+      "field": "detected_condition",
+      "source_id": "rfi-maw-demo-7ec5369a9b",
+      "source_type": "rfi_candidate"
+    },
+    {
+      "excerpt": "add_alternate_ambiguity",
+      "field": "detected_condition",
+      "source_id": "rfi-maw-demo-a24f536924",
+      "source_type": "rfi_candidate"
+    }
+  ],
+  "executive_summary": "MAW Music Education Center Plan Review: readiness level bid_ready_with_assumptions (score=0.89), with 0 blockers, 5 warnings, and 6 prioritized reviewer actions.",
+  "issue_count": 17,
+  "key_rfi_candidates": [
+    {
+      "candidate_id": "rfi-maw-demo-a24f536924",
+      "confidence": 0.88,
+      "detected_condition": "add_alternate_ambiguity",
+      "recommended_action": "Request add alternate definition including scope limits, quantity basis, and acceptable products.",
+      "severity": "high",
+      "title": "Add alternate or allowance language needs clarification"
+    },
+    {
+      "candidate_id": "rfi-maw-demo-7ec5369a9b",
+      "confidence": 0.88,
+      "detected_condition": "add_alternate_ambiguity",
+      "recommended_action": "Request add alternate definition including scope limits, quantity basis, and acceptable products.",
+      "severity": "high",
+      "title": "Add alternate or allowance language needs clarification"
+    },
+    {
+      "candidate_id": "rfi-maw-demo-574a6a5c1a",
+      "confidence": 0.82,
+      "detected_condition": "placeholder_device_description",
+      "recommended_action": "Request a specific performance requirement or basis-of-design selection for this item.",
+      "severity": "medium",
+      "title": "Placeholder device description for maw-recital-drapery"
+    }
+  ],
+  "keynote_count": 0,
+  "labor_summary": {
+    "available": true,
+    "confidence": 0.53,
+    "risk_factors": [
+      "add_alternate_ambiguity"
+    ],
+    "total_labor_hours_expected": 51.31,
+    "warnings": [
+      "Add alternate language ambiguity detected; labor range may shift with clarifications."
+    ]
+  },
+  "legend_count": 0,
+  "legend_item_count": 0,
+  "missing_scope_summary": {
+    "diagnostic_count": 0,
+    "diagnostics": []
+  },
+  "name": "MAW Music Education Center Plan Review",
+  "placeholder_count": 0,
+  "prioritized_reviewer_actions": [
+    {
+      "action_id": "act-0ec014104d",
+      "description": "High estimator risks require estimator review.",
+      "priority": "high",
+      "reason": "Warning indicates unresolved estimating risk.",
+      "related_risks": [
+        "readiness_warning"
+      ],
+      "source_refs": [
+        {
+          "excerpt": "ready",
+          "field": "status",
+          "source_id": "maw-plan-review",
+          "source_type": "readiness"
+        }
+      ],
+      "suggested_owner_role": "discipline_lead",
+      "title": "Address readiness warning"
+    },
+    {
+      "action_id": "act-b5f3fe2154",
+      "description": "High-priority recommendations require estimator review.",
+      "priority": "high",
+      "reason": "Warning indicates unresolved estimating risk.",
+      "related_risks": [
+        "readiness_warning"
+      ],
+      "source_refs": [
+        {
+          "excerpt": "ready",
+          "field": "status",
+          "source_id": "maw-plan-review",
+          "source_type": "readiness"
+        }
+      ],
+      "suggested_owner_role": "discipline_lead",
+      "title": "Address readiness warning"
+    },
+    {
+      "action_id": "act-d55c8e0bcc",
+      "description": "Labor estimate confidence is below preferred threshold.",
+      "priority": "high",
+      "reason": "Warning indicates unresolved estimating risk.",
+      "related_risks": [
+        "readiness_warning"
+      ],
+      "source_refs": [
+        {
+          "excerpt": "ready",
+          "field": "status",
+          "source_id": "maw-plan-review",
+          "source_type": "readiness"
+        }
+      ],
+      "suggested_owner_role": "discipline_lead",
+      "title": "Address readiness warning"
+    },
+    {
+      "action_id": "act-2640042178",
+      "description": "Labor estimate confidence is below preferred threshold for bid carry.",
+      "priority": "high",
+      "reason": "Low labor confidence increases estimate volatility.",
+      "related_risks": [
+        "labor_confidence_low"
+      ],
+      "source_refs": [
+        {
+          "excerpt": "confidence=0.53",
+          "field": "confidence",
+          "source_id": "maw-plan-review",
+          "source_type": "labor_estimate"
+        }
+      ],
+      "suggested_owner_role": "estimator",
+      "title": "Recalibrate labor confidence"
+    },
+    {
+      "action_id": "act-5a603c0cdc",
+      "description": "Placeholder device description for maw-recital-drapery",
+      "priority": "high",
+      "reason": "RFI candidate ambiguity affects bid inclusions.",
+      "related_risks": [
+        "placeholder_device_description"
+      ],
+      "source_refs": [
+        {
+          "excerpt": "placeholder_device_description",
+          "field": "detected_condition",
+          "source_id": "rfi-maw-demo-574a6a5c1a",
+          "source_type": "rfi_candidate"
+        }
+      ],
+      "suggested_owner_role": "systems_engineer",
+      "title": "Review high-impact RFI candidate"
+    },
+    {
+      "action_id": "act-db51a7c7e7",
+      "description": "Add alternate or allowance language needs clarification",
+      "priority": "high",
+      "reason": "RFI candidate ambiguity affects bid inclusions.",
+      "related_risks": [
+        "add_alternate_ambiguity"
+      ],
+      "source_refs": [
+        {
+          "excerpt": "add_alternate_ambiguity",
+          "field": "detected_condition",
+          "source_id": "rfi-maw-demo-7ec5369a9b",
+          "source_type": "rfi_candidate"
+        }
+      ],
+      "suggested_owner_role": "systems_engineer",
+      "title": "Review high-impact RFI candidate"
+    }
+  ],
+  "project_id": "maw-demo",
+  "readiness_message": "Plan review is bid-ready with explicit assumptions.",
+  "readiness_status": "ready",
+  "readiness_summary": {
+    "message": "Plan review is bid-ready with explicit assumptions.",
+    "readiness_level": "bid_ready_with_assumptions",
+    "readiness_score": 0.89,
+    "section_scores": {
+      "assumptions_quality": 0.76,
+      "drawing_spec_alignment": 1.0,
+      "equipment_completeness": 1.0,
+      "labor_estimate_confidence": 0.53,
+      "quantity_confidence": 1.0,
+      "revision_stability": 1.0,
+      "rfi_candidate_risk": 0.78,
+      "scope_responsibility_clarity": 1.0
+    },
+    "status": "ready"
+  },
+  "recommendation_count": 4,
+  "reconciliation_issue_count": 0,
+  "review_id": "maw-plan-review",
+  "review_required_count": 6,
+  "revision_summary": {
+    "available": false,
+    "change_count": 0,
+    "confidence": null,
+    "high_or_critical_changes": 0,
+    "summary": "No revision comparison provided for this brief."
+  },
+  "room_count": 4,
+  "scope_gap_count": 4,
+  "specification_count": 4,
+  "system_count": 5,
+  "top_blockers": [],
+  "top_warnings": [
+    "High estimator risks require estimator review.",
+    "High-priority recommendations require estimator review.",
+    "Labor estimate confidence is below preferred threshold.",
+    "Missing device schedule, keynotes, or legend data.",
+    "Review confidence is below 0.75."
+  ]
+}

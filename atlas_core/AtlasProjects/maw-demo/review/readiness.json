@@ -1,0 +1,36 @@
+{
+  "blockers": [],
+  "blocking_issues": [],
+  "confidence": 0.73,
+  "created_by_engine_version": "plan-review-readiness-service/2.0.0",
+  "evidence_refs": [],
+  "message": "Plan review is bid-ready with explicit assumptions.",
+  "missing_scope_diagnostics": [],
+  "project_id": "maw-demo",
+  "readiness_level": "bid_ready_with_assumptions",
+  "readiness_score": 0.89,
+  "recommendation_summary": "0 blockers, 6 warnings, and 2 recommended actions based on deterministic scoring.",
+  "recommended_reviewer_actions": [
+    "Document reviewer sign-off for warnings prior to submission.",
+    "Re-run labor assumptions with estimator calibration notes."
+  ],
+  "section_scores": {
+    "assumptions_quality": 0.76,
+    "drawing_spec_alignment": 1.0,
+    "equipment_completeness": 1.0,
+    "labor_estimate_confidence": 0.53,
+    "quantity_confidence": 1.0,
+    "revision_stability": 1.0,
+    "rfi_candidate_risk": 0.78,
+    "scope_responsibility_clarity": 1.0
+  },
+  "status": "ready",
+  "warnings": [
+    "High estimator risks require estimator review.",
+    "High-priority recommendations require estimator review.",
+    "Labor estimate confidence is below preferred threshold.",
+    "Missing device schedule, keynotes, or legend data.",
+    "Review confidence is below 0.75.",
+    "Scope gaps require estimator review."
+  ]
+}

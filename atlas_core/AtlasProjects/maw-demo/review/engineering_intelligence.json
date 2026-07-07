@@ -1,0 +1,438 @@
+{
+  "created_by_engine_version": "engineering-insights-service/1.0.0",
+  "insights": [
+    {
+      "category": "Labor Risk",
+      "confidence": 0.85,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Labor estimate confidence is 0.53, indicating unstable quantity assumptions.",
+      "evidence_refs": [
+        "Add alternate language ambiguity detected; labor range may shift with clarifications."
+      ],
+      "insight_id": "labor-risk-low-confidence",
+      "priority": "Low",
+      "recommended_action": "Review labor categories with highest risk factors before pricing.",
+      "severity": "high",
+      "supporting_objects": [
+        "cable_pull",
+        "cable_pull",
+        "cable_pull",
+        "cable_pull",
+        "cable_pull",
+        "device_mounting",
+        "device_mounting",
+        "device_mounting"
+      ],
+      "title": "Labor estimate confidence is below preferred engineering threshold"
+    },
+    {
+      "category": "General Recommendation",
+      "confidence": 0.81,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Estimator Brief produced prioritized deterministic reviewer actions.",
+      "evidence_refs": [
+        "Address readiness warning",
+        "Address readiness warning",
+        "Address readiness warning",
+        "Recalibrate labor confidence",
+        "Review high-impact RFI candidate",
+        "Review high-impact RFI candidate"
+      ],
+      "insight_id": "general-recommendation-brief-actions",
+      "priority": "Low",
+      "recommended_action": "Execute highest-priority reviewer actions before pricing freeze.",
+      "severity": "medium",
+      "supporting_objects": [
+        "act-0ec014104d",
+        "act-b5f3fe2154",
+        "act-d55c8e0bcc",
+        "act-2640042178",
+        "act-5a603c0cdc",
+        "act-db51a7c7e7"
+      ],
+      "title": "Highest-confidence reviewer actions are available"
+    },
+    {
+      "category": "Coordination Issue",
+      "confidence": 0.79,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Equipment/system/room references show coordination gaps requiring engineering alignment.",
+      "evidence_refs": [
+        "maw-recital-drapery"
+      ],
+      "insight_id": "coordination-issue-cross-object",
+      "priority": "Low",
+      "recommended_action": "Resolve room and system assignment gaps before lock-in.",
+      "severity": "medium",
+      "supporting_objects": [
+        "maw-recital-drapery"
+      ],
+      "title": "Cross-object coordination issues detected"
+    },
+    {
+      "category": "Engineering Assumption",
+      "confidence": 0.77,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "11 engineering assumptions were captured and should be validated.",
+      "evidence_refs": [
+        "Speaker amplifier capacity should be verified.",
+        "Assistive listening requirements should be verified.",
+        "DSP programming scope should be verified.",
+        "Travel distance, lodging, mileage, and per diem requirements should be reviewed.",
+        "Projector cooling and ventilation should be verified.",
+        "Projector lens type and throw distance should be verified.",
+        "Projector mounting solution should be verified.",
+        "Projector power requirements should be verified.",
+        "Projector structural support and backing should be verified.",
+        "Display mounting solution should be verified."
+      ],
+      "insight_id": "engineering-assumption-review",
+      "priority": "Low",
+      "recommended_action": "Validate assumption ownership and document approval path.",
+      "severity": "medium",
+      "supporting_objects": [
+        "audio_amplifier_missing_maw-recital-speakers",
+        "audio_hearing_assistance_missing",
+        "audio_programming_missing_maw-control-processor",
+        "construction_travel_distance_review",
+        "projection_cooling_missing_maw-recital-projector",
+        "projection_lens_missing_maw-recital-projector",
+        "projection_mount_missing_maw-recital-projector",
+        "projection_power_missing_maw-recital-projector",
+        "projection_structure_missing_maw-recital-projector",
+        "video_display_mount_missing_maw-classroom-display"
+      ],
+      "title": "Engineering assumptions require deterministic confirmation"
+    },
+    {
+      "category": "Code / Standards Reminder",
+      "confidence": 0.66,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Deterministic package cues indicate standards-related review reminders.",
+      "evidence_refs": [
+        "Speaker amplifier capacity should be verified.",
+        "Assistive listening requirements should be verified.",
+        "DSP programming scope should be verified.",
+        "Travel distance, lodging, mileage, and per diem requirements should be reviewed.",
+        "Projector cooling and ventilation should be verified.",
+        "Projector lens type and throw distance should be verified.",
+        "Projector mounting solution should be verified.",
+        "Projector power requirements should be verified.",
+        "Projector structural support and backing should be verified.",
+        "Display mounting solution should be verified.",
+        "Display mounting solution should be verified."
+      ],
+      "insight_id": "code-standards-reminder",
+      "priority": "Low",
+      "recommended_action": "Confirm owner/standard notes in specifications and addenda during final review.",
+      "severity": "low",
+      "supporting_objects": [
+        "Speaker amplifier capacity should be verified.",
+        "Assistive listening requirements should be verified.",
+        "DSP programming scope should be verified.",
+        "Travel distance, lodging, mileage, and per diem requirements should be reviewed.",
+        "Projector cooling and ventilation should be verified.",
+        "Projector lens type and throw distance should be verified.",
+        "Projector mounting solution should be verified.",
+        "Projector power requirements should be verified.",
+        "Projector structural support and backing should be verified.",
+        "Display mounting solution should be verified.",
+        "Display mounting solution should be verified."
+      ],
+      "title": "Standards and owner criteria reminders generated"
+    },
+    {
+      "category": "Schedule Risk",
+      "confidence": 0.6,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Readiness evidence includes schedule-sensitive warning indicators.",
+      "evidence_refs": [
+        "Missing device schedule, keynotes, or legend data."
+      ],
+      "insight_id": "schedule-risk-advisory",
+      "priority": "Low",
+      "recommended_action": "Review schedule-related assumptions and critical path dependencies.",
+      "severity": "low",
+      "supporting_objects": [
+        "Missing device schedule, keynotes, or legend data."
+      ],
+      "title": "Schedule risk advisory"
+    }
+  ],
+  "project_health": {
+    "categories": [
+      {
+        "category": "Engineering Completeness",
+        "rationale": "Balances available drawings, specifications, and equipment against active blockers.",
+        "score": 1.0,
+        "weight": 0.3,
+        "weighted_score": 0.3
+      },
+      {
+        "category": "Package Consistency",
+        "rationale": "Penalizes missing-scope diagnostics and readiness warnings.",
+        "score": 0.8200000000000001,
+        "weight": 0.25,
+        "weighted_score": 0.21
+      },
+      {
+        "category": "Cross-Object Coordination",
+        "rationale": "Uses deterministic relationship density across the project knowledge graph.",
+        "score": 0.6666666666666666,
+        "weight": 0.2,
+        "weighted_score": 0.13
+      },
+      {
+        "category": "Estimating Confidence",
+        "rationale": "Combines review confidence and labor confidence when available.",
+        "score": 0.595,
+        "weight": 0.15,
+        "weighted_score": 0.09
+      },
+      {
+        "category": "Revision Stability",
+        "rationale": "Reduces score when high/critical revision changes are present.",
+        "score": 1.0,
+        "weight": 0.1,
+        "weighted_score": 0.1
+      }
+    ],
+    "created_by_engine_version": "engineering-insights-service/1.0.0",
+    "rationale": [
+      "Engineering Completeness: 1.00 x 0.30",
+      "Package Consistency: 0.82 x 0.25",
+      "Cross-Object Coordination: 0.67 x 0.20",
+      "Estimating Confidence: 0.59 x 0.15",
+      "Revision Stability: 1.00 x 0.10",
+      "Blockers considered: 0",
+      "Missing scope diagnostics considered: 0"
+    ],
+    "score": 83
+  },
+  "recommendations": [
+    {
+      "category": "General Recommendation",
+      "confidence": 0.85,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Deterministic recommendation generated from engineering insight: Labor estimate confidence is 0.53, indicating unstable quantity assumptions.",
+      "evidence_refs": [
+        "Add alternate language ambiguity detected; labor range may shift with clarifications."
+      ],
+      "insight_id": "recommendation-labor-risk-low-confidence",
+      "priority": "Low",
+      "recommended_action": "Review labor categories with highest risk factors before pricing.",
+      "severity": "high",
+      "supporting_objects": [
+        "cable_pull",
+        "cable_pull",
+        "cable_pull",
+        "cable_pull",
+        "cable_pull",
+        "device_mounting",
+        "device_mounting",
+        "device_mounting"
+      ],
+      "title": "Labor estimate confidence is below preferred engineering threshold"
+    },
+    {
+      "category": "General Recommendation",
+      "confidence": 0.81,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Deterministic recommendation generated from engineering insight: Estimator Brief produced prioritized deterministic reviewer actions.",
+      "evidence_refs": [
+        "Address readiness warning",
+        "Address readiness warning",
+        "Address readiness warning",
+        "Recalibrate labor confidence",
+        "Review high-impact RFI candidate",
+        "Review high-impact RFI candidate"
+      ],
+      "insight_id": "recommendation-general-recommendation-brief-actions",
+      "priority": "Low",
+      "recommended_action": "Execute highest-priority reviewer actions before pricing freeze.",
+      "severity": "medium",
+      "supporting_objects": [
+        "act-0ec014104d",
+        "act-b5f3fe2154",
+        "act-d55c8e0bcc",
+        "act-2640042178",
+        "act-5a603c0cdc",
+        "act-db51a7c7e7"
+      ],
+      "title": "Highest-confidence reviewer actions are available"
+    },
+    {
+      "category": "General Recommendation",
+      "confidence": 0.79,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Deterministic recommendation generated from engineering insight: Equipment/system/room references show coordination gaps requiring engineering alignment.",
+      "evidence_refs": [
+        "maw-recital-drapery"
+      ],
+      "insight_id": "recommendation-coordination-issue-cross-object",
+      "priority": "Low",
+      "recommended_action": "Resolve room and system assignment gaps before lock-in.",
+      "severity": "medium",
+      "supporting_objects": [
+        "maw-recital-drapery"
+      ],
+      "title": "Cross-object coordination issues detected"
+    },
+    {
+      "category": "General Recommendation",
+      "confidence": 0.77,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Deterministic recommendation generated from engineering insight: 11 engineering assumptions were captured and should be validated.",
+      "evidence_refs": [
+        "Speaker amplifier capacity should be verified.",
+        "Assistive listening requirements should be verified.",
+        "DSP programming scope should be verified.",
+        "Travel distance, lodging, mileage, and per diem requirements should be reviewed.",
+        "Projector cooling and ventilation should be verified.",
+        "Projector lens type and throw distance should be verified.",
+        "Projector mounting solution should be verified.",
+        "Projector power requirements should be verified.",
+        "Projector structural support and backing should be verified.",
+        "Display mounting solution should be verified."
+      ],
+      "insight_id": "recommendation-engineering-assumption-review",
+      "priority": "Low",
+      "recommended_action": "Validate assumption ownership and document approval path.",
+      "severity": "medium",
+      "supporting_objects": [
+        "audio_amplifier_missing_maw-recital-speakers",
+        "audio_hearing_assistance_missing",
+        "audio_programming_missing_maw-control-processor",
+        "construction_travel_distance_review",
+        "projection_cooling_missing_maw-recital-projector",
+        "projection_lens_missing_maw-recital-projector",
+        "projection_mount_missing_maw-recital-projector",
+        "projection_power_missing_maw-recital-projector",
+        "projection_structure_missing_maw-recital-projector",
+        "video_display_mount_missing_maw-classroom-display"
+      ],
+      "title": "Engineering assumptions require deterministic confirmation"
+    },
+    {
+      "category": "General Recommendation",
+      "confidence": 0.66,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Deterministic recommendation generated from engineering insight: Deterministic package cues indicate standards-related review reminders.",
+      "evidence_refs": [
+        "Speaker amplifier capacity should be verified.",
+        "Assistive listening requirements should be verified.",
+        "DSP programming scope should be verified.",
+        "Travel distance, lodging, mileage, and per diem requirements should be reviewed.",
+        "Projector cooling and ventilation should be verified.",
+        "Projector lens type and throw distance should be verified.",
+        "Projector mounting solution should be verified.",
+        "Projector power requirements should be verified.",
+        "Projector structural support and backing should be verified.",
+        "Display mounting solution should be verified.",
+        "Display mounting solution should be verified."
+      ],
+      "insight_id": "recommendation-code-standards-reminder",
+      "priority": "Low",
+      "recommended_action": "Confirm owner/standard notes in specifications and addenda during final review.",
+      "severity": "low",
+      "supporting_objects": [
+        "Speaker amplifier capacity should be verified.",
+        "Assistive listening requirements should be verified.",
+        "DSP programming scope should be verified.",
+        "Travel distance, lodging, mileage, and per diem requirements should be reviewed.",
+        "Projector cooling and ventilation should be verified.",
+        "Projector lens type and throw distance should be verified.",
+        "Projector mounting solution should be verified.",
+        "Projector power requirements should be verified.",
+        "Projector structural support and backing should be verified.",
+        "Display mounting solution should be verified.",
+        "Display mounting solution should be verified."
+      ],
+      "title": "Standards and owner criteria reminders generated"
+    },
+    {
+      "category": "General Recommendation",
+      "confidence": 0.6,
+      "created_by_engine_version": "engineering-insights-service/1.0.0",
+      "description": "Deterministic recommendation generated from engineering insight: Readiness evidence includes schedule-sensitive warning indicators.",
+      "evidence_refs": [
+        "Missing device schedule, keynotes, or legend data."
+      ],
+      "insight_id": "recommendation-schedule-risk-advisory",
+      "priority": "Low",
+      "recommended_action": "Review schedule-related assumptions and critical path dependencies.",
+      "severity": "low",
+      "supporting_objects": [
+        "Missing device schedule, keynotes, or legend data."
+      ],
+      "title": "Schedule risk advisory"
+    }
+  ],
+  "system_health": [
+    {
+      "confidence": 0.66,
+      "drawing_coverage": 1.0,
+      "equipment_completeness": 1.0,
+      "health_score": 82,
+      "labor_confidence": 0.53,
+      "outstanding_assumptions": 0,
+      "outstanding_rfis": 0,
+      "specification_coverage": 1.0,
+      "system_id": "maw-performance-audio",
+      "system_name": "Performance Audio",
+      "warnings": []
+    },
+    {
+      "confidence": 0.66,
+      "drawing_coverage": 1.0,
+      "equipment_completeness": 1.0,
+      "health_score": 82,
+      "labor_confidence": 0.53,
+      "outstanding_assumptions": 0,
+      "outstanding_rfis": 0,
+      "specification_coverage": 1.0,
+      "system_id": "maw-projection",
+      "system_name": "Projection",
+      "warnings": []
+    },
+    {
+      "confidence": 0.66,
+      "drawing_coverage": 1.0,
+      "equipment_completeness": 1.0,
+      "health_score": 82,
+      "labor_confidence": 0.53,
+      "outstanding_assumptions": 0,
+      "outstanding_rfis": 0,
+      "specification_coverage": 1.0,
+      "system_id": "maw-av-control",
+      "system_name": "AV Control",
+      "warnings": []
+    },
+    {
+      "confidence": 0.66,
+      "drawing_coverage": 1.0,
+      "equipment_completeness": 1.0,
+      "health_score": 82,
+      "labor_confidence": 0.53,
+      "outstanding_assumptions": 0,
+      "outstanding_rfis": 0,
+      "specification_coverage": 1.0,
+      "system_id": "maw-classroom-av",
+      "system_name": "Classroom AV",
+      "warnings": []
+    },
+    {
+      "confidence": 0.66,
+      "drawing_coverage": 1.0,
+      "equipment_completeness": 1.0,
+      "health_score": 82,
+      "labor_confidence": 0.53,
+      "outstanding_assumptions": 0,
+      "outstanding_rfis": 0,
+      "specification_coverage": 1.0,
+      "system_id": "maw-lobby-digital-signage",
+      "system_name": "Lobby Digital Signage",
+      "warnings": []
+    }
+  ]
+}
