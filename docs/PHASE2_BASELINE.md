@@ -49,6 +49,11 @@ MAW is not product logic:
 - python -m atlas_core.cli demo-maw-labor-estimate
 - python -m atlas_core.cli demo-maw-revision-comparison
 
+## Local GUI Prototype
+- Streamlit entry point: apps/phase2_review_app.py
+- Run: streamlit run apps/phase2_review_app.py
+- GUI usage and details: docs/PHASE2_GUI.md
+
 ## Expected Outputs
 Representative output characteristics from MAW snapshots:
 - Plan review pipeline returns coherent review, readiness, brief, and final review artifacts.
