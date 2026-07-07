@@ -131,6 +131,10 @@ from atlas_core.services.plan_review_application_service import (
 from atlas_core.services.pdf_plan_review_intake_service import (
     PdfPlanReviewIntakeService,
 )
+from atlas_core.services.project_workspace_service import (
+    ProjectWorkspaceRecord,
+    ProjectWorkspaceService,
+)
 from atlas_core.services.document_intake_service import (
     DocumentIntakeService,
     PackageDiscoveryResult,
@@ -220,4 +224,6 @@ __all__ = [
     "ScopeReconciliationService",
     "SpecificationIndexerService",
     "SystemDetectionService",
+    "ProjectWorkspaceRecord",
+    "ProjectWorkspaceService",
 ]

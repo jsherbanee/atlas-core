@@ -1,7 +1,7 @@
 # Atlas Core Development Status
 
 ## Current State
-Atlas Core is in active Phase 2 Bid Intelligence development with a stabilization baseline candidate prepared.
+Atlas Core is in active Phase 2 Bid Intelligence development with a stabilization baseline candidate prepared and a new persistent Atlas workspace shell in progress.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
@@ -22,6 +22,11 @@ Current MAW reference-project behavior:
 - Atlas attempts real package intake from examples/music_academy_of_the_west for the Reference Project view.
 - Seed fixture data is retained as regression fallback only when real package intake is unavailable.
 - GUI labels explicitly indicate whether Reference Project is using Real package intake or Seed fixture fallback.
+
+Current workspace behavior:
+- Atlas launches to a Home screen with New Project, Open Project, and Recent Projects actions.
+- Local workspace records are stored under outputs/project_workspaces/.
+- The active project view uses left navigation for overview, brief, files, readiness, revision, assumptions, and evidence sections.
 
 ## Latest Completed Feature
 - Estimator Brief Enhancements (deterministic executive summary, prioritized reviewer actions, and evidence traceability)

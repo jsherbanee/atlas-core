@@ -160,6 +160,27 @@ class Project:
             "lifecycle_events": [event.to_dict() for event in self.lifecycle_events],
         }
 
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "Project":
+        target_margin_value = payload.get("target_margin")
+        return cls(
+            project_id=str(payload.get("project_id") or ""),
+            name=str(payload.get("name") or ""),
+            client=str(payload.get("client") or ""),
+            location=payload.get("location"),
+            bid_date=payload.get("bid_date"),
+            status=payload.get("status") or ProjectStatus.INTAKE,
+            buildings=[str(item) for item in list(payload.get("buildings") or [])],
+            google_drive_folder=payload.get("google_drive_folder"),
+            output_folder=payload.get("output_folder"),
+            target_margin=0.28
+            if target_margin_value is None
+            else float(target_margin_value),
+            cslb_scope=str(payload.get("cslb_scope") or "C7"),
+            notes=[str(item) for item in list(payload.get("notes") or [])],
+            lifecycle_events=list(payload.get("lifecycle_events") or []),
+        )
+
     def _set_status(
         self,
         new_status: ProjectStatus,
@@ -194,4 +215,4 @@ class Project:
         if isinstance(event, ProjectLifecycleEvent):
             return event
 
-        return ProjectLifecycleEvent(**event)
+        return ProjectLifecycleEvent.from_dict(event)

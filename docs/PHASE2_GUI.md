@@ -1,12 +1,20 @@
 # Atlas
 
 ## Purpose
-Provide a local read-only interface for estimators to run Atlas Intake and inspect deterministic project review outputs.
+Provide a local workspace interface for estimators to run Atlas Intake and inspect deterministic project review outputs.
 
-This interface is for review only:
+This interface is local-only:
 - No authentication.
-- No database persistence.
+- No cloud persistence.
+- Local file-backed workspace persistence under `outputs/project_workspaces/`.
 - No procurement/RFQ/submittal/invoice/execution/closeout/vendor communication workflows.
+
+Atlas launches to a Home screen with:
+- `+ New Project`
+- `Open Project`
+- `Recent Projects`
+
+The active workspace uses left navigation for the project sections.
 
 ## Atlas Intake (Local)
 The GUI now supports local drag-and-drop intake for estimator bid packages.
@@ -28,7 +36,7 @@ Files are automatically classified into:
 - metadata/
 - unsupported/
 
-After classification, Atlas runs deterministic intake and then executes the existing project review pipeline.
+After classification, Atlas runs deterministic intake, saves the workspace locally, and then executes the existing project review pipeline.
 
 ## Data Sources
 The GUI supports two explicit source modes.
@@ -75,7 +83,7 @@ If expected folders are missing, Atlas shows a warning and still attempts determ
 1. Select `Uploaded Project` in the sidebar.
 2. Drag files into Atlas Intake (single file, many files, or ZIP).
 3. Click `Run Atlas Intake`.
-4. Review import summary, warnings, and project review tabs.
+4. Review import summary, warnings, and workspace sections.
 
 ## Deterministic Extraction Rules
 - PDF: extract embedded text.
@@ -99,18 +107,16 @@ For existing local intake snapshots, the sidebar includes `Use Existing Intake S
 This allows browsing `intake_snapshot.json` files already generated under local outputs/examples folders.
 
 ## Visible Sections
-- Project Overview
-- Readiness Score and Readiness Level
-- Section Scores
-- Top Blocking Issues
-- Warnings
+- Overview
+- Executive Summary
+- Project Files
+- Readiness
 - Estimator Brief
-- Prioritized Reviewer Actions
 - RFI Candidates
-- Labor Estimate Summary
-- Revision Comparison Summary
+- Labor Estimate
+- Revision Comparison
 - Engineering Assumptions
-- Evidence / Source References
+- Evidence
 
 ## Notes
 - The GUI reads deterministic outputs from existing services and sample data.

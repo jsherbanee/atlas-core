@@ -36,6 +36,16 @@ class ProjectLifecycleEvent:
         data["to_status"] = self.to_status.value
         return data
 
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "ProjectLifecycleEvent":
+        return cls(
+            from_status=payload.get("from_status"),
+            to_status=payload.get("to_status"),
+            note=payload.get("note"),
+            changed_by=payload.get("changed_by"),
+            changed_at=str(payload.get("changed_at") or datetime.now(UTC).isoformat()),
+        )
+
     @staticmethod
     def _normalize_optional_text(value: str | None) -> str | None:
         if value is None:
