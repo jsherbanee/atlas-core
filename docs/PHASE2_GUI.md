@@ -46,6 +46,8 @@ Uploaded Project:
 - Banner shows detected project name when available
 - Banner shows package location
 - Import summary table is shown
+- Extraction diagnostics are shown (pages with/without embedded text, files requiring OCR)
+- Per-file extraction status is shown (`extracted`, `partial`, `requires_ocr`, `unsupported`, `failed`)
 - Extraction warnings are shown
 
 MAW remains reference data only and is not product-specific business logic.
@@ -107,3 +109,14 @@ This allows browsing `intake_snapshot.json` files already generated under local 
 - The app does not mutate project data.
 - Scanned/image-only PDFs can produce warnings when no embedded text is extractable.
 - Atlas does not fabricate sheet/spec/equipment extraction when text is unavailable.
+
+## Extraction Diagnostics
+Atlas Intake surfaces the following diagnostics in the Import Summary:
+- total files
+- total pages (where page counts are available)
+- pages with embedded text
+- pages without embedded text
+- documents requiring OCR
+- extraction warning count
+
+When `documents requiring OCR` is non-zero, Atlas displays guidance that OCR is needed before text-rich project intelligence can be extracted.

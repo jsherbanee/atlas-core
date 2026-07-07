@@ -176,6 +176,9 @@ def test_build_reference_project_context_uses_real_intake_when_available(
     assert context["import_summary"]["drawing_count"] == 1
     assert context["import_summary"]["specification_count"] == 1
     assert context["import_summary"]["schedule_count"] == 1
+    assert "total_files" in context["import_summary"]
+    assert "documents_requiring_ocr" in context["import_summary"]
+    assert isinstance(context["import_summary"].get("file_diagnostics"), list)
 
 
 def test_build_reference_project_context_falls_back_when_package_missing(
@@ -192,6 +195,7 @@ def test_build_reference_project_context_falls_back_when_package_missing(
     assert any(
         "curated seed fixture data" in warning for warning in context["warnings"]
     )
+    assert context.get("import_summary") == {}
 
 
 def test_build_reference_project_context_warns_for_no_extractable_text(

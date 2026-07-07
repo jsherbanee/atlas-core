@@ -6,6 +6,10 @@ import json
 from pathlib import Path
 import zipfile
 
+from atlas_core.services.pdf_text_extraction_service import (
+    ExtractedPdfPage,
+    PdfTextExtractionService,
+)
 from pypdf import PdfWriter
 
 from atlas_core.services.document_intake_service import (
@@ -78,6 +82,11 @@ def test_metadata_and_pdf_page_extraction(tmp_path: Path) -> None:
     assert len(snapshot.raw_pages) == 3
     assert all(page["source_file"].endswith(".pdf") for page in snapshot.raw_pages)
     assert any("OCR is required" in warning for warning in snapshot.warnings)
+    assert snapshot.import_summary["total_files"] >= 4
+    assert snapshot.import_summary["total_pages"] == 3
+    assert snapshot.import_summary["pages_without_embedded_text"] >= 3
+    assert snapshot.import_summary["documents_requiring_ocr"] >= 1
+    assert snapshot.import_summary["extraction_warning_count"] >= 1
 
 
 def test_spec_and_sheet_detection_and_equipment_candidates(tmp_path: Path) -> None:
@@ -171,6 +180,87 @@ def test_zip_upload_is_unpacked_recursively(tmp_path: Path) -> None:
     assert result.import_summary["drawing_count"] == 1
     assert result.import_summary["schedule_count"] == 1
     assert result.snapshot.raw_pages
+
+
+def test_pdf_embedded_text_status_reports_extracted(tmp_path: Path) -> None:
+    package = _build_package(tmp_path)
+
+    class _TextExtractor(PdfTextExtractionService):
+        def extract_pages(self, pdf_path: str | Path) -> list[ExtractedPdfPage]:
+            return [
+                ExtractedPdfPage(
+                    page_number=1,
+                    text="AV-101 AUDIO PLAN",
+                    source_file=Path(pdf_path).name,
+                )
+            ]
+
+    service = DocumentIntakeService(pdf_text_extraction_service=_TextExtractor())
+    snapshot = service.build_snapshot(package)
+    diagnostics = list(snapshot.import_summary.get("file_diagnostics") or [])
+
+    drawing_diagnostics = [
+        item for item in diagnostics if item.get("file_name") == "AV-101 Audio Plan.pdf"
+    ]
+    assert drawing_diagnostics
+    assert drawing_diagnostics[0]["status"] == "extracted"
+    assert snapshot.import_summary["pages_with_embedded_text"] >= 1
+
+
+def test_pdf_mixed_text_status_reports_partial(tmp_path: Path) -> None:
+    package = _build_package(tmp_path)
+
+    class _MixedExtractor(PdfTextExtractionService):
+        def extract_pages(self, pdf_path: str | Path) -> list[ExtractedPdfPage]:
+            source = Path(pdf_path).name
+            if source != "AV-101 Audio Plan.pdf":
+                return [ExtractedPdfPage(page_number=1, text="", source_file=source)]
+
+            return [
+                ExtractedPdfPage(page_number=1, text="AV-101", source_file=source),
+                ExtractedPdfPage(page_number=2, text="", source_file=source),
+            ]
+
+    service = DocumentIntakeService(pdf_text_extraction_service=_MixedExtractor())
+    snapshot = service.build_snapshot(package)
+    diagnostics = list(snapshot.import_summary.get("file_diagnostics") or [])
+    drawing_diagnostics = [
+        item for item in diagnostics if item.get("file_name") == "AV-101 Audio Plan.pdf"
+    ]
+    assert drawing_diagnostics
+    assert drawing_diagnostics[0]["status"] == "partial"
+
+
+def test_snapshot_serializes_file_diagnostics(tmp_path: Path) -> None:
+    package = _build_package(tmp_path)
+    service = DocumentIntakeService()
+    snapshot = service.build_snapshot(package)
+    snapshot_path = service.write_snapshot(snapshot, tmp_path / "outputs")
+    loaded_snapshot = service.load_snapshot(snapshot_path)
+
+    assert "file_diagnostics" in loaded_snapshot.import_summary
+    assert isinstance(loaded_snapshot.import_summary["file_diagnostics"], list)
+
+
+def test_image_only_intake_requires_ocr_without_fabricated_entities(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "image_only_project"
+    (package / "drawings").mkdir(parents=True)
+    (package / "specifications").mkdir(parents=True)
+    (package / "schedules").mkdir(parents=True)
+    (package / "addenda").mkdir(parents=True)
+    (package / "images").mkdir(parents=True)
+    (package / "images" / "scan-001.png").write_bytes(b"image-bytes")
+
+    snapshot = DocumentIntakeService().build_snapshot(package)
+
+    assert snapshot.raw_pages == []
+    assert snapshot.raw_sheets == []
+    assert snapshot.raw_sections == []
+    assert snapshot.equipment_candidates == []
+    assert snapshot.import_summary["documents_requiring_ocr"] >= 1
+    assert any("OCR support is required" in warning for warning in snapshot.warnings)
 
 
 def _zip_bytes(files: dict[str, bytes]) -> bytes:

@@ -187,6 +187,20 @@ def main() -> None:
     if import_summary:
         st.markdown("Import Summary")
         summary_rows = [
+            {"metric": "total files", "value": import_summary.get("total_files", 0)},
+            {"metric": "total pages", "value": import_summary.get("total_pages", 0)},
+            {
+                "metric": "pages with embedded text",
+                "value": import_summary.get("pages_with_embedded_text", 0),
+            },
+            {
+                "metric": "pages without embedded text",
+                "value": import_summary.get("pages_without_embedded_text", 0),
+            },
+            {
+                "metric": "documents requiring OCR",
+                "value": import_summary.get("documents_requiring_ocr", 0),
+            },
             {
                 "metric": "drawing count",
                 "value": import_summary.get("drawing_count", 0),
@@ -216,6 +230,31 @@ def main() -> None:
             },
         ]
         st.dataframe(summary_rows, use_container_width=True, hide_index=True)
+
+        file_diagnostics = list(import_summary.get("file_diagnostics") or [])
+        if file_diagnostics:
+            st.markdown("Per-File Extraction Status")
+            st.dataframe(
+                [
+                    {
+                        "file": item.get("file_name"),
+                        "group": item.get("document_group"),
+                        "status": item.get("status"),
+                        "pages": item.get("total_pages"),
+                        "pages_with_text": item.get("pages_with_embedded_text"),
+                        "pages_without_text": item.get("pages_without_embedded_text"),
+                    }
+                    for item in file_diagnostics
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    if int(import_summary.get("documents_requiring_ocr", 0) or 0) > 0:
+        st.warning(
+            "Some files require OCR before Atlas can extract text-rich project intelligence. "
+            "Atlas does not fabricate sheet/spec/equipment extraction from image-only files."
+        )
 
     st.markdown("Extraction Warnings")
     for warning in list(context.get("warnings") or []):

@@ -82,6 +82,11 @@ Supported formats:
 - Archives: ZIP
 
 Import summary includes:
+- total files
+- total pages (if available)
+- pages with embedded text
+- pages without embedded text
+- documents requiring OCR
 - drawing count
 - specification count
 - schedule count
@@ -89,6 +94,7 @@ Import summary includes:
 - image count
 - unsupported file count
 - extraction warnings
+- per-file extraction status (`extracted`, `partial`, `requires_ocr`, `unsupported`, `failed`)
 
 Expected package structure:
 - examples/music_academy_of_the_west/drawings/*.pdf

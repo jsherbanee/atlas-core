@@ -192,6 +192,8 @@ class DocumentIntakeService:
 
         page_records: list[dict[str, Any]] = []
         source_references: list[dict[str, Any]] = []
+        file_diagnostics: list[dict[str, Any]] = []
+        schedule_rows_by_file: dict[str, int] = {}
 
         for group_name, files in (
             ("drawings", discovery.drawing_files),
@@ -201,12 +203,20 @@ class DocumentIntakeService:
             ("images", discovery.image_files),
         ):
             for file_path in files:
-                file_pages, file_warnings = self._extract_document_pages(
+                file_pages, file_warnings, diagnostic = self._extract_document_pages(
                     file_path,
                     group_name,
                 )
                 page_records.extend(file_pages)
                 warnings.extend(file_warnings)
+                file_diagnostics.append(
+                    {
+                        "file_name": file_path.name,
+                        "file_path": str(file_path),
+                        "document_group": group_name,
+                        **diagnostic,
+                    }
+                )
 
         raw_sheets = extract_drawing_sheet_candidates(
             [
@@ -227,10 +237,72 @@ class DocumentIntakeService:
             discovery.schedule_files
         )
         warnings.extend(schedule_warnings)
+        for schedule in csv_schedules:
+            source_file = str(schedule.get("source_file") or "")
+            if source_file:
+                schedule_rows_by_file[source_file] = len(
+                    list(schedule.get("rows") or [])
+                )
+
         pdf_schedules = detect_schedule_like_pages(
             [page for page in page_records if page.get("document_group") == "schedules"]
         )
         raw_device_schedules = self._dedupe_dicts([*csv_schedules, *pdf_schedules])
+
+        for diagnostic in file_diagnostics:
+            if diagnostic.get("document_group") != "schedules":
+                continue
+            if str(diagnostic.get("status") or "") == "unsupported":
+                continue
+
+            file_name = str(diagnostic.get("file_name") or "")
+            row_count = schedule_rows_by_file.get(file_name)
+            if row_count is not None:
+                diagnostic["rows_extracted"] = row_count
+
+        for warning in schedule_warnings:
+            warning_lower = warning.lower()
+            if (
+                "unsupported" not in warning_lower
+                and "could not be parsed" not in warning_lower
+            ):
+                continue
+
+            file_name = (
+                warning.split(" ", 2)[2].split(" ", 1)[0]
+                if warning.startswith("Schedule file ")
+                else ""
+            )
+            if not file_name:
+                continue
+
+            matched = False
+            for diagnostic in file_diagnostics:
+                if str(diagnostic.get("file_name") or "") != file_name:
+                    continue
+                diagnostic["status"] = "unsupported"
+                diagnostic["warnings"] = sorted(
+                    set(list(diagnostic.get("warnings") or []) + [warning])
+                )
+                matched = True
+                break
+
+            if not matched:
+                file_diagnostics.append(
+                    {
+                        "file_name": file_name,
+                        "file_path": str(
+                            discovery.package_path / "schedules" / file_name
+                        ),
+                        "document_group": "schedules",
+                        "status": "unsupported",
+                        "total_pages": None,
+                        "pages_with_embedded_text": 0,
+                        "pages_without_embedded_text": 0,
+                        "requires_ocr": False,
+                        "warnings": [warning],
+                    }
+                )
 
         equipment_candidates = self._equipment_candidates_with_schedule_context(
             page_records,
@@ -275,6 +347,25 @@ class DocumentIntakeService:
         package_path_value = str(discovery.package_path.resolve())
         snapshot_id = f"intake-{hashlib.sha1(package_path_value.encode('utf-8')).hexdigest()[:12]}"
 
+        for unsupported_file in discovery.unsupported_files:
+            file_diagnostics.append(
+                {
+                    "file_name": unsupported_file.name,
+                    "file_path": str(unsupported_file),
+                    "document_group": "unsupported",
+                    "status": "unsupported",
+                    "total_pages": None,
+                    "pages_with_embedded_text": 0,
+                    "pages_without_embedded_text": 0,
+                    "requires_ocr": False,
+                    "warnings": [f"{unsupported_file.name}: unsupported file format."],
+                }
+            )
+
+        diagnostics_summary = self._build_extraction_diagnostics(
+            file_diagnostics, warnings
+        )
+
         return DocumentIntakeSnapshot(
             snapshot_id=snapshot_id,
             package_path=package_path_value,
@@ -301,6 +392,7 @@ class DocumentIntakeService:
                 "addenda_count": len(discovery.addenda_files),
                 "image_count": len(discovery.image_files),
                 "unsupported_file_count": len(discovery.unsupported_files),
+                **diagnostics_summary,
                 "extraction_warnings": sorted(set(warnings)),
                 "package_location": package_path_value,
             },
@@ -379,42 +471,87 @@ class DocumentIntakeService:
         self,
         file_path: Path,
         group_name: str,
-    ) -> tuple[list[dict[str, Any]], list[str]]:
+    ) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
         suffix = file_path.suffix.lower()
         if suffix == ".pdf":
-            return self._extract_pdf_pages(file_path, group_name)
+            pages, warnings = self._extract_pdf_pages(file_path, group_name)
+            return pages, warnings, self._file_status_from_pages(pages, warnings)
 
         if suffix == ".docx":
             text = self._extract_docx_text(file_path)
-            return self._single_page_record(file_path, group_name, text)
+            pages, warnings = self._single_page_record(file_path, group_name, text)
+            return pages, warnings, self._file_status_from_pages(pages, warnings)
 
         if suffix in {".csv", ".xlsx", ".xls"}:
-            return [], []
+            return (
+                [],
+                [],
+                {
+                    "status": "extracted",
+                    "total_pages": None,
+                    "pages_with_embedded_text": 0,
+                    "pages_without_embedded_text": 0,
+                    "requires_ocr": False,
+                    "warnings": [],
+                },
+            )
 
         if suffix in {".txt", ".rtf"}:
             text = file_path.read_text(encoding="utf-8", errors="ignore")
-            return self._single_page_record(file_path, group_name, text)
+            pages, warnings = self._single_page_record(file_path, group_name, text)
+            return pages, warnings, self._file_status_from_pages(pages, warnings)
 
         if suffix == ".doc":
             text = file_path.read_text(encoding="latin-1", errors="ignore")
             normalized = " ".join(text.split())
             if not normalized:
-                return [], [
-                    f"{file_path.name}: DOC extraction is unsupported; provide DOCX or PDF."
-                ]
+                warning = f"{file_path.name}: DOC extraction is unsupported; provide DOCX or PDF."
+                return (
+                    [],
+                    [warning],
+                    {
+                        "status": "unsupported",
+                        "total_pages": 1,
+                        "pages_with_embedded_text": 0,
+                        "pages_without_embedded_text": 1,
+                        "requires_ocr": False,
+                        "warnings": [warning],
+                    },
+                )
 
             warning = f"{file_path.name}: DOC extraction is best-effort; provide DOCX or PDF for reliable parsing."
             pages, _ = self._single_page_record(file_path, group_name, text)
-            return pages, [warning]
+            status = self._file_status_from_pages(pages, [warning])
+            return pages, [warning], status
 
         if suffix in self._IMAGE_EXTENSIONS:
-            return [], [
-                f"{file_path.name}: This image contains no extractable embedded text. OCR support is required."
-            ]
+            warning = f"{file_path.name}: This image contains no extractable embedded text. OCR support is required."
+            return (
+                [],
+                [warning],
+                {
+                    "status": "requires_ocr",
+                    "total_pages": 1,
+                    "pages_with_embedded_text": 0,
+                    "pages_without_embedded_text": 1,
+                    "requires_ocr": True,
+                    "warnings": [warning],
+                },
+            )
 
-        return [], [
-            f"{file_path.name}: unsupported document format for text extraction."
-        ]
+        warning = f"{file_path.name}: unsupported document format for text extraction."
+        return (
+            [],
+            [warning],
+            {
+                "status": "unsupported",
+                "total_pages": None,
+                "pages_with_embedded_text": 0,
+                "pages_without_embedded_text": 0,
+                "requires_ocr": False,
+                "warnings": [warning],
+            },
+        )
 
     def _single_page_record(
         self,
@@ -437,6 +574,64 @@ class DocumentIntakeService:
             )
 
         return [record], warnings
+
+    @staticmethod
+    def _file_status_from_pages(
+        pages: list[dict[str, Any]],
+        warnings: list[str],
+    ) -> dict[str, Any]:
+        total_pages = len(pages)
+        pages_with_text = sum(1 for page in pages if bool(page.get("has_text")))
+        pages_without_text = max(total_pages - pages_with_text, 0)
+
+        if total_pages == 0:
+            status = "failed"
+        elif pages_with_text == total_pages:
+            status = "extracted"
+        elif pages_with_text == 0:
+            status = "requires_ocr"
+        else:
+            status = "partial"
+
+        return {
+            "status": status,
+            "total_pages": total_pages,
+            "pages_with_embedded_text": pages_with_text,
+            "pages_without_embedded_text": pages_without_text,
+            "requires_ocr": status == "requires_ocr",
+            "warnings": list(warnings),
+        }
+
+    @staticmethod
+    def _build_extraction_diagnostics(
+        file_diagnostics: list[dict[str, Any]],
+        warnings: list[str],
+    ) -> dict[str, Any]:
+        total_pages = sum(
+            int(item.get("total_pages") or 0)
+            for item in file_diagnostics
+            if item.get("total_pages") is not None
+        )
+        pages_with_embedded_text = sum(
+            int(item.get("pages_with_embedded_text") or 0) for item in file_diagnostics
+        )
+        pages_without_embedded_text = sum(
+            int(item.get("pages_without_embedded_text") or 0)
+            for item in file_diagnostics
+        )
+        documents_requiring_ocr = sum(
+            1 for item in file_diagnostics if bool(item.get("requires_ocr"))
+        )
+
+        return {
+            "total_files": len(file_diagnostics),
+            "total_pages": total_pages,
+            "pages_with_embedded_text": pages_with_embedded_text,
+            "pages_without_embedded_text": pages_without_embedded_text,
+            "documents_requiring_ocr": documents_requiring_ocr,
+            "extraction_warning_count": len(sorted(set(warnings))),
+            "file_diagnostics": file_diagnostics,
+        }
 
     @staticmethod
     def _load_metadata(discovery: PackageDiscoveryResult) -> dict[str, Any]:
