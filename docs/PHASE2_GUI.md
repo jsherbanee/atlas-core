@@ -1,7 +1,7 @@
-# Phase 2 Local Review GUI
+# Atlas
 
 ## Purpose
-Provide a local read-only interface for estimators to inspect deterministic Phase 2 Bid Intelligence outputs.
+Provide a local read-only interface for estimators to run Atlas Intake and inspect deterministic project review outputs.
 
 This interface is for review only:
 - No authentication.
@@ -28,12 +28,12 @@ Files are automatically classified into:
 - metadata/
 - unsupported/
 
-After classification, Atlas runs deterministic intake and then executes the existing Bid Intelligence review pipeline.
+After classification, Atlas runs deterministic intake and then executes the existing project review pipeline.
 
 ## Data Sources
 The GUI supports two explicit source modes.
 
-Sample Data:
+Reference Project:
 - Music Academy of the West (Reference Project)
 
 Uploaded Project:
@@ -43,7 +43,7 @@ Uploaded Project:
 - Import summary table is shown
 - Extraction warnings are shown
 
-MAW remains sample/reference data only and is not product-specific business logic.
+MAW remains reference data only and is not product-specific business logic.
 
 ## Run Instructions
 1. Install GUI dependency:
@@ -55,7 +55,7 @@ MAW remains sample/reference data only and is not product-specific business logi
 1. Select `Uploaded Project` in the sidebar.
 2. Drag files into Atlas Intake (single file, many files, or ZIP).
 3. Click `Run Atlas Intake`.
-4. Review import summary, warnings, and Phase 2 output tabs.
+4. Review import summary, warnings, and project review tabs.
 
 ## Deterministic Extraction Rules
 - PDF: extract embedded text.

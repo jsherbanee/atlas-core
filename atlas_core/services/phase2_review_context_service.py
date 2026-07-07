@@ -1,4 +1,4 @@
-"""Build deterministic Phase 2 review context for local GUI inspection."""
+"""Build deterministic review context for Atlas local GUI inspection."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ def build_sample_review_context(sample_project_id: str = "maw") -> dict[str, Any
 
     return {
         "data_source_mode": "seed_sample_data",
-        "data_source_label": "Seed sample data",
+        "data_source_label": "Reference Project",
         "sample_project_id": sample_project_id,
         "sample_project_name": "Music Academy of the West",
         "review": baseline_result.review,
@@ -103,7 +103,7 @@ def build_intake_review_context(snapshot_path: str | Path) -> dict[str, Any]:
     workflow_result = intake_service.run_review_from_snapshot(snapshot)
     return {
         "data_source_mode": "real_package_intake",
-        "data_source_label": "Real package intake",
+        "data_source_label": "Uploaded Project",
         "sample_project_id": "intake",
         "sample_project_name": str(
             snapshot.metadata.get("project_name")

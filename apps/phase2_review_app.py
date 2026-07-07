@@ -1,4 +1,4 @@
-"""Local read-only Streamlit GUI for Phase 2 Bid Intelligence review."""
+"""Local read-only Streamlit GUI for Atlas project intake and review."""
 
 from __future__ import annotations
 
@@ -64,13 +64,12 @@ def _render_intake_box(st: Any) -> None:
 
 def main() -> None:
     st = _load_streamlit()
-    st.set_page_config(
-        page_title="Atlas Phase 2 Bid Intelligence Review", layout="wide"
-    )
+    st.set_page_config(page_title="Atlas", layout="wide")
 
-    st.title("Atlas Phase 2 Bid Intelligence Review")
+    st.title("Atlas")
+    st.subheader("Atlas Intake")
     st.caption(
-        "Read-only local prototype for inspecting deterministic Phase 2 outputs."
+        "Upload a complete project package to run deterministic intake and project review."
     )
 
     source_mode = st.sidebar.radio(
@@ -85,10 +84,10 @@ def main() -> None:
         selected_label = st.sidebar.selectbox(
             "Sample Project", options=list(options.keys()), index=0
         )
-        st.sidebar.caption("Music Academy of the West remains reference/demo data.")
+        st.sidebar.caption("Music Academy of the West remains reference project data.")
         context = build_sample_review_context(options[selected_label])
-        context["data_source_label"] = "Sample Data"
-        context["sample_project_name"] = "Music Academy of the West (Reference Project)"
+        context["data_source_label"] = "Reference Project"
+        context["sample_project_name"] = "Music Academy of the West"
     else:
         _render_intake_box(st)
         uploaded_files = st.file_uploader(
@@ -176,7 +175,7 @@ def main() -> None:
     labor = getattr(review, "labor_estimate", None)
 
     if context.get("data_source_mode") == "seed_sample_data":
-        st.info("Sample Data\n" "Music Academy of the West (Reference Project)")
+        st.info("Reference Project\nMusic Academy of the West")
     else:
         project_name = str(context.get("sample_project_name") or "Uploaded Project")
         st.success(f"Uploaded Project\n{project_name}")
@@ -232,12 +231,12 @@ def main() -> None:
 
     tabs = st.tabs(
         [
-            "Overview",
+            "Project Review",
             "Readiness",
             "Estimator Brief",
-            "RFIs",
-            "Labor",
-            "Revisions",
+            "RFI Candidates",
+            "Labor Estimate",
+            "Revision Comparison",
             "Assumptions",
             "Evidence",
         ]

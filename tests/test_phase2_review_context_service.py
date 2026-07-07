@@ -38,7 +38,7 @@ def test_build_sample_review_context_returns_phase2_outputs() -> None:
 
     assert context["sample_project_id"] == "maw"
     assert context["data_source_mode"] == "seed_sample_data"
-    assert context["data_source_label"] == "Seed sample data"
+    assert context["data_source_label"] == "Reference Project"
     assert context["sample_project_name"] == "Music Academy of the West"
     assert readiness is not None
     assert readiness.readiness_score is not None
@@ -104,7 +104,7 @@ def test_build_intake_review_context_has_real_source_label(tmp_path: Path) -> No
     context = build_intake_review_context(snapshot_path)
 
     assert context["data_source_mode"] == "real_package_intake"
-    assert context["data_source_label"] == "Real package intake"
+    assert context["data_source_label"] == "Uploaded Project"
     assert context["sample_project_id"] == "intake"
     assert context["review"].review_id == "review-intake-002"
     assert "drawing_count" in context["import_summary"]
