@@ -1,4 +1,4 @@
-"""Atlas Workspace v1 Streamlit application shell."""
+"""Atlas Workspace v1.5 project-centric shell for Phase 2 review outputs."""
 
 from __future__ import annotations
 
@@ -22,39 +22,54 @@ from atlas_core.services.project_workspace_service import (
     ProjectWorkspaceService,
 )
 
-ACTIVE_NAVIGATION = {
-    "PROJECT": [
-        "Overview",
-        "Executive Summary",
-        "Project Files",
-        "Drawings",
-        "Specifications",
-        "Equipment",
-        "Systems",
-    ],
-    "BID INTELLIGENCE": [
-        "Readiness",
-        "Estimator Brief",
-        "RFI Candidates",
-        "Labor Estimate",
-        "Revision Comparison",
-        "Engineering Assumptions",
-        "Evidence",
-    ],
-    "REPORTS": ["Reports", "Exports"],
-    "SETTINGS": ["Project Settings", "Application Settings"],
-}
+PROJECT_MANAGER_PAGES = [
+    "Home",
+    "Projects",
+    "Reference Projects",
+    "Recent Projects",
+    "Create New Project",
+    "Open Existing Project",
+]
 
-DISABLED_NAVIGATION = {
-    "PROJECT LIFECYCLE": [
-        "Engineering",
-        "Procurement",
-        "Financials",
-        "Construction",
-        "Closeout",
-        "Service",
-    ]
-}
+PROJECT_PAGES = [
+    "Overview",
+    "Executive Summary",
+    "Project Files",
+    "Drawings",
+    "Specifications",
+    "Equipment",
+    "Systems",
+]
+
+BID_INTELLIGENCE_PAGES = [
+    "Readiness",
+    "Estimator Brief",
+    "RFI Candidates",
+    "Labor Estimate",
+    "Revision Comparison",
+    "Engineering Assumptions",
+    "Evidence",
+]
+
+DISABLED_LIFECYCLE_PAGES = [
+    "Engineering",
+    "Procurement",
+    "Financials",
+    "Construction",
+    "Closeout",
+    "Service",
+]
+
+REPORT_PAGES = ["Reports", "Exports"]
+SETTINGS_PAGES = ["Project Settings", "Application Settings"]
+
+ALL_ACTIVE_PAGES = (
+    PROJECT_MANAGER_PAGES
+    + PROJECT_PAGES
+    + BID_INTELLIGENCE_PAGES
+    + REPORT_PAGES
+    + SETTINGS_PAGES
+)
 
 SUPPORTED_UPLOAD_TYPES = [
     "pdf",
@@ -96,34 +111,94 @@ def _inject_styles(st: Any) -> None:
     st.markdown(
         """
         <style>
-        .atlas-shell-title {font-size: 1.1rem; font-weight: 600; letter-spacing: 0.02rem;}
-        .atlas-meta {color: #6b7280; font-size: 0.85rem;}
-        .atlas-chip {padding: 2px 8px; border-radius: 999px; font-size: 0.78rem; border: 1px solid #d1d5db; display: inline-block; margin-right: 6px;}
-        .atlas-muted {color: #6b7280;}
-        .atlas-context h4 {margin-top: 0.2rem;}
-        .atlas-statusbar {padding-top: 0.35rem; border-top: 1px solid #e5e7eb;}
+        :root {
+            --atlas-gray: #6b7280;
+            --atlas-blue: #2563eb;
+            --atlas-green: #16a34a;
+            --atlas-amber: #d97706;
+            --atlas-red: #dc2626;
+        }
+        .atlas-title {
+            font-size: 1.12rem;
+            font-weight: 650;
+            letter-spacing: 0.02rem;
+            margin-bottom: 0.2rem;
+        }
+        .atlas-muted {
+            color: var(--atlas-gray);
+            font-size: 0.86rem;
+        }
+        .atlas-breadcrumb {
+            color: var(--atlas-gray);
+            font-size: 0.82rem;
+            margin-bottom: 0.4rem;
+        }
+        .atlas-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 0.55rem 0.7rem;
+            margin-bottom: 0.45rem;
+            background: #ffffff;
+        }
+        .atlas-card-title {
+            color: var(--atlas-gray);
+            font-size: 0.76rem;
+            margin-bottom: 0.2rem;
+        }
+        .atlas-card-value {
+            font-size: 1.02rem;
+            font-weight: 600;
+        }
+        .atlas-statusbar {
+            border-top: 1px solid #e5e7eb;
+            margin-top: 0.7rem;
+            padding-top: 0.4rem;
+        }
+        .atlas-chip {
+            border-radius: 999px;
+            padding: 2px 8px;
+            border: 1px solid #d1d5db;
+            font-size: 0.75rem;
+            display: inline-block;
+            margin-right: 4px;
+            margin-top: 2px;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
 
-def _init_session_state(st: Any) -> None:
-    st.session_state.setdefault("atlas_active_workspace_id", None)
-    st.session_state.setdefault("atlas_active_page", "Overview")
-    st.session_state.setdefault("atlas_layout_mode", "Desktop")
-    st.session_state.setdefault("atlas_navigation_collapsed", False)
-    st.session_state.setdefault("atlas_project_selector", "Recent Projects")
-    st.session_state.setdefault("atlas_workspace_action", "")
-    st.session_state.setdefault("atlas_pending_open_path", "")
-    st.session_state.setdefault("atlas_new_project_id", "")
-    st.session_state.setdefault("atlas_new_project_name", "")
-    st.session_state.setdefault("atlas_new_project_client", "")
-    st.session_state.setdefault("atlas_new_project_location", "")
-    st.session_state.setdefault("atlas_new_project_bid_date", "")
-    st.session_state.setdefault("atlas_upload_signature", "")
-    st.session_state.setdefault("atlas_uploaded_context", None)
-    st.session_state.setdefault("atlas_context_selection", {"kind": "project"})
+def _status_chip(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized in {"healthy", "ready", "high", "extracted", "green"}:
+        return "🟢 " + value
+    if normalized in {"processing", "in progress", "blue"}:
+        return "🔵 " + value
+    if normalized in {"needs review", "warning", "partial", "amber"}:
+        return "🟠 " + value
+    if normalized in {"critical", "failed", "requires_ocr", "red"}:
+        return "🔴 " + value
+    return "⚪ " + value
+
+
+def _safe_text(value: Any, default: str = "Unknown") -> str:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        normalized = value.strip()
+        return normalized or default
+    return str(value)
+
+
+def _first_text(*values: Any) -> str | None:
+    for value in values:
+        if isinstance(value, str):
+            normalized = value.strip()
+            if normalized:
+                return normalized
+
+    return None
 
 
 def _uploaded_file_signature(uploaded_files: list[Any]) -> str:
@@ -148,26 +223,6 @@ def _to_rows(items: list[Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def _first_text(*values: Any) -> str | None:
-    for value in values:
-        if not isinstance(value, str):
-            continue
-        normalized = value.strip()
-        if normalized:
-            return normalized
-
-    return None
-
-
-def _safe_text(value: Any, default: str = "Unknown") -> str:
-    if value is None:
-        return default
-    if isinstance(value, str):
-        normalized = value.strip()
-        return normalized or default
-    return str(value)
-
-
 def _current_commit() -> str:
     try:
         result = subprocess.run(
@@ -182,6 +237,25 @@ def _current_commit() -> str:
     return result.stdout.strip() or "n/a"
 
 
+def _init_session_state(st: Any) -> None:
+    st.session_state.setdefault("atlas_active_workspace_id", None)
+    st.session_state.setdefault("atlas_active_page", "Home")
+    st.session_state.setdefault("atlas_layout_mode", "Desktop")
+    st.session_state.setdefault("atlas_navigation_collapsed", False)
+    st.session_state.setdefault("atlas_project_selector", "Recent Projects")
+    st.session_state.setdefault("atlas_workspace_action", "")
+    st.session_state.setdefault("atlas_pending_open_path", "")
+    st.session_state.setdefault("atlas_new_project_id", "")
+    st.session_state.setdefault("atlas_new_project_name", "")
+    st.session_state.setdefault("atlas_new_project_client", "")
+    st.session_state.setdefault("atlas_new_project_location", "")
+    st.session_state.setdefault("atlas_new_project_bid_date", "")
+    st.session_state.setdefault("atlas_upload_signature", "")
+    st.session_state.setdefault("atlas_uploaded_context", None)
+    st.session_state.setdefault("atlas_context_selection", {"kind": "project"})
+    st.session_state.setdefault("atlas_file_search", "")
+
+
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
     status = record.project.status
     if isinstance(status, ProjectStatus):
@@ -189,13 +263,12 @@ def _project_stage(record: ProjectWorkspaceRecord) -> str:
     return str(status).replace("_", " ").title()
 
 
-def _project_status(
-    record: ProjectWorkspaceRecord, context: dict[str, Any] | None
-) -> str:
+def _project_status(context: dict[str, Any] | None) -> str:
     if context is None:
         return "Unknown"
 
-    readiness = getattr(context.get("review"), "readiness", None)
+    review = context.get("review")
+    readiness = getattr(review, "readiness", None) if review is not None else None
     level = getattr(getattr(readiness, "readiness_level", None), "value", None)
     return _safe_text(level, "Needs Review").title()
 
@@ -224,7 +297,6 @@ def _build_record_from_context(
             metadata.get("name"),
             getattr(review, "name", None),
             context.get("sample_project_name"),
-            project_id,
         )
         or project_id
     )
@@ -299,8 +371,7 @@ def _load_context_for_record(record: ProjectWorkspaceRecord) -> dict[str, Any] |
 def _ensure_active_workspace(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    active_id = st.session_state.get("atlas_active_workspace_id")
-    if active_id:
+    if st.session_state.get("atlas_active_workspace_id"):
         return
 
     recent = workspace_service.list_recent_workspaces(limit=1)
@@ -314,7 +385,7 @@ def _ensure_active_workspace(
     st.session_state["atlas_active_workspace_id"] = record.workspace_id
 
 
-def _load_active_record(
+def _active_record(
     st: Any,
     workspace_service: ProjectWorkspaceService,
 ) -> ProjectWorkspaceRecord | None:
@@ -337,12 +408,12 @@ def _selector_options(recent: list[ProjectWorkspaceRecord]) -> list[SelectorOpti
             kind="recent",
             value=record.workspace_id,
         )
-        for record in recent[:15]
+        for record in recent[:20]
     )
     options.append(SelectorOption(label="Reference Projects", kind="category"))
     options.append(
         SelectorOption(
-            label="Reference Project · Music Academy of the West [Reference]",
+            label="Reference · Music Academy of the West [Reference]",
             kind="reference",
             value="maw-reference",
         )
@@ -358,21 +429,41 @@ def _apply_selector_choice(
     selected_label: str,
     options: list[SelectorOption],
 ) -> None:
-    choice = next((item for item in options if item.label == selected_label), None)
-    if choice is None:
+    option = next((item for item in options if item.label == selected_label), None)
+    if option is None:
         return
 
-    if choice.kind == "recent" and choice.value:
-        st.session_state["atlas_active_workspace_id"] = choice.value
+    if option.kind == "recent" and option.value:
+        st.session_state["atlas_active_workspace_id"] = option.value
         st.session_state["atlas_workspace_action"] = ""
-    elif choice.kind == "reference":
+    elif option.kind == "reference":
         context = build_reference_project_context(DEFAULT_MAW_REFERENCE_PACKAGE)
         record = _build_record_from_context(context)
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
         st.session_state["atlas_workspace_action"] = ""
-    elif choice.kind in {"create", "open"}:
-        st.session_state["atlas_workspace_action"] = choice.kind
+    elif option.kind == "create":
+        st.session_state["atlas_active_page"] = "Create New Project"
+    elif option.kind == "open":
+        st.session_state["atlas_active_page"] = "Open Existing Project"
+
+
+def _group_for_page(page: str) -> str:
+    if page in PROJECT_MANAGER_PAGES:
+        return "Project Manager"
+    if page in PROJECT_PAGES:
+        return "Project"
+    if page in BID_INTELLIGENCE_PAGES:
+        return "Bid Intelligence"
+    if page in REPORT_PAGES:
+        return "Reports"
+    if page in SETTINGS_PAGES:
+        return "Settings"
+    return "Workspace"
+
+
+def _breadcrumb(record: ProjectWorkspaceRecord, page: str) -> str:
+    return f"Projects / {record.project.name} / {_group_for_page(page)} / {page}"
 
 
 def _render_header(
@@ -381,209 +472,422 @@ def _render_header(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    recent = workspace_service.list_recent_workspaces(limit=25)
+    recent = workspace_service.list_recent_workspaces(limit=30)
     options = _selector_options(recent)
     labels = [item.label for item in options]
 
     if st.session_state.get("atlas_project_selector") not in labels:
         st.session_state["atlas_project_selector"] = labels[0]
 
-    st.markdown("<div class='atlas-shell-title'>Atlas</div>", unsafe_allow_html=True)
-    header_cols = st.columns([2.9, 2.8, 3.3, 0.9, 0.9, 1.2, 1.4, 1.8, 1.8])
+    st.markdown(
+        "<div class='atlas-title'>Atlas Workspace</div>", unsafe_allow_html=True
+    )
 
-    selected = header_cols[0].selectbox(
+    cols = st.columns([2.8, 1.2, 3.2, 1.0, 1.0, 1.2, 1.4, 1.6, 1.7])
+    selected = cols[0].selectbox(
         "Current Project",
         options=labels,
-        index=labels.index(st.session_state["atlas_project_selector"]),
         key="atlas_project_selector",
     )
     _apply_selector_choice(st, workspace_service, selected, options)
 
-    header_cols[1].selectbox(
-        "Layout",
-        options=["Desktop", "Tablet", "Mobile"],
-        key="atlas_layout_mode",
+    cols[1].selectbox(
+        "Layout", ["Desktop", "Tablet", "Mobile"], key="atlas_layout_mode"
     )
-
-    header_cols[2].text_input(
-        "Global Search", value="", placeholder="Search (coming soon)"
+    cols[2].text_input("Global Search", value="", placeholder="Search (placeholder)")
+    cols[3].button("Alerts", disabled=True, use_container_width=True)
+    cols[4].button("Settings", use_container_width=True)
+    cols[5].selectbox("Profile", ["User"], index=0)
+    cols[6].markdown(
+        f"<div class='atlas-muted'>Atlas v{__version__}</div>", unsafe_allow_html=True
     )
-    header_cols[3].button("Notifications", disabled=True, use_container_width=True)
-    header_cols[4].button("Settings", use_container_width=True)
-    header_cols[5].selectbox(
-        "Profile",
-        options=["User"],
-        index=0,
-        label_visibility="visible",
+    cols[7].markdown(
+        f"<div class='atlas-muted'>Stage: {_project_stage(record)}</div>",
+        unsafe_allow_html=True,
     )
-
-    version_text = f"Atlas v{__version__}"
-    stage_text = f"Stage: {_project_stage(record)}"
-    status_text = f"Status: {_project_status(record, context)}"
-    header_cols[6].markdown(
-        f"<div class='atlas-meta'>{version_text}</div>", unsafe_allow_html=True
-    )
-    header_cols[7].markdown(
-        f"<div class='atlas-meta'>{stage_text}</div>", unsafe_allow_html=True
-    )
-    header_cols[8].markdown(
-        f"<div class='atlas-meta'>{status_text}</div>", unsafe_allow_html=True
+    cols[8].markdown(
+        f"<div class='atlas-muted'>Status: {_project_status(context)}</div>",
+        unsafe_allow_html=True,
     )
 
 
-def _render_navigation_controls(st: Any, container: Any, mode: str) -> None:
-    container.markdown("### Navigation")
+def _nav_buttons(st: Any, host: Any, mode: str) -> None:
+    active_page = st.session_state.get("atlas_active_page", "Home")
 
-    active_page = st.session_state.get("atlas_active_page", "Overview")
+    host.markdown("### Navigation")
+    groups: list[tuple[str, list[str]]] = [
+        ("PROJECT MANAGER", PROJECT_MANAGER_PAGES),
+        ("PROJECT", PROJECT_PAGES),
+        ("BID INTELLIGENCE", BID_INTELLIGENCE_PAGES),
+        ("REPORTS", REPORT_PAGES),
+        ("SETTINGS", SETTINGS_PAGES),
+    ]
 
-    for group_name, pages in ACTIVE_NAVIGATION.items():
-        with container.expander(group_name, expanded=active_page in pages):
+    for group_name, pages in groups:
+        with host.expander(group_name, expanded=active_page in pages):
             for page in pages:
-                if container.button(
+                if host.button(
                     page,
                     key=f"atlas_nav_{mode}_{group_name}_{page}",
-                    use_container_width=True,
                     type="primary" if active_page == page else "secondary",
+                    use_container_width=True,
                 ):
                     st.session_state["atlas_active_page"] = page
 
-    for group_name, pages in DISABLED_NAVIGATION.items():
-        with container.expander(group_name, expanded=False):
-            for page in pages:
-                container.button(
-                    f"{page} · Coming Soon",
-                    disabled=True,
-                    key=f"atlas_nav_disabled_{mode}_{group_name}_{page}",
-                    use_container_width=True,
-                )
+    with host.expander("PROJECT LIFECYCLE", expanded=False):
+        for page in DISABLED_LIFECYCLE_PAGES:
+            host.button(
+                f"{page} · Coming Soon",
+                key=f"atlas_nav_disabled_{mode}_{page}",
+                disabled=True,
+                use_container_width=True,
+            )
 
 
 def _set_context_selection(st: Any, kind: str, data: dict[str, Any]) -> None:
     st.session_state["atlas_context_selection"] = {"kind": kind, "data": data}
 
 
-def _render_quick_actions(st: Any) -> None:
-    st.markdown("Quick Actions")
-    cols = st.columns(4)
-    if cols[0].button("Open Project Files", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Project Files"
-    if cols[1].button("Review Readiness", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Readiness"
-    if cols[2].button("Open Executive Summary", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Executive Summary"
-    if cols[3].button("Review RFIs", use_container_width=True):
-        st.session_state["atlas_active_page"] = "RFI Candidates"
+def _metric_card(st: Any, title: str, value: str) -> None:
+    st.markdown(
+        "<div class='atlas-card'>"
+        f"<div class='atlas-card-title'>{title}</div>"
+        f"<div class='atlas-card-value'>{value}</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_home_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
+    st.subheader("Home")
+    st.caption("Project-centric launch point for Atlas Workspace.")
+
+    recent = workspace_service.list_recent_workspaces(limit=8)
+    summary_cols = st.columns(4)
+    _metric_card(summary_cols[0], "Recent Projects", str(len(recent)))
+    _metric_card(summary_cols[1], "Reference Projects", "1")
+    _metric_card(summary_cols[2], "Active Modules", "Phase 2")
+    _metric_card(summary_cols[3], "Lifecycle Modules", "Coming Soon")
+
+    st.markdown("Quick Start")
+    quick_cols = st.columns(4)
+    if quick_cols[0].button("Projects", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Projects"
+    if quick_cols[1].button("Reference Projects", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Reference Projects"
+    if quick_cols[2].button("Create New Project", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Create New Project"
+    if quick_cols[3].button("Open Existing Project", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Open Existing Project"
+
+    if recent:
+        st.markdown("Recent Projects")
+        st.dataframe(
+            [
+                {
+                    "project": record.project.name,
+                    "id": record.project.project_id,
+                    "status": _project_stage(record),
+                    "source": record.source_label,
+                    "updated": record.updated_at,
+                }
+                for record in recent
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
+    st.subheader("Projects")
+    records = workspace_service.list_recent_workspaces(limit=200)
+    if not records:
+        st.info("No projects available yet.")
+        return
+
+    search = st.text_input("Search Projects", value="")
+    filtered = [
+        record
+        for record in records
+        if search.strip().lower() in record.project.name.lower()
+        or search.strip().lower() in record.project.project_id.lower()
+        or not search.strip()
+    ]
+
+    st.dataframe(
+        [
+            {
+                "project": record.project.name,
+                "project_id": record.project.project_id,
+                "source": record.source_label,
+                "status": _project_stage(record),
+                "updated": record.updated_at,
+            }
+            for record in filtered
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    labels = [
+        f"{record.project.name} · {record.project.project_id}" for record in filtered
+    ]
+    if labels:
+        selected_label = st.selectbox("Open Project", options=labels)
+        selected = filtered[labels.index(selected_label)]
+        if st.button("Open Selected Project", type="primary"):
+            st.session_state["atlas_active_workspace_id"] = selected.workspace_id
+            st.session_state["atlas_active_page"] = "Overview"
+            st.rerun()
+
+
+def _render_reference_projects_page(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    st.subheader("Reference Projects")
+    st.markdown(
+        "<span class='atlas-chip'>Reference</span> Music Academy of the West",
+        unsafe_allow_html=True,
+    )
+    st.caption("Canonical deterministic reference project for local review.")
+    if st.button("Open Music Academy of the West", type="primary"):
+        context = build_reference_project_context(DEFAULT_MAW_REFERENCE_PACKAGE)
+        record = _build_record_from_context(context)
+        workspace_service.save_record(record)
+        st.session_state["atlas_active_workspace_id"] = record.workspace_id
+        st.session_state["atlas_active_page"] = "Overview"
+        st.rerun()
+
+
+def _render_recent_projects_page(
+    st: Any, workspace_service: ProjectWorkspaceService
+) -> None:
+    st.subheader("Recent Projects")
+    records = workspace_service.list_recent_workspaces(limit=20)
+    if not records:
+        st.info("No recent projects yet.")
+        return
+
+    for record in records:
+        with st.container(border=True):
+            st.markdown(f"**{record.project.name}**")
+            st.caption(
+                f"{record.project.project_id} · {_project_stage(record)} · {record.source_label}"
+            )
+            if st.button(
+                "Open",
+                key=f"atlas_recent_open_{record.workspace_id}",
+                use_container_width=True,
+            ):
+                st.session_state["atlas_active_workspace_id"] = record.workspace_id
+                st.session_state["atlas_active_page"] = "Overview"
+                st.rerun()
+
+
+def _render_create_project_page(
+    st: Any, workspace_service: ProjectWorkspaceService
+) -> None:
+    st.subheader("Create New Project")
+    with st.form("atlas_create_project_form", clear_on_submit=False):
+        project_id = st.text_input("Project ID", key="atlas_new_project_id")
+        name = st.text_input("Project Name", key="atlas_new_project_name")
+        client = st.text_input("Owner / Client", key="atlas_new_project_client")
+        location = st.text_input("Location", key="atlas_new_project_location")
+        bid_date = st.text_input("Bid Date", key="atlas_new_project_bid_date")
+        submitted = st.form_submit_button("Create Project")
+
+    if not submitted:
+        return
+
+    if not project_id.strip() or not name.strip() or not client.strip():
+        st.error("Project ID, Project Name, and Owner / Client are required.")
+        return
+
+    record = workspace_service.create_manual_record(
+        project_id=project_id.strip(),
+        name=name.strip(),
+        client=client.strip(),
+        location=location.strip() or None,
+        bid_date=bid_date.strip() or None,
+    )
+    workspace_service.save_record(record)
+    st.session_state["atlas_active_workspace_id"] = record.workspace_id
+    st.session_state["atlas_active_page"] = "Overview"
+    st.success(f"Created project {record.project.name}.")
+    st.rerun()
+
+
+def _render_open_existing_page(
+    st: Any, workspace_service: ProjectWorkspaceService
+) -> None:
+    st.subheader("Open Existing Project")
+    path_text = st.text_input(
+        "Workspace file, intake snapshot, or package folder",
+        key="atlas_pending_open_path",
+        placeholder="outputs/project_workspaces/example/workspace.json",
+    )
+
+    if not st.button("Open Path", type="primary"):
+        return
+
+    path = Path(path_text).expanduser()
+    if not path.exists():
+        st.error(f"Path not found: {path}")
+        return
+
+    if path.is_dir() and (path / "workspace.json").exists():
+        record = workspace_service.load_record(path / "workspace.json")
+        workspace_service.save_record(record)
+        st.session_state["atlas_active_workspace_id"] = record.workspace_id
+        st.session_state["atlas_active_page"] = "Overview"
+        st.rerun()
+        return
+
+    if path.name == "workspace.json":
+        record = workspace_service.load_record(path)
+        workspace_service.save_record(record)
+        st.session_state["atlas_active_workspace_id"] = record.workspace_id
+        st.session_state["atlas_active_page"] = "Overview"
+        st.rerun()
+        return
+
+    if path.name == "intake_snapshot.json":
+        context = build_intake_review_context(path)
+        record = _build_record_from_context(context)
+        workspace_service.save_record(record)
+        st.session_state["atlas_active_workspace_id"] = record.workspace_id
+        st.session_state["atlas_active_page"] = "Overview"
+        st.rerun()
+        return
+
+    if path.is_dir():
+        context = build_reference_project_context(path)
+        record = _build_record_from_context(context)
+        workspace_service.save_record(record)
+        st.session_state["atlas_active_workspace_id"] = record.workspace_id
+        st.session_state["atlas_active_page"] = "Overview"
+        st.rerun()
+        return
+
+    st.error(
+        "Open a workspace.json file, intake_snapshot.json file, or package folder."
+    )
 
 
 def _render_overview_page(
     st: Any, record: ProjectWorkspaceRecord, context: dict[str, Any] | None
 ) -> None:
     st.subheader("Mission Control")
+
     review = context.get("review") if context else None
     readiness = getattr(review, "readiness", None) if review is not None else None
     import_summary = dict(context.get("import_summary") or {}) if context else {}
+    warnings = list(context.get("warnings") or []) if context else []
     metadata = (
         dict(getattr(context.get("intake_snapshot"), "metadata", {}) or {})
         if context
         else {}
     )
 
-    cards = st.columns(4)
-    cards[0].metric("Project Name", record.project.name)
-    cards[1].metric("Lifecycle Stage", _project_stage(record))
-    cards[2].metric("Project Status", _project_status(record, context))
-    cards[3].metric(
+    row1 = st.columns(4)
+    _metric_card(row1[0], "Project", _safe_text(record.project.name, "n/a"))
+    _metric_card(row1[1], "Lifecycle Stage", _project_stage(record))
+    _metric_card(row1[2], "Current Status", _status_chip(_project_status(context)))
+    _metric_card(
+        row1[3],
         "Import Status",
-        context.get("data_source_label", "Manual") if context else "Manual",
+        _safe_text(context.get("data_source_label") if context else "Manual", "Manual"),
     )
 
-    cards2 = st.columns(4)
-    cards2[0].metric(
-        "Readiness Score",
-        (
-            f"{getattr(readiness, 'readiness_score', None):.2f}"
-            if getattr(readiness, "readiness_score", None) is not None
-            else "n/a"
-        ),
+    row2 = st.columns(4)
+    readiness_score = getattr(readiness, "readiness_score", None)
+    readiness_level = _safe_text(
+        getattr(getattr(readiness, "readiness_level", None), "value", None),
+        "n/a",
+    ).title()
+    _metric_card(
+        row2[0],
+        "Readiness",
+        f"{readiness_score:.2f}" if readiness_score is not None else "n/a",
     )
-    cards2[1].metric(
-        "Readiness Level",
-        _safe_text(
-            getattr(getattr(readiness, "readiness_level", None), "value", None), "n/a"
-        ).title(),
+    _metric_card(row2[1], "Readiness Level", _status_chip(readiness_level))
+    _metric_card(
+        row2[2], "Current Confidence", str(getattr(review, "confidence", "n/a"))
     )
-    cards2[2].metric("Confidence", str(getattr(review, "confidence", "n/a")))
-    cards2[3].metric(
+    _metric_card(
+        row2[3],
         "Top Risks",
         str(len(getattr(review, "estimator_risks", []) or [])) if review else "0",
     )
 
-    profile_rows = [
-        (
-            "Owner",
-            _safe_text(
+    metadata_rows = [
+        {
+            "field": "Owner",
+            "value": _safe_text(
                 _first_text(
                     metadata.get("owner"), metadata.get("client"), record.project.client
-                )
+                ),
+                "n/a",
             ),
-        ),
-        ("Architect", _safe_text(metadata.get("architect"))),
-        (
-            "Consultants",
-            (
-                _safe_text(metadata.get("consultants"), "n/a")
-                if metadata.get("consultants")
-                else "n/a"
-            ),
-        ),
-        (
-            "Project Number",
-            _safe_text(
+        },
+        {
+            "field": "Architect",
+            "value": _safe_text(metadata.get("architect"), "n/a"),
+        },
+        {
+            "field": "Consultants",
+            "value": _safe_text(metadata.get("consultants"), "n/a"),
+        },
+        {
+            "field": "Project Number",
+            "value": _safe_text(
                 _first_text(
                     metadata.get("project_number"),
                     metadata.get("project_id"),
                     record.project.project_id,
-                )
+                ),
+                "n/a",
             ),
-        ),
-        ("Issue Date", _safe_text(metadata.get("issue_date"))),
-        (
-            "Bid Date",
-            _safe_text(_first_text(metadata.get("bid_date"), record.project.bid_date)),
-        ),
+        },
+        {
+            "field": "Issue Date",
+            "value": _safe_text(metadata.get("issue_date"), "n/a"),
+        },
+        {
+            "field": "Bid Date",
+            "value": _safe_text(
+                _first_text(metadata.get("bid_date"), record.project.bid_date), "n/a"
+            ),
+        },
     ]
-    st.dataframe(
-        [{"field": field, "value": value} for field, value in profile_rows],
-        use_container_width=True,
-        hide_index=True,
-    )
+    st.dataframe(metadata_rows, use_container_width=True, hide_index=True)
 
-    risk_rows = [
-        {"risk": item.get("title", "risk"), "level": item.get("risk_level", "unknown")}
-        for item in _to_rows(list(getattr(review, "estimator_risks", []) or []))[:5]
-    ]
-    if risk_rows:
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.markdown("Top Blockers")
+        blockers = list(getattr(readiness, "blocking_issues", []) or [])
+        if blockers:
+            st.dataframe(
+                [{"blocker": item} for item in blockers[:8]],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No active blockers.")
+
         st.markdown("Top Risks")
-        st.dataframe(risk_rows, use_container_width=True, hide_index=True)
+        risks = (
+            _to_rows(list(getattr(review, "estimator_risks", []) or []))
+            if review
+            else []
+        )
+        if risks:
+            st.dataframe(risks[:8], use_container_width=True, hide_index=True)
+        else:
+            st.info("No active risks.")
 
-    recent_activity = [
-        {
-            "event": "Workspace opened",
-            "timestamp": record.last_opened_at or record.updated_at,
-        },
-        {
-            "event": "Last intake",
-            "timestamp": _safe_text(import_summary.get("package_location"), "n/a"),
-        },
-        {
-            "event": "Last review",
-            "timestamp": record.updated_at,
-        },
-    ]
-    st.markdown("Recent Activity")
-    st.dataframe(recent_activity, use_container_width=True, hide_index=True)
-
-    if import_summary:
+    with col_b:
         st.markdown("Import Summary")
         st.dataframe(
             [
@@ -612,13 +916,49 @@ def _render_overview_page(
             hide_index=True,
         )
 
-    _render_quick_actions(st)
+        st.markdown("Current Warnings")
+        if warnings:
+            st.dataframe(
+                [{"warning": item} for item in warnings[:8]],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No warnings.")
+
+    st.markdown("Recent Activity")
+    st.dataframe(
+        [
+            {
+                "event": "Workspace opened",
+                "timestamp": record.last_opened_at or record.updated_at,
+            },
+            {
+                "event": "Last intake",
+                "timestamp": _safe_text(import_summary.get("package_location"), "n/a"),
+            },
+            {"event": "Last review", "timestamp": record.updated_at},
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("Quick Actions")
+    quick = st.columns(4)
+    if quick[0].button("Project Files", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Project Files"
+    if quick[1].button("Readiness", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Readiness"
+    if quick[2].button("Executive Summary", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Executive Summary"
+    if quick[3].button("RFI Candidates", use_container_width=True):
+        st.session_state["atlas_active_page"] = "RFI Candidates"
 
 
 def _render_executive_summary_page(st: Any, context: dict[str, Any] | None) -> None:
     st.subheader("Executive Summary")
     if context is None:
-        st.info("No review context available for this project.")
+        st.info("No review context available.")
         return
 
     review = context.get("review")
@@ -626,28 +966,46 @@ def _render_executive_summary_page(st: Any, context: dict[str, Any] | None) -> N
     readiness = getattr(review, "readiness", None) if review is not None else None
     import_summary = dict(context.get("import_summary") or {})
 
-    row1 = st.columns(3)
-    row1[0].metric(
+    cards = st.columns(3)
+    _metric_card(
+        cards[0],
         "Overall Health",
-        _safe_text(
-            getattr(getattr(readiness, "readiness_level", None), "value", None), "n/a"
-        ).title(),
+        _status_chip(
+            _safe_text(
+                getattr(getattr(readiness, "readiness_level", None), "value", None),
+                "n/a",
+            ).title()
+        ),
     )
-    row1[1].metric(
-        "Critical Risks", str(len(getattr(review, "estimator_risks", []) or []))
+    _metric_card(
+        cards[1],
+        "Critical Risks",
+        str(len(getattr(review, "estimator_risks", []) or [])),
     )
-    row1[2].metric(
-        "High Priority RFIs", str(len(getattr(review, "rfi_candidates", []) or []))
-    )
-
-    row2 = st.columns(3)
-    row2[0].metric(
+    _metric_card(
+        cards[2],
         "Labor Confidence",
         str(getattr(getattr(review, "labor_estimate", None), "confidence", "n/a")),
     )
-    row2[1].metric("Scope Gaps", str(getattr(review, "scope_gap_count", lambda: 0)()))
-    row2[2].metric(
-        "Documents Requiring OCR", str(import_summary.get("documents_requiring_ocr", 0))
+
+    cards2 = st.columns(4)
+    _metric_card(
+        cards2[0], "Scope Gaps", str(getattr(review, "scope_gap_count", lambda: 0)())
+    )
+    _metric_card(
+        cards2[1],
+        "Documents Requiring OCR",
+        str(import_summary.get("documents_requiring_ocr", 0)),
+    )
+    _metric_card(
+        cards2[2],
+        "Priority RFIs",
+        str(len(getattr(review, "rfi_candidates", []) or [])),
+    )
+    _metric_card(
+        cards2[3],
+        "Recommended Actions",
+        str(len(list(getattr(brief, "prioritized_reviewer_actions", []) or []))),
     )
 
     st.markdown("Critical Risks")
@@ -672,7 +1030,7 @@ def _files_by_folder(context: dict[str, Any] | None) -> dict[str, list[dict[str,
         "Schedules": [],
         "Addenda": [],
         "Images": [],
-        "Other": [],
+        "Other Documents": [],
     }
     if context is None:
         return folder_map
@@ -696,24 +1054,26 @@ def _files_by_folder(context: dict[str, Any] | None) -> dict[str, list[dict[str,
         elif group == "images":
             folder = "Images"
         else:
-            folder = "Other"
+            folder = "Other Documents"
 
         file_name = str(item.get("file_name") or "unknown")
-        ref_count = sum(
+        references = sum(
             1
             for ref in source_refs
             if Path(str(ref.get("source_file") or "")).name == file_name
         )
-        warnings = item.get("warnings") or []
+        warnings = list(item.get("warnings") or [])
+
         folder_map[folder].append(
             {
                 "filename": file_name,
-                "revision": "unknown",
+                "revision": _safe_text(item.get("revision"), "unknown"),
                 "status": _safe_text(item.get("status"), "unknown"),
                 "pages": item.get("total_pages"),
-                "references": ref_count,
-                "warnings": len(list(warnings)),
-                "group": folder,
+                "references": references,
+                "warnings": len(warnings),
+                "folder": folder,
+                "group": group,
             }
         )
 
@@ -758,33 +1118,59 @@ def _render_project_files_page(
     workspace_service: ProjectWorkspaceService,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader("Project Files")
+    st.subheader("Project Explorer")
     _render_upload_panel(st, workspace_service)
 
     folders = _files_by_folder(context)
     folder_name = st.selectbox("Folder", options=list(folders.keys()))
-    records = folders.get(folder_name, [])
+    records = list(folders.get(folder_name, []))
 
-    if records:
-        st.dataframe(records, use_container_width=True, hide_index=True)
-        file_names = [str(item.get("filename") or "") for item in records]
-        selected_file = st.selectbox(
-            "Select file",
-            options=file_names,
-            key=f"atlas_file_selector_{folder_name}",
-        )
-        selected = next(
-            (item for item in records if str(item.get("filename")) == selected_file),
-            None,
-        )
-        if selected is not None:
-            _set_context_selection(
-                st,
-                "file",
-                {"folder": folder_name, "file": selected},
-            )
-    else:
-        st.info("No files found in this folder.")
+    search = st.text_input(
+        "Search files",
+        key="atlas_file_search",
+        value=st.session_state.get("atlas_file_search", ""),
+    )
+    status_options = sorted({item["status"] for item in records})
+    status_filter = st.multiselect(
+        "Filter by status", options=status_options, default=[]
+    )
+    sort_field = st.selectbox(
+        "Sort by", options=["filename", "status", "pages", "warnings", "references"]
+    )
+    sort_dir = (
+        st.selectbox("Order", options=["Ascending", "Descending"]) == "Descending"
+    )
+
+    filtered = [
+        item
+        for item in records
+        if (search.strip().lower() in item["filename"].lower() or not search.strip())
+        and (item["status"] in status_filter if status_filter else True)
+    ]
+    filtered.sort(key=lambda item: str(item.get(sort_field) or ""), reverse=sort_dir)
+
+    display_rows = [
+        {
+            "filename": item["filename"],
+            "revision": item["revision"],
+            "status": _status_chip(item["status"]),
+            "pages": item["pages"],
+            "references": item["references"],
+            "warnings": item["warnings"],
+        }
+        for item in filtered
+    ]
+
+    if not display_rows:
+        st.info("No files match the current filters.")
+        return
+
+    st.dataframe(display_rows, use_container_width=True, hide_index=True)
+
+    file_labels = [item["filename"] for item in filtered]
+    selected_file = st.selectbox("Select file", options=file_labels)
+    selected = next(item for item in filtered if item["filename"] == selected_file)
+    _set_context_selection(st, "file", {"folder": folder_name, "file": selected})
 
 
 def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
@@ -803,9 +1189,8 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
             )
             for item in rows
         ]
-        selected = st.selectbox("Drawing", options=labels)
-        item = rows[labels.index(selected)]
-        _set_context_selection(st, "drawing", item)
+        selected = st.selectbox("Select Drawing", options=labels)
+        _set_context_selection(st, "drawing", rows[labels.index(selected)])
         return
 
     discovered = list(
@@ -815,11 +1200,11 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
     )
     if discovered:
         st.dataframe(
-            [{"drawing_file": name} for name in discovered],
+            [{"drawing_file": item} for item in discovered],
             use_container_width=True,
             hide_index=True,
         )
-        selected = st.selectbox("Drawing file", options=discovered)
+        selected = st.selectbox("Select Drawing File", options=discovered)
         _set_context_selection(st, "drawing", {"source_file": selected})
     else:
         st.info("No drawings discovered.")
@@ -842,24 +1227,25 @@ def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None
             )
             for item in rows
         ]
-        selected = st.selectbox("Specification", options=labels)
+        selected = st.selectbox("Select Specification", options=labels)
         _set_context_selection(st, "specification", rows[labels.index(selected)])
-    else:
-        discovered = list(
-            (getattr(context.get("intake_snapshot"), "discovered_files", {}) or {}).get(
-                "specifications", []
-            )
+        return
+
+    discovered = list(
+        (getattr(context.get("intake_snapshot"), "discovered_files", {}) or {}).get(
+            "specifications", []
         )
-        if discovered:
-            st.dataframe(
-                [{"specification_file": name} for name in discovered],
-                use_container_width=True,
-                hide_index=True,
-            )
-            selected = st.selectbox("Specification file", options=discovered)
-            _set_context_selection(st, "specification", {"source_file": selected})
-        else:
-            st.info("No specifications discovered.")
+    )
+    if discovered:
+        st.dataframe(
+            [{"specification_file": item} for item in discovered],
+            use_container_width=True,
+            hide_index=True,
+        )
+        selected = st.selectbox("Select Specification File", options=discovered)
+        _set_context_selection(st, "specification", {"source_file": selected})
+    else:
+        st.info("No specifications discovered.")
 
 
 def _render_equipment_page(st: Any, context: dict[str, Any] | None) -> None:
@@ -875,7 +1261,7 @@ def _render_equipment_page(st: Any, context: dict[str, Any] | None) -> None:
         f"{_safe_text(item.get('equipment_id'), 'item')} · {_safe_text(item.get('description'), '')}"
         for item in rows
     ]
-    selected = st.selectbox("Equipment", options=labels)
+    selected = st.selectbox("Select Equipment", options=labels)
     _set_context_selection(st, "equipment", rows[labels.index(selected)])
 
 
@@ -883,16 +1269,17 @@ def _render_systems_page(st: Any, context: dict[str, Any] | None) -> None:
     st.subheader("Systems")
     review = context.get("review") if context else None
     rows = _to_rows(list(getattr(review, "systems", []) or []))
-    if rows:
-        st.dataframe(rows, use_container_width=True, hide_index=True)
-        labels = [
-            f"{_safe_text(item.get('system_id'), 'system')} · {_safe_text(item.get('name'), '')}"
-            for item in rows
-        ]
-        selected = st.selectbox("System", options=labels)
-        _set_context_selection(st, "system", rows[labels.index(selected)])
-    else:
+    if not rows:
         st.info("No systems detected.")
+        return
+
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+    labels = [
+        f"{_safe_text(item.get('system_id'), 'system')} · {_safe_text(item.get('name'), '')}"
+        for item in rows
+    ]
+    selected = st.selectbox("Select System", options=labels)
+    _set_context_selection(st, "system", rows[labels.index(selected)])
 
 
 def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None:
@@ -902,13 +1289,14 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
     readiness = getattr(review, "readiness", None) if review is not None else None
     labor = getattr(review, "labor_estimate", None) if review is not None else None
 
+    st.subheader(page)
+
     if page == "Readiness":
-        st.subheader("Readiness")
         if readiness is None:
             st.info("No readiness assessment available.")
             return
         st.write(getattr(readiness, "message", ""))
-        section_scores = getattr(readiness, "section_scores", {}) or {}
+        section_scores = dict(getattr(readiness, "section_scores", {}) or {})
         if section_scores:
             st.dataframe(
                 [
@@ -937,7 +1325,6 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         return
 
     if page == "Estimator Brief":
-        st.subheader("Estimator Brief")
         if brief is None:
             st.info("No estimator brief available.")
             return
@@ -949,7 +1336,6 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         return
 
     if page == "RFI Candidates":
-        st.subheader("RFI Candidates")
         rows = (
             _to_rows(list(getattr(review, "rfi_candidates", []) or []))
             if review
@@ -962,7 +1348,6 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         return
 
     if page == "Labor Estimate":
-        st.subheader("Labor Estimate")
         if labor is None:
             st.info("No labor estimate available.")
             return
@@ -972,10 +1357,7 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
                     "field": "Total Labor Hours Expected",
                     "value": getattr(labor, "total_labor_hours_expected", None),
                 },
-                {
-                    "field": "Confidence",
-                    "value": getattr(labor, "confidence", None),
-                },
+                {"field": "Confidence", "value": getattr(labor, "confidence", None)},
             ],
             use_container_width=True,
             hide_index=True,
@@ -986,7 +1368,6 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         return
 
     if page == "Revision Comparison":
-        st.subheader("Revision Comparison")
         if revision is None:
             st.info("No revision comparison available.")
             return
@@ -1011,7 +1392,6 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         return
 
     if page == "Engineering Assumptions":
-        st.subheader("Engineering Assumptions")
         rows = (
             _to_rows(list(getattr(review, "engineering_assumptions", []) or []))
             if review
@@ -1024,7 +1404,6 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         return
 
     if page == "Evidence":
-        st.subheader("Evidence")
         brief_refs = list(getattr(brief, "evidence_refs", []) or []) if brief else []
         if brief_refs:
             st.markdown("Brief Evidence")
@@ -1050,98 +1429,207 @@ def _render_reports_page(st: Any, page: str) -> None:
     st.subheader(page)
     if page == "Reports":
         st.info(
-            "Reporting workspace is planned. Core bid intelligence outputs remain available in current sections."
+            "Reporting module scaffolded. Use active Phase 2 pages for current outputs."
         )
     else:
         st.info(
-            "Export workspace is planned. Use current deterministic exports from existing workflows."
+            "Exports module scaffolded. Current deterministic export services remain unchanged."
         )
 
 
 def _render_settings_page(st: Any, page: str) -> None:
     st.subheader(page)
     if page == "Project Settings":
-        st.info(
-            "Project settings controls are scaffolded in Workspace v1 and will expand in later phases."
-        )
+        st.info("Project settings scaffold is available for future expansion.")
     else:
-        st.info("Application settings controls are scaffolded in Workspace v1.")
+        st.info("Application settings scaffold is available for future expansion.")
 
 
-def _render_workspace_action_panel(
-    st: Any, workspace_service: ProjectWorkspaceService
-) -> None:
-    action = st.session_state.get("atlas_workspace_action", "")
-    if action == "create":
-        with st.expander("Create New Project", expanded=True):
-            with st.form("atlas_create_project_form", clear_on_submit=False):
-                project_id = st.text_input("Project ID", key="atlas_new_project_id")
-                name = st.text_input("Project Name", key="atlas_new_project_name")
-                client = st.text_input("Owner / Client", key="atlas_new_project_client")
-                location = st.text_input("Location", key="atlas_new_project_location")
-                bid_date = st.text_input("Bid Date", key="atlas_new_project_bid_date")
-                submitted = st.form_submit_button("Create")
+def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
+    st.markdown("### Context Panel")
+    selection = dict(
+        st.session_state.get("atlas_context_selection") or {"kind": "project"}
+    )
+    kind = str(selection.get("kind") or "project")
+    data = dict(selection.get("data") or {})
 
-            if submitted:
-                if not project_id.strip() or not name.strip() or not client.strip():
-                    st.error(
-                        "Project ID, Project Name, and Owner / Client are required."
-                    )
-                else:
-                    record = workspace_service.create_manual_record(
-                        project_id=project_id.strip(),
-                        name=name.strip(),
-                        client=client.strip(),
-                        location=location.strip() or None,
-                        bid_date=bid_date.strip() or None,
-                    )
-                    workspace_service.save_record(record)
-                    st.session_state["atlas_active_workspace_id"] = record.workspace_id
-                    st.session_state["atlas_workspace_action"] = ""
-                    st.success(f"Created project workspace for {record.project.name}.")
-                    st.rerun()
+    review = context.get("review") if context else None
 
-    if action == "open":
-        with st.expander("Open Existing Project", expanded=True):
-            path_text = st.text_input(
-                "Workspace file, snapshot file, or project folder",
-                key="atlas_pending_open_path",
-                placeholder="outputs/project_workspaces/example/workspace.json",
+    if kind == "drawing":
+        st.markdown("#### Drawing")
+        st.dataframe([data], use_container_width=True, hide_index=True)
+
+        if review is not None:
+            equipment = [
+                item
+                for item in _to_rows(list(getattr(review, "equipment", []) or []))
+                if _safe_text(item.get("drawing_reference"), "").strip()
+            ]
+            if equipment:
+                st.markdown("Equipment")
+                st.dataframe(equipment[:8], use_container_width=True, hide_index=True)
+
+            specs = _to_rows(list(getattr(review, "specification_sections", []) or []))
+            if specs:
+                st.markdown("Specifications")
+                st.dataframe(specs[:8], use_container_width=True, hide_index=True)
+
+            rfi_rows = _to_rows(list(getattr(review, "rfi_candidates", []) or []))
+            if rfi_rows:
+                st.markdown("RFIs")
+                st.dataframe(rfi_rows[:5], use_container_width=True, hide_index=True)
+
+        st.markdown("Revision History")
+        st.info("Revision history timeline is coming soon.")
+
+        source_refs = (
+            _to_rows(
+                list(
+                    getattr(context.get("intake_snapshot"), "source_references", [])
+                    or []
+                )
             )
-            if st.button("Open Path", use_container_width=True):
-                path = Path(path_text).expanduser()
-                if not path.exists():
-                    st.error(f"Path not found: {path}")
-                elif path.is_dir() and (path / "workspace.json").exists():
-                    record = workspace_service.load_record(path / "workspace.json")
-                    workspace_service.save_record(record)
-                    st.session_state["atlas_active_workspace_id"] = record.workspace_id
-                    st.session_state["atlas_workspace_action"] = ""
-                    st.rerun()
-                elif path.name == "workspace.json":
-                    record = workspace_service.load_record(path)
-                    workspace_service.save_record(record)
-                    st.session_state["atlas_active_workspace_id"] = record.workspace_id
-                    st.session_state["atlas_workspace_action"] = ""
-                    st.rerun()
-                elif path.name == "intake_snapshot.json":
-                    context = build_intake_review_context(path)
-                    record = _build_record_from_context(context)
-                    workspace_service.save_record(record)
-                    st.session_state["atlas_active_workspace_id"] = record.workspace_id
-                    st.session_state["atlas_workspace_action"] = ""
-                    st.rerun()
-                elif path.is_dir():
-                    context = build_reference_project_context(path)
-                    record = _build_record_from_context(context)
-                    workspace_service.save_record(record)
-                    st.session_state["atlas_active_workspace_id"] = record.workspace_id
-                    st.session_state["atlas_workspace_action"] = ""
-                    st.rerun()
-                else:
-                    st.error(
-                        "Open a workspace.json file, an intake_snapshot.json file, or a project folder."
-                    )
+            if context
+            else []
+        )
+        if source_refs:
+            st.markdown("Evidence")
+            st.dataframe(source_refs[:8], use_container_width=True, hide_index=True)
+        return
+
+    if kind == "specification":
+        st.markdown("#### Specification")
+        st.dataframe([data], use_container_width=True, hide_index=True)
+
+        if review is not None:
+            drawings = _to_rows(list(getattr(review, "drawing_sheets", []) or []))
+            if drawings:
+                st.markdown("Referenced Drawings")
+                st.dataframe(drawings[:8], use_container_width=True, hide_index=True)
+
+            equipment = [
+                item
+                for item in _to_rows(list(getattr(review, "equipment", []) or []))
+                if _safe_text(item.get("specification_reference"), "").strip()
+            ]
+            if equipment:
+                st.markdown("Equipment")
+                st.dataframe(equipment[:8], use_container_width=True, hide_index=True)
+
+            systems = _to_rows(list(getattr(review, "systems", []) or []))
+            if systems:
+                st.markdown("Systems")
+                st.dataframe(systems[:8], use_container_width=True, hide_index=True)
+
+            rfi_rows = _to_rows(list(getattr(review, "rfi_candidates", []) or []))
+            if rfi_rows:
+                st.markdown("Related RFIs")
+                st.dataframe(rfi_rows[:5], use_container_width=True, hide_index=True)
+        return
+
+    if kind == "equipment":
+        st.markdown("#### Equipment")
+        st.dataframe([data], use_container_width=True, hide_index=True)
+        st.dataframe(
+            [
+                {
+                    "field": "Manufacturer",
+                    "value": _safe_text(data.get("manufacturer"), "n/a"),
+                },
+                {"field": "System", "value": _safe_text(data.get("system_id"), "n/a")},
+                {
+                    "field": "Drawing Reference",
+                    "value": _safe_text(data.get("drawing_reference"), "n/a"),
+                },
+                {
+                    "field": "Specification Reference",
+                    "value": _safe_text(data.get("specification_reference"), "n/a"),
+                },
+                {
+                    "field": "Risk",
+                    "value": "Derived from readiness and estimator risk outputs",
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        return
+
+    if kind == "file":
+        file_item = dict(data.get("file") or {})
+        folder = _safe_text(data.get("folder"), "Unknown")
+        st.markdown(f"#### {file_item.get('filename', 'File')}")
+        st.dataframe(
+            [
+                {"field": "Folder", "value": folder},
+                {
+                    "field": "Revision",
+                    "value": _safe_text(file_item.get("revision"), "unknown"),
+                },
+                {
+                    "field": "Status",
+                    "value": _status_chip(
+                        _safe_text(file_item.get("status"), "unknown")
+                    ),
+                },
+                {"field": "Pages", "value": file_item.get("pages")},
+                {"field": "References", "value": file_item.get("references")},
+                {"field": "Warnings", "value": file_item.get("warnings")},
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        if folder == "Drawings":
+            _set_context_selection(st, "drawing", file_item)
+            st.info(
+                "Drawing context available. Select Drawings page for structured records."
+            )
+        elif folder == "Specifications":
+            _set_context_selection(st, "specification", file_item)
+            st.info(
+                "Specification context available. Select Specifications page for structured records."
+            )
+        return
+
+    st.markdown("#### Project")
+    if context is None:
+        st.info(
+            "Select a drawing, specification, equipment item, or file to inspect context."
+        )
+        return
+
+    st.dataframe(
+        [
+            {
+                "field": "Data Source",
+                "value": _safe_text(context.get("data_source_label"), "Manual"),
+            },
+            {
+                "field": "Package Location",
+                "value": _safe_text(context.get("package_location"), "n/a"),
+            },
+            {"field": "Warnings", "value": len(list(context.get("warnings") or []))},
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+def _render_status_bar(
+    st: Any, record: ProjectWorkspaceRecord, context: dict[str, Any] | None
+) -> None:
+    st.markdown("<div class='atlas-statusbar'></div>", unsafe_allow_html=True)
+    intake = _safe_text(context.get("package_location") if context else None, "n/a")
+    review_time = record.updated_at
+    commit = _current_commit()
+
+    cols = st.columns(5)
+    cols[0].caption(f"Current project: {record.project.name}")
+    cols[1].caption(f"Lifecycle stage: {_project_stage(record)}")
+    cols[2].caption(f"Last intake: {intake}")
+    cols[3].caption(f"Last review: {review_time}")
+    cols[4].caption(f"Atlas v{__version__} · commit {commit}")
 
 
 def _render_main_content(
@@ -1150,10 +1638,21 @@ def _render_main_content(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    _render_workspace_action_panel(st, workspace_service)
+    page = st.session_state.get("atlas_active_page", "Home")
 
-    page = st.session_state.get("atlas_active_page", "Overview")
-    if page == "Overview":
+    if page == "Home":
+        _render_home_page(st, workspace_service)
+    elif page == "Projects":
+        _render_projects_page(st, workspace_service)
+    elif page == "Reference Projects":
+        _render_reference_projects_page(st, workspace_service)
+    elif page == "Recent Projects":
+        _render_recent_projects_page(st, workspace_service)
+    elif page == "Create New Project":
+        _render_create_project_page(st, workspace_service)
+    elif page == "Open Existing Project":
+        _render_open_existing_page(st, workspace_service)
+    elif page == "Overview":
         _render_overview_page(st, record, context)
     elif page == "Executive Summary":
         _render_executive_summary_page(st, context)
@@ -1167,149 +1666,12 @@ def _render_main_content(
         _render_equipment_page(st, context)
     elif page == "Systems":
         _render_systems_page(st, context)
-    elif page in ACTIVE_NAVIGATION["BID INTELLIGENCE"]:
+    elif page in BID_INTELLIGENCE_PAGES:
         _render_bid_page(st, page, context)
-    elif page in ACTIVE_NAVIGATION["REPORTS"]:
+    elif page in REPORT_PAGES:
         _render_reports_page(st, page)
-    elif page in ACTIVE_NAVIGATION["SETTINGS"]:
+    elif page in SETTINGS_PAGES:
         _render_settings_page(st, page)
-
-
-def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
-    st.markdown("<div class='atlas-context'>", unsafe_allow_html=True)
-    st.markdown("### Context Panel")
-
-    selection = dict(
-        st.session_state.get("atlas_context_selection") or {"kind": "project"}
-    )
-    kind = str(selection.get("kind") or "project")
-    data = dict(selection.get("data") or {})
-
-    review = context.get("review") if context else None
-
-    if kind == "file":
-        file_data = dict(data.get("file") or {})
-        st.markdown(f"#### {_safe_text(file_data.get('filename'))}")
-        st.dataframe(
-            [
-                {"field": "Folder", "value": _safe_text(file_data.get("group"))},
-                {"field": "Status", "value": _safe_text(file_data.get("status"))},
-                {"field": "Pages", "value": file_data.get("pages")},
-                {"field": "References", "value": file_data.get("references")},
-                {"field": "Warnings", "value": file_data.get("warnings")},
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        if str(file_data.get("group", "")).lower() == "drawings" and review is not None:
-            equipment = [
-                item
-                for item in _to_rows(list(getattr(review, "equipment", []) or []))
-                if _safe_text(item.get("drawing_reference"), "").lower() != ""
-            ]
-            if equipment:
-                st.markdown("Equipment")
-                st.dataframe(equipment[:8], use_container_width=True, hide_index=True)
-
-        st.markdown("Revision History")
-        st.info("Revision timeline will be added in a future phase.")
-
-    elif kind == "drawing":
-        st.markdown("#### Drawing")
-        st.dataframe([data], use_container_width=True, hide_index=True)
-        if review is not None:
-            related_equipment = [
-                item
-                for item in _to_rows(list(getattr(review, "equipment", []) or []))
-                if _safe_text(item.get("drawing_reference"), "").strip()
-            ]
-            if related_equipment:
-                st.markdown("Equipment")
-                st.dataframe(
-                    related_equipment[:8], use_container_width=True, hide_index=True
-                )
-
-            st.markdown("RFIs")
-            rfi_rows = _to_rows(list(getattr(review, "rfi_candidates", []) or []))
-            if rfi_rows:
-                st.dataframe(rfi_rows[:5], use_container_width=True, hide_index=True)
-
-    elif kind == "specification":
-        st.markdown("#### Specification")
-        st.dataframe([data], use_container_width=True, hide_index=True)
-        if review is not None:
-            related = [
-                item
-                for item in _to_rows(list(getattr(review, "equipment", []) or []))
-                if _safe_text(item.get("specification_reference"), "").strip()
-            ]
-            if related:
-                st.markdown("Equipment")
-                st.dataframe(related[:8], use_container_width=True, hide_index=True)
-
-            systems = _to_rows(list(getattr(review, "systems", []) or []))
-            if systems:
-                st.markdown("Systems")
-                st.dataframe(systems[:8], use_container_width=True, hide_index=True)
-
-    elif kind == "equipment":
-        st.markdown("#### Equipment")
-        st.dataframe([data], use_container_width=True, hide_index=True)
-        st.markdown("Drawing References")
-        st.write(_safe_text(data.get("drawing_reference"), "n/a"))
-        st.markdown("Specifications")
-        st.write(_safe_text(data.get("specification_reference"), "n/a"))
-        st.markdown("Manufacturer")
-        st.write(_safe_text(data.get("manufacturer"), "n/a"))
-        st.markdown("Risks")
-        st.write("Risk links are derived from readiness and estimator risk outputs.")
-
-    else:
-        st.markdown("#### Project")
-        if context is None:
-            st.info("Select a project element to view contextual details.")
-        else:
-            st.dataframe(
-                [
-                    {
-                        "field": "Data Source",
-                        "value": _safe_text(context.get("data_source_label"), "Manual"),
-                    },
-                    {
-                        "field": "Package Location",
-                        "value": _safe_text(context.get("package_location"), "n/a"),
-                    },
-                    {
-                        "field": "Warnings",
-                        "value": len(list(context.get("warnings") or [])),
-                    },
-                ],
-                use_container_width=True,
-                hide_index=True,
-            )
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-def _render_status_bar(
-    st: Any,
-    record: ProjectWorkspaceRecord,
-    context: dict[str, Any] | None,
-) -> None:
-    st.markdown("<div class='atlas-statusbar'></div>", unsafe_allow_html=True)
-    last_intake = _safe_text(
-        context.get("package_location") if context else None, "n/a"
-    )
-    last_review = record.updated_at
-    commit = _current_commit()
-
-    cols = st.columns(5)
-    cols[0].caption(f"Current project: {record.project.name}")
-    cols[1].caption(f"Lifecycle stage: {_project_stage(record)}")
-    cols[2].caption(f"Last intake: {last_intake}")
-    cols[3].caption(f"Last review: {last_review}")
-    cols[4].caption(f"Atlas v{__version__} · commit {commit}")
 
 
 def _render_shell(
@@ -1320,41 +1682,50 @@ def _render_shell(
 ) -> None:
     _render_header(st, workspace_service, record, context)
 
+    current_page = st.session_state.get("atlas_active_page", "Home")
+    st.markdown(
+        f"<div class='atlas-breadcrumb'>{_breadcrumb(record, current_page)}</div>",
+        unsafe_allow_html=True,
+    )
+
     layout_mode = st.session_state.get("atlas_layout_mode", "Desktop")
-    nav_collapsed = bool(st.session_state.get("atlas_navigation_collapsed", False))
+    collapsed = bool(st.session_state.get("atlas_navigation_collapsed", False))
 
     if layout_mode == "Desktop":
-        nav_col, main_col, context_col = st.columns([2.4, 6.2, 2.4])
+        nav_col, main_col, context_col = st.columns([2.3, 6.4, 2.3])
         with nav_col:
-            _render_navigation_controls(st, st, "desktop")
+            _nav_buttons(st, st, "desktop")
         with main_col:
             _render_main_content(st, workspace_service, record, context)
         with context_col:
             _render_context_panel(st, context)
+
     elif layout_mode == "Tablet":
-        toolbar = st.columns([2.3, 7.7])
-        with toolbar[0]:
+        ctrl_cols = st.columns([2.2, 7.8])
+        with ctrl_cols[0]:
             st.checkbox("Collapse Sidebar", key="atlas_navigation_collapsed")
-        if nav_collapsed:
-            main_col, context_col = st.columns([7.2, 2.8])
+
+        if collapsed:
+            nav_popover = st.popover("Navigation")
+            _nav_buttons(st, nav_popover, "tablet")
+            main_col, context_col = st.columns([7.1, 2.9])
             with main_col:
-                nav_popover = st.popover("Navigation")
-                _render_navigation_controls(st, nav_popover, "tablet")
                 _render_main_content(st, workspace_service, record, context)
             with context_col:
                 _render_context_panel(st, context)
         else:
-            nav_col, main_col, context_col = st.columns([2.4, 5.6, 2.0])
+            nav_col, main_col, context_col = st.columns([2.3, 5.5, 2.2])
             with nav_col:
-                _render_navigation_controls(st, st, "tablet")
+                _nav_buttons(st, st, "tablet")
             with main_col:
                 _render_main_content(st, workspace_service, record, context)
             with context_col:
                 _render_context_panel(st, context)
+
     else:
-        drawer = st.popover("Open Navigation")
-        _render_navigation_controls(st, drawer, "mobile")
-        main_col, context_col = st.columns([6.8, 3.2])
+        nav_drawer = st.popover("Open Navigation")
+        _nav_buttons(st, nav_drawer, "mobile")
+        main_col, context_col = st.columns([6.7, 3.3])
         with main_col:
             _render_main_content(st, workspace_service, record, context)
         with context_col:
@@ -1372,19 +1743,20 @@ def main() -> None:
     workspace_service = ProjectWorkspaceService()
     _ensure_active_workspace(st, workspace_service)
 
-    active_record = _load_active_record(st, workspace_service)
-    if active_record is None:
-        st.error("No active workspace was found. Open or create a project.")
+    record = _active_record(st, workspace_service)
+    if record is None:
+        st.error("No active project workspace available.")
         return
 
-    context = _load_context_for_record(active_record)
+    context = _load_context_for_record(record)
     if context is not None:
-        active_record = _build_record_from_context(
-            context, existing_record=active_record
-        )
-        workspace_service.save_record(active_record)
+        record = _build_record_from_context(context, existing_record=record)
+        workspace_service.save_record(record)
 
-    _render_shell(st, workspace_service, active_record, context)
+    if st.session_state.get("atlas_active_page") not in ALL_ACTIVE_PAGES:
+        st.session_state["atlas_active_page"] = "Home"
+
+    _render_shell(st, workspace_service, record, context)
 
 
 if __name__ == "__main__":

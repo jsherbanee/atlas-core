@@ -9,7 +9,7 @@ This interface is local-only:
 - Local file-backed workspace persistence under `outputs/project_workspaces/`.
 - No procurement/RFQ/submittal/invoice/execution/closeout/vendor communication workflows.
 
-Atlas Workspace v1 launches into a persistent application shell.
+Atlas Workspace v1 (Sprint 5) launches into a persistent application shell.
 
 Shell layout:
 - Header
@@ -30,6 +30,7 @@ Header includes:
 - Atlas version
 - Project lifecycle stage
 - Project status
+- breadcrumb trail for current workspace location
 
 ## Atlas Intake (Local)
 The GUI now supports local drag-and-drop intake for estimator bid packages.
@@ -62,6 +63,14 @@ Selector options include:
 - Create New Project
 - Open Existing Project
 - Reference Project: Music Academy of the West (`[Reference]` badge)
+
+Selecting project actions routes to project-centric pages:
+- Home
+- Projects
+- Reference Projects
+- Recent Projects
+- Create New Project
+- Open Existing Project
 
 ## Data Sources
 The workspace supports two explicit source modes.
@@ -106,6 +115,14 @@ If expected folders are missing, Atlas shows a warning and still attempts determ
 
 ## Navigation
 
+Project Manager:
+- Home
+- Projects
+- Reference Projects
+- Recent Projects
+- Create New Project
+- Open Existing Project
+
 Project:
 - Overview
 - Executive Summary
@@ -145,7 +162,7 @@ Settings:
 - Tablet: collapsible sidebar with navigation popover
 - Mobile: drawer-style navigation popover
 
-The current page and selected project remain visible in all modes.
+The current page, selected project, and breadcrumb remain visible in all modes.
 
 ## Upload Flow
 1. Open `Project Files`.
@@ -202,7 +219,7 @@ Project Files includes folder-based exploration:
 - Schedules
 - Addenda
 - Images
-- Other
+- Other Documents
 
 Per-file rows include:
 - filename
@@ -211,6 +228,12 @@ Per-file rows include:
 - pages
 - references
 - warning count
+
+Explorer controls:
+- sorting
+- status filtering
+- search
+- folder selection
 
 Selecting a file updates the Context Panel.
 
@@ -221,6 +244,26 @@ Examples:
 - drawing/file selection: metadata, related equipment, RFIs, evidence hints
 - specification selection: linked equipment and systems
 - equipment selection: drawing/spec references, manufacturer, risk context
+
+Drawing context includes:
+- metadata
+- equipment
+- specifications
+- RFIs
+- revision history placeholder
+- evidence references
+
+Specification context includes:
+- referenced drawings
+- equipment
+- systems
+- related RFIs
+
+Equipment context includes:
+- manufacturer
+- system
+- drawing/specification references
+- risk context
 
 ## Status Bar
 The status bar is always visible and shows:
@@ -236,6 +279,7 @@ The status bar is always visible and shows:
 - The app does not mutate project data.
 - Scanned/image-only PDFs can produce warnings when no embedded text is extractable.
 - Atlas does not fabricate sheet/spec/equipment extraction when text is unavailable.
+- Lifecycle modules beyond Phase 2 remain visible as disabled `Coming Soon` navigation only.
 
 ## Extraction Diagnostics
 Atlas Intake surfaces the following diagnostics in the Import Summary:
