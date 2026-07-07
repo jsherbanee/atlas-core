@@ -1,5 +1,7 @@
 from typing import Any
 
+import pytest
+
 from atlas_core.domain import (
     BidPackageReview,
     DetailCallout,
@@ -51,7 +53,8 @@ def test_build_matches_engine_evaluation_for_same_review():
     )
 
     engine = build_default_engine()
-    service = EngineeringAssumptionService(engineering_rule_engine=engine)
+    with pytest.deprecated_call(match="EngineeringAssumptionService is deprecated"):
+        service = EngineeringAssumptionService(engineering_rule_engine=engine)
 
     assert assumption_ids(service.build(review)) == assumption_ids(
         engine.evaluate(review)
@@ -79,7 +82,8 @@ def test_generates_assumptions_through_registered_rule_modules():
         ]
     )
 
-    assumptions = EngineeringAssumptionService().build(review)
+    with pytest.deprecated_call(match="EngineeringAssumptionService is deprecated"):
+        assumptions = EngineeringAssumptionService().build(review)
     ids = set(assumption_ids(assumptions))
 
     assert "projection_mount_missing_eq-projector" in ids
@@ -91,7 +95,8 @@ def test_missing_review_fields_do_not_crash():
     class MinimalReview:
         pass
 
-    assumptions = EngineeringAssumptionService().build(MinimalReview())
+    with pytest.deprecated_call(match="EngineeringAssumptionService is deprecated"):
+        assumptions = EngineeringAssumptionService().build(MinimalReview())
 
     assert assumptions == []
 
@@ -133,6 +138,7 @@ def test_returns_empty_for_clean_review():
         ],
     )
 
-    assumptions = EngineeringAssumptionService().build(review)
+    with pytest.deprecated_call(match="EngineeringAssumptionService is deprecated"):
+        assumptions = EngineeringAssumptionService().build(review)
 
     assert assumptions == []

@@ -1,7 +1,7 @@
 """Project lifecycle event domain model for Atlas Core."""
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from atlas_core.domain.project import ProjectStatus
@@ -13,7 +13,7 @@ class ProjectLifecycleEvent:
     to_status: ProjectStatus
     note: str | None = None
     changed_by: str | None = None
-    changed_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    changed_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def __post_init__(self) -> None:
         if self.from_status is not None and not isinstance(

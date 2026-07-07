@@ -1,7 +1,7 @@
 """Purchase order domain model for Atlas Core."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -103,7 +103,7 @@ class PurchaseOrder:
     status: PurchaseOrderStatus = PurchaseOrderStatus.DRAFT
     lines: list[PurchaseOrderLine] = field(default_factory=list)
     issued_at: str | None = None
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     notes: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -136,7 +136,7 @@ class PurchaseOrder:
 
     def issue(self) -> None:
         self.status = PurchaseOrderStatus.ISSUED
-        self.issued_at = datetime.utcnow().isoformat()
+        self.issued_at = datetime.now(UTC).isoformat()
 
     def cancel(self) -> None:
         self.status = PurchaseOrderStatus.CANCELLED

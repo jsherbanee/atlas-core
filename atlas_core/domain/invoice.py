@@ -1,7 +1,7 @@
 """Invoice domain model for Atlas Core."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -90,7 +90,7 @@ class Invoice:
     received_at: str | None = None
     approved_at: str | None = None
     paid_at: str | None = None
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     notes: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -123,11 +123,11 @@ class Invoice:
 
     def receive(self) -> None:
         self.status = InvoiceStatus.RECEIVED
-        self.received_at = datetime.utcnow().isoformat()
+        self.received_at = datetime.now(UTC).isoformat()
 
     def approve(self) -> None:
         self.status = InvoiceStatus.APPROVED
-        self.approved_at = datetime.utcnow().isoformat()
+        self.approved_at = datetime.now(UTC).isoformat()
 
     def dispute(self, note: str | None = None) -> None:
         self.status = InvoiceStatus.DISPUTED
@@ -136,7 +136,7 @@ class Invoice:
 
     def pay(self) -> None:
         self.status = InvoiceStatus.PAID
-        self.paid_at = datetime.utcnow().isoformat()
+        self.paid_at = datetime.now(UTC).isoformat()
 
     def void(self) -> None:
         self.status = InvoiceStatus.VOID

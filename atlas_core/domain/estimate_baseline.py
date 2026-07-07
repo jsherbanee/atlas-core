@@ -1,7 +1,7 @@
 """Estimate baseline domain model for Atlas Core."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -24,7 +24,7 @@ class EstimateBaseline:
     rows: list[EquipmentMatrixRow] = field(default_factory=list)
     status: EstimateBaselineStatus = EstimateBaselineStatus.DRAFT
     version: int = 1
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     created_by: str | None = None
     notes: list[str] = field(default_factory=list)
 
