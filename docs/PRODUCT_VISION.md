@@ -14,6 +14,8 @@ This means the same structured data generated during bid review should carry for
 ## Why Atlas Core Exists
 Estimating teams often re-enter the same information multiple times across bid, procurement, and project execution systems. Atlas Core reduces this waste by turning raw plan/spec inputs into normalized, reusable decision data.
 
+Atlas is intentionally inspired by engineering discipline and decision support rather than consumer software paradigms. For the long-term visual and UX posture, see [DESIGN_LANGUAGE.md](DESIGN_LANGUAGE.md).
+
 ## Current Scope
 The engine currently prioritizes:
 - Drawing/spec/schedule intelligence

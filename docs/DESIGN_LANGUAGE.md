@@ -18,13 +18,31 @@ Atlas is not a consumer app.
 
 Every visual element should exist because it improves engineering decision-making. Every pixel should justify its existence.
 
-## 3. Brand Personality
+## 3. Engineering Philosophy
+
+Atlas should behave like an engineering instrument rather than a reporting dashboard.
+
+The role of Atlas is to:
+
+- collect engineering information
+- normalize engineering information
+- preserve traceability
+- identify conflicts
+- expose relationships
+- increase engineering confidence
+- support human decision-making
+
+Atlas should never attempt to replace engineering judgment.
+
+Its purpose is to help engineers make better decisions more quickly.
+
+## 4. Brand Personality
 
 Atlas should feel calm, confident, precise, methodical, professional, trustworthy, purposeful, restrained, and intelligent.
 
 Atlas should avoid flashiness, visual clutter, gaming aesthetics, science fiction styling, cyberpunk cues, gratuitous animation, and anything that makes the interface feel performative rather than dependable.
 
-## 4. Emotional Goals
+## 5. Emotional Goals
 
 Atlas should create confidence, not excitement.
 
@@ -37,7 +55,7 @@ Users should feel:
 
 Atlas should reduce uncertainty, help users orient quickly, and make engineering judgment feel supported rather than burdened.
 
-## 5. Visual Inspiration
+## 6. Visual Inspiration
 
 Atlas draws inspiration from engineering and industrial design disciplines, not from racing aesthetics.
 
@@ -45,13 +63,23 @@ Relevant references include British Racing engineering, the Aston Martin Formula
 
 The influence to borrow is engineering discipline: clarity under pressure, dense but legible information, and interfaces that support critical decisions. Atlas should not copy the appearance of any of these systems.
 
-## 6. Things Atlas Will Never Become
+## 7. Telemetry Mindset
+
+Atlas is informed by the engineering culture behind motorsport telemetry, not by the visual appearance of telemetry software.
+
+The relevant ideas are engineering discipline, data integrity, traceability, confidence, relationship analysis, performance optimization, decision support, and real-time awareness.
+
+Atlas should take the mindset of careful instrumentation and rapid analysis while remaining a platform for commercial AV, theatrical, themed entertainment, and systems integration.
+
+Atlas should not reference or imitate specific telemetry products, software interfaces, logos, branding, or proprietary implementations.
+
+## 8. Things Atlas Will Never Become
 
 Atlas will never become a gaming UI, a cyberpunk interface, a sci-fi control panel, a glowing HUD, or a fake telemetry display.
 
 Atlas should avoid decorative gauges, neon accents, overuse of gradients, animated backgrounds, information overload, and any design that favors appearance over function.
 
-## 7. Color Philosophy
+## 9. Color Philosophy
 
 Atlas colors should communicate structure and state, not decoration.
 
@@ -67,7 +95,7 @@ Status colors should be reserved for state communication only:
 
 Color should support confidence and orientation. It should never compete with the information itself.
 
-## 8. Typography Philosophy
+## 10. Typography Philosophy
 
 Typography should be readable, engineering-focused, professional, and timeless.
 
@@ -75,7 +103,7 @@ It should favor legibility in dense working environments and support long sessio
 
 Typography should establish hierarchy through weight, spacing, and scale rather than novelty.
 
-## 9. Layout Philosophy
+## 11. Layout Philosophy
 
 Layout should be intentional and predictable.
 
@@ -85,7 +113,7 @@ Atlas should favor hierarchy over decoration, predictable navigation, logically 
 
 Cards should be used only when they improve comprehension. Tables should remain readable and primary where structured comparison matters. The layout should support professionals who may spend hours inside Atlas.
 
-## 10. Navigation Philosophy
+## 12. Navigation Philosophy
 
 Atlas is project-centric, not document-centric and not estimate-centric.
 
@@ -98,7 +126,7 @@ Navigation should always help answer four questions:
 
 Navigation should be persistent, require minimal clicks, and maintain a predictable hierarchy. The interface should feel like a workspace, not a maze.
 
-## 11. Data Visualization
+## 13. Data Visualization
 
 Charts should exist only when they improve engineering understanding.
 
@@ -106,7 +134,7 @@ Prefer tables, relationship graphs, confidence indicators, status chips, timelin
 
 Avoid decorative charts or visualizations that look impressive but do not help the user make a decision.
 
-## 12. Motion Philosophy
+## 14. Motion Philosophy
 
 Motion should communicate state.
 
@@ -114,13 +142,13 @@ Useful motion includes panel expansion, selection feedback, relationship highlig
 
 Avoid animations for entertainment, large transitions, and motion that slows engineering work.
 
-## 13. Iconography
+## 15. Iconography
 
 Iconography should be simple, technical, and consistent.
 
 Use thin line icons and avoid novelty symbols, playful illustration, or icons that imply consumer software behavior.
 
-## 14. Component Philosophy
+## 16. Component Philosophy
 
 Atlas components should be optimized for engineering clarity.
 
@@ -134,7 +162,7 @@ Atlas components should be optimized for engineering clarity.
 - Search should help users move from object discovery to decision context.
 - The context panel should expose canonical values, supporting evidence, and uncertainty.
 
-## 15. Themes
+## 17. Themes
 
 Atlas supports two long-term visual themes.
 
@@ -144,13 +172,29 @@ Control Room Theme: dark, quiet, and suited to high-focus environments.
 
 Both themes must share the same layout, hierarchy, navigation behavior, and interaction logic. Themes are visual only.
 
-## 16. Accessibility
+## 18. Accessibility
 
 Atlas should support high contrast, keyboard navigation, screen reader compatibility, scalable typography, and color-independent status communication.
 
 Accessibility is not an add-on. It is part of engineering clarity.
 
-## 17. Future Visual Evolution
+## 19. Engineering Confidence
+
+Atlas should be designed so future architectural concepts can express engineering trust without collapsing into a single readiness score.
+
+One future concept is the Engineering Confidence Index (ECI), an aggregate engineering confidence metric.
+
+ECI is conceptually different from Readiness.
+
+Readiness asks: "Can this project be estimated?"
+
+Engineering Confidence asks: "How complete, consistent, and trustworthy is the engineering model?"
+
+Potential future contributors to ECI include resolver confidence, Knowledge Graph completeness, drawing/specification consistency, evidence quality, RFI exposure, revision stability, labor confidence, and relationship integrity.
+
+ECI is a documented future direction only. It is not implemented here.
+
+## 20. Future Visual Evolution
 
 Future features should feel like they have always belonged in Atlas.
 
@@ -158,19 +202,25 @@ New surfaces should preserve the same design grammar, hierarchy, and interaction
 
 Consistency should outrank novelty.
 
-## 18. Design Principles
+## 21. Design Principles
 
 Atlas should follow these permanent design principles:
 
 - Design for engineers.
+- Atlas highlights decisions rather than displaying data.
+- Atlas reduces engineering uncertainty.
+- Relationships are more valuable than isolated metrics.
+- Information should become quieter as confidence increases.
+- Confidence should always be explainable.
+- Every recommendation must be traceable.
+- Engineers remain the final decision makers.
 - Show relationships before metrics.
 - Prioritize decisions over dashboards.
-- Information should become quieter as confidence increases.
 - Color communicates state, never decoration.
 - Respect the user's attention.
 - Everything should feel intentional.
 
-## 19. Relationship to the Domain Model
+## 22. Relationship to the Domain Model
 
 [DOMAIN_MODEL.md](DOMAIN_MODEL.md) defines Atlas's business architecture: the entities, lifecycle transitions, and module boundaries that make the platform durable.
 
