@@ -11,12 +11,10 @@ from typing import Any
 
 from atlas_core import __version__
 from atlas_core.domain import Project, ProjectStatus
-from atlas_core.services.document_intake_service import UploadedIntakeFile
 from atlas_core.services.phase2_review_context_service import (
     DEFAULT_MAW_REFERENCE_PACKAGE,
     build_intake_review_context,
     build_reference_project_context,
-    build_uploaded_review_context,
 )
 from atlas_core.services.project_workspace_service import (
     ProjectWorkspaceRecord,
@@ -30,6 +28,7 @@ from atlas_core.services.engineering_insights_service import (
 PROJECT_MANAGER_PAGES = [
     "Home",
     "Projects",
+    "Pinned Projects",
     "Reference Projects",
     "Recent Projects",
     "Create New Project",
@@ -297,6 +296,12 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_global_search", "")
     st.session_state.setdefault("atlas_global_search_index", 0)
     st.session_state.setdefault("atlas_equipment_search", "")
+    st.session_state.setdefault("atlas_search_type_filters", [])
+    st.session_state.setdefault("atlas_relationship_search_enabled", False)
+    st.session_state.setdefault("atlas_rename_project_name", "")
+    st.session_state.setdefault("atlas_duplicate_project_id", "")
+    st.session_state.setdefault("atlas_duplicate_project_name", "")
+    st.session_state.setdefault("atlas_loaded_workspace_state_for", None)
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -394,6 +399,11 @@ def _build_record_from_context(
 
 
 def _load_context_for_record(record: ProjectWorkspaceRecord) -> dict[str, Any] | None:
+    if record.package_location:
+        package_path = Path(record.package_location)
+        if package_path.exists() and package_path.is_dir():
+            return build_reference_project_context(package_path)
+
     if record.intake_snapshot_path:
         snapshot_path = Path(record.intake_snapshot_path)
         if snapshot_path.exists():
@@ -424,7 +434,10 @@ def _ensure_active_workspace(
 
     context = build_reference_project_context(DEFAULT_MAW_REFERENCE_PACKAGE)
     record = _build_record_from_context(context)
+    record.is_reference = True
+    record.source_label = "Reference Project"
     workspace_service.save_record(record)
+    workspace_service.set_reference_project(record.workspace_id, reference=True)
     st.session_state["atlas_active_workspace_id"] = record.workspace_id
 
 
@@ -438,12 +451,19 @@ def _active_record(
 
     records = {
         record.workspace_id: record
-        for record in workspace_service.list_recent_workspaces(limit=500)
+        for record in workspace_service.list_workspaces(
+            include_archived=True,
+            limit=1000,
+        )
     }
     return records.get(active_id)
 
 
-def _selector_options(recent: list[ProjectWorkspaceRecord]) -> list[SelectorOption]:
+def _selector_options(
+    recent: list[ProjectWorkspaceRecord],
+    pinned: list[ProjectWorkspaceRecord],
+    references: list[ProjectWorkspaceRecord],
+) -> list[SelectorOption]:
     options = [SelectorOption(label="Recent Projects", kind="category")]
     options.extend(
         SelectorOption(
@@ -453,14 +473,32 @@ def _selector_options(recent: list[ProjectWorkspaceRecord]) -> list[SelectorOpti
         )
         for record in recent[:20]
     )
-    options.append(SelectorOption(label="Reference Projects", kind="category"))
-    options.append(
+    options.append(SelectorOption(label="Pinned Projects", kind="category"))
+    options.extend(
         SelectorOption(
-            label="Reference · Music Academy of the West [Reference]",
-            kind="reference",
-            value="maw-reference",
+            label=f"Pinned · {record.project.name}",
+            kind="recent",
+            value=record.workspace_id,
         )
+        for record in pinned[:20]
     )
+    options.append(SelectorOption(label="Reference Projects", kind="category"))
+    options.extend(
+        SelectorOption(
+            label=f"Reference · {record.project.name}",
+            kind="recent",
+            value=record.workspace_id,
+        )
+        for record in references[:20]
+    )
+    if not references:
+        options.append(
+            SelectorOption(
+                label="Reference · Music Academy of the West [Reference]",
+                kind="reference",
+                value="maw-reference",
+            )
+        )
     options.append(SelectorOption(label="Create New Project", kind="create"))
     options.append(SelectorOption(label="Open Existing Project", kind="open"))
     return options
@@ -482,7 +520,10 @@ def _apply_selector_choice(
     elif option.kind == "reference":
         context = build_reference_project_context(DEFAULT_MAW_REFERENCE_PACKAGE)
         record = _build_record_from_context(context)
+        record.is_reference = True
+        record.source_label = "Reference Project"
         workspace_service.save_record(record)
+        workspace_service.set_reference_project(record.workspace_id, reference=True)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
         st.session_state["atlas_workspace_action"] = ""
     elif option.kind == "create":
@@ -516,7 +557,9 @@ def _render_header(
     context: dict[str, Any] | None,
 ) -> None:
     recent = workspace_service.list_recent_workspaces(limit=30)
-    options = _selector_options(recent)
+    pinned = workspace_service.list_pinned_workspaces(limit=30)
+    references = workspace_service.list_reference_workspaces()
+    options = _selector_options(recent, pinned, references)
     labels = [item.label for item in options]
 
     if st.session_state.get("atlas_project_selector") not in labels:
@@ -595,6 +638,166 @@ def _set_context_selection(st: Any, kind: str, data: dict[str, Any]) -> None:
     st.session_state["atlas_context_selection"] = {"kind": kind, "data": data}
 
 
+def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
+    selection = dict(st.session_state.get("atlas_context_selection") or {})
+    selected_kind = str(selection.get("kind") or "")
+    selected_data = dict(selection.get("data") or {})
+    selected_drawing = selected_data if selected_kind == "drawing" else None
+    selected_specification = selected_data if selected_kind == "specification" else None
+
+    return {
+        "last_open_page": str(st.session_state.get("atlas_active_page") or "Home"),
+        "selected_drawing": selected_drawing,
+        "selected_specification": selected_specification,
+        "expanded_navigation": [
+            _group_for_page(str(st.session_state.get("atlas_active_page") or "Home"))
+        ],
+        "filters": {
+            "file_search": str(st.session_state.get("atlas_file_search") or ""),
+            "equipment_search": str(
+                st.session_state.get("atlas_equipment_search") or ""
+            ),
+            "search_type_filters": list(
+                st.session_state.get("atlas_search_type_filters") or []
+            ),
+            "relationship_search": bool(
+                st.session_state.get("atlas_relationship_search_enabled", False)
+            ),
+        },
+        "search_state": {
+            "global_search": str(st.session_state.get("atlas_global_search") or ""),
+            "result_index": int(st.session_state.get("atlas_global_search_index") or 0),
+        },
+        "window_preferences": {
+            "layout_mode": str(st.session_state.get("atlas_layout_mode") or "Desktop"),
+            "navigation_collapsed": bool(
+                st.session_state.get("atlas_navigation_collapsed", False)
+            ),
+        },
+        "context_selection": selection,
+    }
+
+
+def _restore_workspace_state(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+) -> None:
+    marker = st.session_state.get("atlas_loaded_workspace_state_for")
+    if marker == record.workspace_id:
+        return
+
+    state = workspace_service.load_workspace_state(record.workspace_id)
+    if not state:
+        st.session_state["atlas_loaded_workspace_state_for"] = record.workspace_id
+        return
+
+    st.session_state["atlas_active_page"] = str(state.get("last_open_page") or "Home")
+
+    filters = dict(state.get("filters") or {})
+    st.session_state["atlas_file_search"] = str(filters.get("file_search") or "")
+    st.session_state["atlas_equipment_search"] = str(
+        filters.get("equipment_search") or ""
+    )
+    st.session_state["atlas_search_type_filters"] = list(
+        filters.get("search_type_filters") or []
+    )
+    st.session_state["atlas_relationship_search_enabled"] = bool(
+        filters.get("relationship_search", False)
+    )
+
+    search_state = dict(state.get("search_state") or {})
+    st.session_state["atlas_global_search"] = str(
+        search_state.get("global_search") or ""
+    )
+    st.session_state["atlas_global_search_index"] = int(
+        search_state.get("result_index") or 0
+    )
+
+    window_preferences = dict(state.get("window_preferences") or {})
+    st.session_state["atlas_layout_mode"] = str(
+        window_preferences.get("layout_mode") or "Desktop"
+    )
+    st.session_state["atlas_navigation_collapsed"] = bool(
+        window_preferences.get("navigation_collapsed", False)
+    )
+
+    context_selection = state.get("context_selection")
+    if isinstance(context_selection, dict):
+        st.session_state["atlas_context_selection"] = dict(context_selection)
+
+    st.session_state["atlas_loaded_workspace_state_for"] = record.workspace_id
+
+
+def _persist_repository_artifacts(
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    if context is None:
+        return
+
+    review = context.get("review")
+    if review is not None and hasattr(review, "to_dict"):
+        workspace_service.save_review_artifact(
+            record.workspace_id,
+            "bid_package_review",
+            dict(review.to_dict()),
+        )
+
+        readiness = getattr(review, "readiness", None)
+        if readiness is not None and hasattr(readiness, "to_dict"):
+            workspace_service.save_review_artifact(
+                record.workspace_id,
+                "readiness",
+                dict(readiness.to_dict()),
+            )
+
+        rfi_candidates = [
+            item.to_dict() if hasattr(item, "to_dict") else item
+            for item in list(getattr(review, "rfi_candidates", []) or [])
+        ]
+        workspace_service.save_review_artifact(
+            record.workspace_id,
+            "rfi_candidates",
+            {"items": rfi_candidates},
+        )
+
+        labor_estimate = getattr(review, "labor_estimate", None)
+        if labor_estimate is not None and hasattr(labor_estimate, "to_dict"):
+            workspace_service.save_review_artifact(
+                record.workspace_id,
+                "labor_estimate",
+                dict(labor_estimate.to_dict()),
+            )
+
+    brief = context.get("brief")
+    if brief is not None and hasattr(brief, "to_dict"):
+        workspace_service.save_review_artifact(
+            record.workspace_id,
+            "estimator_brief",
+            dict(brief.to_dict()),
+        )
+
+    revision_comparison = context.get("revision_comparison")
+    if revision_comparison is not None and hasattr(revision_comparison, "to_dict"):
+        workspace_service.save_review_artifact(
+            record.workspace_id,
+            "revision_comparison",
+            dict(revision_comparison.to_dict()),
+        )
+
+    graph = _build_knowledge_graph(record, context)
+    workspace_service.save_knowledge_graph(record.workspace_id, graph)
+
+    intelligence = _build_engineering_intelligence(record, context)
+    if intelligence is not None:
+        workspace_service.save_engineering_intelligence(
+            record.workspace_id,
+            intelligence.to_dict(),
+        )
+
+
 def _metric_card(st: Any, title: str, value: str) -> None:
     st.markdown(
         "<div class='atlas-card'>"
@@ -610,9 +813,10 @@ def _render_home_page(st: Any, workspace_service: ProjectWorkspaceService) -> No
     st.caption("Project-centric launch point for Atlas Workspace.")
 
     recent = workspace_service.list_recent_workspaces(limit=8)
+    references = workspace_service.list_reference_workspaces()
     summary_cols = st.columns(4)
     _metric_card(summary_cols[0], "Recent Projects", str(len(recent)))
-    _metric_card(summary_cols[1], "Reference Projects", "1")
+    _metric_card(summary_cols[1], "Reference Projects", str(len(references)))
     _metric_card(summary_cols[2], "Active Modules", "Phase 2")
     _metric_card(summary_cols[3], "Lifecycle Modules", "Coming Soon")
 
@@ -647,7 +851,11 @@ def _render_home_page(st: Any, workspace_service: ProjectWorkspaceService) -> No
 
 def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
     st.subheader("Projects")
-    records = workspace_service.list_recent_workspaces(limit=200)
+    include_archived = st.checkbox("Show archived projects", value=False)
+    records = workspace_service.list_workspaces(
+        include_archived=include_archived,
+        limit=500,
+    )
     if not records:
         st.info("No projects available yet.")
         return
@@ -668,6 +876,9 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
                 "project_id": record.project.project_id,
                 "source": record.source_label,
                 "status": _project_stage(record),
+                "pinned": record.pinned,
+                "reference": record.is_reference,
+                "archived": record.archived,
                 "updated": record.updated_at,
             }
             for record in filtered
@@ -682,10 +893,125 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
     if labels:
         selected_label = st.selectbox("Open Project", options=labels)
         selected = filtered[labels.index(selected_label)]
-        if st.button("Open Selected Project", type="primary"):
+
+        action_cols = st.columns(4)
+        if action_cols[0].button("Open Selected Project", type="primary"):
             st.session_state["atlas_active_workspace_id"] = selected.workspace_id
             st.session_state["atlas_active_page"] = "Overview"
             st.rerun()
+
+        pin_label = "Unpin" if selected.pinned else "Pin"
+        if action_cols[1].button(pin_label, use_container_width=True):
+            workspace_service.pin_project(
+                selected.workspace_id, pinned=not selected.pinned
+            )
+            st.rerun()
+
+        reference_label = (
+            "Unmark Reference" if selected.is_reference else "Mark Reference"
+        )
+        if action_cols[2].button(reference_label, use_container_width=True):
+            workspace_service.set_reference_project(
+                selected.workspace_id,
+                reference=not selected.is_reference,
+            )
+            st.rerun()
+
+        archive_label = "Unarchive" if selected.archived else "Archive"
+        if action_cols[3].button(archive_label, use_container_width=True):
+            workspace_service.archive_project(
+                selected.workspace_id,
+                archived=not selected.archived,
+            )
+            if selected.workspace_id == st.session_state.get(
+                "atlas_active_workspace_id"
+            ):
+                st.session_state["atlas_active_workspace_id"] = None
+                st.session_state["atlas_active_page"] = "Home"
+            st.rerun()
+
+        st.markdown("#### Rename Project")
+        rename_name = st.text_input(
+            "New project name",
+            value=selected.project.name,
+            key=f"atlas_rename_name_{selected.workspace_id}",
+        )
+        if st.button("Rename Project", key=f"atlas_rename_btn_{selected.workspace_id}"):
+            if rename_name.strip():
+                workspace_service.rename_project(
+                    selected.workspace_id, rename_name.strip()
+                )
+                st.rerun()
+
+        st.markdown("#### Duplicate Project")
+        duplicate_id = st.text_input(
+            "Duplicate project ID",
+            value=f"{selected.workspace_id}-copy",
+            key=f"atlas_duplicate_id_{selected.workspace_id}",
+        )
+        duplicate_name = st.text_input(
+            "Duplicate project name",
+            value=f"{selected.project.name} Copy",
+            key=f"atlas_duplicate_name_{selected.workspace_id}",
+        )
+        if st.button(
+            "Duplicate Project",
+            key=f"atlas_duplicate_btn_{selected.workspace_id}",
+        ):
+            workspace_service.duplicate_project(
+                selected.workspace_id,
+                new_workspace_id=duplicate_id.strip(),
+                new_name=duplicate_name.strip() or None,
+            )
+            st.rerun()
+
+        if st.button(
+            "Delete Project",
+            key=f"atlas_delete_btn_{selected.workspace_id}",
+            type="secondary",
+        ):
+            workspace_service.delete_project(selected.workspace_id)
+            if selected.workspace_id == st.session_state.get(
+                "atlas_active_workspace_id"
+            ):
+                st.session_state["atlas_active_workspace_id"] = None
+                st.session_state["atlas_active_page"] = "Home"
+            st.rerun()
+
+
+def _render_pinned_projects_page(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    st.subheader("Pinned Projects")
+    records = workspace_service.list_pinned_workspaces(limit=200)
+    if not records:
+        st.info("No pinned projects yet.")
+        return
+
+    st.dataframe(
+        [
+            {
+                "project": record.project.name,
+                "project_id": record.project.project_id,
+                "status": _project_stage(record),
+                "updated": record.updated_at,
+            }
+            for record in records
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    labels = [
+        f"{record.project.name} · {record.project.project_id}" for record in records
+    ]
+    selected_label = st.selectbox("Open Pinned Project", options=labels)
+    selected = records[labels.index(selected_label)]
+    if st.button("Open Pinned Project", type="primary"):
+        st.session_state["atlas_active_workspace_id"] = selected.workspace_id
+        st.session_state["atlas_active_page"] = "Overview"
+        st.rerun()
 
 
 def _render_reference_projects_page(
@@ -693,15 +1019,43 @@ def _render_reference_projects_page(
     workspace_service: ProjectWorkspaceService,
 ) -> None:
     st.subheader("Reference Projects")
+    references = workspace_service.list_reference_workspaces(include_archived=False)
+    if references:
+        st.dataframe(
+            [
+                {
+                    "project": record.project.name,
+                    "project_id": record.workspace_id,
+                    "status": _project_stage(record),
+                    "updated": record.updated_at,
+                }
+                for record in references
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        labels = [
+            f"{record.project.name} · {record.workspace_id}" for record in references
+        ]
+        selected_label = st.selectbox("Open Reference Project", options=labels)
+        selected = references[labels.index(selected_label)]
+        if st.button("Open Selected Reference", type="primary"):
+            st.session_state["atlas_active_workspace_id"] = selected.workspace_id
+            st.session_state["atlas_active_page"] = "Overview"
+            st.rerun()
+
     st.markdown(
         "<span class='atlas-chip'>Reference</span> Music Academy of the West",
         unsafe_allow_html=True,
     )
     st.caption("Canonical deterministic reference project for local review.")
-    if st.button("Open Music Academy of the West", type="primary"):
+    if st.button("Import MAW Reference", type="primary"):
         context = build_reference_project_context(DEFAULT_MAW_REFERENCE_PACKAGE)
         record = _build_record_from_context(context)
+        record.is_reference = True
+        record.source_label = "Reference Project"
         workspace_service.save_record(record)
+        workspace_service.set_reference_project(record.workspace_id, reference=True)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
         st.session_state["atlas_active_page"] = "Overview"
         st.rerun()
@@ -740,8 +1094,18 @@ def _render_create_project_page(
         project_id = st.text_input("Project ID", key="atlas_new_project_id")
         name = st.text_input("Project Name", key="atlas_new_project_name")
         client = st.text_input("Owner / Client", key="atlas_new_project_client")
+        consultant = st.text_input("Consultant")
+        architect = st.text_input("Architect")
+        engineers_text = st.text_input("Engineers (comma-separated)")
+        project_number = st.text_input("Project Number")
+        issue_date = st.text_input("Issue Date")
         location = st.text_input("Location", key="atlas_new_project_location")
         bid_date = st.text_input("Bid Date", key="atlas_new_project_bid_date")
+        lifecycle_stage = st.selectbox(
+            "Lifecycle Stage",
+            options=[status.value for status in ProjectStatus],
+            index=1,
+        )
         submitted = st.form_submit_button("Create Project")
 
     if not submitted:
@@ -755,8 +1119,19 @@ def _render_create_project_page(
         project_id=project_id.strip(),
         name=name.strip(),
         client=client.strip(),
+        consultant=consultant.strip() or None,
+        architect=architect.strip() or None,
+        engineers=[
+            item.strip()
+            for item in engineers_text.split(",")
+            if isinstance(item, str) and item.strip()
+        ],
+        project_number=project_number.strip() or None,
+        issue_date=issue_date.strip() or None,
         location=location.strip() or None,
         bid_date=bid_date.strip() or None,
+        status=ProjectStatus(lifecycle_stage),
+        lifecycle_stage=lifecycle_stage,
     )
     workspace_service.save_record(record)
     st.session_state["atlas_active_workspace_id"] = record.workspace_id
@@ -772,7 +1147,7 @@ def _render_open_existing_page(
     path_text = st.text_input(
         "Workspace file, intake snapshot, or package folder",
         key="atlas_pending_open_path",
-        placeholder="outputs/project_workspaces/example/workspace.json",
+        placeholder="AtlasProjects/example-project/project.json",
     )
 
     if not st.button("Open Path", type="primary"):
@@ -783,6 +1158,14 @@ def _render_open_existing_page(
         st.error(f"Path not found: {path}")
         return
 
+    if path.is_dir() and (path / "project.json").exists():
+        record = workspace_service.load_record(path / "project.json")
+        workspace_service.save_record(record)
+        st.session_state["atlas_active_workspace_id"] = record.workspace_id
+        st.session_state["atlas_active_page"] = "Overview"
+        st.rerun()
+        return
+
     if path.is_dir() and (path / "workspace.json").exists():
         record = workspace_service.load_record(path / "workspace.json")
         workspace_service.save_record(record)
@@ -791,7 +1174,7 @@ def _render_open_existing_page(
         st.rerun()
         return
 
-    if path.name == "workspace.json":
+    if path.name in {"workspace.json", "project.json", "metadata.json"}:
         record = workspace_service.load_record(path)
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
@@ -818,7 +1201,7 @@ def _render_open_existing_page(
         return
 
     st.error(
-        "Open a workspace.json file, intake_snapshot.json file, or package folder."
+        "Open a project.json/workspace.json file, intake_snapshot.json file, or project folder."
     )
 
 
@@ -2805,7 +3188,11 @@ def _render_global_search_panel(
             st.rerun()
 
 
-def _render_upload_panel(st: Any, workspace_service: ProjectWorkspaceService) -> None:
+def _render_upload_panel(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+) -> None:
     uploaded_files = st.file_uploader(
         "Upload package files",
         type=SUPPORTED_UPLOAD_TYPES,
@@ -2820,20 +3207,37 @@ def _render_upload_panel(st: Any, workspace_service: ProjectWorkspaceService) ->
             st.session_state.pop("atlas_uploaded_context", None)
 
     if st.button("Run Atlas Intake", type="primary", disabled=not uploaded_files):
-        intake_files = [
-            UploadedIntakeFile(name=file.name, data=file.getvalue())
-            for file in uploaded_files or []
-        ]
         with st.spinner("Running deterministic intake and review..."):
-            st.session_state["atlas_uploaded_context"] = build_uploaded_review_context(
-                uploaded_files=intake_files
+            updated_record = workspace_service.import_uploaded_documents(
+                workspace_id=record.workspace_id,
+                uploaded_files=[
+                    (str(file.name), bytes(file.getvalue()))
+                    for file in uploaded_files or []
+                ],
+            )
+            st.session_state["atlas_uploaded_context"] = (
+                build_reference_project_context(
+                    updated_record.package_location
+                    if updated_record.package_location is not None
+                    else workspace_service.project_path(updated_record.workspace_id)
+                    / "documents"
+                )
             )
 
         context = st.session_state.get("atlas_uploaded_context")
         if context is not None:
-            record = _build_record_from_context(context)
-            workspace_service.save_record(record)
-            st.session_state["atlas_active_workspace_id"] = record.workspace_id
+            refreshed_record = _build_record_from_context(
+                context,
+                existing_record=updated_record,
+            )
+            refreshed_record.workspace_state = dict(updated_record.workspace_state)
+            refreshed_record.pinned = updated_record.pinned
+            refreshed_record.is_reference = updated_record.is_reference
+            refreshed_record.archived = updated_record.archived
+            workspace_service.save_record(refreshed_record)
+            st.session_state["atlas_active_workspace_id"] = (
+                refreshed_record.workspace_id
+            )
             st.success("Atlas Intake completed and workspace updated.")
             st.rerun()
 
@@ -2841,10 +3245,11 @@ def _render_upload_panel(st: Any, workspace_service: ProjectWorkspaceService) ->
 def _render_project_files_page(
     st: Any,
     workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
     st.subheader("Project Explorer")
-    _render_upload_panel(st, workspace_service)
+    _render_upload_panel(st, workspace_service, record)
 
     folders = _files_by_folder(context)
     folder_name = st.selectbox("Folder", options=list(folders.keys()))
@@ -4150,6 +4555,8 @@ def _render_main_content(
         _render_home_page(st, workspace_service)
     elif page == "Projects":
         _render_projects_page(st, workspace_service)
+    elif page == "Pinned Projects":
+        _render_pinned_projects_page(st, workspace_service)
     elif page == "Reference Projects":
         _render_reference_projects_page(st, workspace_service)
     elif page == "Recent Projects":
@@ -4163,7 +4570,7 @@ def _render_main_content(
     elif page == "Executive Summary":
         _render_executive_summary_page(st, context)
     elif page == "Project Files":
-        _render_project_files_page(st, workspace_service, context)
+        _render_project_files_page(st, workspace_service, record, context)
     elif page == "Drawings":
         _render_drawings_page(st, context)
     elif page == "Specifications":
@@ -4337,15 +4744,35 @@ def main() -> None:
         st.error("No active project workspace available.")
         return
 
+    _restore_workspace_state(st, workspace_service, record)
+
     context = _load_context_for_record(record)
     if context is not None:
         record = _build_record_from_context(context, existing_record=record)
+        record.workspace_state = workspace_service.load_workspace_state(
+            record.workspace_id
+        )
+        record.pinned = bool(record.metadata.get("pinned", record.pinned))
+        record.is_reference = bool(
+            record.metadata.get("reference", record.is_reference)
+        )
+        record.archived = bool(record.metadata.get("archived", record.archived))
         workspace_service.save_record(record)
+        _persist_repository_artifacts(workspace_service, record, context)
+        workspace_service.log_event(
+            record.workspace_id,
+            "review_executed",
+            {"source_mode": record.source_mode, "project_id": record.project_id},
+        )
 
     if st.session_state.get("atlas_active_page") not in ALL_ACTIVE_PAGES:
         st.session_state["atlas_active_page"] = "Home"
 
     _render_shell(st, workspace_service, record, context)
+    workspace_service.save_workspace_state(
+        record.workspace_id,
+        _workspace_state_snapshot(st),
+    )
 
 
 if __name__ == "__main__":

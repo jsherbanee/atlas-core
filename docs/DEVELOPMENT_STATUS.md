@@ -27,7 +27,7 @@ Current MAW reference-project behavior:
 
 Current workspace behavior:
 - Atlas launches to a Home screen with New Project, Open Project, and Recent Projects actions.
-- Local workspace records are stored under outputs/project_workspaces/.
+- Local project records are stored under AtlasProjects/.
 - The active project view uses left navigation for overview, brief, files, readiness, revision, assumptions, and evidence sections.
 
 ## Latest Completed Feature

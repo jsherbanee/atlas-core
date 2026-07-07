@@ -6,7 +6,7 @@ Provide a local project-centric workspace shell for estimators to run Atlas Inta
 This interface is local-only:
 - No authentication.
 - No cloud persistence.
-- Local file-backed workspace persistence under `outputs/project_workspaces/`.
+- Local file-backed project repository persistence under `AtlasProjects/`.
 - No procurement/RFQ/submittal/invoice/execution/closeout/vendor communication workflows.
 
 Atlas Workspace v1 (Sprint 8) launches into a persistent interactive engineering shell.

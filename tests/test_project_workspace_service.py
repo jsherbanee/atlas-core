@@ -29,7 +29,7 @@ def test_project_round_trip_preserves_lifecycle_events() -> None:
 
 
 def test_workspace_service_saves_and_loads_records(tmp_path: Path) -> None:
-    service = ProjectWorkspaceService(tmp_path / "workspaces")
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
     record = ProjectWorkspaceRecord(
         workspace_id="project-001",
         project=Project(
@@ -47,13 +47,15 @@ def test_workspace_service_saves_and_loads_records(tmp_path: Path) -> None:
     loaded = service.load_record(saved_path)
 
     assert saved_path.exists()
+    assert (tmp_path / "AtlasProjects" / "project-001" / "project.json").exists()
+    assert (tmp_path / "AtlasProjects" / "project-001" / "metadata.json").exists()
     assert loaded.workspace_id == "project-001"
     assert loaded.project.name == "Workspace Project"
     assert loaded.import_summary["drawing_count"] == 2
 
 
 def test_workspace_service_lists_recent_projects_by_last_opened(tmp_path: Path) -> None:
-    service = ProjectWorkspaceService(tmp_path / "workspaces")
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
 
     first = ProjectWorkspaceRecord(
         workspace_id="project-a",
@@ -72,3 +74,32 @@ def test_workspace_service_lists_recent_projects_by_last_opened(tmp_path: Path) 
     recent = service.list_recent_workspaces()
 
     assert [record.workspace_id for record in recent[:2]] == ["project-b", "project-a"]
+
+
+def test_workspace_service_project_manager_actions(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="project-001",
+        name="Project 001",
+        client="Client",
+    )
+    service.save_record(record)
+
+    renamed = service.rename_project("project-001", "Project 001 Renamed")
+    assert renamed.project.name == "Project 001 Renamed"
+
+    pinned = service.pin_project("project-001", pinned=True)
+    assert pinned.pinned is True
+
+    reference = service.set_reference_project("project-001", reference=True)
+    assert reference.is_reference is True
+
+    archived = service.archive_project("project-001", archived=True)
+    assert archived.archived is True
+
+    duplicated = service.duplicate_project(
+        "project-001",
+        new_workspace_id="project-001-copy",
+        new_name="Project 001 Copy",
+    )
+    assert duplicated.project.project_id == "project-001-copy"
