@@ -54,6 +54,44 @@ MAW is not product logic:
 - Run: streamlit run apps/phase2_review_app.py
 - GUI usage and details: docs/PHASE2_GUI.md
 
+## Local Package Intake (Deterministic)
+- Build intake snapshot from local folder package:
+	- atlas-core package-intake --path examples/music_academy_of_the_west --out outputs/maw_intake
+- Run review from package intake:
+	- atlas-core phase2-review --package examples/music_academy_of_the_west --out outputs/maw_review
+- Run review from an existing snapshot:
+	- atlas-core phase2-review --snapshot outputs/maw_intake/intake_snapshot.json --out outputs/maw_review
+
+## Atlas Intake Drag-and-Drop (GUI)
+Phase 2 Local Review GUI supports deterministic local uploads:
+- One file, many files, or ZIP package drag-and-drop
+- Session package created at outputs/uploads/<session_id>
+- Files auto-classified into drawings/specifications/schedules/addenda/images/metadata/unsupported
+- Deterministic intake snapshot built and review pipeline executed from that session package
+
+Supported formats:
+- Documents: PDF, DOCX, DOC, TXT, RTF
+- Spreadsheets: XLSX, XLS, CSV
+- Images: JPG, JPEG, PNG, TIFF
+- Metadata: JSON
+- Archives: ZIP
+
+Import summary includes:
+- drawing count
+- specification count
+- schedule count
+- addenda count
+- image count
+- unsupported file count
+- extraction warnings
+
+Expected package structure:
+- examples/music_academy_of_the_west/drawings/*.pdf
+- examples/music_academy_of_the_west/specifications/*.pdf
+- examples/music_academy_of_the_west/schedules/*.pdf|*.csv|*.xlsx
+- examples/music_academy_of_the_west/addenda/*.pdf
+- examples/music_academy_of_the_west/metadata.json
+
 ## Expected Outputs
 Representative output characteristics from MAW snapshots:
 - Plan review pipeline returns coherent review, readiness, brief, and final review artifacts.

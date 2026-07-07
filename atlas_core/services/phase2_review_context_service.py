@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
 from atlas_core.cli.__main__ import (
@@ -16,6 +17,8 @@ from atlas_core.services import (
     PlanReviewWorkflowService,
     RevisionComparisonService,
 )
+from atlas_core.services.document_intake_service import DocumentIntakeService
+from atlas_core.services.document_intake_service import UploadedIntakeFile
 
 
 def get_sample_projects() -> list[dict[str, str]]:
@@ -60,6 +63,8 @@ def build_sample_review_context(sample_project_id: str = "maw") -> dict[str, Any
     revision_comparison = _build_revision_comparison()
 
     return {
+        "data_source_mode": "seed_sample_data",
+        "data_source_label": "Seed sample data",
         "sample_project_id": sample_project_id,
         "sample_project_name": "Music Academy of the West",
         "review": baseline_result.review,
@@ -67,6 +72,88 @@ def build_sample_review_context(sample_project_id: str = "maw") -> dict[str, Any
         "final_review": baseline_result.final_review,
         "revision_comparison": revision_comparison,
         "rows": baseline_result.rows,
+        "warnings": [],
+        "intake_snapshot": None,
+    }
+
+
+def discover_local_intake_snapshots(
+    search_roots: list[str | Path] | None = None,
+) -> list[dict[str, str]]:
+    roots = (
+        [Path("outputs"), Path("examples")]
+        if search_roots is None
+        else [Path(root) for root in search_roots]
+    )
+    snapshots: list[dict[str, str]] = []
+    for root in roots:
+        if not root.exists() or not root.is_dir():
+            continue
+
+        for snapshot_path in sorted(root.rglob("intake_snapshot.json")):
+            label = f"{snapshot_path.parent.name} ({snapshot_path})"
+            snapshots.append({"label": label, "path": str(snapshot_path)})
+
+    return snapshots
+
+
+def build_intake_review_context(snapshot_path: str | Path) -> dict[str, Any]:
+    intake_service = DocumentIntakeService()
+    snapshot = intake_service.load_snapshot(snapshot_path)
+    workflow_result = intake_service.run_review_from_snapshot(snapshot)
+    return {
+        "data_source_mode": "real_package_intake",
+        "data_source_label": "Real package intake",
+        "sample_project_id": "intake",
+        "sample_project_name": str(
+            snapshot.metadata.get("project_name")
+            or snapshot.metadata.get("name")
+            or Path(snapshot.package_path).name
+        ),
+        "review": workflow_result.review,
+        "brief": workflow_result.brief,
+        "final_review": workflow_result.final_review,
+        "revision_comparison": None,
+        "rows": workflow_result.rows,
+        "warnings": list(snapshot.warnings),
+        "import_summary": dict(snapshot.import_summary),
+        "package_location": str(
+            snapshot.import_summary.get("package_location") or snapshot.package_path
+        ),
+        "intake_snapshot": snapshot,
+    }
+
+
+def build_uploaded_review_context(
+    uploaded_files: list[UploadedIntakeFile],
+    uploads_root: str | Path = "outputs/uploads",
+) -> dict[str, Any]:
+    intake_service = DocumentIntakeService()
+    upload_result = intake_service.build_session_package_from_uploads(
+        uploaded_files=uploaded_files,
+        uploads_root=uploads_root,
+    )
+    workflow_result = intake_service.run_review_from_snapshot(upload_result.snapshot)
+    project_name = str(
+        upload_result.snapshot.metadata.get("project_name")
+        or upload_result.snapshot.metadata.get("name")
+        or upload_result.package_path.name
+    )
+    return {
+        "data_source_mode": "uploaded_project",
+        "data_source_label": "Uploaded Project",
+        "sample_project_id": "uploaded",
+        "sample_project_name": project_name,
+        "review": workflow_result.review,
+        "brief": workflow_result.brief,
+        "final_review": workflow_result.final_review,
+        "revision_comparison": None,
+        "rows": workflow_result.rows,
+        "warnings": list(upload_result.warnings),
+        "import_summary": dict(upload_result.import_summary),
+        "package_location": str(upload_result.package_path),
+        "intake_snapshot": upload_result.snapshot,
+        "upload_session_id": upload_result.session_id,
     }
 
 

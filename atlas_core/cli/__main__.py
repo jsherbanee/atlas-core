@@ -17,6 +17,8 @@ def main(argv: list[str] | None = None) -> int:
         "demo-maw-rfi-candidates",
         "demo-maw-labor-estimate",
         "demo-maw-revision-comparison",
+        "package-intake",
+        "phase2-review",
     }
 
     if argv and not argv[0].startswith("-") and argv[0] not in known_commands:
@@ -46,6 +48,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "demo-maw-revision-comparison":
         return _demo_maw_revision_comparison()
+
+    if args.command == "package-intake":
+        return _package_intake(args.path, args.out)
+
+    if args.command == "phase2-review":
+        return _phase2_review(
+            package_path=args.package,
+            snapshot_path=args.snapshot,
+            output_dir=args.out,
+        )
 
     parser.print_help()
     return 0
@@ -97,8 +109,110 @@ def _build_parser() -> argparse.ArgumentParser:
         "demo-maw-revision-comparison",
         help="Compare two deterministic MAW review snapshots and print revision changes",
     )
+    package_intake_parser = subparsers.add_parser(
+        "package-intake",
+        help="Build deterministic intake snapshot from a local package folder",
+    )
+    package_intake_parser.add_argument(
+        "--path",
+        type=Path,
+        required=True,
+        help="Path to package folder (drawings/specifications/schedules/addenda)",
+    )
+    package_intake_parser.add_argument(
+        "--out",
+        type=Path,
+        required=True,
+        help="Output folder for intake snapshot",
+    )
+
+    phase2_review_parser = subparsers.add_parser(
+        "phase2-review",
+        help="Run plan review from a package intake path or existing intake snapshot",
+    )
+    phase2_review_source_group = phase2_review_parser.add_mutually_exclusive_group(
+        required=True
+    )
+    phase2_review_source_group.add_argument(
+        "--package",
+        type=Path,
+        help="Path to package folder",
+    )
+    phase2_review_source_group.add_argument(
+        "--snapshot",
+        type=Path,
+        help="Path to intake snapshot JSON",
+    )
+    phase2_review_parser.add_argument(
+        "--out",
+        type=Path,
+        required=True,
+        help="Output folder for phase2 review exports",
+    )
 
     return parser
+
+
+def _package_intake(package_path: Path, output_dir: Path) -> int:
+    from atlas_core.services.document_intake_service import DocumentIntakeService
+
+    intake_service = DocumentIntakeService()
+    snapshot = intake_service.build_snapshot(package_path)
+    snapshot_path = intake_service.write_snapshot(snapshot, output_dir)
+
+    print("data source: real package intake")
+    print(f"intake snapshot: {snapshot_path}")
+    print(
+        "intake summary: "
+        f"pages={len(snapshot.raw_pages)} "
+        f"sheets={len(snapshot.raw_sheets)} "
+        f"sections={len(snapshot.raw_sections)} "
+        f"schedules={len(snapshot.raw_device_schedules)} "
+        f"equipment_candidates={len(snapshot.equipment_candidates)} "
+        f"warnings={len(snapshot.warnings)}"
+    )
+    for warning in snapshot.warnings:
+        print(f"warning: {warning}")
+
+    return 0
+
+
+def _phase2_review(
+    package_path: Path | None,
+    snapshot_path: Path | None,
+    output_dir: Path,
+) -> int:
+    from atlas_core.services import PlanReviewExportService
+    from atlas_core.services.document_intake_service import DocumentIntakeService
+
+    intake_service = DocumentIntakeService()
+    if snapshot_path is not None:
+        snapshot = intake_service.load_snapshot(snapshot_path)
+    elif package_path is not None:
+        snapshot = intake_service.build_snapshot(package_path)
+    else:
+        raise ValueError("Either --package or --snapshot must be provided")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written_snapshot_path = intake_service.write_snapshot(snapshot, output_dir)
+    workflow_result = intake_service.run_review_from_snapshot(snapshot)
+    export_result = PlanReviewExportService().export_plan_review(
+        workflow_result,
+        output_dir=output_dir,
+        prefix="phase2_review",
+    )
+
+    print("data source: real package intake")
+    print(f"intake snapshot: {written_snapshot_path}")
+    print(f"review exports: {json.dumps(export_result.to_dict(), sort_keys=True)}")
+    print(
+        "review summary: "
+        f"review_id={workflow_result.review.review_id} "
+        f"readiness_status={getattr(getattr(workflow_result.review.readiness, 'status', None), 'value', None)} "
+        f"readiness_score={getattr(workflow_result.review.readiness, 'readiness_score', None)}"
+    )
+
+    return 0
 
 
 def _demo_estimate() -> int:

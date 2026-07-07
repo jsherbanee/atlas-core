@@ -1,8 +1,11 @@
 import csv
+import json
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+from pypdf import PdfWriter
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,6 +19,45 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         check=False,
     )
+
+
+def _write_blank_pdf(path: Path) -> None:
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    with path.open("wb") as file:
+        writer.write(file)
+
+
+def _build_intake_package(tmp_path: Path) -> Path:
+    package = tmp_path / "intake-package"
+    (package / "drawings").mkdir(parents=True)
+    (package / "specifications").mkdir(parents=True)
+    (package / "schedules").mkdir(parents=True)
+    (package / "addenda").mkdir(parents=True)
+
+    (package / "metadata.json").write_text(
+        json.dumps(
+            {
+                "project_id": "project-cli-intake",
+                "review_id": "review-cli-intake",
+                "project_name": "CLI Intake Project",
+                "name": "CLI Intake Plan Review",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    _write_blank_pdf(package / "drawings" / "AV-101 Audio Plan.pdf")
+    _write_blank_pdf(
+        package / "specifications" / "27 41 16 Integrated Audio Systems.pdf"
+    )
+    _write_blank_pdf(package / "addenda" / "ADD-1 AV Addendum.pdf")
+    (package / "schedules" / "audio_schedule.csv").write_text(
+        "tag,description\nSPK-1,Main ceiling speaker\n",
+        encoding="utf-8",
+    )
+
+    return package
 
 
 def test_demo_estimate_runs_successfully():
@@ -275,3 +317,39 @@ def test_unknown_command_prints_help():
     assert "demo-maw-rfi-candidates" in result.stdout
     assert "demo-maw-labor-estimate" in result.stdout
     assert "demo-maw-revision-comparison" in result.stdout
+
+
+def test_package_intake_command_writes_snapshot(tmp_path):
+    package_path = _build_intake_package(tmp_path)
+    output_dir = tmp_path / "intake-output"
+
+    result = run_cli(
+        "package-intake",
+        "--path",
+        str(package_path),
+        "--out",
+        str(output_dir),
+    )
+
+    assert result.returncode == 0
+    assert "data source: real package intake" in result.stdout
+    assert (output_dir / "intake_snapshot.json").exists()
+
+
+def test_phase2_review_command_exports_outputs(tmp_path):
+    package_path = _build_intake_package(tmp_path)
+    output_dir = tmp_path / "phase2-review-output"
+
+    result = run_cli(
+        "phase2-review",
+        "--package",
+        str(package_path),
+        "--out",
+        str(output_dir),
+    )
+
+    assert result.returncode == 0
+    assert "data source: real package intake" in result.stdout
+    assert (output_dir / "intake_snapshot.json").exists()
+    assert (output_dir / "phase2_review_estimator_brief.csv").exists()
+    assert (output_dir / "phase2_review_plan_review.json").exists()

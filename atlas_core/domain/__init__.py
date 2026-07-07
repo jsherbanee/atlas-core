@@ -65,6 +65,10 @@ from atlas_core.domain.revision_comparison import (
     RevisionComparison,
     RevisionComparisonSourceRef,
 )
+from atlas_core.domain.document_intake import (
+    DocumentIntakeSnapshot,
+    IntakeSourceReference,
+)
 
 __all__ = [
     "BidPackageReview",
@@ -92,6 +96,8 @@ __all__ = [
     "RevisionChangeType",
     "RevisionChangeSeverity",
     "RevisionComparisonSourceRef",
+    "DocumentIntakeSnapshot",
+    "IntakeSourceReference",
     "DrawingDiscipline",
     "DrawingSheet",
     "SpecificationDiscipline",

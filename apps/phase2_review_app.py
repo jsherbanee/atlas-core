@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from atlas_core.services.phase2_review_context_service import (
+    build_uploaded_review_context,
+    build_intake_review_context,
     build_sample_review_context,
+    discover_local_intake_snapshots,
     get_sample_projects,
 )
+from atlas_core.services.document_intake_service import UploadedIntakeFile
 
 
 def _load_streamlit() -> Any:
@@ -38,6 +43,25 @@ def _to_rows(items: list[Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _uploaded_file_signature(uploaded_files: list[Any]) -> str:
+    digest = hashlib.sha1()
+    for file in uploaded_files:
+        digest.update(str(getattr(file, "name", "")).encode("utf-8"))
+        digest.update(str(getattr(file, "size", 0)).encode("utf-8"))
+
+    return digest.hexdigest()
+
+
+def _render_intake_box(st: Any) -> None:
+    st.subheader("Atlas Intake")
+    st.markdown("**Drag your project here**")
+    st.markdown("Supported formats")
+    st.markdown(
+        "PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, JPEG, PNG, TIFF, TXT, RTF, JSON, ZIP"
+    )
+    st.caption("or Browse Files")
+
+
 def main() -> None:
     st = _load_streamlit()
     st.set_page_config(
@@ -49,22 +73,149 @@ def main() -> None:
         "Read-only local prototype for inspecting deterministic Phase 2 outputs."
     )
 
-    sample_projects = get_sample_projects()
-    options = {project["label"]: project["id"] for project in sample_projects}
-
-    selected_label = st.sidebar.selectbox(
-        "Sample Project",
-        options=list(options.keys()),
+    source_mode = st.sidebar.radio(
+        "Data Source",
+        options=["Uploaded Project", "Sample Data"],
         index=0,
     )
-    st.sidebar.caption("MAW is canonical sample/reference data only.")
 
-    context = build_sample_review_context(options[selected_label])
+    if source_mode == "Sample Data":
+        sample_projects = get_sample_projects()
+        options = {project["label"]: project["id"] for project in sample_projects}
+        selected_label = st.sidebar.selectbox(
+            "Sample Project", options=list(options.keys()), index=0
+        )
+        st.sidebar.caption("Music Academy of the West remains reference/demo data.")
+        context = build_sample_review_context(options[selected_label])
+        context["data_source_label"] = "Sample Data"
+        context["sample_project_name"] = "Music Academy of the West (Reference Project)"
+    else:
+        _render_intake_box(st)
+        uploaded_files = st.file_uploader(
+            "",
+            type=[
+                "pdf",
+                "docx",
+                "doc",
+                "xlsx",
+                "xls",
+                "csv",
+                "jpg",
+                "jpeg",
+                "png",
+                "tiff",
+                "txt",
+                "rtf",
+                "json",
+                "zip",
+            ],
+            accept_multiple_files=True,
+            label_visibility="collapsed",
+        )
+
+        if uploaded_files:
+            upload_signature = _uploaded_file_signature(uploaded_files)
+            current_signature = st.session_state.get("atlas_upload_signature")
+            if current_signature != upload_signature:
+                st.session_state.pop("atlas_uploaded_context", None)
+                st.session_state["atlas_upload_signature"] = upload_signature
+
+        process_upload = st.button(
+            "Run Atlas Intake",
+            type="primary",
+            disabled=not uploaded_files,
+        )
+
+        if process_upload and uploaded_files:
+            intake_files = [
+                UploadedIntakeFile(name=file.name, data=file.getvalue())
+                for file in uploaded_files
+            ]
+            with st.spinner("Classifying files and running deterministic review..."):
+                st.session_state["atlas_uploaded_context"] = (
+                    build_uploaded_review_context(
+                        uploaded_files=intake_files,
+                    )
+                )
+
+        context = st.session_state.get("atlas_uploaded_context")
+        if context is None:
+            _empty_state(
+                st,
+                "Upload one or more project files (or a ZIP) and run Atlas Intake.",
+            )
+            return
+
+    # Keep legacy snapshot mode available for existing local outputs.
+    if source_mode == "Uploaded Project" and st.sidebar.checkbox(
+        "Use Existing Intake Snapshot",
+        value=False,
+    ):
+        intake_snapshots = discover_local_intake_snapshots()
+        if intake_snapshots:
+            snapshot_options = {
+                item["label"]: item["path"] for item in intake_snapshots
+            }
+            selected_snapshot_label = st.sidebar.selectbox(
+                "Intake Snapshot",
+                options=list(snapshot_options.keys()),
+                index=0,
+            )
+            context = build_intake_review_context(
+                snapshot_options[selected_snapshot_label]
+            )
+        else:
+            st.sidebar.warning(
+                "No intake snapshots discovered under outputs/ or examples/."
+            )
+
     review = context["review"]
     brief = context["brief"]
     revision = context["revision_comparison"]
     readiness = getattr(review, "readiness", None)
     labor = getattr(review, "labor_estimate", None)
+
+    if context.get("data_source_mode") == "seed_sample_data":
+        st.info("Sample Data\n" "Music Academy of the West (Reference Project)")
+    else:
+        project_name = str(context.get("sample_project_name") or "Uploaded Project")
+        st.success(f"Uploaded Project\n{project_name}")
+
+    package_location = str(context.get("package_location") or "")
+    if package_location:
+        st.caption(f"Package Location: {package_location}")
+
+    import_summary = dict(context.get("import_summary") or {})
+    if import_summary:
+        st.markdown("Import Summary")
+        summary_rows = [
+            {
+                "metric": "drawing count",
+                "value": import_summary.get("drawing_count", 0),
+            },
+            {
+                "metric": "specification count",
+                "value": import_summary.get("specification_count", 0),
+            },
+            {
+                "metric": "schedule count",
+                "value": import_summary.get("schedule_count", 0),
+            },
+            {
+                "metric": "addenda count",
+                "value": import_summary.get("addenda_count", 0),
+            },
+            {"metric": "image count", "value": import_summary.get("image_count", 0)},
+            {
+                "metric": "unsupported file count",
+                "value": import_summary.get("unsupported_file_count", 0),
+            },
+        ]
+        st.dataframe(summary_rows, use_container_width=True, hide_index=True)
+
+    st.markdown("Extraction Warnings")
+    for warning in list(context.get("warnings") or []):
+        st.warning(warning)
 
     readiness_score = getattr(readiness, "readiness_score", None)
     readiness_level = getattr(
@@ -203,37 +354,46 @@ def main() -> None:
 
     with tabs[5]:
         st.subheader("Revision Comparison Summary")
-        st.dataframe(
-            [
-                {
-                    "field": "Baseline Revision ID",
-                    "value": revision.baseline_revision_id,
-                },
-                {
-                    "field": "Comparison Revision ID",
-                    "value": revision.comparison_revision_id,
-                },
-                {"field": "Change Count", "value": len(revision.changes)},
-                {"field": "Added Items", "value": len(revision.added_items)},
-                {"field": "Removed Items", "value": len(revision.removed_items)},
-                {"field": "Modified Items", "value": len(revision.modified_items)},
-                {
-                    "field": "Labor Impact Flags",
-                    "value": len(revision.labor_impact_flags),
-                },
-                {"field": "RFI Impacts", "value": len(revision.rfi_impacts)},
-                {"field": "Confidence", "value": revision.confidence},
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        st.markdown("Revision Changes")
-        changes = _to_rows(list(revision.changes or []))
-        if changes:
-            st.dataframe(changes, use_container_width=True, hide_index=True)
+        if revision is None:
+            _empty_state(st, "No revision comparison available for this source.")
         else:
-            _empty_state(st, "No revision changes available.")
+            st.dataframe(
+                [
+                    {
+                        "field": "Baseline Revision ID",
+                        "value": revision.baseline_revision_id,
+                    },
+                    {
+                        "field": "Comparison Revision ID",
+                        "value": revision.comparison_revision_id,
+                    },
+                    {"field": "Change Count", "value": len(revision.changes)},
+                    {"field": "Added Items", "value": len(revision.added_items)},
+                    {
+                        "field": "Removed Items",
+                        "value": len(revision.removed_items),
+                    },
+                    {
+                        "field": "Modified Items",
+                        "value": len(revision.modified_items),
+                    },
+                    {
+                        "field": "Labor Impact Flags",
+                        "value": len(revision.labor_impact_flags),
+                    },
+                    {"field": "RFI Impacts", "value": len(revision.rfi_impacts)},
+                    {"field": "Confidence", "value": revision.confidence},
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            st.markdown("Revision Changes")
+            changes = _to_rows(list(revision.changes or []))
+            if changes:
+                st.dataframe(changes, use_container_width=True, hide_index=True)
+            else:
+                _empty_state(st, "No revision changes available.")
 
     with tabs[6]:
         st.subheader("Engineering Assumptions")
