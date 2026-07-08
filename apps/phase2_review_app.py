@@ -44,6 +44,14 @@ PROJECT_MANAGER_PAGES = [
     "Open Existing Project",
 ]
 
+TOP_LEVEL_NAVIGATION: list[tuple[str, str]] = [
+    ("Mission Control", "Mission Control"),
+    ("Projects", "Projects"),
+    ("Knowledge", "Relationship Visualization"),
+    ("Reports", "Reports"),
+    ("Administration", "Project Settings"),
+]
+
 ENGINEERING_PAGES = [
     "Overview",
     "Engineering Workbench",
@@ -874,123 +882,33 @@ def _render_header(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    recent = workspace_service.list_recent_workspaces(limit=30)
-    pinned = workspace_service.list_pinned_workspaces(limit=30)
-    references = workspace_service.list_reference_workspaces()
-    options = _selector_options(recent, pinned, references)
-    labels = [item.label for item in options]
-
-    if st.session_state.get("atlas_project_selector") not in labels:
-        st.session_state["atlas_project_selector"] = labels[0]
-
-    st.markdown("<div class='atlas-title'>Atlas</div>", unsafe_allow_html=True)
-
-    cols = st.columns([3.0, 3.2, 1.1, 1.0, 1.2, 1.9])
-    selected = cols[0].selectbox(
-        "Project",
-        options=labels,
-        key="atlas_project_selector",
-    )
-    _apply_selector_choice(st, workspace_service, selected, options)
+    cols = st.columns([2.2, 6.8, 0.8, 0.8])
+    if cols[0].button("Atlas", use_container_width=True, type="secondary"):
+        st.session_state["atlas_active_page"] = "Mission Control"
+        st.rerun()
 
     cols[1].text_input(
         "Global Search",
         key="atlas_global_search",
         placeholder="Search drawings, specs, equipment, systems, RFIs, evidence",
     )
-    cols[2].button("Actions", disabled=True, use_container_width=True)
+    cols[2].button("Alerts", disabled=True, use_container_width=True)
     cols[3].button("Settings", use_container_width=True)
-    cols[4].selectbox("Profile", ["User"], index=0)
-    cols[5].markdown(
-        f"<div class='atlas-muted'>Page: {st.session_state.get('atlas_active_page', 'Mission Control')}</div>",
-        unsafe_allow_html=True,
-    )
 
 
 def _nav_buttons(st: Any, host: Any, mode: str) -> None:
     active_page = st.session_state.get("atlas_active_page", "Mission Control")
 
     host.markdown("### Navigation")
-    groups: list[tuple[str, list[tuple[str, str]]]] = [
-        (
-            "MISSION CONTROL",
-            [("Mission Control", "Mission Control")],
-        ),
-        (
-            "PROJECTS",
-            [
-                ("Projects", "Projects"),
-                ("Pinned Projects", "Pinned Projects"),
-                ("Reference Projects", "Reference Projects"),
-                ("Recent Projects", "Recent Projects"),
-                ("Create New Project", "Create New Project"),
-                ("Open Existing Project", "Open Existing Project"),
-            ],
-        ),
-        (
-            "ENGINEERING",
-            [
-                ("Workbench", "Engineering Workbench"),
-                ("Drawings", "Drawings"),
-                ("Specifications", "Specifications"),
-                ("Equipment", "Equipment"),
-                ("Systems", "Systems"),
-                ("Resolver", "Engineering Resolver"),
-                ("Coordination", "Coordination Review"),
-                ("Notebook", "Engineering Notebook"),
-            ],
-        ),
-        (
-            "KNOWLEDGE",
-            [
-                ("Knowledge Graph", "Relationship Visualization"),
-                ("Relationships", "Relationship Explorer"),
-                ("Evidence", "Evidence"),
-                ("Timeline", "Timeline"),
-                ("Master Library", "Master Library Explorer"),
-            ],
-        ),
-        (
-            "REPORTS",
-            [
-                ("Estimator Brief", "Estimator Brief"),
-                ("Readiness", "Readiness"),
-                ("Labor Estimate", "Labor Estimate"),
-                ("Revision Comparison", "Revision Comparison"),
-                ("Exports", "Exports"),
-            ],
-        ),
-        (
-            "ADMINISTRATION",
-            [
-                ("Repository", "Project Settings"),
-                ("Settings", "Application Settings"),
-            ],
-        ),
-    ]
-
-    for group_name, entries in groups:
-        with host.expander(
-            group_name,
-            expanded=active_page in [item[1] for item in entries],
+    for label, page in TOP_LEVEL_NAVIGATION:
+        if host.button(
+            label,
+            key=f"atlas_nav_{mode}_{label}_{page}",
+            type="primary" if active_page == page else "secondary",
+            use_container_width=True,
         ):
-            for label, page in entries:
-                if host.button(
-                    label,
-                    key=f"atlas_nav_{mode}_{group_name}_{label}_{page}",
-                    type="primary" if active_page == page else "secondary",
-                    use_container_width=True,
-                ):
-                    st.session_state["atlas_active_page"] = page
-
-    with host.expander("PROJECT LIFECYCLE", expanded=False):
-        for page in DISABLED_LIFECYCLE_PAGES:
-            host.button(
-                f"{page} · Coming Soon",
-                key=f"atlas_nav_disabled_{mode}_{page}",
-                disabled=True,
-                use_container_width=True,
-            )
+            st.session_state["atlas_active_page"] = page
+            st.rerun()
 
 
 def _set_context_selection(st: Any, kind: str, data: dict[str, Any]) -> None:
@@ -1451,6 +1369,8 @@ def _render_home_page(
     )
     signals = list(payload.get("signals") or [])
     actions = list(payload.get("actions") or [])
+    timeline = list(payload.get("timeline") or [])
+    pending_timeline = list(payload.get("pending_timeline") or [])
     active_signal = dict(payload.get("active_signal") or {})
 
     _render_page_header(
@@ -1468,36 +1388,49 @@ def _render_home_page(
     _metric_card(summary_cols[0], "Action Items", str(len(actions)))
     _metric_card(summary_cols[1], "Active Projects", str(len(active_projects)))
     _metric_card(summary_cols[2], "Needs Attention", str(len(attention_projects)))
-    _metric_card(summary_cols[3], "Recent Workspaces", str(len(signals)))
+    _metric_card(summary_cols[3], "Upcoming This Week", str(len(pending_timeline)))
 
     st.markdown("### Continue Working")
-    continue_cols = st.columns(3)
-    if continue_cols[0].button(
-        "Open Engineering Workbench", type="primary", use_container_width=True
-    ):
-        st.session_state["atlas_active_page"] = "Engineering Workbench"
-        st.rerun()
-    if continue_cols[1].button(
-        "Open Resolver Conflict Center", use_container_width=True
-    ):
-        st.session_state["atlas_active_page"] = "Resolver Conflict Center"
-        st.rerun()
-    if continue_cols[2].button("Open Coordination Review", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Coordination Review"
-        st.rerun()
+    if signals:
+        for item in signals[:3]:
+            with st.container(border=True):
+                st.markdown(f"**{_safe_text(item.get('project'), 'Project')}**")
+                st.caption(
+                    f"{_safe_text(item.get('stage'), 'n/a')} · "
+                    f"{_safe_text(item.get('status'), 'Active')}"
+                )
+                cols = st.columns([2.3, 1.7, 1.8])
+                cols[0].caption(
+                    f"Health: {int(item.get('errors', 0))} errors, "
+                    f"{int(item.get('warnings', 0))} warnings"
+                )
+                cols[1].caption(f"Artifacts: {int(item.get('review_artifacts', 0))}")
+                if cols[2].button(
+                    "Continue Review",
+                    key=f"atlas_mc_continue_{item.get('workspace_id')}",
+                    use_container_width=True,
+                    type="primary",
+                ):
+                    st.session_state["atlas_active_workspace_id"] = _safe_text(
+                        item.get("workspace_id"),
+                        "",
+                    )
+                    st.session_state["atlas_active_page"] = "Engineering Workbench"
+                    st.rerun()
+    else:
+        st.info("No recent projects to continue yet.")
 
     st.markdown("### Action Center")
     if actions:
         st.dataframe(
             [
                 {
+                    "Priority": item["priority"],
                     "Action": item["title"],
                     "Project": item["project"],
-                    "Priority": item["priority"],
                     "Reason": item["reason"],
                     "Count": item["count"],
-                    "Related Page": item["related_page"],
-                    "Recommended Destination": item["destination"],
+                    "Next Step": item["destination"],
                 }
                 for item in actions[:14]
             ],
@@ -1520,6 +1453,9 @@ def _render_home_page(
             if st.button("Go to selected action", type="primary"):
                 st.session_state["atlas_active_page"] = selected_destination
                 st.rerun()
+        if st.button("View all action items", key="atlas_mc_view_all_actions"):
+            st.session_state["atlas_active_page"] = "Engineering Workbench"
+            st.rerun()
     else:
         st.info("No priority actions detected. Continue from Engineering Workbench.")
 
@@ -1562,6 +1498,23 @@ def _render_home_page(
         )
     else:
         st.success("No blocked projects in the recent workspace set.")
+
+    st.markdown("### Recent Activity")
+    if timeline:
+        st.dataframe(
+            [
+                {
+                    "Event": item.get("event"),
+                    "Status": item.get("status"),
+                    "Timestamp": item.get("timestamp"),
+                }
+                for item in timeline[:8]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.caption("No recent activity.")
 
     if active_signal:
         st.caption(
@@ -10326,13 +10279,15 @@ def _render_mission_control_panels(
                     "Priority": item.get("priority"),
                     "Action": item.get("title"),
                     "Project": item.get("project"),
-                    "Go To": item.get("destination"),
                 }
-                for item in actions[:6]
+                for item in actions[:5]
             ],
             use_container_width=True,
             hide_index=True,
         )
+        if st.button("View all action items", key="atlas_side_view_actions"):
+            st.session_state["atlas_active_page"] = "Engineering Workbench"
+            st.rerun()
     else:
         st.caption("No high-priority actions detected.")
 
@@ -10350,6 +10305,9 @@ def _render_mission_control_panels(
             use_container_width=True,
             hide_index=True,
         )
+        if st.button("View full activity", key="atlas_side_view_activity"):
+            st.session_state["atlas_active_page"] = "Timeline"
+            st.rerun()
     else:
         st.caption("No activity yet.")
 
@@ -10362,11 +10320,14 @@ def _render_mission_control_panels(
                     "Status": item.get("status"),
                     "Details": item.get("details"),
                 }
-                for item in pending_timeline[:8]
+                for item in pending_timeline[:5]
             ],
             use_container_width=True,
             hide_index=True,
         )
+        if st.button("View full timeline", key="atlas_side_view_timeline"):
+            st.session_state["atlas_active_page"] = "Timeline"
+            st.rerun()
     else:
         st.caption("No pending timeline items.")
 
@@ -10382,11 +10343,14 @@ def _render_mission_control_panels(
                     "Status": item.get("status"),
                     "Reason": item.get("reason"),
                 }
-                for item in attention[:8]
+                for item in attention[:5]
             ],
             use_container_width=True,
             hide_index=True,
         )
+        if st.button("View all projects", key="atlas_side_view_projects"):
+            st.session_state["atlas_active_page"] = "Projects"
+            st.rerun()
     else:
         st.caption("No blocked projects in recent workspaces.")
 
@@ -10416,7 +10380,6 @@ def _render_shell(
     )
 
     layout_mode = st.session_state.get("atlas_layout_mode", "Desktop")
-    collapsed = bool(st.session_state.get("atlas_navigation_collapsed", False))
 
     if layout_mode == "Desktop":
         nav_col, main_col, context_col = st.columns([2.3, 6.4, 2.3])
@@ -10437,62 +10400,36 @@ def _render_shell(
                 _render_context_panel(st, context)
 
     elif layout_mode == "Tablet":
-        ctrl_cols = st.columns([2.2, 7.8])
-        with ctrl_cols[0]:
-            st.checkbox("Collapse Sidebar", key="atlas_navigation_collapsed")
-
-        if collapsed:
-            nav_popover = st.popover("Navigation")
-            _nav_buttons(st, nav_popover, "tablet")
-            main_col, context_col = st.columns([7.1, 2.9])
-            with main_col:
-                _render_main_content(
-                    st,
-                    workspace_service,
-                    record,
-                    context,
-                    mission_control_payload,
-                )
-            with context_col:
-                if current_page == "Mission Control":
-                    _render_mission_control_panels(st, mission_control_payload)
-                else:
-                    _render_context_panel(st, context)
+        nav_popover = st.popover("Navigation")
+        _nav_buttons(st, nav_popover, "tablet")
+        _render_main_content(
+            st,
+            workspace_service,
+            record,
+            context,
+            mission_control_payload,
+        )
+        st.markdown("---")
+        if current_page == "Mission Control":
+            _render_mission_control_panels(st, mission_control_payload)
         else:
-            nav_col, main_col, context_col = st.columns([2.3, 5.5, 2.2])
-            with nav_col:
-                _nav_buttons(st, st, "tablet")
-            with main_col:
-                _render_main_content(
-                    st,
-                    workspace_service,
-                    record,
-                    context,
-                    mission_control_payload,
-                )
-            with context_col:
-                if current_page == "Mission Control":
-                    _render_mission_control_panels(st, mission_control_payload)
-                else:
-                    _render_context_panel(st, context)
+            _render_context_panel(st, context)
 
     else:
         nav_drawer = st.popover("Open Navigation")
         _nav_buttons(st, nav_drawer, "mobile")
-        main_col, context_col = st.columns([6.7, 3.3])
-        with main_col:
-            _render_main_content(
-                st,
-                workspace_service,
-                record,
-                context,
-                mission_control_payload,
-            )
-        with context_col:
-            if current_page == "Mission Control":
-                _render_mission_control_panels(st, mission_control_payload)
-            else:
-                _render_context_panel(st, context)
+        _render_main_content(
+            st,
+            workspace_service,
+            record,
+            context,
+            mission_control_payload,
+        )
+        st.markdown("---")
+        if current_page == "Mission Control":
+            _render_mission_control_panels(st, mission_control_payload)
+        else:
+            _render_context_panel(st, context)
 
     _render_status_bar(st, record, context)
 

@@ -21,13 +21,10 @@ Shell layout:
 The shell remains visible while page content changes.
 
 Header includes:
-- Atlas logo/title
-- Project selector
+- Atlas logo button (returns to Mission Control)
 - Global Search (project-wide object search)
-- Actions placeholder
+- Alerts placeholder
 - Settings
-- User/profile placeholder
-- Current page context
 
 System metadata (version/commit/stage/status) remains available in the status bar.
 
@@ -53,23 +50,17 @@ Files are automatically classified into:
 
 After classification, Atlas runs deterministic intake, saves the workspace locally, and then executes the existing project review pipeline.
 
-## Project Selector
-Workspace v1 uses a project selector instead of separate home controls.
+## Navigation Intent
+Workspace navigation is mission-oriented at the top level.
 
-Selector options include:
-- Recent Projects
-- Reference Projects
-- Create New Project
-- Open Existing Project
-- Reference Project: Music Academy of the West (`[Reference]` badge)
-
-Selecting project actions routes to project-centric pages:
+Top-level navigation includes:
 - Mission Control
 - Projects
-- Reference Projects
-- Recent Projects
-- Create New Project
-- Open Existing Project
+- Knowledge
+- Reports
+- Administration
+
+Engineering and project lifecycle work remain available inside project workflows rather than top-level navigation.
 
 ## Data Sources
 The workspace supports two explicit source modes.
@@ -112,61 +103,20 @@ If expected folders are missing, Atlas shows a warning and still attempts determ
    - streamlit run apps/phase2_review_app.py
 3. Open `Reference Project` to verify MAW source mode.
 
-## Navigation
+## Mission Control Content
+Mission Control center column includes:
+- Top summary cards: Action Items, Active Projects, Needs Attention, Upcoming This Week
+- Continue Working project cards
+- Main Action Center table with priority and next-step routing
+- Active Projects table
+- Projects Requiring Attention table
+- Recent Activity
 
-Mission Control:
-- Mission Control
-
-Projects:
-- Projects
-- Pinned Projects
-- Reference Projects
-- Recent Projects
-- Create New Project
-- Open Existing Project
-
-Engineering:
-- Overview
-- Engineering Workbench
-- Engineering Notebook
-- Project Files
-- Drawings
-- Drawing Explorer
-- Specifications
-- Specification Explorer
-- Equipment
-- Systems
-- Engineering Resolver
-- Resolver Conflict Center
-- Engineering Intelligence
-- Coordination Review
-
-Knowledge:
-- Relationship Visualization
-- Relationship Explorer
-- Evidence
-- Timeline
-- Master Library Explorer
-
-Reports:
-- Reports
-- Estimator Brief
-- Readiness
-- Labor Estimate
-- Revision Comparison
-- Exports
-
-Administration:
-- Project Settings
-- Application Settings
-
-Project Lifecycle (disabled, Coming Soon):
-- Engineering
-- Procurement
-- Financials
-- Construction
-- Closeout
-- Service
+Mission Control right panels include:
+- Action Center (compact)
+- Recent Activity
+- Upcoming Timeline
+- Projects Requiring Attention
 
 ## Responsive Navigation
 - Desktop: persistent sidebar
@@ -178,6 +128,10 @@ The current page, selected project, and breadcrumb remain visible in all modes.
 Context panel behavior:
 - Mission Control: the right column is replaced by global panels (Action Center, Recent Activity, Upcoming Timeline, Projects Requiring Attention).
 - All other pages: the right column remains the object-level context panel.
+
+Responsive behavior:
+- Desktop: three-column shell (navigation, content, right panel).
+- Tablet and mobile: navigation collapses to popover/hamburger and right panels stack below main content.
 
 ## Upload Flow
 1. Open `Project Files`.
