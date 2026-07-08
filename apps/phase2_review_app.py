@@ -29,6 +29,7 @@ from atlas_core.services.specification_intelligence import (
     SpecificationIntelligenceEngine,
     SpecificationReferenceType,
 )
+from atlas_core.services.coordination_intelligence import CoordinationIntelligenceEngine
 from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 
 PROJECT_MANAGER_PAGES = [
@@ -55,6 +56,7 @@ PROJECT_PAGES = [
     "Engineering Resolver",
     "Resolver Conflict Center",
     "Engineering Intelligence",
+    "Coordination Review",
     "Relationship Explorer",
     "Relationship Visualization",
     "Timeline",
@@ -1750,6 +1752,10 @@ def _workspace_objects(
             "specification_relationships": [],
             "specification_intelligence_confidence": "n/a",
             "specification_cross_reference_warnings": [],
+            "coordination_findings": [],
+            "coordination_issues": [],
+            "coordination_summary": {},
+            "coordination_confidence": "n/a",
         }
 
     review = context.get("review")
@@ -1828,9 +1834,7 @@ def _workspace_objects(
             3,
         )
         for spec_relationship in specification_intelligence_result.relationships:
-            specification_relationships_by_source[
-                spec_relationship.source_id
-            ].append(
+            specification_relationships_by_source[spec_relationship.source_id].append(
                 spec_relationship.to_dict()
             )
 
@@ -2227,6 +2231,23 @@ def _workspace_objects(
         specifications=specifications,
         equipment=equipment,
     )
+    coordination_result = None
+    if review is not None:
+        try:
+            coordination_result = CoordinationIntelligenceEngine().build(
+                review=review,
+                drawings=drawings,
+                specifications=specifications,
+                equipment=equipment,
+                systems=systems,
+                rfis=rfi_rows,
+                assumptions=_to_rows(
+                    list(getattr(review, "engineering_assumptions", []) or [])
+                ),
+                evidence=evidence_rows,
+            )
+        except Exception:
+            coordination_result = None
 
     return {
         "drawings": drawings,
@@ -2248,6 +2269,26 @@ def _workspace_objects(
         "specification_relationships": specification_relationship_payload,
         "specification_intelligence_confidence": specification_intelligence_confidence,
         "specification_cross_reference_warnings": specification_cross_reference_warnings,
+        "coordination_findings": (
+            [item.to_dict() for item in coordination_result.findings]
+            if coordination_result is not None
+            else []
+        ),
+        "coordination_issues": (
+            [item.to_dict() for item in coordination_result.issues]
+            if coordination_result is not None
+            else []
+        ),
+        "coordination_summary": (
+            coordination_result.summary.to_dict()
+            if coordination_result is not None
+            else {}
+        ),
+        "coordination_confidence": (
+            round(float(coordination_result.confidence), 3)
+            if coordination_result is not None
+            else "n/a"
+        ),
     }
 
 
@@ -2346,6 +2387,17 @@ def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any
                 "data": item,
             }
         )
+    for item in objects["coordination_findings"]:
+        entries.append(
+            {
+                "kind": "Coordination Finding",
+                "name": _safe_text(item.get("title"), "Coordination Finding"),
+                "subtitle": _safe_text(item.get("category"), ""),
+                "page": "Coordination Review",
+                "selection_kind": "project",
+                "data": item,
+            }
+        )
     if resolver_result is not None:
         for item in list(getattr(resolver_result, "resolved_objects", []) or []):
             item_dict = item.to_dict()
@@ -2396,6 +2448,7 @@ def _timeline_events(
     revision = context.get("revision_comparison") if context else None
     resolver_result = _build_engineering_resolver(record, context)
     intelligence = _build_engineering_intelligence(record, context)
+    coordination_summary = dict(_workspace_objects(context).get("coordination_summary") or {})
 
     events = [
         {
@@ -2437,6 +2490,16 @@ def _timeline_events(
                 ),
                 "n/a",
             ),
+        },
+        {
+            "event": "Coordination Intelligence Generated",
+            "timestamp": record.updated_at,
+            "status": (
+                "Completed"
+                if int(coordination_summary.get("total_findings", 0) or 0) > 0
+                else "Pending"
+            ),
+            "details": _safe_text(coordination_summary.get("total_findings"), "0"),
         },
         {
             "event": "Revision Compared",
@@ -3774,6 +3837,125 @@ def _build_knowledge_graph(
                 _safe_text(warning.get("message"), "n/a"),
             )
 
+    for finding in list(objects.get("coordination_findings") or []):
+        finding_id = _safe_text(finding.get("finding_id"), "finding")
+        finding_node = f"coordination_finding:{finding_id}"
+        _add_node(
+            finding_node,
+            "Coordination Finding",
+            _safe_text(finding.get("title"), "Coordination Finding"),
+            "Coordination Review",
+            "project",
+            data=finding,
+            metadata={
+                "source_file": _safe_text(
+                    context.get("package_location") if context else None,
+                    "n/a",
+                ),
+                "source_page": "n/a",
+                "sheet_number": "n/a",
+                "specification_section": "n/a",
+                "extraction_confidence": _safe_text(finding.get("confidence"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            finding_node,
+            "Project to Coordination Finding",
+            _safe_text(finding.get("confidence"), "n/a"),
+            _safe_text(finding.get("description"), "n/a"),
+        )
+
+        for ref in list(finding.get("related_objects") or []):
+            related_id = _safe_text(ref, "")
+            if not related_id:
+                continue
+            if ":" not in related_id:
+                continue
+            prefix, value = related_id.split(":", 1)
+            normalized_target = ""
+            if prefix == "drawing":
+                normalized_target = f"drawing:{value}"
+            elif prefix == "spec":
+                normalized_target = f"spec:{value}"
+            elif prefix == "equipment":
+                normalized_target = f"equipment:{value}"
+            elif prefix == "system":
+                normalized_target = f"system:{value}"
+            elif prefix == "rfi":
+                normalized_target = f"rfi:{value}"
+            elif prefix == "assumption":
+                normalized_target = f"assumption:{value}"
+            elif prefix == "evidence":
+                normalized_target = related_id
+
+            if not normalized_target:
+                continue
+            if _node_by_id({"nodes": nodes}, normalized_target) is None:
+                continue
+            _add_edge(
+                finding_node,
+                normalized_target,
+                "Coordination finding references object",
+                _safe_text(finding.get("confidence"), "n/a"),
+                _safe_text(finding.get("title"), "n/a"),
+            )
+
+        for evidence_row in list(finding.get("evidence") or []):
+            evidence_id = _safe_text(evidence_row.get("object_id"), "")
+            if (
+                evidence_id.startswith("evidence:")
+                and _node_by_id({"nodes": nodes}, evidence_id) is not None
+            ):
+                _add_edge(
+                    finding_node,
+                    evidence_id,
+                    "Coordination finding to evidence",
+                    _safe_text(evidence_row.get("confidence"), "n/a"),
+                    _safe_text(evidence_row.get("source_ref"), "n/a"),
+                )
+
+    for issue in list(objects.get("coordination_issues") or []):
+        issue_id = _safe_text(issue.get("issue_id"), "issue")
+        issue_node = f"coordination_issue:{issue_id}"
+        _add_node(
+            issue_node,
+            "Coordination Issue",
+            _safe_text(issue.get("category"), "Coordination Issue"),
+            "Coordination Review",
+            "project",
+            data=issue,
+            metadata={
+                "source_file": _safe_text(
+                    context.get("package_location") if context else None,
+                    "n/a",
+                ),
+                "source_page": "n/a",
+                "sheet_number": "n/a",
+                "specification_section": "n/a",
+                "extraction_confidence": _safe_text(issue.get("severity"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            issue_node,
+            "Project to Coordination Issue",
+            _safe_text(issue.get("severity"), "n/a"),
+            issue_id,
+        )
+        for finding_id in list(issue.get("finding_ids") or []):
+            _add_edge(
+                issue_node,
+                f"coordination_finding:{finding_id}",
+                "Coordination issue to finding",
+                _safe_text(issue.get("severity"), "n/a"),
+                issue_id,
+            )
+
     file_diags = list(import_summary.get("file_diagnostics") or [])
     for diag in file_diags:
         file_name = _safe_text(diag.get("file_name"), "unknown")
@@ -4361,11 +4543,17 @@ def _render_engineering_workbench_page(
         scope_tokens,
         scope_filter_enabled,
     )
+    coordination_rows = _filter_rows_by_scope(
+        list(objects.get("coordination_findings", [])),
+        scope_tokens,
+        scope_filter_enabled,
+    )
 
-    top_row = st.columns(3)
+    top_row = st.columns(4)
     _metric_card(top_row[0], "Active Engineering Insights", str(len(insight_rows)))
     _metric_card(top_row[1], "Resolver Conflicts", str(len(conflict_rows)))
     _metric_card(top_row[2], "Open RFI Candidates", str(len(rfi_rows)))
+    _metric_card(top_row[3], "Coordination Findings", str(len(coordination_rows)))
 
     row_a = st.columns([3.6, 3.2, 3.2])
     with row_a[0]:
@@ -4491,6 +4679,27 @@ def _render_engineering_workbench_page(
                 use_container_width=True,
                 hide_index=True,
             )
+
+    st.markdown("#### Coordination Findings")
+    if coordination_rows:
+        st.dataframe(
+            [
+                {
+                    "severity": _safe_text(item.get("severity"), "n/a"),
+                    "category": _safe_text(item.get("category"), "n/a"),
+                    "title": _safe_text(item.get("title"), "n/a"),
+                    "recommended action": _safe_text(
+                        item.get("recommended_action"),
+                        "n/a",
+                    ),
+                }
+                for item in coordination_rows[:12]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No coordination findings match the current scope.")
 
     st.markdown("#### Evidence Panel")
     if evidence_rows:
@@ -4749,6 +4958,202 @@ def _top_reference_counts(
     ]
 
 
+def _render_coordination_review_page(
+    st: Any,
+    context: dict[str, Any] | None,
+) -> None:
+    st.subheader("Coordination Review")
+    objects = _workspace_objects(context)
+    findings = list(objects.get("coordination_findings", []))
+    issues = list(objects.get("coordination_issues", []))
+    summary = dict(objects.get("coordination_summary") or {})
+
+    if not findings:
+        st.info(
+            "No coordination findings are available for the current project context."
+        )
+        return
+
+    top_row = st.columns(4)
+    _metric_card(top_row[0], "Coordination Findings", str(len(findings)))
+    _metric_card(
+        top_row[1],
+        "Conflicts",
+        str(summary.get("conflict_count", 0)),
+    )
+    _metric_card(top_row[2], "Gaps", str(summary.get("gap_count", 0)))
+    _metric_card(
+        top_row[3],
+        "Coordination Confidence",
+        _safe_text(objects.get("coordination_confidence"), "n/a"),
+    )
+
+    filters = st.columns([1.6, 1.3, 1.3, 1.8])
+    category_filter = filters[0].multiselect(
+        "Category",
+        options=sorted({_safe_text(item.get("category"), "") for item in findings}),
+        default=[],
+    )
+    severity_filter = filters[1].multiselect(
+        "Severity",
+        options=["critical", "high", "medium", "low"],
+        default=[],
+    )
+    confidence_filter = filters[2].multiselect(
+        "Confidence",
+        options=["high", "medium", "low"],
+        default=[],
+    )
+    query = filters[3].text_input(
+        "Search Findings",
+        value=st.session_state.get("atlas_coordination_search", ""),
+        key="atlas_coordination_search",
+        placeholder="title, object id, category",
+    )
+
+    filtered = [
+        item
+        for item in findings
+        if (
+            (
+                not category_filter
+                or _safe_text(item.get("category"), "") in category_filter
+            )
+            and (
+                not severity_filter
+                or _safe_text(item.get("severity"), "") in severity_filter
+            )
+            and (
+                not confidence_filter
+                or _safe_text(item.get("confidence"), "") in confidence_filter
+            )
+            and (not query or _contains_any(str(item), [query]))
+        )
+    ]
+
+    severity_rank = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+    filtered.sort(
+        key=lambda item: severity_rank.get(_safe_text(item.get("severity"), ""), 0),
+        reverse=True,
+    )
+
+    st.markdown("#### Findings")
+    st.dataframe(
+        [
+            {
+                "severity": _safe_text(item.get("severity"), "n/a"),
+                "category": _safe_text(item.get("category"), "n/a"),
+                "confidence": _safe_text(item.get("confidence"), "n/a"),
+                "title": _safe_text(item.get("title"), "n/a"),
+                "recommended action": _safe_text(
+                    item.get("recommended_action"),
+                    "n/a",
+                ),
+                "related objects": ", ".join(
+                    list(item.get("related_objects") or [])[:6]
+                )
+                or "n/a",
+            }
+            for item in filtered
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    if filtered:
+        labels = [
+            f"{_safe_text(item.get('severity'), 'n/a')} · {_safe_text(item.get('title'), 'finding')}"
+            for item in filtered
+        ]
+        selected_label = st.selectbox(
+            "Select Finding",
+            options=labels,
+            key="atlas_coordination_finding",
+        )
+        selected = filtered[labels.index(selected_label)]
+
+        detail_col, issue_col = st.columns([2.3, 1.7])
+        with detail_col:
+            st.markdown("#### Finding Detail")
+            st.dataframe(
+                [
+                    {
+                        "field": "Finding ID",
+                        "value": _safe_text(selected.get("finding_id"), "n/a"),
+                    },
+                    {
+                        "field": "Category",
+                        "value": _safe_text(selected.get("category"), "n/a"),
+                    },
+                    {
+                        "field": "Severity",
+                        "value": _safe_text(selected.get("severity"), "n/a"),
+                    },
+                    {
+                        "field": "Confidence",
+                        "value": _safe_text(selected.get("confidence"), "n/a"),
+                    },
+                    {
+                        "field": "Description",
+                        "value": _safe_text(selected.get("description"), "n/a"),
+                    },
+                    {
+                        "field": "Recommended Action",
+                        "value": _safe_text(
+                            selected.get("recommended_action"),
+                            "n/a",
+                        ),
+                    },
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            evidence_rows = list(selected.get("evidence") or [])
+            st.markdown("#### Supporting Evidence")
+            if evidence_rows:
+                st.dataframe(evidence_rows, use_container_width=True, hide_index=True)
+            else:
+                st.info("No explicit evidence rows were attached to this finding.")
+
+        with issue_col:
+            st.markdown("#### Coordination Issues")
+            related_issues = [
+                item
+                for item in issues
+                if _safe_text(selected.get("finding_id"), "")
+                in list(item.get("finding_ids") or [])
+            ]
+            if related_issues:
+                st.dataframe(related_issues, use_container_width=True, hide_index=True)
+            else:
+                st.info("No grouped issue currently references this finding.")
+
+            st.markdown("#### Summary")
+            st.dataframe(
+                [
+                    {
+                        "field": "Total Findings",
+                        "value": summary.get("total_findings", 0),
+                    },
+                    {
+                        "field": "Agreement",
+                        "value": summary.get("agreement_count", 0),
+                    },
+                    {
+                        "field": "Conflict",
+                        "value": summary.get("conflict_count", 0),
+                    },
+                    {
+                        "field": "Gap",
+                        "value": summary.get("gap_count", 0),
+                    },
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
 def _render_engineering_intelligence_page(
     st: Any,
     record: ProjectWorkspaceRecord,
@@ -4763,6 +5168,7 @@ def _render_engineering_intelligence_page(
         return
 
     graph = _build_knowledge_graph(record=record, context=context)
+    objects = _workspace_objects(context)
     insights = list(intelligence.insights)
     systems = list(intelligence.system_health)
     recommendations = list(intelligence.recommendations)
@@ -4915,6 +5321,39 @@ def _render_engineering_intelligence_page(
                 "supporting objects": ", ".join(item.supporting_objects[:5]),
             }
             for item in coordination
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    coordination_summary = dict(objects.get("coordination_summary") or {})
+    coordination_findings = list(objects.get("coordination_findings") or [])
+    st.markdown("#### Coordination Intelligence Summary")
+    st.dataframe(
+        [
+            {
+                "total findings": coordination_summary.get("total_findings", 0),
+                "conflicts": coordination_summary.get("conflict_count", 0),
+                "gaps": coordination_summary.get("gap_count", 0),
+                "agreements": coordination_summary.get("agreement_count", 0),
+                "confidence": _safe_text(
+                    objects.get("coordination_confidence"),
+                    "n/a",
+                ),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.dataframe(
+        [
+            {
+                "severity": _safe_text(item.get("severity"), "n/a"),
+                "category": _safe_text(item.get("category"), "n/a"),
+                "title": _safe_text(item.get("title"), "n/a"),
+                "action": _safe_text(item.get("recommended_action"), "n/a"),
+            }
+            for item in coordination_findings[:10]
         ],
         use_container_width=True,
         hide_index=True,
@@ -6926,6 +7365,11 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
     revision = context.get("revision_comparison") if context else None
     readiness = getattr(review, "readiness", None) if review is not None else None
     labor = getattr(review, "labor_estimate", None) if review is not None else None
+    coordination_objects = _workspace_objects(context)
+    coordination_summary = dict(coordination_objects.get("coordination_summary") or {})
+    coordination_findings = list(
+        coordination_objects.get("coordination_findings") or []
+    )
 
     st.subheader(page)
 
@@ -6963,6 +7407,23 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
                 use_container_width=True,
                 hide_index=True,
             )
+        st.markdown("Coordination Summary")
+        st.dataframe(
+            [
+                {
+                    "total findings": coordination_summary.get("total_findings", 0),
+                    "conflicts": coordination_summary.get("conflict_count", 0),
+                    "gaps": coordination_summary.get("gap_count", 0),
+                    "agreements": coordination_summary.get("agreement_count", 0),
+                    "confidence": _safe_text(
+                        coordination_objects.get("coordination_confidence"),
+                        "n/a",
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
         return
 
     if page == "Estimator Brief":
@@ -6982,6 +7443,28 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
             if st.button("Open Evidence Workspace", key="atlas_brief_open_evidence"):
                 st.session_state["atlas_active_page"] = "Evidence"
                 st.rerun()
+
+        high_priority_coordination = [
+            item
+            for item in coordination_findings
+            if _safe_text(item.get("severity"), "") in {"critical", "high"}
+        ]
+        st.markdown("Coordination Advisory")
+        if high_priority_coordination:
+            st.dataframe(
+                [
+                    {
+                        "severity": _safe_text(item.get("severity"), "n/a"),
+                        "title": _safe_text(item.get("title"), "n/a"),
+                        "action": _safe_text(item.get("recommended_action"), "n/a"),
+                    }
+                    for item in high_priority_coordination[:6]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No critical coordination advisories for the current brief.")
         return
 
     if page == "RFI Candidates":
@@ -7109,11 +7592,50 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         return
 
 
-def _render_reports_page(st: Any, page: str) -> None:
+def _render_reports_page(
+    st: Any,
+    page: str,
+    context: dict[str, Any] | None,
+) -> None:
     st.subheader(page)
     if page == "Reports":
-        st.info(
-            "Reporting module scaffolded. Use active Phase 2 pages for current outputs."
+        objects = _workspace_objects(context)
+        summary = dict(objects.get("coordination_summary") or {})
+        findings = list(objects.get("coordination_findings") or [])
+        st.caption(
+            "Estimator-facing report summary. Atlas coordination findings are advisory and traceable."
+        )
+        st.dataframe(
+            [
+                {
+                    "coordination findings": summary.get("total_findings", 0),
+                    "conflicts": summary.get("conflict_count", 0),
+                    "gaps": summary.get("gap_count", 0),
+                    "agreements": summary.get("agreement_count", 0),
+                    "confidence": _safe_text(
+                        objects.get("coordination_confidence"),
+                        "n/a",
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.dataframe(
+            [
+                {
+                    "severity": _safe_text(item.get("severity"), "n/a"),
+                    "category": _safe_text(item.get("category"), "n/a"),
+                    "title": _safe_text(item.get("title"), "n/a"),
+                    "recommended action": _safe_text(
+                        item.get("recommended_action"),
+                        "n/a",
+                    ),
+                }
+                for item in findings[:12]
+            ],
+            use_container_width=True,
+            hide_index=True,
         )
     else:
         st.info(
@@ -7614,6 +8136,8 @@ def _render_main_content(
         _render_resolver_conflict_center_page(st, record, context)
     elif page == "Engineering Intelligence":
         _render_engineering_intelligence_page(st, record, context)
+    elif page == "Coordination Review":
+        _render_coordination_review_page(st, context)
     elif page == "Relationship Explorer":
         _render_relationship_explorer_page(st, record, context)
     elif page == "Relationship Visualization":
@@ -7697,7 +8221,7 @@ def _render_main_content(
     elif page in BID_INTELLIGENCE_PAGES:
         _render_bid_page(st, page, context)
     elif page in REPORT_PAGES:
-        _render_reports_page(st, page)
+        _render_reports_page(st, page, context)
     elif page in SETTINGS_PAGES:
         _render_settings_page(st, page, workspace_service, record)
 

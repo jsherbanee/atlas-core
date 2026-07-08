@@ -185,6 +185,17 @@ from atlas_core.services.specification_intelligence import (
     SpecificationRelationship,
     SpecificationSection,
 )
+from atlas_core.services.coordination_intelligence import (
+    CoordinationCategory,
+    CoordinationConfidence,
+    CoordinationEvidence,
+    CoordinationFinding,
+    CoordinationIntelligenceEngine,
+    CoordinationIntelligenceResult,
+    CoordinationIssue,
+    CoordinationSeverity,
+    CoordinationSummary,
+)
 
 __all__ = [
     "BaselineService",
@@ -275,6 +286,15 @@ __all__ = [
     "SpecificationReferenceType",
     "SpecificationRelationship",
     "SpecificationSection",
+    "CoordinationCategory",
+    "CoordinationConfidence",
+    "CoordinationEvidence",
+    "CoordinationFinding",
+    "CoordinationIntelligenceEngine",
+    "CoordinationIntelligenceResult",
+    "CoordinationIssue",
+    "CoordinationSeverity",
+    "CoordinationSummary",
     "PackageDiscoveryResult",
     "UploadedIntakeFile",
     "UploadSessionResult",
