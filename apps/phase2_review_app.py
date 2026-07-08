@@ -38,6 +38,7 @@ PROJECT_MANAGER_PAGES = [
 
 PROJECT_PAGES = [
     "Overview",
+    "Engineering Workbench",
     "Executive Summary",
     "Project Files",
     "Drawings",
@@ -45,6 +46,7 @@ PROJECT_PAGES = [
     "Equipment",
     "Systems",
     "Engineering Resolver",
+    "Resolver Conflict Center",
     "Engineering Intelligence",
     "Relationship Explorer",
     "Relationship Visualization",
@@ -81,6 +83,19 @@ DISABLED_LIFECYCLE_PAGES = [
 
 REPORT_PAGES = ["Reports", "Exports"]
 SETTINGS_PAGES = ["Project Settings", "Application Settings"]
+
+INVESTIGATION_SELECTION_KINDS = {
+    "drawing",
+    "specification",
+    "equipment",
+    "system",
+    "room",
+    "manufacturer",
+    "evidence",
+    "resolved",
+    "resolver_conflict",
+    "rfi",
+}
 
 ALL_ACTIVE_PAGES = (
     PROJECT_MANAGER_PAGES
@@ -899,7 +914,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         action_cols = st.columns(4)
         if action_cols[0].button("Open Selected Project", type="primary"):
             st.session_state["atlas_active_workspace_id"] = selected.workspace_id
-            st.session_state["atlas_active_page"] = "Overview"
+            st.session_state["atlas_active_page"] = "Engineering Workbench"
             st.rerun()
 
         pin_label = "Unpin" if selected.pinned else "Pin"
@@ -1012,7 +1027,7 @@ def _render_pinned_projects_page(
     selected = records[labels.index(selected_label)]
     if st.button("Open Pinned Project", type="primary"):
         st.session_state["atlas_active_workspace_id"] = selected.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
+        st.session_state["atlas_active_page"] = "Engineering Workbench"
         st.rerun()
 
 
@@ -1043,7 +1058,7 @@ def _render_reference_projects_page(
         selected = references[labels.index(selected_label)]
         if st.button("Open Selected Reference", type="primary"):
             st.session_state["atlas_active_workspace_id"] = selected.workspace_id
-            st.session_state["atlas_active_page"] = "Overview"
+            st.session_state["atlas_active_page"] = "Engineering Workbench"
             st.rerun()
 
     st.markdown(
@@ -1059,7 +1074,7 @@ def _render_reference_projects_page(
         workspace_service.save_record(record)
         workspace_service.set_reference_project(record.workspace_id, reference=True)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
+        st.session_state["atlas_active_page"] = "Engineering Workbench"
         st.rerun()
 
 
@@ -1084,7 +1099,7 @@ def _render_recent_projects_page(
                 use_container_width=True,
             ):
                 st.session_state["atlas_active_workspace_id"] = record.workspace_id
-                st.session_state["atlas_active_page"] = "Overview"
+                st.session_state["atlas_active_page"] = "Engineering Workbench"
                 st.rerun()
 
 
@@ -1137,7 +1152,7 @@ def _render_create_project_page(
     )
     workspace_service.save_record(record)
     st.session_state["atlas_active_workspace_id"] = record.workspace_id
-    st.session_state["atlas_active_page"] = "Overview"
+    st.session_state["atlas_active_page"] = "Engineering Workbench"
     st.success(f"Created project {record.project.name}.")
     st.rerun()
 
@@ -1164,7 +1179,7 @@ def _render_open_existing_page(
         record = workspace_service.load_record(path / "project.json")
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
+        st.session_state["atlas_active_page"] = "Engineering Workbench"
         st.rerun()
         return
 
@@ -1172,7 +1187,7 @@ def _render_open_existing_page(
         record = workspace_service.load_record(path / "workspace.json")
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
+        st.session_state["atlas_active_page"] = "Engineering Workbench"
         st.rerun()
         return
 
@@ -1180,7 +1195,7 @@ def _render_open_existing_page(
         record = workspace_service.load_record(path)
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
+        st.session_state["atlas_active_page"] = "Engineering Workbench"
         st.rerun()
         return
 
@@ -1189,7 +1204,7 @@ def _render_open_existing_page(
         record = _build_record_from_context(context)
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
+        st.session_state["atlas_active_page"] = "Engineering Workbench"
         st.rerun()
         return
 
@@ -1198,7 +1213,7 @@ def _render_open_existing_page(
         record = _build_record_from_context(context)
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
+        st.session_state["atlas_active_page"] = "Engineering Workbench"
         st.rerun()
         return
 
@@ -1870,6 +1885,7 @@ def _workspace_objects(
 
 def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any]]:
     objects = _workspace_objects(context)
+    resolver_result = _build_engineering_resolver(record=None, context=context)
     entries: list[dict[str, Any]] = []
 
     for item in objects["drawings"]:
@@ -1962,6 +1978,31 @@ def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any
                 "data": item,
             }
         )
+    if resolver_result is not None:
+        for item in list(getattr(resolver_result, "resolved_objects", []) or []):
+            item_dict = item.to_dict()
+            entries.append(
+                {
+                    "kind": "Resolved Object",
+                    "name": _safe_text(item_dict.get("object_id"), "Resolved"),
+                    "subtitle": _safe_text(item_dict.get("object_type"), "object"),
+                    "page": "Engineering Workbench",
+                    "selection_kind": "resolved",
+                    "data": item_dict,
+                }
+            )
+        for item in list(getattr(resolver_result, "conflicts", []) or []):
+            item_dict = item.to_dict()
+            entries.append(
+                {
+                    "kind": "Resolver Conflict",
+                    "name": _safe_text(item_dict.get("conflict_id"), "Conflict"),
+                    "subtitle": _safe_text(item_dict.get("message"), ""),
+                    "page": "Resolver Conflict Center",
+                    "selection_kind": "resolver_conflict",
+                    "data": item_dict,
+                }
+            )
     for item in objects["evidence"]:
         entries.append(
             {
@@ -1985,10 +2026,12 @@ def _timeline_events(
     review = context.get("review") if context else None
     brief = context.get("brief") if context else None
     revision = context.get("revision_comparison") if context else None
+    resolver_result = _build_engineering_resolver(record, context)
+    intelligence = _build_engineering_intelligence(record, context)
 
     events = [
         {
-            "event": "Project intake",
+            "event": "Project Imported",
             "timestamp": record.created_at,
             "status": "Completed",
             "details": _safe_text(
@@ -1996,19 +2039,39 @@ def _timeline_events(
             ),
         },
         {
-            "event": "Document imports",
-            "timestamp": record.updated_at,
-            "status": "Completed",
-            "details": f"{import_summary.get('total_files', 0)} files",
-        },
-        {
-            "event": "Review run",
+            "event": "Review Executed",
             "timestamp": record.updated_at,
             "status": "Completed" if review is not None else "Pending",
             "details": _safe_text(getattr(review, "review_id", None), "n/a"),
         },
         {
-            "event": "Revision comparison",
+            "event": "Resolver Updated",
+            "timestamp": record.updated_at,
+            "status": "Completed" if resolver_result is not None else "Pending",
+            "details": _safe_text(
+                (
+                    getattr(resolver_result, "summary", {}).get("resolved_count")
+                    if resolver_result is not None
+                    else None
+                ),
+                "n/a",
+            ),
+        },
+        {
+            "event": "Engineering Insight Generated",
+            "timestamp": record.updated_at,
+            "status": "Completed" if intelligence is not None else "Pending",
+            "details": _safe_text(
+                (
+                    len(list(getattr(intelligence, "insights", []) or []))
+                    if intelligence is not None
+                    else None
+                ),
+                "n/a",
+            ),
+        },
+        {
+            "event": "Revision Compared",
             "timestamp": record.updated_at,
             "status": "Completed" if revision is not None else "Not Available",
             "details": _safe_text(
@@ -2017,7 +2080,7 @@ def _timeline_events(
             ),
         },
         {
-            "event": "Readiness update",
+            "event": "Readiness Updated",
             "timestamp": record.updated_at,
             "status": "Completed" if review is not None else "Pending",
             "details": _safe_text(
@@ -2032,16 +2095,16 @@ def _timeline_events(
             ),
         },
         {
-            "event": "Estimator brief generation",
+            "event": "Estimator Brief Generated",
             "timestamp": record.updated_at,
             "status": "Completed" if brief is not None else "Pending",
             "details": _safe_text(getattr(brief, "brief_title", None), "n/a"),
         },
         {
-            "event": "Future collaboration milestones",
-            "timestamp": "n/a",
-            "status": "Disabled",
-            "details": "Future events are intentionally disabled for local deterministic mode.",
+            "event": "Document Imports",
+            "timestamp": record.updated_at,
+            "status": "Completed",
+            "details": f"{import_summary.get('total_files', 0)} files",
         },
     ]
     return events
@@ -2685,9 +2748,7 @@ def _build_knowledge_graph(
                     "source_page": "n/a",
                     "sheet_number": "n/a",
                     "specification_section": "n/a",
-                    "extraction_confidence": _safe_text(
-                        resolved.confidence, "n/a"
-                    ),
+                    "extraction_confidence": _safe_text(resolved.confidence, "n/a"),
                     "creation_timestamp": created_at,
                     "last_update": updated_at,
                     "manual_review_required": resolved.manual_review_required,
@@ -2719,6 +2780,44 @@ def _build_knowledge_graph(
                         _safe_text(resolved.confidence, "n/a"),
                         ", ".join(resolved.evidence_ids) or "n/a",
                     )
+
+        for conflict in resolver_result.conflicts:
+            conflict_node = f"resolver_conflict:{conflict.conflict_id}"
+            _add_node(
+                conflict_node,
+                "Resolver Conflict",
+                _safe_text(conflict.field_name, "conflict"),
+                "Resolver Conflict Center",
+                "resolver_conflict",
+                data=conflict.to_dict(),
+                metadata={
+                    "source_file": _safe_text(
+                        context.get("package_location") if context else None, "n/a"
+                    ),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": "n/a",
+                    "extraction_confidence": _safe_text(
+                        resolver_result.confidence, "n/a"
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                summary_node,
+                conflict_node,
+                "Resolver summary to conflict",
+                _safe_text(resolver_result.confidence, "n/a"),
+                ", ".join(conflict.evidence_ids) or "n/a",
+            )
+            _add_edge(
+                conflict_node,
+                _safe_text(conflict.target_id, "n/a"),
+                "Conflict targets object",
+                _safe_text(conflict.severity, "n/a"),
+                ", ".join(conflict.evidence_ids) or "n/a",
+            )
 
     file_diags = list(import_summary.get("file_diagnostics") or [])
     for diag in file_diags:
@@ -2767,8 +2866,12 @@ def _build_knowledge_graph(
     return {
         "nodes": nodes,
         "edges": edges,
-        "resolver_result": resolver_result.to_dict() if resolver_result is not None else None,
-        "resolver_summary": resolver_result.summary if resolver_result is not None else {},
+        "resolver_result": (
+            resolver_result.to_dict() if resolver_result is not None else None
+        ),
+        "resolver_summary": (
+            resolver_result.summary if resolver_result is not None else {}
+        ),
     }
 
 
@@ -2866,6 +2969,13 @@ def _metadata_for_selection(
         candidates.append(
             f"resolved:{_safe_text(data.get('object_type'), '')}:{_safe_text(data.get('object_id'), '')}"
         )
+    elif kind == "rfi":
+        rfi_id = _safe_text(data.get("rfi_id"), _safe_text(data.get("title"), "rfi"))
+        candidates.append(f"rfi:{rfi_id}")
+    elif kind == "resolver_conflict":
+        candidates.append(
+            f"resolver_conflict:{_safe_text(data.get('conflict_id'), '')}"
+        )
     elif kind == "evidence":
         candidates.append(
             f"evidence:{_safe_text(data.get('source_file'), 'file')}:{data.get('page', 'n/a')}"
@@ -2919,6 +3029,746 @@ def _build_engineering_resolver(
     return EngineeringResolver().resolve(
         ResolverContext(review=review, knowledge_graph=context.get("knowledge_graph"))
     )
+
+
+def _selection_node_id(kind: str, data: dict[str, Any]) -> str | None:
+    if kind == "drawing":
+        return f"drawing:{_safe_text(data.get('drawing_number'), '')}"
+    if kind == "specification":
+        return f"spec:{_safe_text(data.get('section'), '')}"
+    if kind == "equipment":
+        return f"equipment:{_safe_text(data.get('equipment_id'), '')}"
+    if kind == "system":
+        return f"system:{_safe_text(data.get('system'), '')}"
+    if kind == "room":
+        return f"room:{_safe_text(data.get('room'), '')}"
+    if kind == "manufacturer":
+        return f"manufacturer:{_safe_text(data.get('manufacturer'), '')}"
+    if kind == "evidence":
+        return (
+            f"evidence:{_safe_text(data.get('source_file'), 'file')}"
+            f":{data.get('page', 'n/a')}"
+        )
+    if kind == "resolved":
+        return (
+            f"resolved:{_safe_text(data.get('object_type'), '')}"
+            f":{_safe_text(data.get('object_id'), '')}"
+        )
+    if kind == "rfi":
+        rfi_id = _safe_text(data.get("rfi_id"), _safe_text(data.get("title"), "rfi"))
+        return f"rfi:{rfi_id}"
+    if kind == "resolver_conflict":
+        return f"resolver_conflict:{_safe_text(data.get('conflict_id'), '')}"
+    if kind == "project":
+        return f"project:{_safe_text(data.get('project_id'), '')}"
+    return None
+
+
+def _scope_tokens(
+    selection: dict[str, Any], selected_node: dict[str, Any] | None
+) -> set[str]:
+    tokens: set[str] = set()
+    data = dict(selection.get("data") or {})
+    raw_values = [
+        selection.get("kind"),
+        selected_node.get("id") if isinstance(selected_node, dict) else None,
+        selected_node.get("label") if isinstance(selected_node, dict) else None,
+        data.get("equipment_id"),
+        data.get("system"),
+        data.get("room"),
+        data.get("manufacturer"),
+        data.get("model"),
+        data.get("section"),
+        data.get("drawing_number"),
+        data.get("object_id"),
+        data.get("object_type"),
+        data.get("target_id"),
+        data.get("source_file"),
+        data.get("title"),
+        data.get("rfi_id"),
+        data.get("conflict_id"),
+    ]
+    for value in raw_values:
+        text = _safe_text(value, "").strip().lower()
+        if text:
+            tokens.add(text)
+            if ":" in text:
+                pieces = [part.strip() for part in text.split(":") if part.strip()]
+                tokens.update(pieces)
+    return tokens
+
+
+def _filter_rows_by_scope(
+    rows: list[dict[str, Any]],
+    scope_tokens: set[str],
+    enabled: bool,
+) -> list[dict[str, Any]]:
+    if not enabled or not scope_tokens:
+        return rows
+    filtered: list[dict[str, Any]] = []
+    for row in rows:
+        text = str(row).lower()
+        if any(token in text for token in scope_tokens):
+            filtered.append(row)
+    return filtered
+
+
+def _resolver_conflict_status(
+    conflict: Any,
+    resolved_by_target: dict[str, Any],
+) -> tuple[str, float]:
+    target_id = _safe_text(getattr(conflict, "target_id", None), "")
+    target = resolved_by_target.get(target_id)
+    target_confidence = float(getattr(target, "confidence", 0.0) or 0.0)
+    if target is None:
+        return "Needs Review", 0.0
+    if (
+        not getattr(target, "manual_review_required", True)
+        and target_confidence >= 0.85
+    ):
+        return "High Confidence", target_confidence
+    if getattr(target, "manual_review_required", False):
+        if target_confidence < 0.7:
+            return "Low Confidence", target_confidence
+        return "Needs Review", target_confidence
+    if target_confidence < 0.7:
+        return "Low Confidence", target_confidence
+    return "Resolved", target_confidence
+
+
+def _build_resolver_conflict_rows(
+    resolver_result: Any,
+) -> list[dict[str, Any]]:
+    if resolver_result is None:
+        return []
+    resolved_objects = list(getattr(resolver_result, "resolved_objects", []) or [])
+    resolved_by_target = {
+        f"{_safe_text(item.object_type, 'object')}:{_safe_text(item.object_id, '')}": item
+        for item in resolved_objects
+    }
+    rows: list[dict[str, Any]] = []
+    for conflict in list(getattr(resolver_result, "conflicts", []) or []):
+        status, target_confidence = _resolver_conflict_status(
+            conflict, resolved_by_target
+        )
+        target_id = _safe_text(getattr(conflict, "target_id", None), "")
+        target = resolved_by_target.get(target_id)
+        canonical = (
+            dict(getattr(target, "canonical_values", {}) or {}) if target else {}
+        )
+        observed_values = list(getattr(conflict, "observed_values", []) or [])
+        observed_text = ", ".join(str(item) for item in observed_values)
+        rows.append(
+            {
+                "conflict_id": _safe_text(
+                    getattr(conflict, "conflict_id", None), "n/a"
+                ),
+                "target_id": target_id,
+                "field": _safe_text(getattr(conflict, "field_name", None), "n/a"),
+                "severity": _safe_text(getattr(conflict, "severity", None), "medium"),
+                "message": _safe_text(getattr(conflict, "message", None), ""),
+                "observed_values": observed_text,
+                "status": status,
+                "status_chip": _status_chip(status),
+                "confidence": round(target_confidence, 2),
+                "manufacturer": _safe_text(canonical.get("manufacturer"), "n/a"),
+                "model": _safe_text(canonical.get("model"), "n/a"),
+                "quantity": _safe_text(canonical.get("quantity"), "n/a"),
+                "room": _safe_text(canonical.get("room_id"), "n/a"),
+                "system": _safe_text(canonical.get("system_id"), "n/a"),
+                "specification": ", ".join(
+                    [
+                        str(item)
+                        for item in list(
+                            canonical.get("specification_references") or []
+                        )
+                    ]
+                )
+                or "n/a",
+                "drawing": ", ".join(
+                    [
+                        str(item)
+                        for item in list(canonical.get("drawing_references") or [])
+                    ]
+                )
+                or "n/a",
+            }
+        )
+    return rows
+
+
+def _render_engineering_trace_panel(
+    st: Any,
+    graph: dict[str, Any],
+    resolver_result: Any,
+    selected_insight: Any | None,
+) -> None:
+    st.markdown("#### Engineering Trace")
+    if selected_insight is None:
+        st.info("Select an insight to inspect engineering trace details.")
+        return
+
+    support_ids = [
+        str(item)
+        for item in list(getattr(selected_insight, "supporting_objects", []) or [])
+    ]
+    evidence_refs = [
+        str(item) for item in list(getattr(selected_insight, "evidence_refs", []) or [])
+    ]
+
+    related_resolved = []
+    related_conflicts = []
+    related_rules = set()
+    if resolver_result is not None:
+        for resolved in list(getattr(resolver_result, "resolved_objects", []) or []):
+            if any(token and token in str(resolved.to_dict()) for token in support_ids):
+                related_resolved.append(resolved)
+                for rule_id in list(getattr(resolved, "rules_applied", []) or []):
+                    related_rules.add(str(rule_id))
+        for conflict in list(getattr(resolver_result, "conflicts", []) or []):
+            if any(token and token in str(conflict.to_dict()) for token in support_ids):
+                related_conflicts.append(conflict)
+
+    related_drawings = sorted(
+        {
+            _safe_text(edge.get("source"), "")
+            for edge in list(graph.get("edges", []))
+            if "drawing:" in _safe_text(edge.get("source"), "")
+            and any(token and token in str(edge) for token in support_ids)
+        }
+    )
+    related_specs = sorted(
+        {
+            _safe_text(edge.get("target"), "")
+            for edge in list(graph.get("edges", []))
+            if "spec:" in _safe_text(edge.get("target"), "")
+            and any(token and token in str(edge) for token in support_ids)
+        }
+    )
+
+    st.dataframe(
+        [
+            {
+                "why atlas generated it": _safe_text(
+                    getattr(selected_insight, "description", None), "n/a"
+                ),
+                "confidence": round(
+                    float(getattr(selected_insight, "confidence", 0.0) or 0.0), 2
+                ),
+                "related objects": ", ".join(support_ids[:8]) or "n/a",
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.dataframe(
+        [
+            {
+                "trace field": "Rules Applied",
+                "value": ", ".join(sorted(related_rules)) or "n/a",
+            },
+            {
+                "trace field": "Supporting Evidence",
+                "value": " | ".join(evidence_refs[:6]) or "n/a",
+            },
+            {
+                "trace field": "Related Drawings",
+                "value": ", ".join(related_drawings[:6]) or "n/a",
+            },
+            {
+                "trace field": "Related Specifications",
+                "value": ", ".join(related_specs[:6]) or "n/a",
+            },
+            {
+                "trace field": "Resolver Decisions",
+                "value": ", ".join(
+                    [
+                        f"{item.object_type}:{item.object_id}"
+                        for item in related_resolved[:6]
+                    ]
+                )
+                or "n/a",
+            },
+            {
+                "trace field": "Knowledge Graph Relationships",
+                "value": str(
+                    sum(
+                        1
+                        for edge in list(graph.get("edges", []))
+                        if any(token and token in str(edge) for token in support_ids)
+                    )
+                ),
+            },
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    if related_conflicts:
+        st.markdown("Trace Conflicts")
+        st.dataframe(
+            [item.to_dict() for item in related_conflicts],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+def _render_engineering_workbench_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    st.subheader("Engineering Workbench")
+    if context is None:
+        st.info("Engineering Workbench requires a loaded project review context.")
+        return
+
+    graph = _build_knowledge_graph(record, context)
+    resolver_result = _build_engineering_resolver(record, context)
+    intelligence = _build_engineering_intelligence(record, context)
+    objects = _workspace_objects(context)
+    brief = context.get("brief")
+
+    selection = dict(
+        st.session_state.get("atlas_context_selection")
+        or {"kind": "project", "data": {}}
+    )
+    selected_kind = _safe_text(selection.get("kind"), "project")
+    selected_data = dict(selection.get("data") or {})
+    selected_node = _node_for_current_selection(
+        graph,
+        selected_kind,
+        selected_data,
+        "Project",
+    )
+    if selected_node is None:
+        selected_node = _select_first_node(graph, "Project")
+
+    selected_node_id = _safe_text(selected_node.get("id"), "") if selected_node else ""
+    scope_tokens = _scope_tokens(selection, selected_node)
+    scope_filter_enabled = selected_kind in INVESTIGATION_SELECTION_KINDS
+
+    insights = (
+        list(getattr(intelligence, "insights", []) or [])
+        if intelligence is not None
+        else []
+    )
+    insight_rows = [item.to_dict() for item in insights]
+    insight_rows = _filter_rows_by_scope(
+        insight_rows, scope_tokens, scope_filter_enabled
+    )
+
+    conflict_rows = _build_resolver_conflict_rows(resolver_result)
+    conflict_rows = _filter_rows_by_scope(
+        conflict_rows, scope_tokens, scope_filter_enabled
+    )
+
+    rfi_rows = list(objects.get("rfis", []))
+    rfi_rows = _filter_rows_by_scope(rfi_rows, scope_tokens, scope_filter_enabled)
+
+    system_rows = (
+        list(getattr(intelligence, "system_health", []) or [])
+        if intelligence is not None
+        else []
+    )
+    high_risk_system_rows = sorted(
+        [
+            item.to_dict() if hasattr(item, "to_dict") else dict(item)
+            for item in system_rows
+        ],
+        key=lambda item: int(item.get("health_score", 0) or 0),
+    )[:8]
+    high_risk_system_rows = _filter_rows_by_scope(
+        high_risk_system_rows,
+        scope_tokens,
+        scope_filter_enabled,
+    )
+
+    recommended_rows = []
+    recommendations = (
+        list(getattr(intelligence, "recommendations", []) or [])
+        if intelligence is not None
+        else []
+    )
+    for item in recommendations:
+        recommended_rows.append(item.to_dict())
+    for item in list(getattr(brief, "prioritized_reviewer_actions", []) or []):
+        recommended_rows.append(
+            item.to_dict() if hasattr(item, "to_dict") else dict(item)
+        )
+    recommended_rows = _filter_rows_by_scope(
+        recommended_rows,
+        scope_tokens,
+        scope_filter_enabled,
+    )
+
+    evidence_rows = _filter_rows_by_scope(
+        list(objects.get("evidence", [])),
+        scope_tokens,
+        scope_filter_enabled,
+    )
+
+    top_row = st.columns(3)
+    _metric_card(top_row[0], "Active Engineering Insights", str(len(insight_rows)))
+    _metric_card(top_row[1], "Resolver Conflicts", str(len(conflict_rows)))
+    _metric_card(top_row[2], "Open RFI Candidates", str(len(rfi_rows)))
+
+    row_a = st.columns([3.6, 3.2, 3.2])
+    with row_a[0]:
+        st.markdown("#### Active Engineering Insights")
+        if insight_rows:
+            st.dataframe(insight_rows[:12], use_container_width=True, hide_index=True)
+            insight_labels = [
+                _safe_text(item.get("title"), f"Insight {index + 1}")
+                for index, item in enumerate(insight_rows[:12])
+            ]
+            selected_insight_label = st.selectbox(
+                "Select Insight",
+                options=insight_labels,
+                key="atlas_workbench_insight",
+            )
+            selected_insight_row = insight_rows[
+                insight_labels.index(selected_insight_label)
+            ]
+            selected_insight_obj = next(
+                (
+                    item
+                    for item in insights
+                    if _safe_text(getattr(item, "title", None), "")
+                    == _safe_text(selected_insight_row.get("title"), "")
+                ),
+                None,
+            )
+            _render_engineering_trace_panel(
+                st, graph, resolver_result, selected_insight_obj
+            )
+        else:
+            st.info("No engineering insights match the current scope.")
+
+    with row_a[1]:
+        st.markdown("#### Resolver Conflicts")
+        if conflict_rows:
+            st.dataframe(conflict_rows[:12], use_container_width=True, hide_index=True)
+            labels = [
+                f"{_safe_text(item.get('field'), 'field')} · {_safe_text(item.get('target_id'), 'target')}"
+                for item in conflict_rows[:12]
+            ]
+            selected_label = st.selectbox(
+                "Select Resolver Conflict",
+                options=labels,
+                key="atlas_workbench_conflict",
+            )
+            selected = conflict_rows[labels.index(selected_label)]
+            if st.button(
+                "Investigate Conflict",
+                key="atlas_investigate_conflict",
+                use_container_width=True,
+            ):
+                _set_context_selection(st, "resolver_conflict", selected)
+                st.rerun()
+        else:
+            st.info("No resolver conflicts for the current scope.")
+
+    with row_a[2]:
+        st.markdown("#### Open RFI Candidates")
+        if rfi_rows:
+            st.dataframe(rfi_rows[:12], use_container_width=True, hide_index=True)
+            labels = [
+                _safe_text(item.get("title"), _safe_text(item.get("rfi_id"), "RFI"))
+                for item in rfi_rows[:12]
+            ]
+            selected_label = st.selectbox(
+                "Select RFI Candidate",
+                options=labels,
+                key="atlas_workbench_rfi",
+            )
+            selected = rfi_rows[labels.index(selected_label)]
+            if st.button(
+                "Investigate RFI", key="atlas_investigate_rfi", use_container_width=True
+            ):
+                _set_context_selection(st, "rfi", selected)
+                st.rerun()
+        else:
+            st.info("No RFI candidates match the current scope.")
+
+    row_b = st.columns([3.6, 3.2, 3.2])
+    with row_b[0]:
+        st.markdown("#### High-Risk Systems")
+        if high_risk_system_rows:
+            st.dataframe(
+                high_risk_system_rows, use_container_width=True, hide_index=True
+            )
+        else:
+            st.info("No high-risk systems match the current scope.")
+
+    with row_b[1]:
+        st.markdown("#### Recommended Actions")
+        if recommended_rows:
+            st.dataframe(
+                recommended_rows[:12], use_container_width=True, hide_index=True
+            )
+        else:
+            st.info("No recommended actions match the current scope.")
+
+    with row_b[2]:
+        st.markdown("#### Selected Object Detail")
+        if selected_node is None:
+            st.info("Select an object to inspect details.")
+        else:
+            st.dataframe(
+                [
+                    {
+                        "field": "Object",
+                        "value": _safe_text(selected_node.get("label"), "n/a"),
+                    },
+                    {
+                        "field": "Type",
+                        "value": _safe_text(selected_node.get("type"), "n/a"),
+                    },
+                    {
+                        "field": "Selection Kind",
+                        "value": selected_kind,
+                    },
+                    {
+                        "field": "Node ID",
+                        "value": selected_node_id or "n/a",
+                    },
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    st.markdown("#### Evidence Panel")
+    if evidence_rows:
+        st.dataframe(evidence_rows[:20], use_container_width=True, hide_index=True)
+    else:
+        st.info("No evidence rows match the current scope.")
+
+    if selected_kind in INVESTIGATION_SELECTION_KINDS and selected_node is not None:
+        st.markdown("### Investigation Mode")
+        subgraph = _relationship_subgraph(graph, selected_node_id, depth=2)
+
+        st.markdown("#### Object Summary")
+        st.dataframe(
+            [dict(selected_node.get("data") or {})],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("#### Relationship Graph")
+        connected_edges = list(subgraph.get("edges", []))[:24]
+        if connected_edges:
+            mermaid_lines = ["graph LR"]
+            for edge in connected_edges:
+                source = _node_label(
+                    graph, _safe_text(edge.get("source"), "n/a")
+                ).replace('"', "")
+                target = _node_label(
+                    graph, _safe_text(edge.get("target"), "n/a")
+                ).replace('"', "")
+                rel = _safe_text(edge.get("relationship"), "linked").replace('"', "")
+                mermaid_lines.append(f'    "{source}" -->|"{rel}"| "{target}"')
+            st.markdown("```mermaid\n" + "\n".join(mermaid_lines) + "\n```")
+        else:
+            st.info("No relationship graph edges found for this selection.")
+
+        st.markdown("#### Supporting Evidence")
+        supporting_evidence = [
+            {
+                "relationship": edge.get("relationship"),
+                "source evidence": edge.get("source_evidence"),
+                "from": _node_label(graph, _safe_text(edge.get("source"), "n/a")),
+                "to": _node_label(graph, _safe_text(edge.get("target"), "n/a")),
+            }
+            for edge in connected_edges
+            if _safe_text(edge.get("source_evidence"), "n/a") != "n/a"
+        ]
+        if supporting_evidence:
+            st.dataframe(supporting_evidence, use_container_width=True, hide_index=True)
+        else:
+            st.info("No explicit supporting evidence references were found.")
+
+        st.markdown("#### Conflicting Evidence")
+        conflicting_rows = [
+            row
+            for row in conflict_rows
+            if selected_node_id
+            and selected_node_id in _safe_text(row.get("target_id"), "")
+        ]
+        if conflicting_rows:
+            st.dataframe(conflicting_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No conflicting evidence detected for this selection.")
+
+        st.markdown("#### Engineering Insights")
+        if insight_rows:
+            st.dataframe(insight_rows[:10], use_container_width=True, hide_index=True)
+        else:
+            st.info("No engineering insights linked to this selection.")
+
+        st.markdown("#### Resolver Decisions")
+        resolver_rows = []
+        if resolver_result is not None:
+            for item in list(getattr(resolver_result, "resolved_objects", []) or []):
+                if selected_node_id and selected_node_id in str(item.to_dict()):
+                    resolver_rows.append(item.to_dict())
+        if resolver_rows:
+            st.dataframe(resolver_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No resolver decisions mapped to this selection.")
+
+        st.markdown("#### Related Documents")
+        related_docs = sorted(
+            {
+                _safe_text(item.get("source_file"), "")
+                for item in evidence_rows
+                if _safe_text(item.get("source_file"), "")
+            }
+        )
+        if related_docs:
+            st.dataframe(
+                [{"document": item} for item in related_docs],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No related documents were found.")
+
+        st.markdown("#### Related Drawings")
+        related_drawings = sorted(
+            {
+                _safe_text(edge.get("source"), "")
+                for edge in connected_edges
+                if _safe_text(edge.get("source"), "").startswith("drawing:")
+            }
+            | {
+                _safe_text(edge.get("target"), "")
+                for edge in connected_edges
+                if _safe_text(edge.get("target"), "").startswith("drawing:")
+            }
+        )
+        if related_drawings:
+            st.dataframe(
+                [{"drawing": item} for item in related_drawings],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No related drawings were found.")
+
+        st.markdown("#### Related Specifications")
+        related_specs = sorted(
+            {
+                _safe_text(edge.get("source"), "")
+                for edge in connected_edges
+                if _safe_text(edge.get("source"), "").startswith("spec:")
+            }
+            | {
+                _safe_text(edge.get("target"), "")
+                for edge in connected_edges
+                if _safe_text(edge.get("target"), "").startswith("spec:")
+            }
+        )
+        if related_specs:
+            st.dataframe(
+                [{"specification": item} for item in related_specs],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No related specifications were found.")
+
+        st.markdown("#### Recommended Actions")
+        if recommended_rows:
+            st.dataframe(
+                recommended_rows[:10], use_container_width=True, hide_index=True
+            )
+        else:
+            st.info("No recommended actions linked to this selection.")
+
+        st.markdown("#### Timeline")
+        st.dataframe(
+            _timeline_events(record, context),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+def _render_resolver_conflict_center_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    st.subheader("Resolver Conflict Center")
+    resolver_result = _build_engineering_resolver(record, context)
+    rows = _build_resolver_conflict_rows(resolver_result)
+    if not rows:
+        st.info("No resolver conflicts are currently available.")
+        return
+
+    cols = st.columns([1.8, 2.4, 1.8])
+    group_by = cols[0].selectbox(
+        "Group By",
+        options=[
+            "Manufacturer",
+            "Model",
+            "Quantity",
+            "Room",
+            "System",
+            "Specification",
+            "Drawing",
+        ],
+    )
+    status_filter = cols[1].multiselect(
+        "Status",
+        options=["Resolved", "Needs Review", "High Confidence", "Low Confidence"],
+        default=[],
+    )
+    severity_filter = cols[2].multiselect(
+        "Severity",
+        options=sorted({str(item.get("severity") or "medium") for item in rows}),
+        default=[],
+    )
+
+    key_map = {
+        "Manufacturer": "manufacturer",
+        "Model": "model",
+        "Quantity": "quantity",
+        "Room": "room",
+        "System": "system",
+        "Specification": "specification",
+        "Drawing": "drawing",
+    }
+    group_key = key_map[group_by]
+
+    filtered = [
+        item
+        for item in rows
+        if (not status_filter or item.get("status") in status_filter)
+        and (not severity_filter or item.get("severity") in severity_filter)
+    ]
+    if not filtered:
+        st.info("No conflicts match the current filters.")
+        return
+
+    grouped: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+    for item in filtered:
+        group_value = _safe_text(item.get(group_key), "n/a")
+        grouped[group_value].append(item)
+
+    for group_value in sorted(grouped.keys()):
+        st.markdown(f"#### {group_by}: {group_value}")
+        st.dataframe(grouped[group_value], use_container_width=True, hide_index=True)
+
+    labels = [
+        f"{_safe_text(item.get('field'), 'field')} · {_safe_text(item.get('target_id'), 'target')}"
+        for item in filtered
+    ]
+    selected_label = st.selectbox("Select Conflict", options=labels)
+    selected = filtered[labels.index(selected_label)]
+    if st.button("Open Conflict in Workbench", type="primary"):
+        _set_context_selection(st, "resolver_conflict", selected)
+        st.session_state["atlas_active_page"] = "Engineering Workbench"
+        st.rerun()
 
 
 def _top_reference_counts(
@@ -3874,12 +4724,15 @@ def _render_relationship_explorer_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader("Relationship Explorer")
+    st.subheader("Relationship Inspector")
     graph = _build_knowledge_graph(record, context)
     nodes = list(graph.get("nodes", []))
     if not nodes:
         st.info("No relationship graph nodes are available yet.")
         return
+
+    intelligence = _build_engineering_intelligence(record, context)
+    insights = list(getattr(intelligence, "insights", []) or []) if intelligence else []
 
     labels = [f"{node['type']}: {node['label']}" for node in nodes]
     selected_label = st.selectbox("Select Object", options=labels)
@@ -3925,6 +4778,96 @@ def _render_relationship_explorer_page(
         )
     else:
         st.info("No outgoing relationships.")
+
+    all_relationships = incoming + outgoing
+    st.markdown("#### Relationship Details")
+    if not all_relationships:
+        st.info("No relationship rows available for this object.")
+    else:
+        relation_labels = [
+            (
+                f"{_safe_text(edge.get('relationship'), 'link')} · "
+                f"{_node_label(graph, _safe_text(edge.get('source'), 'n/a'))} -> "
+                f"{_node_label(graph, _safe_text(edge.get('target'), 'n/a'))}"
+            )
+            for edge in all_relationships
+        ]
+        selected_relation_label = st.selectbox(
+            "Select Relationship",
+            options=relation_labels,
+            key="atlas_relationship_inspector_selection",
+        )
+        selected_edge = all_relationships[
+            relation_labels.index(selected_relation_label)
+        ]
+
+        source_node = _node_by_id(graph, _safe_text(selected_edge.get("source"), ""))
+        target_node = _node_by_id(graph, _safe_text(selected_edge.get("target"), ""))
+        related_insight_rows = [
+            item.to_dict() if hasattr(item, "to_dict") else dict(item)
+            for item in insights
+            if _contains_any(
+                str(item),
+                [
+                    _safe_text(selected_edge.get("source"), ""),
+                    _safe_text(selected_edge.get("target"), ""),
+                    _safe_text(source_node.get("label") if source_node else None, ""),
+                    _safe_text(target_node.get("label") if target_node else None, ""),
+                ],
+            )
+        ]
+
+        st.dataframe(
+            [
+                {
+                    "relationship type": _safe_text(
+                        selected_edge.get("relationship"), "n/a"
+                    ),
+                    "source": _node_label(
+                        graph, _safe_text(selected_edge.get("source"), "n/a")
+                    ),
+                    "target": _node_label(
+                        graph, _safe_text(selected_edge.get("target"), "n/a")
+                    ),
+                    "confidence": _safe_text(selected_edge.get("confidence"), "n/a"),
+                    "supporting evidence": _safe_text(
+                        selected_edge.get("source_evidence"), "n/a"
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.markdown("Connected Objects")
+        st.dataframe(
+            [
+                {
+                    "object": _node_label(
+                        graph, _safe_text(selected_edge.get("source"), "n/a")
+                    ),
+                    "type": _safe_text(
+                        source_node.get("type") if source_node else None, "n/a"
+                    ),
+                },
+                {
+                    "object": _node_label(
+                        graph, _safe_text(selected_edge.get("target"), "n/a")
+                    ),
+                    "type": _safe_text(
+                        target_node.get("type") if target_node else None, "n/a"
+                    ),
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.markdown("Related Engineering Insights")
+        if related_insight_rows:
+            st.dataframe(
+                related_insight_rows[:8], use_container_width=True, hide_index=True
+            )
+        else:
+            st.info("No engineering insights reference this relationship.")
 
     subgraph = _relationship_subgraph(
         graph, _safe_text(selected_node.get("id"), ""), depth
@@ -4024,7 +4967,7 @@ def _render_timeline_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader("Project Timeline")
+    st.subheader("Engineering Activity Timeline")
     events = _timeline_events(record, context)
     st.dataframe(events, use_container_width=True, hide_index=True)
 
@@ -4062,6 +5005,13 @@ def _node_for_current_selection(
         return _node_by_id(graph, node_id)
     if kind == "resolved":
         node_id = f"resolved:{_safe_text(data.get('object_type'), '')}:{_safe_text(data.get('object_id'), '')}"
+        return _node_by_id(graph, node_id)
+    if kind == "rfi":
+        rfi_id = _safe_text(data.get("rfi_id"), _safe_text(data.get("title"), "rfi"))
+        node_id = f"rfi:{rfi_id}"
+        return _node_by_id(graph, node_id)
+    if kind == "resolver_conflict":
+        node_id = f"resolver_conflict:{_safe_text(data.get('conflict_id'), '')}"
         return _node_by_id(graph, node_id)
     if kind == "evidence":
         node_id = f"evidence:{_safe_text(data.get('source_file'), 'file')}:{data.get('page', 'n/a')}"
@@ -4325,6 +5275,13 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         )
         if rows:
             st.dataframe(rows, use_container_width=True, hide_index=True)
+            labels = [
+                _safe_text(item.get("title"), _safe_text(item.get("rfi_id"), "RFI"))
+                for item in rows
+            ]
+            selected_label = st.selectbox("Select RFI Object", options=labels)
+            selected = rows[labels.index(selected_label)]
+            _set_context_selection(st, "rfi", selected)
         else:
             st.info("No RFI candidates detected.")
         return
@@ -4744,9 +5701,34 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
             data,
             [
                 ("Engineering Resolver", "Go to Resolver"),
+                ("Engineering Workbench", "Open Workbench"),
                 ("Equipment", "Go to Equipment"),
                 ("Systems", "Go to Systems"),
                 ("Specifications", "Go to Specifications"),
+            ],
+        )
+        return
+
+    if kind == "resolver_conflict":
+        _render_object_context(
+            "Resolver Conflict",
+            data,
+            [
+                ("Resolver Conflict Center", "Open Conflict Center"),
+                ("Engineering Workbench", "Open Workbench"),
+                ("Engineering Resolver", "Open Resolver"),
+            ],
+        )
+        return
+
+    if kind == "rfi":
+        _render_object_context(
+            "RFI Candidate",
+            data,
+            [
+                ("Engineering Workbench", "Open Workbench"),
+                ("RFI Candidates", "Open RFIs"),
+                ("Evidence", "Open Evidence"),
             ],
         )
         return
@@ -4891,6 +5873,8 @@ def _render_main_content(
         _render_open_existing_page(st, workspace_service)
     elif page == "Overview":
         _render_overview_page(st, record, context)
+    elif page == "Engineering Workbench":
+        _render_engineering_workbench_page(st, record, context)
     elif page == "Executive Summary":
         _render_executive_summary_page(st, context)
     elif page == "Project Files":
@@ -4905,6 +5889,8 @@ def _render_main_content(
         _render_systems_page(st, record, context)
     elif page == "Engineering Resolver":
         _render_engineering_resolver_page(st, record, context)
+    elif page == "Resolver Conflict Center":
+        _render_resolver_conflict_center_page(st, record, context)
     elif page == "Engineering Intelligence":
         _render_engineering_intelligence_page(st, record, context)
     elif page == "Relationship Explorer":

@@ -674,7 +674,9 @@ class EngineeringInsightsService:
         rationale.append(f"Blockers considered: {blockers}")
         rationale.append(f"Missing scope diagnostics considered: {missing_scope}")
         rationale.append(f"Resolver conflicts considered: {resolver_conflicts}")
-        rationale.append(f"Resolver manual reviews considered: {resolver_manual_reviews}")
+        rationale.append(
+            f"Resolver manual reviews considered: {resolver_manual_reviews}"
+        )
 
         return ProjectHealthModel(
             score=score, categories=categories, rationale=rationale

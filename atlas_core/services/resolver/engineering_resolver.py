@@ -298,7 +298,9 @@ class EngineeringResolver:
 
         for specification in review.specification_sections:
             resolved_objects.append(
-                self._resolve_specification(specification, review.equipment, rules_by_id)
+                self._resolve_specification(
+                    specification, review.equipment, rules_by_id
+                )
             )
 
         for manufacturer_name in manufacturer_names:
@@ -397,9 +399,7 @@ class EngineeringResolver:
         drawing_references = canonical_values["drawing_references"]
         for drawing_reference in drawing_references:
             if drawing_reference not in drawings_by_id:
-                conflict_id = (
-                    f"conflict:equipment:{equipment.equipment_id}:drawing:{drawing_reference}"
-                )
+                conflict_id = f"conflict:equipment:{equipment.equipment_id}:drawing:{drawing_reference}"
                 conflicts.append(
                     ResolutionConflict(
                         conflict_id=conflict_id,
@@ -416,9 +416,7 @@ class EngineeringResolver:
         specification_references = canonical_values["specification_references"]
         for specification_reference in specification_references:
             if specification_reference not in specifications_by_id:
-                conflict_id = (
-                    f"conflict:equipment:{equipment.equipment_id}:spec:{specification_reference}"
-                )
+                conflict_id = f"conflict:equipment:{equipment.equipment_id}:spec:{specification_reference}"
                 conflicts.append(
                     ResolutionConflict(
                         conflict_id=conflict_id,
@@ -469,7 +467,9 @@ class EngineeringResolver:
         conflicts: list[ResolutionConflict],
     ) -> ResolvedObject:
         system_equipment = [
-            item for item in equipment if _normalize_text(item.system_id) == system.system_id
+            item
+            for item in equipment
+            if _normalize_text(item.system_id) == system.system_id
         ]
         evidence_ids = [f"system:{system.system_id}"] + [
             f"equipment:{item.equipment_id}" for item in system_equipment
