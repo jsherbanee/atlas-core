@@ -1,5 +1,19 @@
 # Atlas Core Development Status
 
+This document answers: Where is Atlas today?
+
+It represents the current implementation state of Atlas Core.
+
+## Related Documentation
+- [README.md](README.md)
+- [PRODUCT_VISION.md](PRODUCT_VISION.md)
+- [DOMAIN_MODEL.md](DOMAIN_MODEL.md)
+- [DESIGN_LANGUAGE.md](DESIGN_LANGUAGE.md)
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [ROADMAP.md](ROADMAP.md)
+- [RELEASE_NOTES.md](RELEASE_NOTES.md)
+- [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)
+
 ## Current State
 Atlas Core is in active Phase 2 Bid Intelligence development with a stabilization baseline candidate prepared and a new persistent Atlas workspace shell in progress.
 
@@ -7,7 +21,7 @@ Atlas Core is in active Phase 2 Bid Intelligence development with a stabilizatio
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: 868 passed, 50 warnings
+- pytest: 917 passed
 
 ## Tooling Status
 - GitHub Actions configured

@@ -2,6 +2,48 @@
 
 Domain object continuity and lifecycle boundaries referenced in this roadmap are defined in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).
 
+## Product Milestones
+
+Sprints describe implementation work.
+
+Milestones describe customer-visible product capability.
+
+### Preview 0.5 (Current)
+- Engineering Intelligence Workspace
+
+### Preview 0.6
+- Engineering Understanding
+- Master Library
+- Manufacturer Registry
+- Product Intelligence
+- Equipment Resolution
+- System Templates
+
+### Preview 0.7
+- Atlas Vision Foundations
+- Drawing Intelligence maturation
+- Specification Intelligence maturation
+- Cross-sheet intelligence
+- Symbol libraries
+- Title block intelligence
+- Future OCR integration points
+
+### Beta 1.0
+- Internal production-ready
+- Real benchmark project validation
+- Performance tuning
+- Documentation complete
+
+### RC1
+- Release Candidate
+- Final stabilization
+
+### Atlas 1.0
+- Commercial AV Bid Intelligence Platform
+
+### Atlas 2.0
+- Complete Project Lifecycle Platform
+
 ## Phase 1: Foundation (Completed)
 Completed outcomes:
 - Core domain model scaffolding
