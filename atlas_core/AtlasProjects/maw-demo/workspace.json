@@ -1,10 +1,10 @@
 {
   "archived": false,
-  "created_at": "2026-07-08T03:02:00.134747+00:00",
+  "created_at": "2026-07-08T03:50:29.633905+00:00",
   "import_summary": {},
   "intake_snapshot_path": null,
   "is_reference": false,
-  "last_opened_at": "2026-07-08T03:02:00.135356+00:00",
+  "last_opened_at": "2026-07-08T03:50:29.634074+00:00",
   "metadata": {},
   "package_location": ".",
   "pinned": false,
@@ -35,7 +35,7 @@
   "source_label": "Seed fixture fallback",
   "source_mode": "seed_fixture_fallback",
   "source_path": ".",
-  "updated_at": "2026-07-08T03:02:00.212907+00:00",
+  "updated_at": "2026-07-08T03:50:29.690654+00:00",
   "warnings": [
     "No supported files were found in .. Using curated seed fixture data instead of the full drawing/specification package.",
     "This view is using curated seed fixture data, not the full drawing/specification package."
@@ -44,28 +44,56 @@
   "workspace_state": {
     "context_selection": {
       "data": {
-        "confidence": "0.83",
-        "current_status": "detected",
-        "description": "Classroom instructional display",
-        "discipline": "General",
-        "drawing_references": [
-          "AV-601"
+        "aliases": [
+          "EPSON",
+          "POWERLITEL735U",
+          "Recital hall laser projector"
         ],
-        "equipment_id": "maw-classroom-display",
-        "manufacturer": "Sony",
-        "model": "FW-65BZ40L",
-        "potential_rfis": [],
-        "room": "maw-classroom",
-        "specification_references": [
-          "27 41 19"
+        "category": "projector",
+        "confidence": 0.86,
+        "created_at": "2026-07-08T03:49:29+00:00",
+        "description": "Recital hall laser projector",
+        "engineering_attributes": {
+          "attributes": {
+            "room": "maw-recital-hall",
+            "system": "maw-projection"
+          },
+          "tags": [
+            "projector",
+            "workspace_import"
+          ]
+        },
+        "family": "Epson Projector",
+        "manufacturer": "Epson",
+        "model": "PowerLite L735U",
+        "normalized_model": "POWERLITEL735U",
+        "product_id": "prd:bbaba6dd623f",
+        "related_products": [
+          {
+            "confidence": 0.8,
+            "evidence_refs": [
+              "drawing:AV-402"
+            ],
+            "relationship_type": "referenced_by_drawing",
+            "target_product_id": "drawing:AV-402"
+          },
+          {
+            "confidence": 0.8,
+            "evidence_refs": [
+              "spec:27 41 19"
+            ],
+            "relationship_type": "referenced_by_specification",
+            "target_product_id": "spec:27 41 19"
+          }
         ],
-        "system": "maw-classroom-av"
+        "status": "active",
+        "updated_at": "2026-07-08T03:49:29+00:00"
       },
-      "kind": "equipment"
+      "kind": "master_product"
     },
     "engineering_notebook_entries": [],
     "expanded_navigation": [
-      "Project Manager"
+      "Mission Control"
     ],
     "filters": {
       "equipment_search": "",
@@ -73,7 +101,7 @@
       "relationship_search": false,
       "search_type_filters": []
     },
-    "last_open_page": "Home",
+    "last_open_page": "Mission Control",
     "search_state": {
       "global_search": "",
       "result_index": 0

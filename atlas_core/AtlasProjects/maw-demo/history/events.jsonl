@@ -84,3 +84,151 @@
 {"event_type": "workspace_opened", "payload": {"last_open_page": "Engineering Assumptions"}, "timestamp": "2026-07-08T03:01:22.336274+00:00"}
 {"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:02:00.181137+00:00"}
 {"event_type": "workspace_opened", "payload": {"last_open_page": "Home"}, "timestamp": "2026-07-08T03:02:00.217910+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:03:15.809306+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Reports"}, "timestamp": "2026-07-08T03:03:15.842899+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:03:23.373754+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Home"}, "timestamp": "2026-07-08T03:03:23.406830+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:10:35.813255+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:10:40.972280+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:10:49.714616+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Home"}, "timestamp": "2026-07-08T03:10:49.762594+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:11:11.859019+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Home"}, "timestamp": "2026-07-08T03:11:11.893178+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:17:11.005265+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:17:11.788886+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:18:32.789994+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:18:32.867115+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Coordination Review"}, "timestamp": "2026-07-08T03:18:32.908325+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:18:51.875657+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:18:51.916077+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:19:25.711320+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:19:25.748950+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:19:27.812453+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:19:27.884118+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Engineering Workbench"}, "timestamp": "2026-07-08T03:19:27.933658+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:21:19.487891+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Relationship Visualization"}, "timestamp": "2026-07-08T03:21:19.557057+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:21:29.698242+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Application Settings"}, "timestamp": "2026-07-08T03:21:29.728158+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:21:41.275103+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:21:41.313645+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:21:54.839218+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:21:54.874751+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:35:18.266459+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:35:18.318161+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:35:26.247519+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:35:26.296730+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:35:38.627423+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:35:38.707532+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:35:38.743665+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:35:49.559400+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:35:49.624857+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Engineering Workbench"}, "timestamp": "2026-07-08T03:35:49.674685+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:35:52.938035+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:35:52.996844+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:35:53.028522+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:36:59.919824+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:36:59.977693+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:37:00.006434+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:00.720353+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:00.777297+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:37:00.805213+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:00.985926+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:01.048536+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:37:01.079185+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:01.145002+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:01.206994+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:37:01.237290+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:01.882782+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:01.947107+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Projects"}, "timestamp": "2026-07-08T03:37:01.973461+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:07.578425+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:07.639180+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Relationship Visualization"}, "timestamp": "2026-07-08T03:37:07.665312+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:09.893046+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:09.952674+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Reports"}, "timestamp": "2026-07-08T03:37:09.978416+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:11.204513+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:11.267146+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Relationship Visualization"}, "timestamp": "2026-07-08T03:37:11.291094+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:43.771162+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:43.831185+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:37:43.864716+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:44.731745+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:44.793649+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:37:44.823503+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:46.413790+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:46.480072+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Relationship Visualization"}, "timestamp": "2026-07-08T03:37:46.505486+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:47.215147+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:47.278210+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Reports"}, "timestamp": "2026-07-08T03:37:47.302776+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:48.013807+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:48.074992+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Relationship Visualization"}, "timestamp": "2026-07-08T03:37:48.100376+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:48.388096+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:48.452079+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Projects"}, "timestamp": "2026-07-08T03:37:48.478528+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:49.418522+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:49.487942+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Engineering Workbench"}, "timestamp": "2026-07-08T03:37:49.531998+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:50.247494+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:37:50.306296+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:37:50.335385+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:43:23.461126+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:43:24.133274+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:43:31.486971+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:43:31.552970+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Timeline"}, "timestamp": "2026-07-08T03:43:31.586775+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:43:36.064209+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:43:36.126158+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:43:36.164175+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:43:58.815583+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:43:58.887450+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Projects"}, "timestamp": "2026-07-08T03:43:58.919591+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:04.132337+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:04.201228+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Reference Projects"}, "timestamp": "2026-07-08T03:44:04.229292+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:06.945238+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:07.009869+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Recent Projects"}, "timestamp": "2026-07-08T03:44:07.036413+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:16.080509+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:16.139555+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:44:16.174035+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:33.905003+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:44:33.949940+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:41.795587+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:41.882105+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Equipment"}, "timestamp": "2026-07-08T03:44:41.935488+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:48.240323+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Equipment"}, "timestamp": "2026-07-08T03:44:48.284343+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:53.319996+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:44:53.382908+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:44:53.423165+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:48:27.622251+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:48:27.693781+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Relationship Visualization"}, "timestamp": "2026-07-08T03:48:27.724703+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:48:33.649997+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:48:33.727497+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Relationship Explorer"}, "timestamp": "2026-07-08T03:48:33.768697+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:48:40.928586+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:48:40.992877+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Evidence"}, "timestamp": "2026-07-08T03:48:41.023903+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:48:42.356435+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:48:42.415989+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Master Library Explorer"}, "timestamp": "2026-07-08T03:48:42.448542+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:49:00.456128+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Master Library Explorer"}, "timestamp": "2026-07-08T03:49:00.486109+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:49:14.887062+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Master Library Explorer"}, "timestamp": "2026-07-08T03:49:14.920893+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:49:29.169657+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Master Library Explorer"}, "timestamp": "2026-07-08T03:49:29.217250+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:49:30.724404+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:49:30.787617+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:49:30.819922+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:50:19.314909+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:50:19.392371+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Engineering Workbench"}, "timestamp": "2026-07-08T03:50:19.439674+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:50:29.603563+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:50:29.664082+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:50:29.695496+00:00"}

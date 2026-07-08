@@ -44,12 +44,46 @@ PROJECT_MANAGER_PAGES = [
     "Open Existing Project",
 ]
 
-TOP_LEVEL_NAVIGATION: list[tuple[str, str]] = [
-    ("Mission Control", "Mission Control"),
-    ("Projects", "Projects"),
-    ("Knowledge", "Relationship Visualization"),
-    ("Reports", "Reports"),
-    ("Administration", "Project Settings"),
+NAV_DROPDOWN_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
+    (
+        "Projects",
+        [
+            ("Projects", "Projects"),
+            ("Pinned Projects", "Pinned Projects"),
+            ("Reference Projects", "Reference Projects"),
+            ("Recent Projects", "Recent Projects"),
+            ("Create New Project", "Create New Project"),
+            ("Open Existing Project", "Open Existing Project"),
+        ],
+    ),
+    (
+        "Knowledge",
+        [
+            ("Knowledge Graph", "Relationship Visualization"),
+            ("Relationships", "Relationship Explorer"),
+            ("Evidence", "Evidence"),
+            ("History", "History"),
+            ("Master Library", "Master Library Explorer"),
+        ],
+    ),
+    (
+        "Reports",
+        [
+            ("Reports", "Reports"),
+            ("Estimator Brief", "Estimator Brief"),
+            ("Readiness", "Readiness"),
+            ("Labor Estimate", "Labor Estimate"),
+            ("Revision Comparison", "Revision Comparison"),
+            ("Exports", "Exports"),
+        ],
+    ),
+    (
+        "Administration",
+        [
+            ("Project Settings", "Project Settings"),
+            ("Application Settings", "Application Settings"),
+        ],
+    ),
 ]
 
 ENGINEERING_PAGES = [
@@ -73,7 +107,7 @@ KNOWLEDGE_PAGES = [
     "Relationship Visualization",
     "Relationship Explorer",
     "Evidence",
-    "Timeline",
+    "History",
     "Master Library Explorer",
     "Metadata Inspector",
 ]
@@ -882,33 +916,36 @@ def _render_header(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    cols = st.columns([2.2, 6.8, 0.8, 0.8])
+    cols = st.columns([2.2, 0.9, 0.9])
     if cols[0].button("Atlas", use_container_width=True, type="secondary"):
         st.session_state["atlas_active_page"] = "Mission Control"
         st.rerun()
 
-    cols[1].text_input(
-        "Global Search",
-        key="atlas_global_search",
-        placeholder="Search drawings, specs, equipment, systems, RFIs, evidence",
-    )
-    cols[2].button("Alerts", disabled=True, use_container_width=True)
-    cols[3].button("Settings", use_container_width=True)
+    if cols[2].button("History", use_container_width=True):
+        st.session_state["atlas_active_page"] = "History"
+        st.rerun()
+    if cols[2].button("Settings", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Application Settings"
+        st.rerun()
 
 
 def _nav_buttons(st: Any, host: Any, mode: str) -> None:
     active_page = st.session_state.get("atlas_active_page", "Mission Control")
 
-    host.markdown("### Navigation")
-    for label, page in TOP_LEVEL_NAVIGATION:
-        if host.button(
-            label,
-            key=f"atlas_nav_{mode}_{label}_{page}",
-            type="primary" if active_page == page else "secondary",
-            use_container_width=True,
+    for group_name, entries in NAV_DROPDOWN_GROUPS:
+        with host.expander(
+            group_name,
+            expanded=active_page in [item[1] for item in entries],
         ):
-            st.session_state["atlas_active_page"] = page
-            st.rerun()
+            for label, page in entries:
+                if host.button(
+                    label,
+                    key=f"atlas_nav_{mode}_{group_name}_{label}_{page}",
+                    type="primary" if active_page == page else "secondary",
+                    use_container_width=True,
+                ):
+                    st.session_state["atlas_active_page"] = page
+                    st.rerun()
 
 
 def _set_context_selection(st: Any, kind: str, data: dict[str, Any]) -> None:
@@ -976,9 +1013,10 @@ def _restore_workspace_state(
         st.session_state["atlas_loaded_workspace_state_for"] = record.workspace_id
         return
 
-    st.session_state["atlas_active_page"] = str(
-        state.get("last_open_page") or "Mission Control"
-    )
+    restored_page = str(state.get("last_open_page") or "Mission Control")
+    if restored_page == "Timeline":
+        restored_page = "History"
+    st.session_state["atlas_active_page"] = restored_page
 
     filters = dict(state.get("filters") or {})
     st.session_state["atlas_file_search"] = str(filters.get("file_search") or "")
@@ -1369,15 +1407,8 @@ def _render_home_page(
     )
     signals = list(payload.get("signals") or [])
     actions = list(payload.get("actions") or [])
-    timeline = list(payload.get("timeline") or [])
     pending_timeline = list(payload.get("pending_timeline") or [])
     active_signal = dict(payload.get("active_signal") or {})
-
-    _render_page_header(
-        st,
-        "Mission Control",
-        "Action-oriented command center for what to do next.",
-    )
 
     attention_projects = [
         item for item in signals if item.get("status") in {"Blocked", "Needs Attention"}
@@ -1480,63 +1511,12 @@ def _render_home_page(
     else:
         st.info("No recent projects available.")
 
-    st.markdown("### Projects Requiring Attention")
-    if attention_projects:
-        st.dataframe(
-            [
-                {
-                    "Project": item["project"],
-                    "Status": item["status"],
-                    "Errors": item["errors"],
-                    "Warnings": item["warnings"],
-                    "Action": item["destination"],
-                }
-                for item in attention_projects[:8]
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-    else:
-        st.success("No blocked projects in the recent workspace set.")
-
-    st.markdown("### Recent Activity")
-    if timeline:
-        st.dataframe(
-            [
-                {
-                    "Event": item.get("event"),
-                    "Status": item.get("status"),
-                    "Timestamp": item.get("timestamp"),
-                }
-                for item in timeline[:8]
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-    else:
-        st.caption("No recent activity.")
-
     if active_signal:
         st.caption(
             "Current workspace status: "
             f"{active_signal.get('status', 'Active')} · "
             f"{active_signal.get('reason', 'Ready for engineering review.')}",
         )
-
-    quick_cols = st.columns(4)
-    st.markdown("### Workspace Actions")
-    if quick_cols[0].button("Projects", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Projects"
-        st.rerun()
-    if quick_cols[1].button("Reference Projects", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Reference Projects"
-        st.rerun()
-    if quick_cols[2].button("Create New Project", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Create New Project"
-        st.rerun()
-    if quick_cols[3].button("Open Existing Project", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Open Existing Project"
-        st.rerun()
 
 
 def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
@@ -5943,7 +5923,7 @@ def _render_engineering_workbench_page(
         else:
             st.info("No recommended actions linked to this selection.")
 
-        st.markdown("#### Timeline")
+        st.markdown("#### History")
         st.dataframe(
             _timeline_events(record, context),
             use_container_width=True,
@@ -6479,8 +6459,8 @@ def _render_engineering_notebook_page(
         if create_actions[1].button("Clear Draft", use_container_width=True):
             st.session_state["atlas_notebook_draft"] = {}
             st.rerun()
-        if create_actions[2].button("Open Timeline", use_container_width=True):
-            st.session_state["atlas_active_page"] = "Timeline"
+        if create_actions[2].button("Open History", use_container_width=True):
+            st.session_state["atlas_active_page"] = "History"
             st.rerun()
 
     with tabs[1]:
@@ -8989,7 +8969,7 @@ def _render_timeline_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader("Engineering Activity Timeline")
+    st.subheader("Engineering Activity History")
     events = _timeline_events(record, context)
     st.dataframe(events, use_container_width=True, hide_index=True)
 
@@ -9157,7 +9137,7 @@ def _render_object_detail_page(
         st.session_state["atlas_active_page"] = "Evidence"
         st.rerun()
 
-    st.markdown("Timeline")
+    st.markdown("History")
     st.dataframe(
         _timeline_events(record, context)[:6], use_container_width=True, hide_index=True
     )
@@ -9933,8 +9913,8 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
         if nav_cols[0].button("Open Notebook", use_container_width=True):
             st.session_state["atlas_active_page"] = "Engineering Notebook"
             st.rerun()
-        if nav_cols[1].button("Open Timeline", use_container_width=True):
-            st.session_state["atlas_active_page"] = "Timeline"
+        if nav_cols[1].button("Open History", use_container_width=True):
+            st.session_state["atlas_active_page"] = "History"
             st.rerun()
         return
 
@@ -10177,7 +10157,7 @@ def _render_main_content(
         _render_relationship_explorer_page(st, record, context)
     elif page == "Relationship Visualization":
         _render_relationship_visualization_page(st, record, context)
-    elif page == "Timeline":
+    elif page == "History":
         _render_timeline_page(st, record, context)
     elif page == "Project Detail":
         _render_object_detail_page(
@@ -10306,7 +10286,7 @@ def _render_mission_control_panels(
             hide_index=True,
         )
         if st.button("View full activity", key="atlas_side_view_activity"):
-            st.session_state["atlas_active_page"] = "Timeline"
+            st.session_state["atlas_active_page"] = "History"
             st.rerun()
     else:
         st.caption("No activity yet.")
@@ -10326,7 +10306,7 @@ def _render_mission_control_panels(
             hide_index=True,
         )
         if st.button("View full timeline", key="atlas_side_view_timeline"):
-            st.session_state["atlas_active_page"] = "Timeline"
+            st.session_state["atlas_active_page"] = "History"
             st.rerun()
     else:
         st.caption("No pending timeline items.")
@@ -10363,7 +10343,6 @@ def _render_shell(
 ) -> None:
     _render_header(st, workspace_service, record, context)
     _sync_notebook_state_to_context(st, context)
-    _render_global_search_panel(st, record, context)
 
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
     mission_control_payload = None
@@ -10382,21 +10361,31 @@ def _render_shell(
     layout_mode = st.session_state.get("atlas_layout_mode", "Desktop")
 
     if layout_mode == "Desktop":
-        nav_col, main_col, context_col = st.columns([2.3, 6.4, 2.3])
-        with nav_col:
-            _nav_buttons(st, st, "desktop")
-        with main_col:
-            _render_main_content(
-                st,
-                workspace_service,
-                record,
-                context,
-                mission_control_payload,
-            )
-        with context_col:
-            if current_page == "Mission Control":
-                _render_mission_control_panels(st, mission_control_payload)
-            else:
+        if current_page == "Mission Control":
+            nav_col, main_col = st.columns([2.4, 7.6])
+            with nav_col:
+                _nav_buttons(st, st, "desktop")
+            with main_col:
+                _render_main_content(
+                    st,
+                    workspace_service,
+                    record,
+                    context,
+                    mission_control_payload,
+                )
+        else:
+            nav_col, main_col, context_col = st.columns([2.3, 6.4, 2.3])
+            with nav_col:
+                _nav_buttons(st, st, "desktop")
+            with main_col:
+                _render_main_content(
+                    st,
+                    workspace_service,
+                    record,
+                    context,
+                    mission_control_payload,
+                )
+            with context_col:
                 _render_context_panel(st, context)
 
     elif layout_mode == "Tablet":
@@ -10409,10 +10398,8 @@ def _render_shell(
             context,
             mission_control_payload,
         )
-        st.markdown("---")
-        if current_page == "Mission Control":
-            _render_mission_control_panels(st, mission_control_payload)
-        else:
+        if current_page != "Mission Control":
+            st.markdown("---")
             _render_context_panel(st, context)
 
     else:
@@ -10425,10 +10412,8 @@ def _render_shell(
             context,
             mission_control_payload,
         )
-        st.markdown("---")
-        if current_page == "Mission Control":
-            _render_mission_control_panels(st, mission_control_payload)
-        else:
+        if current_page != "Mission Control":
+            st.markdown("---")
             _render_context_panel(st, context)
 
     _render_status_bar(st, record, context)
