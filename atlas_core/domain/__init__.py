@@ -69,6 +69,16 @@ from atlas_core.domain.document_intake import (
     DocumentIntakeSnapshot,
     IntakeSourceReference,
 )
+from atlas_core.domain.master_library import (
+    EngineeringAttributes,
+    ManufacturerReference,
+    MasterProduct,
+    ProductAlias,
+    ProductCategory,
+    ProductFamily,
+    ProductRelationship,
+    ProductStatus,
+)
 
 __all__ = [
     "BidPackageReview",
@@ -98,6 +108,14 @@ __all__ = [
     "RevisionComparisonSourceRef",
     "DocumentIntakeSnapshot",
     "IntakeSourceReference",
+    "MasterProduct",
+    "ProductCategory",
+    "ProductFamily",
+    "ManufacturerReference",
+    "ProductAlias",
+    "ProductStatus",
+    "EngineeringAttributes",
+    "ProductRelationship",
     "DrawingDiscipline",
     "DrawingSheet",
     "SpecificationDiscipline",

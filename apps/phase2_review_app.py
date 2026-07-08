@@ -32,6 +32,7 @@ from atlas_core.services.specification_intelligence import (
 )
 from atlas_core.services.coordination_intelligence import CoordinationIntelligenceEngine
 from atlas_core.services.resolver import EngineeringResolver, ResolverContext
+from atlas_core.services.master_library import MasterLibraryService
 
 PROJECT_MANAGER_PAGES = [
     "Home",
@@ -47,6 +48,7 @@ PROJECT_PAGES = [
     "Overview",
     "Engineering Workbench",
     "Engineering Notebook",
+    "Master Library Explorer",
     "Executive Summary",
     "Project Files",
     "Drawings",
@@ -586,6 +588,7 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_notebook_entries", [])
     st.session_state.setdefault("atlas_notebook_search", "")
     st.session_state.setdefault("atlas_notebook_draft", {})
+    st.session_state.setdefault("atlas_master_library_search", "")
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -2713,6 +2716,19 @@ def _workspace_objects(
     return result
 
 
+def _master_library_rows(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    cached = _context_cached(context, "master_library_rows")
+    if isinstance(cached, list):
+        return cached
+
+    objects = _workspace_objects(context)
+    service = MasterLibraryService()
+    service.import_workspace_equipment(list(objects.get("equipment") or []))
+    rows = service.explorer_rows()
+    _set_context_cached(context, "master_library_rows", rows)
+    return rows
+
+
 def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any]]:
     cached = _context_cached(context, "global_search_entries")
     if isinstance(cached, list):
@@ -2796,6 +2812,20 @@ def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any
                 "subtitle": "equipment model",
                 "page": "Equipment",
                 "selection_kind": "model",
+                "data": item,
+            }
+        )
+    for item in _master_library_rows(context):
+        entries.append(
+            {
+                "kind": "Master Product",
+                "name": _safe_text(item.get("model"), "Product"),
+                "subtitle": (
+                    f"{_safe_text(item.get('manufacturer'), '')}"
+                    f" · {_safe_text(item.get('category'), 'other')}"
+                ),
+                "page": "Master Library Explorer",
+                "selection_kind": "master_product",
                 "data": item,
             }
         )
@@ -4612,6 +4642,20 @@ def _metadata_for_selection(
             "relationship_count": len(list(data.get("related_objects") or [])),
             "evidence_count": len(list(data.get("evidence_refs") or [])),
         }
+    elif kind == "master_product":
+        return {
+            "label": _safe_text(data.get("model"), "Master Product"),
+            "type": "Master Product",
+            "source_file": "Master Library Explorer",
+            "source_page": _safe_text(data.get("product_id"), "n/a"),
+            "sheet_number": "n/a",
+            "specification_section": "n/a",
+            "extraction_confidence": _safe_text(data.get("confidence"), "n/a"),
+            "creation_timestamp": _safe_text(data.get("created_at"), "n/a"),
+            "last_update": _safe_text(data.get("updated_at"), "n/a"),
+            "relationship_count": len(list(data.get("related_products") or [])),
+            "evidence_count": len(list(data.get("aliases") or [])),
+        }
 
     for node_id in candidates:
         node = _node_by_id(graph, node_id)
@@ -4703,6 +4747,8 @@ def _selection_node_id(kind: str, data: dict[str, Any]) -> str | None:
         return f"project:{_safe_text(data.get('project_id'), '')}"
     if kind == "notebook_entry":
         return f"notebook:{_safe_text(data.get('entry_id'), '')}"
+    if kind == "master_product":
+        return f"master_product:{_safe_text(data.get('product_id'), '')}"
     return None
 
 
@@ -8009,6 +8055,307 @@ def _render_systems_page(
     _set_context_selection(st, "system", selected)
 
 
+def _render_master_library_explorer_page(
+    st: Any,
+    context: dict[str, Any] | None,
+) -> None:
+    _render_page_header(
+        st,
+        "Master Library Explorer",
+        "Canonical engineering catalog for products and systems. This is not procurement, inventory, or ERP.",
+    )
+
+    if context is None:
+        _render_empty_state(
+            st,
+            "Master Library Explorer requires a loaded project context.",
+        )
+        return
+
+    rows = _master_library_rows(context)
+    if not rows:
+        _render_empty_state(
+            st,
+            "No products available. Import project files to build deterministic product mappings.",
+        )
+        return
+
+    categories = sorted(
+        {str(item.get("category") or "other") for item in rows if item.get("category")}
+    )
+    manufacturers = sorted(
+        {
+            str(item.get("manufacturer") or "Unknown")
+            for item in rows
+            if item.get("manufacturer")
+        }
+    )
+    statuses = sorted(
+        {str(item.get("status") or "unknown") for item in rows if item.get("status")}
+    )
+
+    filter_cols = st.columns([2.4, 1.6, 1.6, 1.4])
+    search_query = filter_cols[0].text_input(
+        "Search Products",
+        value=st.session_state.get("atlas_master_library_search", ""),
+        key="atlas_master_library_search",
+        placeholder="manufacturer, model, alias, family",
+    )
+    selected_categories = filter_cols[1].multiselect(
+        "Category",
+        options=categories,
+        default=[],
+    )
+    selected_manufacturers = filter_cols[2].multiselect(
+        "Manufacturer",
+        options=manufacturers,
+        default=[],
+    )
+    selected_statuses = filter_cols[3].multiselect(
+        "Status",
+        options=statuses,
+        default=[],
+    )
+
+    q = search_query.strip().lower()
+    filtered = [
+        item
+        for item in rows
+        if (
+            (
+                not q
+                or q
+                in " ".join(
+                    [
+                        str(item.get("product_id") or ""),
+                        str(item.get("manufacturer") or ""),
+                        str(item.get("model") or ""),
+                        str(item.get("description") or ""),
+                        str(item.get("family") or ""),
+                        " ".join(list(item.get("aliases") or [])),
+                    ]
+                ).lower()
+            )
+            and (
+                not selected_categories
+                or str(item.get("category") or "other") in selected_categories
+            )
+            and (
+                not selected_manufacturers
+                or str(item.get("manufacturer") or "Unknown") in selected_manufacturers
+            )
+            and (
+                not selected_statuses
+                or str(item.get("status") or "unknown") in selected_statuses
+            )
+        )
+    ]
+
+    summary_cols = st.columns(3)
+    with summary_cols[0]:
+        st.markdown("#### Category Browser")
+        category_counts: dict[str, int] = defaultdict(int)
+        for item in filtered:
+            category_counts[str(item.get("category") or "other")] += 1
+        st.dataframe(
+            [
+                {"category": key, "products": value}
+                for key, value in sorted(category_counts.items())
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    with summary_cols[1]:
+        st.markdown("#### Manufacturer Browser")
+        manufacturer_counts: dict[str, int] = defaultdict(int)
+        for item in filtered:
+            manufacturer_counts[str(item.get("manufacturer") or "Unknown")] += 1
+        st.dataframe(
+            [
+                {"manufacturer": key, "products": value}
+                for key, value in sorted(manufacturer_counts.items())
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    with summary_cols[2]:
+        st.markdown("#### Status")
+        status_counts: dict[str, int] = defaultdict(int)
+        for item in filtered:
+            status_counts[str(item.get("status") or "unknown")] += 1
+        st.dataframe(
+            [
+                {"status": key, "products": value}
+                for key, value in sorted(status_counts.items())
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown("#### Canonical Product Model")
+    st.dataframe(
+        [
+            {
+                "manufacturer": item.get("manufacturer"),
+                "model": item.get("model"),
+                "normalized_model": item.get("normalized_model"),
+                "description": item.get("description"),
+                "category": item.get("category"),
+                "family": item.get("family"),
+                "status": item.get("status"),
+                "aliases": len(list(item.get("aliases") or [])),
+                "relationships": len(list(item.get("related_products") or [])),
+                "confidence": item.get("confidence"),
+            }
+            for item in filtered
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    if not filtered:
+        _render_empty_state(st, "No master library products match the current filters.")
+        return
+
+    labels = [
+        (
+            f"{_safe_text(item.get('manufacturer'), 'Unknown')}"
+            f" · {_safe_text(item.get('model'), 'Unknown')}"
+            f" · {_safe_text(item.get('category'), 'other')}"
+        )
+        for item in filtered
+    ]
+    selected_label = st.selectbox("Select Master Product", options=labels)
+    selected = filtered[labels.index(selected_label)]
+    _set_context_selection(st, "master_product", selected)
+
+    detail_cols = st.columns([2.5, 1.5])
+    with detail_cols[0]:
+        st.markdown("#### Product Detail")
+        st.dataframe(
+            [
+                {
+                    "field": "Product ID",
+                    "value": _safe_text(selected.get("product_id"), "n/a"),
+                },
+                {
+                    "field": "Manufacturer",
+                    "value": _safe_text(selected.get("manufacturer"), "n/a"),
+                },
+                {"field": "Model", "value": _safe_text(selected.get("model"), "n/a")},
+                {
+                    "field": "Normalized Model",
+                    "value": _safe_text(selected.get("normalized_model"), "n/a"),
+                },
+                {
+                    "field": "Description",
+                    "value": _safe_text(selected.get("description"), "n/a"),
+                },
+                {
+                    "field": "Category",
+                    "value": _safe_text(selected.get("category"), "n/a"),
+                },
+                {"field": "Family", "value": _safe_text(selected.get("family"), "n/a")},
+                {"field": "Status", "value": _safe_text(selected.get("status"), "n/a")},
+                {
+                    "field": "Confidence",
+                    "value": _safe_text(selected.get("confidence"), "n/a"),
+                },
+                {
+                    "field": "Created",
+                    "value": _safe_text(selected.get("created_at"), "n/a"),
+                },
+                {
+                    "field": "Updated",
+                    "value": _safe_text(selected.get("updated_at"), "n/a"),
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.markdown("#### Aliases")
+        aliases = list(selected.get("aliases") or [])
+        st.dataframe(
+            [{"alias": str(item)} for item in aliases],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with detail_cols[1]:
+        st.markdown("#### Relationship Browser")
+        relationships = list(selected.get("related_products") or [])
+        if relationships:
+            st.dataframe(
+                [
+                    {
+                        "relationship": _safe_text(
+                            item.get("relationship_type"), "n/a"
+                        ),
+                        "target": _safe_text(item.get("target_product_id"), "n/a"),
+                        "confidence": _safe_text(item.get("confidence"), "n/a"),
+                    }
+                    for item in relationships
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+            for item in relationships[:8]:
+                target = _safe_text(item.get("target_product_id"), "")
+                if st.button(
+                    f"Open {target}",
+                    key=f"atlas_master_library_target_{_safe_text(selected.get('product_id'), 'product')}_{target}",
+                    use_container_width=True,
+                ):
+                    _open_linked_object(st, target)
+        else:
+            st.info("No related products mapped yet.")
+
+    st.markdown("#### Alias Resolution")
+    resolver_cols = st.columns([2.1, 2.1, 3.8])
+    test_manufacturer = resolver_cols[0].text_input(
+        "Manufacturer Input",
+        value=_safe_text(selected.get("manufacturer"), ""),
+        key="atlas_master_library_resolve_manufacturer",
+    )
+    test_model = resolver_cols[1].text_input(
+        "Model/Alias Input",
+        value=_safe_text(selected.get("model"), ""),
+        key="atlas_master_library_resolve_model",
+    )
+    test_description = resolver_cols[2].text_input(
+        "Description Input",
+        value=_safe_text(selected.get("description"), ""),
+        key="atlas_master_library_resolve_description",
+    )
+
+    if st.button("Resolve Product", key="atlas_master_library_resolve_button"):
+        service = MasterLibraryService()
+        service.import_workspace_equipment(
+            list(_workspace_objects(context).get("equipment") or [])
+        )
+        resolution = service.resolve_product(
+            manufacturer=test_manufacturer,
+            model=test_model,
+            description=test_description,
+        )
+        matched = dict(resolution.get("matched") or {})
+        st.dataframe(
+            [
+                {
+                    "matched product": _safe_text(
+                        matched.get("product_id"), "No match"
+                    ),
+                    "manufacturer": _safe_text(matched.get("manufacturer"), "n/a"),
+                    "model": _safe_text(matched.get("model"), "n/a"),
+                    "confidence": _safe_text(resolution.get("confidence"), "0.0"),
+                    "trace": " | ".join(list(resolution.get("trace") or [])),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
 def _render_relationship_explorer_page(
     st: Any,
     record: ProjectWorkspaceRecord,
@@ -9203,6 +9550,78 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
             st.rerun()
         return
 
+    if kind == "master_product":
+        st.markdown("#### Master Product")
+        st.dataframe(
+            [
+                {
+                    "field": "Product ID",
+                    "value": _safe_text(data.get("product_id"), "n/a"),
+                },
+                {
+                    "field": "Manufacturer",
+                    "value": _safe_text(data.get("manufacturer"), "n/a"),
+                },
+                {"field": "Model", "value": _safe_text(data.get("model"), "n/a")},
+                {
+                    "field": "Normalized Model",
+                    "value": _safe_text(data.get("normalized_model"), "n/a"),
+                },
+                {
+                    "field": "Description",
+                    "value": _safe_text(data.get("description"), "n/a"),
+                },
+                {
+                    "field": "Category",
+                    "value": _safe_text(data.get("category"), "n/a"),
+                },
+                {"field": "Family", "value": _safe_text(data.get("family"), "n/a")},
+                {"field": "Status", "value": _safe_text(data.get("status"), "n/a")},
+                {
+                    "field": "Confidence",
+                    "value": _safe_text(data.get("confidence"), "n/a"),
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        aliases = list(data.get("aliases") or [])
+        if aliases:
+            st.markdown("Aliases")
+            st.dataframe(
+                [{"alias": str(item)} for item in aliases],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        relationships = list(data.get("related_products") or [])
+        if relationships:
+            st.markdown("Relationships")
+            st.dataframe(
+                [
+                    {
+                        "relationship": _safe_text(
+                            item.get("relationship_type"),
+                            "n/a",
+                        ),
+                        "target": _safe_text(item.get("target_product_id"), "n/a"),
+                    }
+                    for item in relationships
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        nav_cols = st.columns(2)
+        if nav_cols[0].button("Open Master Library", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Master Library Explorer"
+            st.rerun()
+        if nav_cols[1].button("Open Equipment", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Equipment"
+            st.rerun()
+        return
+
     st.markdown("#### Project")
     if context is None:
         st.info(
@@ -9333,6 +9752,8 @@ def _render_main_content(
         _render_engineering_workbench_page(st, record, context)
     elif page == "Engineering Notebook":
         _render_engineering_notebook_page(st, record, context)
+    elif page == "Master Library Explorer":
+        _render_master_library_explorer_page(st, context)
     elif page == "Executive Summary":
         _render_executive_summary_page(st, context)
     elif page == "Project Files":

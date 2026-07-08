@@ -196,6 +196,13 @@ from atlas_core.services.coordination_intelligence import (
     CoordinationSeverity,
     CoordinationSummary,
 )
+from atlas_core.services.master_library import (
+    AliasResolver,
+    LibraryResolver,
+    MasterLibraryRepository,
+    MasterLibraryService,
+    ProductMatcher,
+)
 
 __all__ = [
     "BaselineService",
@@ -295,6 +302,11 @@ __all__ = [
     "CoordinationIssue",
     "CoordinationSeverity",
     "CoordinationSummary",
+    "MasterLibraryService",
+    "MasterLibraryRepository",
+    "LibraryResolver",
+    "AliasResolver",
+    "ProductMatcher",
     "PackageDiscoveryResult",
     "UploadedIntakeFile",
     "UploadSessionResult",
