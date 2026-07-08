@@ -80,3 +80,7 @@
 {"event_type": "workspace_opened", "payload": {"last_open_page": "Evidence"}, "timestamp": "2026-07-07T04:43:04.198622+00:00"}
 {"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-07T04:43:08.921777+00:00"}
 {"event_type": "workspace_opened", "payload": {"last_open_page": "Engineering Assumptions"}, "timestamp": "2026-07-07T04:43:08.952214+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:01:21.431800+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Engineering Assumptions"}, "timestamp": "2026-07-08T03:01:22.336274+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:02:00.181137+00:00"}
+{"event_type": "workspace_opened", "payload": {"last_open_page": "Home"}, "timestamp": "2026-07-08T03:02:00.217910+00:00"}

@@ -178,16 +178,16 @@
       {
         "category": "Cross-Object Coordination",
         "rationale": "Uses deterministic relationship density across the project knowledge graph.",
-        "score": 0.6666666666666666,
+        "score": 0.9364406779661016,
         "weight": 0.2,
-        "weighted_score": 0.13
+        "weighted_score": 0.19
       },
       {
         "category": "Estimating Confidence",
-        "rationale": "Combines review confidence and labor confidence when available.",
-        "score": 0.595,
+        "rationale": "Combines review, labor, and resolver confidence when available.",
+        "score": 0.7295,
         "weight": 0.15,
-        "weighted_score": 0.09
+        "weighted_score": 0.11
       },
       {
         "category": "Revision Stability",
@@ -201,13 +201,15 @@
     "rationale": [
       "Engineering Completeness: 1.00 x 0.30",
       "Package Consistency: 0.82 x 0.25",
-      "Cross-Object Coordination: 0.67 x 0.20",
-      "Estimating Confidence: 0.59 x 0.15",
+      "Cross-Object Coordination: 0.94 x 0.20",
+      "Estimating Confidence: 0.73 x 0.15",
       "Revision Stability: 1.00 x 0.10",
       "Blockers considered: 0",
-      "Missing scope diagnostics considered: 0"
+      "Missing scope diagnostics considered: 0",
+      "Resolver conflicts considered: 0",
+      "Resolver manual reviews considered: 0"
     ],
-    "score": 83
+    "score": 90
   },
   "recommendations": [
     {
@@ -373,7 +375,7 @@
       "confidence": 0.66,
       "drawing_coverage": 1.0,
       "equipment_completeness": 1.0,
-      "health_score": 82,
+      "health_score": 89,
       "labor_confidence": 0.53,
       "outstanding_assumptions": 0,
       "outstanding_rfis": 0,
@@ -386,7 +388,7 @@
       "confidence": 0.66,
       "drawing_coverage": 1.0,
       "equipment_completeness": 1.0,
-      "health_score": 82,
+      "health_score": 89,
       "labor_confidence": 0.53,
       "outstanding_assumptions": 0,
       "outstanding_rfis": 0,
@@ -399,7 +401,7 @@
       "confidence": 0.66,
       "drawing_coverage": 1.0,
       "equipment_completeness": 1.0,
-      "health_score": 82,
+      "health_score": 89,
       "labor_confidence": 0.53,
       "outstanding_assumptions": 0,
       "outstanding_rfis": 0,
@@ -412,7 +414,7 @@
       "confidence": 0.66,
       "drawing_coverage": 1.0,
       "equipment_completeness": 1.0,
-      "health_score": 82,
+      "health_score": 89,
       "labor_confidence": 0.53,
       "outstanding_assumptions": 0,
       "outstanding_rfis": 0,
@@ -425,7 +427,7 @@
       "confidence": 0.66,
       "drawing_coverage": 1.0,
       "equipment_completeness": 1.0,
-      "health_score": 82,
+      "health_score": 89,
       "labor_confidence": 0.53,
       "outstanding_assumptions": 0,
       "outstanding_rfis": 0,

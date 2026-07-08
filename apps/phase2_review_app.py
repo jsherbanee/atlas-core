@@ -4501,7 +4501,10 @@ def _build_knowledge_graph(
             evidence_counts[edge["target"]] += 1
 
     for node_id, count in relationship_counts.items():
-        node = nodes[id_to_index[node_id]]
+        node_index = id_to_index.get(node_id)
+        if node_index is None:
+            continue
+        node = nodes[node_index]
         node.setdefault("metadata", {})["relationship_count"] = count
         node.setdefault("metadata", {})["evidence_count"] = evidence_counts[node_id]
 
