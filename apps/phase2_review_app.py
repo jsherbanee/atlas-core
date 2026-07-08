@@ -25,6 +25,10 @@ from atlas_core.services.engineering_insights_service import (
     EngineeringInsightsService,
 )
 from atlas_core.services.drawing_intelligence import DrawingIntelligenceEngine
+from atlas_core.services.specification_intelligence import (
+    SpecificationIntelligenceEngine,
+    SpecificationReferenceType,
+)
 from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 
 PROJECT_MANAGER_PAGES = [
@@ -45,6 +49,7 @@ PROJECT_PAGES = [
     "Drawings",
     "Drawing Explorer",
     "Specifications",
+    "Specification Explorer",
     "Equipment",
     "Systems",
     "Engineering Resolver",
@@ -1565,6 +1570,164 @@ def _contains_any(haystack: Any, values: list[str]) -> bool:
     return any(value.lower() in hay for value in values if value)
 
 
+def _section_sort_value(section_number: str) -> int:
+    digits = "".join(
+        character for character in str(section_number) if character.isdigit()
+    )
+    if not digits:
+        return 10**9
+    return int(digits)
+
+
+def _specification_cross_reference_warnings(
+    drawings: list[dict[str, Any]],
+    specifications: list[dict[str, Any]],
+    equipment: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    warnings: list[dict[str, Any]] = []
+
+    def _add_warning(
+        warning_id: str,
+        category: str,
+        severity: str,
+        message: str,
+        related_objects: list[str],
+    ) -> None:
+        warnings.append(
+            {
+                "warning_id": warning_id,
+                "category": category,
+                "severity": severity,
+                "message": message,
+                "related_objects": [item for item in related_objects if item],
+            }
+        )
+
+    drawing_numbers = {_safe_text(item.get("drawing_number"), "") for item in drawings}
+    spec_sections = {_safe_text(item.get("section"), "") for item in specifications}
+
+    for item in specifications:
+        section = _safe_text(item.get("section"), "")
+        for drawing_ref in list(item.get("referenced_drawings") or []):
+            if drawing_ref in drawing_numbers:
+                continue
+            _add_warning(
+                warning_id=f"spec-drawing-missing:{section}:{drawing_ref}",
+                category="spec_to_drawing_missing",
+                severity="high",
+                message=(
+                    f"Specification {section} references drawing {drawing_ref}, "
+                    "but no matching drawing object was found."
+                ),
+                related_objects=[section, drawing_ref],
+            )
+
+    for item in drawings:
+        drawing_number = _safe_text(item.get("drawing_number"), "")
+        for section in list(item.get("referenced_specifications") or []):
+            if section in spec_sections:
+                continue
+            _add_warning(
+                warning_id=f"drawing-spec-missing:{drawing_number}:{section}",
+                category="drawing_to_spec_missing",
+                severity="high",
+                message=(
+                    f"Drawing {drawing_number} references specification {section}, "
+                    "but no matching specification object was found."
+                ),
+                related_objects=[drawing_number, section],
+            )
+
+    for item in equipment:
+        equipment_id = _safe_text(item.get("equipment_id"), "")
+        drawing_refs = list(item.get("drawing_references") or [])
+        spec_refs = list(item.get("specification_references") or [])
+        if drawing_refs and not spec_refs:
+            _add_warning(
+                warning_id=f"equipment-drawing-no-spec:{equipment_id}",
+                category="equipment_in_drawing_not_in_spec",
+                severity="medium",
+                message=(
+                    f"Equipment {equipment_id} appears in drawing references but has no "
+                    "specification reference."
+                ),
+                related_objects=[equipment_id] + drawing_refs[:3],
+            )
+        if spec_refs and not drawing_refs:
+            _add_warning(
+                warning_id=f"equipment-spec-no-drawing:{equipment_id}",
+                category="equipment_in_spec_not_in_drawing",
+                severity="medium",
+                message=(
+                    f"Equipment {equipment_id} appears in specification references but has "
+                    "no drawing reference."
+                ),
+                related_objects=[equipment_id] + spec_refs[:3],
+            )
+
+    spec_systems = {
+        _safe_text(system, "")
+        for item in specifications
+        for system in list(item.get("referenced_systems") or [])
+    }
+    drawing_systems = {
+        _safe_text(system, "")
+        for item in drawings
+        for system in list(item.get("referenced_systems") or [])
+    }
+    for system in sorted(spec_systems - drawing_systems):
+        _add_warning(
+            warning_id=f"system-spec-no-drawing:{system}",
+            category="system_in_spec_without_drawing_coverage",
+            severity="high",
+            message=(
+                f"System {system} appears in specifications but has no drawing coverage."
+            ),
+            related_objects=[system],
+        )
+
+    execution_requirement_types = {
+        "testing_requirements",
+        "commissioning_requirements",
+        "coordination_requirements",
+        "quality_assurance_requirements",
+    }
+    for drawing in drawings:
+        detail_refs = list(drawing.get("detail_references") or [])
+        if not detail_refs:
+            continue
+        drawing_number = _safe_text(drawing.get("drawing_number"), "")
+        for section in list(drawing.get("referenced_specifications") or []):
+            spec = next(
+                (
+                    item
+                    for item in specifications
+                    if _safe_text(item.get("section"), "") == section
+                ),
+                None,
+            )
+            if spec is None:
+                continue
+            requirement_types = {
+                _safe_text(item.get("requirement_type"), "")
+                for item in list(spec.get("requirement_candidates") or [])
+            }
+            if requirement_types.isdisjoint(execution_requirement_types):
+                continue
+            _add_warning(
+                warning_id=f"drawing-detail-spec-execution:{drawing_number}:{section}",
+                category="drawing_detail_references_spec_execution_requirement",
+                severity="medium",
+                message=(
+                    f"Drawing {drawing_number} detail references align with execution "
+                    f"requirements in specification {section}; verify field coordination."
+                ),
+                related_objects=[drawing_number, section] + detail_refs[:2],
+            )
+
+    return warnings
+
+
 def _workspace_objects(
     context: dict[str, Any] | None,
 ) -> dict[str, Any]:
@@ -1583,6 +1746,10 @@ def _workspace_objects(
             "drawing_hierarchy": {"project_id": "", "disciplines": {}},
             "drawing_relationships": [],
             "drawing_intelligence_confidence": "n/a",
+            "specification_index": {},
+            "specification_relationships": [],
+            "specification_intelligence_confidence": "n/a",
+            "specification_cross_reference_warnings": [],
         }
 
     review = context.get("review")
@@ -1597,11 +1764,18 @@ def _workspace_objects(
     source_refs = _to_rows(list(getattr(snapshot, "source_references", []) or []))
 
     drawing_intelligence_result = None
+    specification_intelligence_result = None
     if review is not None:
         try:
             drawing_intelligence_result = DrawingIntelligenceEngine().build(review)
         except Exception:
             drawing_intelligence_result = None
+        try:
+            specification_intelligence_result = SpecificationIntelligenceEngine().build(
+                review
+            )
+        except Exception:
+            specification_intelligence_result = None
 
     metadata_by_sheet: dict[str, Any] = {}
     relationships_by_source: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -1612,6 +1786,13 @@ def _workspace_objects(
     }
     drawing_relationship_payload: list[dict[str, Any]] = []
     drawing_intelligence_confidence: str | float = "n/a"
+    section_by_number: dict[str, Any] = {}
+    specification_relationships_by_source: dict[str, list[dict[str, Any]]] = (
+        defaultdict(list)
+    )
+    specification_index_payload: dict[str, Any] = {}
+    specification_relationship_payload: list[dict[str, Any]] = []
+    specification_intelligence_confidence: str | float = "n/a"
 
     if drawing_intelligence_result is not None:
         metadata_by_sheet = {
@@ -1629,6 +1810,28 @@ def _workspace_objects(
         for relationship in drawing_intelligence_result.relationships:
             relationships_by_source[relationship.source_id.upper()].append(
                 relationship.to_dict()
+            )
+
+    if specification_intelligence_result is not None:
+        section_by_number = {
+            section.section_number: section
+            for section in specification_intelligence_result.sections
+        }
+        specification_index_payload = (
+            specification_intelligence_result.specification_index.to_dict()
+        )
+        specification_relationship_payload = [
+            item.to_dict() for item in specification_intelligence_result.relationships
+        ]
+        specification_intelligence_confidence = round(
+            float(specification_intelligence_result.confidence),
+            3,
+        )
+        for spec_relationship in specification_intelligence_result.relationships:
+            specification_relationships_by_source[
+                spec_relationship.source_id
+            ].append(
+                spec_relationship.to_dict()
             )
 
     evidence_rows = [
@@ -1783,6 +1986,7 @@ def _workspace_objects(
     specifications: list[dict[str, Any]] = []
     for item in spec_rows:
         section = _safe_text(item.get("section_number"), "Unknown")
+        intelligence_section = section_by_number.get(section)
         title = _safe_text(item.get("title"), "Untitled Section")
         source_file = _safe_text(item.get("source_file"), "")
         ref_drawings = [
@@ -1828,11 +2032,68 @@ def _workspace_objects(
                 if _safe_text(ref.get("section_number"), "")
             ]
 
+        referenced_standards: list[str] = []
+        referenced_manufacturers: list[str] = []
+        referenced_products: list[str] = []
+        referenced_schedules: list[str] = []
+        addendum_references: list[str] = []
+        requirement_candidates: list[dict[str, Any]] = []
+        part_rows: list[dict[str, Any]] = []
+        article_rows: list[dict[str, Any]] = []
+        section_relationships: list[dict[str, Any]] = []
+        discipline = _safe_text(item.get("discipline"), "other")
+        status = "indexed"
+        revision = _safe_text(item.get("revision"), "n/a")
+        issue_date = _safe_text(item.get("issue_date"), "n/a")
+        section_sequence: int | str = _section_sort_value(section)
+        extraction_confidence: str | float = _safe_text(item.get("confidence"), "n/a")
+        division = _safe_text(item.get("division"), "n/a")
+
+        if intelligence_section is not None:
+            metadata = intelligence_section.metadata
+            referenced_standards = list(metadata.referenced_standards)
+            referenced_manufacturers = list(metadata.referenced_manufacturers)
+            referenced_products = list(metadata.referenced_products)
+            referenced_schedules = list(metadata.related_schedules)
+            addendum_references = list(metadata.addendum_references)
+            requirement_candidates = [
+                dict(candidate)
+                for candidate in intelligence_section.requirement_candidates
+            ]
+            part_rows = [item.to_dict() for item in intelligence_section.parts]
+            article_rows = [item.to_dict() for item in intelligence_section.articles]
+            section_relationships = specification_relationships_by_source.get(
+                section,
+                [],
+            )
+            discipline = metadata.discipline.value
+            status = intelligence_section.status
+            revision = _safe_text(intelligence_section.revision, "n/a")
+            issue_date = _safe_text(intelligence_section.issue_date, "n/a")
+            extraction_confidence = round(float(intelligence_section.confidence), 3)
+            division = metadata.division
+            section_sequence = _section_sort_value(section)
+
+            for reference in intelligence_section.references:
+                if reference.reference_type == SpecificationReferenceType.DRAWING:
+                    cross_refs.append(reference.target_id)
+                elif reference.reference_type == SpecificationReferenceType.SYSTEM:
+                    ref_systems.append(reference.target_id)
+                elif reference.reference_type == SpecificationReferenceType.EQUIPMENT:
+                    ref_equipment.append({"equipment_id": reference.target_id})
+                elif reference.reference_type == SpecificationReferenceType.SECTION:
+                    cross_refs.append(reference.target_id)
+
         specifications.append(
             {
-                "division": _safe_text(item.get("division"), "n/a"),
+                "division": division,
                 "section": section,
                 "title": title,
+                "discipline": discipline,
+                "status": status,
+                "revision": revision,
+                "issue_date": issue_date,
+                "section_sequence": section_sequence,
                 "source_file": source_file,
                 "referenced_drawings": [
                     _safe_text(drawing.get("drawing_number"), "drawing")
@@ -1852,7 +2113,16 @@ def _workspace_objects(
                     for evidence in ref_evidence
                 ],
                 "cross_references": [item for item in cross_refs if item],
-                "extraction_confidence": _safe_text(item.get("confidence"), "n/a"),
+                "referenced_standards": referenced_standards,
+                "referenced_manufacturers": referenced_manufacturers,
+                "referenced_products": referenced_products,
+                "related_schedules": referenced_schedules,
+                "addendum_references": addendum_references,
+                "parts": part_rows,
+                "articles": article_rows,
+                "requirement_candidates": requirement_candidates,
+                "intelligence_relationships": section_relationships,
+                "extraction_confidence": extraction_confidence,
             }
         )
 
@@ -1952,6 +2222,11 @@ def _workspace_objects(
         {item["manufacturer"] for item in equipment if item["manufacturer"]}
     )
     models = sorted({item["model"] for item in equipment if item["model"]})
+    specification_cross_reference_warnings = _specification_cross_reference_warnings(
+        drawings=drawings,
+        specifications=specifications,
+        equipment=equipment,
+    )
 
     return {
         "drawings": drawings,
@@ -1969,6 +2244,10 @@ def _workspace_objects(
         "drawing_hierarchy": drawing_hierarchy_payload,
         "drawing_relationships": drawing_relationship_payload,
         "drawing_intelligence_confidence": drawing_intelligence_confidence,
+        "specification_index": specification_index_payload,
+        "specification_relationships": specification_relationship_payload,
+        "specification_intelligence_confidence": specification_intelligence_confidence,
+        "specification_cross_reference_warnings": specification_cross_reference_warnings,
     }
 
 
@@ -1994,7 +2273,7 @@ def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any
                 "kind": "Specification",
                 "name": _safe_text(item.get("section"), "Specification"),
                 "subtitle": _safe_text(item.get("title"), ""),
-                "page": "Specifications",
+                "page": "Specification Explorer",
                 "selection_kind": "specification",
                 "data": item,
             }
@@ -2430,6 +2709,357 @@ def _build_knowledge_graph(
             _safe_text(item.get("source_file"), "n/a"),
         )
 
+        for part in list(item.get("parts") or []):
+            part_number = _safe_text(part.get("part_number"), "part")
+            part_node = f"spec_part:{_safe_text(item.get('section'), '')}:{part_number}"
+            _add_node(
+                part_node,
+                "Specification Part",
+                f"{_safe_text(item.get('section'), 'Spec')} {part_number}",
+                "Specification Explorer",
+                "specification",
+                data={
+                    "section": _safe_text(item.get("section"), "n/a"),
+                    "part_number": part_number,
+                    "title": _safe_text(part.get("title"), "n/a"),
+                },
+                metadata={
+                    "source_file": _safe_text(item.get("source_file"), "n/a"),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": _safe_text(item.get("section"), "n/a"),
+                    "extraction_confidence": _safe_text(
+                        item.get("extraction_confidence"), "n/a"
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                spec_node,
+                part_node,
+                "Specification to Part",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                _safe_text(part.get("title"), "n/a"),
+            )
+
+        for requirement in list(item.get("requirement_candidates") or []):
+            req_type = _safe_text(requirement.get("requirement_type"), "requirement")
+            req_node = (
+                f"spec_requirement:{_safe_text(item.get('section'), '')}:{req_type}"
+            )
+            _add_node(
+                req_node,
+                "Requirement Candidate",
+                req_type,
+                "Specification Explorer",
+                "specification",
+                data={
+                    "section": _safe_text(item.get("section"), "n/a"),
+                    "requirement_type": req_type,
+                    "text": _safe_text(requirement.get("text"), "n/a"),
+                },
+                metadata={
+                    "source_file": _safe_text(item.get("source_file"), "n/a"),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": _safe_text(item.get("section"), "n/a"),
+                    "extraction_confidence": _safe_text(
+                        requirement.get("confidence"),
+                        _safe_text(item.get("extraction_confidence"), "n/a"),
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                spec_node,
+                req_node,
+                "Specification to Requirement Candidate",
+                _safe_text(
+                    requirement.get("confidence"),
+                    _safe_text(item.get("extraction_confidence"), "n/a"),
+                ),
+                _safe_text(requirement.get("text"), "n/a"),
+            )
+
+        for manufacturer in list(item.get("referenced_manufacturers") or []):
+            manufacturer_node = f"manufacturer:{manufacturer}"
+            _add_edge(
+                spec_node,
+                manufacturer_node,
+                "Specification to Manufacturer",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                _safe_text(item.get("section"), "n/a"),
+            )
+
+        for product in list(item.get("referenced_products") or []):
+            product_node = f"product:spec:{product}"
+            _add_node(
+                product_node,
+                "Product",
+                product,
+                "Specification Explorer",
+                "specification",
+                data={
+                    "product": product,
+                    "section": _safe_text(item.get("section"), ""),
+                },
+                metadata={
+                    "source_file": _safe_text(item.get("source_file"), "n/a"),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": _safe_text(item.get("section"), "n/a"),
+                    "extraction_confidence": _safe_text(
+                        item.get("extraction_confidence"), "n/a"
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                spec_node,
+                product_node,
+                "Specification to Product",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                _safe_text(item.get("section"), "n/a"),
+            )
+
+        for addendum in list(item.get("addendum_references") or []):
+            addendum_node = f"addendum:{addendum}"
+            _add_node(
+                addendum_node,
+                "Addendum",
+                addendum,
+                "Project Files",
+                "file",
+                data={"addendum": addendum},
+                metadata={
+                    "source_file": _safe_text(item.get("source_file"), "n/a"),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": _safe_text(item.get("section"), "n/a"),
+                    "extraction_confidence": _safe_text(
+                        item.get("extraction_confidence"), "n/a"
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                spec_node,
+                addendum_node,
+                "Specification to Addendum",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                addendum,
+            )
+
+        for part in list(item.get("parts") or []):
+            part_number = _safe_text(part.get("part_number"), "Part")
+            part_id = (
+                f"spec_part:{_safe_text(item.get('section'), 'unknown')}:{part_number}"
+            )
+            _add_node(
+                part_id,
+                "Specification Part",
+                f"{_safe_text(item.get('section'), 'Section')} {part_number}",
+                "Specification Explorer",
+                "specification",
+                data={
+                    "section": _safe_text(item.get("section"), ""),
+                    "part_number": part_number,
+                    "title": _safe_text(part.get("title"), ""),
+                },
+                metadata={
+                    "source_file": _safe_text(item.get("source_file"), "n/a"),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": _safe_text(item.get("section"), "n/a"),
+                    "extraction_confidence": _safe_text(
+                        item.get("extraction_confidence"), "n/a"
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                spec_node,
+                part_id,
+                "Specification to Specification Part",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                _safe_text(part.get("title"), "n/a"),
+            )
+
+        for article in list(item.get("articles") or []):
+            article_id = f"spec_article:{_safe_text(item.get('section'), 'unknown')}:{_safe_text(article.get('identifier'), 'article')}"
+            _add_node(
+                article_id,
+                "Specification Article",
+                _safe_text(article.get("heading"), "Article"),
+                "Specification Explorer",
+                "specification",
+                data={
+                    "section": _safe_text(item.get("section"), ""),
+                    "identifier": _safe_text(article.get("identifier"), ""),
+                    "heading": _safe_text(article.get("heading"), ""),
+                },
+                metadata={
+                    "source_file": _safe_text(item.get("source_file"), "n/a"),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": _safe_text(item.get("section"), "n/a"),
+                    "extraction_confidence": _safe_text(
+                        item.get("extraction_confidence"), "n/a"
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                spec_node,
+                article_id,
+                "Specification to Article",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                _safe_text(article.get("heading"), "n/a"),
+            )
+
+        for requirement in list(item.get("requirement_candidates") or []):
+            req_type = _safe_text(requirement.get("requirement_type"), "requirement")
+            req_id = f"spec_requirement:{_safe_text(item.get('section'), 'unknown')}:{req_type}"
+            _add_node(
+                req_id,
+                "Requirement Candidate",
+                req_type,
+                "Specification Explorer",
+                "specification",
+                data={
+                    "section": _safe_text(item.get("section"), ""),
+                    "requirement_type": req_type,
+                    "text": _safe_text(requirement.get("text"), ""),
+                },
+                metadata={
+                    "source_file": _safe_text(item.get("source_file"), "n/a"),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": _safe_text(item.get("section"), "n/a"),
+                    "extraction_confidence": _safe_text(
+                        requirement.get("confidence"), "n/a"
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                spec_node,
+                req_id,
+                "Specification to Requirement Candidate",
+                _safe_text(requirement.get("confidence"), "n/a"),
+                _safe_text(requirement.get("text"), "n/a"),
+            )
+
+        for standard in list(item.get("referenced_standards") or []):
+            standard_id = f"standard:{standard}"
+            _add_node(
+                standard_id,
+                "Standard",
+                standard,
+                "Specification Explorer",
+                "specification",
+                data={"standard": standard},
+                metadata={
+                    "source_file": _safe_text(item.get("source_file"), "n/a"),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": _safe_text(item.get("section"), "n/a"),
+                    "extraction_confidence": _safe_text(
+                        item.get("extraction_confidence"), "n/a"
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                spec_node,
+                standard_id,
+                "Specification to Standard",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                standard,
+            )
+
+        for addendum in list(item.get("addendum_references") or []):
+            addendum_id = f"addendum:{addendum}"
+            _add_node(
+                addendum_id,
+                "Addendum",
+                addendum,
+                "Specification Explorer",
+                "specification",
+                data={"addendum": addendum},
+                metadata={
+                    "source_file": _safe_text(item.get("source_file"), "n/a"),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": _safe_text(item.get("section"), "n/a"),
+                    "extraction_confidence": _safe_text(
+                        item.get("extraction_confidence"), "n/a"
+                    ),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                spec_node,
+                addendum_id,
+                "Specification to Addendum",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                addendum,
+            )
+
+        for manufacturer in list(item.get("referenced_manufacturers") or []):
+            _add_edge(
+                spec_node,
+                f"manufacturer:{manufacturer}",
+                "Specification to Manufacturer",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                manufacturer,
+            )
+
+        for product in list(item.get("referenced_products") or []):
+            _add_edge(
+                spec_node,
+                f"product:unknown:{product}",
+                "Specification to Product",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                product,
+            )
+
+        for system in list(item.get("referenced_systems") or []):
+            _add_edge(
+                spec_node,
+                f"system:{system}",
+                "Specification to System",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                system,
+            )
+
+        for rfi in list(item.get("referenced_rfis") or []):
+            _add_edge(
+                spec_node,
+                f"rfi:{rfi}",
+                "Specification to RFI Candidate",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                rfi,
+            )
+
+        for evidence in list(item.get("referenced_evidence") or []):
+            _add_edge(
+                spec_node,
+                f"evidence:{evidence}",
+                "Specification to Evidence",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                evidence,
+            )
+
     for item in objects.get("equipment", []):
         eq_node = f"equipment:{item.get('equipment_id', 'unknown')}"
         _add_node(
@@ -2638,6 +3268,30 @@ def _build_knowledge_graph(
                 _safe_text(item.get("extraction_confidence"), "n/a"),
                 _safe_text(item.get("source_file"), "n/a"),
             )
+        for system_ref in item.get("referenced_systems", []):
+            _add_edge(
+                spec_node,
+                f"system:{system_ref}",
+                "Specification to System",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                _safe_text(item.get("section"), "n/a"),
+            )
+        for equipment_ref in item.get("referenced_equipment", []):
+            _add_edge(
+                spec_node,
+                f"equipment:{equipment_ref}",
+                "Specification to Equipment",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                _safe_text(item.get("section"), "n/a"),
+            )
+        for rfi_ref in item.get("referenced_rfis", []):
+            _add_edge(
+                spec_node,
+                f"rfi:{rfi_ref}",
+                "Specification to RFI Candidate",
+                _safe_text(item.get("extraction_confidence"), "n/a"),
+                _safe_text(item.get("section"), "n/a"),
+            )
 
     for item in objects.get("evidence", []):
         evidence_id = f"evidence:{_safe_text(item.get('source_file'), 'file')}:{item.get('page', 'n/a')}"
@@ -2727,6 +3381,20 @@ def _build_knowledge_graph(
             _safe_text(item.get("confidence"), "n/a"),
             _safe_text(item.get("source_file"), "n/a"),
         )
+
+        for specification in objects.get("specifications", []):
+            section = _safe_text(specification.get("section"), "")
+            title = _safe_text(specification.get("title"), "")
+            if not section:
+                continue
+            if _contains_any(str(item), [section, title]):
+                _add_edge(
+                    f"spec:{section}",
+                    node_id,
+                    "Specification to Engineering Assumption",
+                    _safe_text(item.get("confidence"), "n/a"),
+                    _safe_text(item.get("source_file"), "n/a"),
+                )
 
         for evidence in objects.get("evidence", []):
             evidence_id = f"evidence:{_safe_text(evidence.get('source_file'), 'file')}:{evidence.get('page', 'n/a')}"
@@ -3044,6 +3712,68 @@ def _build_knowledge_graph(
                         _safe_text(insight.title, "n/a"),
                     )
 
+            for specification in objects.get("specifications", []):
+                section = _safe_text(specification.get("section"), "")
+                if not section:
+                    continue
+                if _contains_any(
+                    support_blob,
+                    [
+                        section,
+                        _safe_text(specification.get("title"), ""),
+                        _safe_text(specification.get("division"), ""),
+                    ],
+                ):
+                    _add_edge(
+                        f"spec:{section}",
+                        insight_node,
+                        "Specification to Engineering Insight",
+                        _safe_text(insight.confidence, "n/a"),
+                        _safe_text(insight.title, "n/a"),
+                    )
+
+    for warning in list(objects.get("specification_cross_reference_warnings") or []):
+        warning_id = _safe_text(warning.get("warning_id"), "warning")
+        warning_node = f"crossref_warning:{warning_id}"
+        _add_node(
+            warning_node,
+            "Cross-Reference Warning",
+            _safe_text(warning.get("category"), "cross-reference warning"),
+            "Specification Explorer",
+            "specification",
+            data=warning,
+            metadata={
+                "source_file": _safe_text(
+                    context.get("package_location") if context else None,
+                    "n/a",
+                ),
+                "source_page": "n/a",
+                "sheet_number": "n/a",
+                "specification_section": "n/a",
+                "extraction_confidence": _safe_text(warning.get("severity"), "n/a"),
+                "creation_timestamp": created_at,
+                "last_update": updated_at,
+            },
+        )
+        _add_edge(
+            project_id,
+            warning_node,
+            "Project to Cross-Reference Warning",
+            _safe_text(warning.get("severity"), "n/a"),
+            _safe_text(warning.get("message"), "n/a"),
+        )
+        for related in list(warning.get("related_objects") or []):
+            related_text = _safe_text(related, "")
+            if not related_text:
+                continue
+            _add_edge(
+                warning_node,
+                related_text,
+                "Warning references object",
+                _safe_text(warning.get("severity"), "n/a"),
+                _safe_text(warning.get("message"), "n/a"),
+            )
+
     file_diags = list(import_summary.get("file_diagnostics") or [])
     for diag in file_diags:
         file_name = _safe_text(diag.get("file_name"), "unknown")
@@ -3221,7 +3951,7 @@ def _metadata_for_selection(
 
 
 def _build_engineering_intelligence(
-    record: ProjectWorkspaceRecord,
+    record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> EngineeringIntelligenceResult | None:
     if context is None:
@@ -4991,18 +5721,31 @@ def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None
         st.info("No specification objects available.")
         return
 
-    st.caption(
+    head_cols = st.columns([2.5, 1.5, 1.5])
+    head_cols[0].caption(
         "Each specification section is a first-class object with linked relationships."
     )
+    head_cols[1].caption(
+        f"Spec intelligence confidence: {_safe_text(objects.get('specification_intelligence_confidence'), 'n/a')}"
+    )
+    head_cols[2].caption(
+        f"Cross-reference warnings: {len(list(objects.get('specification_cross_reference_warnings') or []))}"
+    )
+
     st.dataframe(
         [
             {
                 "division": item["division"],
                 "section": item["section"],
                 "title": item["title"],
+                "discipline": _safe_text(item.get("discipline"), "other"),
+                "status": _safe_text(item.get("status"), "indexed"),
+                "revision": _safe_text(item.get("revision"), "n/a"),
                 "drawings": len(item["referenced_drawings"]),
                 "equipment": len(item["referenced_equipment"]),
                 "systems": len(item["referenced_systems"]),
+                "standards": len(item.get("referenced_standards", [])),
+                "requirements": len(item.get("requirement_candidates", [])),
                 "rfis": len(item["referenced_rfis"]),
                 "evidence": len(item["referenced_evidence"]),
                 "cross refs": len(item["cross_references"]),
@@ -5025,6 +5768,22 @@ def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None
             {"property": "Division", "value": selected["division"]},
             {"property": "Section", "value": selected["section"]},
             {"property": "Title", "value": selected["title"]},
+            {
+                "property": "Discipline",
+                "value": _safe_text(selected.get("discipline"), "other"),
+            },
+            {
+                "property": "Status",
+                "value": _safe_text(selected.get("status"), "indexed"),
+            },
+            {
+                "property": "Revision",
+                "value": _safe_text(selected.get("revision"), "n/a"),
+            },
+            {
+                "property": "Issue Date",
+                "value": _safe_text(selected.get("issue_date"), "n/a"),
+            },
             {
                 "property": "Cross References",
                 "value": ", ".join(selected["cross_references"]) or "n/a",
@@ -5061,24 +5820,443 @@ def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None
                 "relationship": "Evidence",
                 "objects": ", ".join(selected["referenced_evidence"]) or "n/a",
             },
+            {
+                "relationship": "Standards",
+                "objects": ", ".join(selected.get("referenced_standards", [])) or "n/a",
+            },
+            {
+                "relationship": "Manufacturers",
+                "objects": ", ".join(selected.get("referenced_manufacturers", []))
+                or "n/a",
+            },
+            {
+                "relationship": "Products",
+                "objects": ", ".join(selected.get("referenced_products", [])) or "n/a",
+            },
+            {
+                "relationship": "Addenda",
+                "objects": ", ".join(selected.get("addendum_references", [])) or "n/a",
+            },
         ],
         use_container_width=True,
         hide_index=True,
     )
 
-    nav_cols = st.columns(4)
-    if nav_cols[0].button("Go to Drawings", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Drawings"
+    requirement_rows = list(selected.get("requirement_candidates") or [])
+    st.markdown("Requirement Candidates")
+    if requirement_rows:
+        st.dataframe(requirement_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("No deterministic requirement candidates detected for this section.")
+
+    warning_rows = list(objects.get("specification_cross_reference_warnings") or [])
+    st.markdown("Cross-Reference Warnings")
+    if warning_rows:
+        st.dataframe(warning_rows[:12], use_container_width=True, hide_index=True)
+    else:
+        st.info("No cross-reference warnings currently detected.")
+
+    nav_cols = st.columns(5)
+    if nav_cols[0].button("Open Specification Explorer", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Specification Explorer"
         st.rerun()
-    if nav_cols[1].button("Go to Equipment", use_container_width=True):
+    if nav_cols[1].button("Go to Drawings", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Drawing Explorer"
+        st.rerun()
+    if nav_cols[2].button("Go to Equipment", use_container_width=True):
         st.session_state["atlas_active_page"] = "Equipment"
         st.rerun()
-    if nav_cols[2].button("Go to Systems", use_container_width=True):
+    if nav_cols[3].button("Go to Systems", use_container_width=True):
         st.session_state["atlas_active_page"] = "Systems"
         st.rerun()
-    if nav_cols[3].button("Go to Evidence", use_container_width=True):
+    if nav_cols[4].button("Go to Evidence", use_container_width=True):
         st.session_state["atlas_active_page"] = "Evidence"
         st.rerun()
+
+
+def _render_specification_explorer_page(
+    st: Any, context: dict[str, Any] | None
+) -> None:
+    st.subheader("Specification Explorer")
+    objects = _workspace_objects(context)
+    rows = list(objects.get("specifications", []))
+    if not rows:
+        st.info("No specification objects available.")
+        return
+
+    index = dict(objects.get("specification_index") or {})
+    warnings = list(objects.get("specification_cross_reference_warnings") or [])
+
+    filter_cols = st.columns([1.5, 1.4, 1.2, 1.2, 1.2, 1.2])
+    search = filter_cols[0].text_input(
+        "Search",
+        key="atlas_spec_explorer_search",
+        placeholder="section, title, standards, manufacturers",
+    )
+    division_filter = filter_cols[1].selectbox(
+        "Division",
+        options=["All"]
+        + sorted({_safe_text(item.get("division"), "n/a") for item in rows}),
+    )
+    discipline_filter = filter_cols[2].selectbox(
+        "Discipline",
+        options=["All"]
+        + sorted({_safe_text(item.get("discipline"), "other") for item in rows}),
+    )
+    system_filter = filter_cols[3].selectbox(
+        "System",
+        options=["All"]
+        + sorted(
+            {
+                _safe_text(system, "")
+                for item in rows
+                for system in list(item.get("referenced_systems") or [])
+                if _safe_text(system, "")
+            }
+        ),
+    )
+    status_filter = filter_cols[4].selectbox(
+        "Status",
+        options=["All"]
+        + sorted({_safe_text(item.get("status"), "indexed") for item in rows}),
+    )
+    revision_filter = filter_cols[5].selectbox(
+        "Revision",
+        options=["All"]
+        + sorted({_safe_text(item.get("revision"), "n/a") for item in rows}),
+    )
+
+    sort_cols = st.columns([1.2, 1.2, 1.2])
+    sort_field = sort_cols[0].selectbox(
+        "Sort by",
+        options=["section_sequence", "section", "title", "division", "discipline"],
+        key="atlas_spec_explorer_sort",
+    )
+    descending = (
+        sort_cols[1].selectbox(
+            "Order",
+            options=["Ascending", "Descending"],
+            key="atlas_spec_explorer_order",
+        )
+        == "Descending"
+    )
+    only_with_warnings = sort_cols[2].checkbox(
+        "Only With Warnings",
+        key="atlas_spec_explorer_warnings_only",
+        value=False,
+    )
+
+    warning_sections = {
+        token
+        for item in warnings
+        for token in list(item.get("related_objects") or [])
+        if token in {_safe_text(section.get("section"), "") for section in rows}
+    }
+
+    filtered = [
+        item
+        for item in rows
+        if (
+            (not search or _contains_any(str(item), [search]))
+            and (
+                division_filter == "All"
+                or _safe_text(item.get("division"), "n/a") == division_filter
+            )
+            and (
+                discipline_filter == "All"
+                or _safe_text(item.get("discipline"), "other") == discipline_filter
+            )
+            and (
+                system_filter == "All"
+                or system_filter in list(item.get("referenced_systems") or [])
+            )
+            and (
+                status_filter == "All"
+                or _safe_text(item.get("status"), "indexed") == status_filter
+            )
+            and (
+                revision_filter == "All"
+                or _safe_text(item.get("revision"), "n/a") == revision_filter
+            )
+            and (
+                not only_with_warnings
+                or _safe_text(item.get("section"), "") in warning_sections
+            )
+        )
+    ]
+
+    def _sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
+        if sort_field == "section_sequence":
+            return (
+                (
+                    10**9
+                    if not isinstance(item.get("section_sequence"), int)
+                    else int(item.get("section_sequence", 0))
+                ),
+                _safe_text(item.get("section"), ""),
+            )
+        return (_safe_text(item.get(sort_field), ""),)
+
+    filtered.sort(key=_sort_key, reverse=descending)
+
+    st.dataframe(
+        [
+            {
+                "division": item.get("division"),
+                "section": item.get("section"),
+                "title": item.get("title"),
+                "discipline": item.get("discipline"),
+                "system": ", ".join(item.get("referenced_systems", [])) or "n/a",
+                "status": item.get("status"),
+                "revision": item.get("revision"),
+                "requirements": len(item.get("requirement_candidates", [])),
+                "warnings": (
+                    "yes"
+                    if _safe_text(item.get("section"), "") in warning_sections
+                    else "no"
+                ),
+                "confidence": item.get("extraction_confidence"),
+            }
+            for item in filtered
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    if not filtered:
+        st.info("No sections match current filters.")
+        return
+
+    labels = [f"{item['section']} · {item['title']}" for item in filtered]
+    selected_label = st.selectbox("Select Section", options=labels)
+    selected = filtered[labels.index(selected_label)]
+    _set_context_selection(st, "specification", selected)
+
+    detail_col, nav_col = st.columns([2.5, 1.5])
+    with detail_col:
+        st.markdown("#### Metadata")
+        st.dataframe(
+            [
+                {
+                    "field": "Division",
+                    "value": _safe_text(selected.get("division"), "n/a"),
+                },
+                {
+                    "field": "Section",
+                    "value": _safe_text(selected.get("section"), "n/a"),
+                },
+                {"field": "Title", "value": _safe_text(selected.get("title"), "n/a")},
+                {
+                    "field": "Discipline",
+                    "value": _safe_text(selected.get("discipline"), "other"),
+                },
+                {
+                    "field": "Status",
+                    "value": _safe_text(selected.get("status"), "indexed"),
+                },
+                {
+                    "field": "Revision",
+                    "value": _safe_text(selected.get("revision"), "n/a"),
+                },
+                {
+                    "field": "Issue Date",
+                    "value": _safe_text(selected.get("issue_date"), "n/a"),
+                },
+                {
+                    "field": "Confidence",
+                    "value": _safe_text(selected.get("extraction_confidence"), "n/a"),
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("#### Parts and Articles")
+        part_rows = list(selected.get("parts") or [])
+        article_rows = list(selected.get("articles") or [])
+        if part_rows:
+            st.dataframe(part_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No Part sections were detected.")
+        if article_rows:
+            st.dataframe(article_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No article headings were detected.")
+
+        st.markdown("#### Requirement Candidates")
+        requirement_rows = list(selected.get("requirement_candidates") or [])
+        if requirement_rows:
+            st.dataframe(requirement_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No deterministic requirement candidates detected.")
+
+        st.markdown("#### Relationships")
+        st.dataframe(
+            [
+                {
+                    "relationship": "Linked Drawings",
+                    "values": ", ".join(selected.get("referenced_drawings", []))
+                    or "n/a",
+                },
+                {
+                    "relationship": "Linked Equipment",
+                    "values": ", ".join(selected.get("referenced_equipment", []))
+                    or "n/a",
+                },
+                {
+                    "relationship": "Linked Systems",
+                    "values": ", ".join(selected.get("referenced_systems", []))
+                    or "n/a",
+                },
+                {
+                    "relationship": "Linked RFIs",
+                    "values": ", ".join(selected.get("referenced_rfis", [])) or "n/a",
+                },
+                {
+                    "relationship": "Linked Evidence",
+                    "values": ", ".join(selected.get("referenced_evidence", []))
+                    or "n/a",
+                },
+                {
+                    "relationship": "Referenced Standards",
+                    "values": ", ".join(selected.get("referenced_standards", []))
+                    or "n/a",
+                },
+                {
+                    "relationship": "Referenced Addenda",
+                    "values": ", ".join(selected.get("addendum_references", []))
+                    or "n/a",
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        insight_result = (
+            _build_engineering_intelligence(record=None, context=context)
+            if context
+            else None
+        )
+        st.markdown("#### Engineering Insights")
+        if insight_result is None:
+            st.info("No engineering insights available.")
+        else:
+            insight_rows = [
+                item.to_dict()
+                for item in list(getattr(insight_result, "insights", []) or [])
+                if _contains_any(str(item), [_safe_text(selected.get("section"), "")])
+            ]
+            if insight_rows:
+                st.dataframe(
+                    insight_rows[:8], use_container_width=True, hide_index=True
+                )
+            else:
+                st.info("No engineering insights currently reference this section.")
+
+    with nav_col:
+        st.markdown("#### Section Navigation")
+        ordered_rows = sorted(
+            rows,
+            key=lambda item: (
+                (
+                    10**9
+                    if not isinstance(item.get("section_sequence"), int)
+                    else int(item.get("section_sequence", 0))
+                ),
+                _safe_text(item.get("section"), ""),
+            ),
+        )
+        selected_index = next(
+            (
+                index
+                for index, item in enumerate(ordered_rows)
+                if _safe_text(item.get("section"), "")
+                == _safe_text(selected.get("section"), "")
+            ),
+            0,
+        )
+        previous_section = (
+            ordered_rows[selected_index - 1] if selected_index > 0 else None
+        )
+        next_section = (
+            ordered_rows[selected_index + 1]
+            if selected_index + 1 < len(ordered_rows)
+            else None
+        )
+        st.dataframe(
+            [
+                {
+                    "target": "Previous Section",
+                    "value": _safe_text(
+                        previous_section.get("section") if previous_section else None,
+                        "n/a",
+                    ),
+                },
+                {
+                    "target": "Next Section",
+                    "value": _safe_text(
+                        next_section.get("section") if next_section else None,
+                        "n/a",
+                    ),
+                },
+                {
+                    "target": "Referenced Drawings",
+                    "value": ", ".join(selected.get("referenced_drawings", []))
+                    or "n/a",
+                },
+                {
+                    "target": "Referenced Equipment",
+                    "value": ", ".join(selected.get("referenced_equipment", []))
+                    or "n/a",
+                },
+                {
+                    "target": "Referenced Systems",
+                    "value": ", ".join(selected.get("referenced_systems", [])) or "n/a",
+                },
+                {
+                    "target": "Referenced Standards",
+                    "value": ", ".join(selected.get("referenced_standards", []))
+                    or "n/a",
+                },
+                {
+                    "target": "Referenced Addenda",
+                    "value": ", ".join(selected.get("addendum_references", []))
+                    or "n/a",
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        if st.button("Open Drawings", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Drawing Explorer"
+            st.rerun()
+        if st.button("Open Equipment", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Equipment"
+            st.rerun()
+        if st.button("Open Systems", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Systems"
+            st.rerun()
+        if st.button("Open Evidence", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Evidence"
+            st.rerun()
+
+    st.markdown("#### Cross-Reference Warnings")
+    if warnings:
+        st.dataframe(warnings, use_container_width=True, hide_index=True)
+    else:
+        st.info("No cross-reference warnings currently detected.")
+
+    index_summary = {
+        "division groups": len(dict(index.get("by_division") or {})),
+        "discipline groups": len(dict(index.get("by_discipline") or {})),
+        "status groups": len(dict(index.get("by_status") or {})),
+        "revision groups": len(dict(index.get("by_revision") or {})),
+    }
+    st.caption(
+        "Specification index summary: "
+        + ", ".join(f"{key}={value}" for key, value in index_summary.items())
+    )
 
 
 def _render_equipment_page(st: Any, context: dict[str, Any] | None) -> None:
@@ -6424,6 +7602,8 @@ def _render_main_content(
         _render_drawing_explorer_page(st, context)
     elif page == "Specifications":
         _render_specifications_page(st, context)
+    elif page == "Specification Explorer":
+        _render_specification_explorer_page(st, context)
     elif page == "Equipment":
         _render_equipment_page(st, context)
     elif page == "Systems":
