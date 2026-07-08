@@ -158,6 +158,19 @@ from atlas_core.services.engineering_insights_service import (
     ProjectHealthModel,
     SystemHealth,
 )
+from atlas_core.services.drawing_intelligence import (
+    DrawingAnalyzer,
+    DrawingDiscipline,
+    DrawingHierarchy,
+    DrawingIndex,
+    DrawingIntelligenceEngine,
+    DrawingIntelligenceResult,
+    DrawingMetadata as IntelligenceDrawingMetadata,
+    DrawingReference,
+    DrawingReferenceType,
+    DrawingRelationship,
+    DrawingSheetCategory,
+)
 
 __all__ = [
     "BaselineService",
@@ -225,6 +238,17 @@ __all__ = [
     "ProjectHealthCategory",
     "ProjectHealthModel",
     "SystemHealth",
+    "DrawingAnalyzer",
+    "DrawingDiscipline",
+    "DrawingHierarchy",
+    "DrawingIndex",
+    "DrawingIntelligenceEngine",
+    "DrawingIntelligenceResult",
+    "IntelligenceDrawingMetadata",
+    "DrawingReference",
+    "DrawingReferenceType",
+    "DrawingRelationship",
+    "DrawingSheetCategory",
     "PackageDiscoveryResult",
     "UploadedIntakeFile",
     "UploadSessionResult",

@@ -24,6 +24,7 @@ from atlas_core.services.engineering_insights_service import (
     EngineeringIntelligenceResult,
     EngineeringInsightsService,
 )
+from atlas_core.services.drawing_intelligence import DrawingIntelligenceEngine
 from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 
 PROJECT_MANAGER_PAGES = [
@@ -42,6 +43,7 @@ PROJECT_PAGES = [
     "Executive Summary",
     "Project Files",
     "Drawings",
+    "Drawing Explorer",
     "Specifications",
     "Equipment",
     "Systems",
@@ -1577,6 +1579,10 @@ def _workspace_objects(
             "rooms": [],
             "manufacturers": [],
             "models": [],
+            "drawing_index": {},
+            "drawing_hierarchy": {"project_id": "", "disciplines": {}},
+            "drawing_relationships": [],
+            "drawing_intelligence_confidence": "n/a",
         }
 
     review = context.get("review")
@@ -1589,6 +1595,41 @@ def _workspace_objects(
     equipment_rows = _to_rows(list(getattr(review, "equipment", []) or []))
     rfi_rows = _to_rows(list(getattr(review, "rfi_candidates", []) or []))
     source_refs = _to_rows(list(getattr(snapshot, "source_references", []) or []))
+
+    drawing_intelligence_result = None
+    if review is not None:
+        try:
+            drawing_intelligence_result = DrawingIntelligenceEngine().build(review)
+        except Exception:
+            drawing_intelligence_result = None
+
+    metadata_by_sheet: dict[str, Any] = {}
+    relationships_by_source: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    drawing_index_payload: dict[str, Any] = {}
+    drawing_hierarchy_payload: dict[str, Any] = {
+        "project_id": _safe_text(getattr(review, "project_id", ""), ""),
+        "disciplines": {},
+    }
+    drawing_relationship_payload: list[dict[str, Any]] = []
+    drawing_intelligence_confidence: str | float = "n/a"
+
+    if drawing_intelligence_result is not None:
+        metadata_by_sheet = {
+            key.upper(): value
+            for key, value in drawing_intelligence_result.drawing_index.by_sheet_number.items()
+        }
+        drawing_index_payload = drawing_intelligence_result.drawing_index.to_dict()
+        drawing_hierarchy_payload = drawing_intelligence_result.hierarchy.to_dict()
+        drawing_relationship_payload = [
+            item.to_dict() for item in drawing_intelligence_result.relationships
+        ]
+        drawing_intelligence_confidence = round(
+            float(drawing_intelligence_result.confidence), 3
+        )
+        for relationship in drawing_intelligence_result.relationships:
+            relationships_by_source[relationship.source_id.upper()].append(
+                relationship.to_dict()
+            )
 
     evidence_rows = [
         {
@@ -1620,8 +1661,40 @@ def _workspace_objects(
         drawing_number = _safe_text(
             item.get("sheet_number"), _safe_text(item.get("drawing_number"), "Unknown")
         )
+        drawing_key = drawing_number.upper()
         title = _safe_text(item.get("title"), "Untitled Drawing")
         source_file = _safe_text(item.get("source_file"), "")
+        intelligence_metadata = metadata_by_sheet.get(drawing_key)
+        referenced_drawings: list[str] = []
+        detail_references: list[str] = []
+        view_references: list[str] = []
+        sheet_category = "other"
+        sheet_sequence: int | str = "n/a"
+        drawing_scale = "n/a"
+        keynotes: list[str] = []
+        general_notes: list[str] = []
+        intelligence_confidence: float | str = "n/a"
+        if intelligence_metadata is not None:
+            referenced_drawings = sorted(
+                {
+                    ref.target_id
+                    for ref in intelligence_metadata.references
+                    if ref.reference_type.value == "sheet"
+                }
+            )
+            detail_references = list(intelligence_metadata.detail_references)
+            view_references = list(intelligence_metadata.view_references)
+            sheet_category = intelligence_metadata.sheet_category.value
+            sheet_sequence = (
+                intelligence_metadata.sheet_sequence
+                if intelligence_metadata.sheet_sequence is not None
+                else "n/a"
+            )
+            drawing_scale = _safe_text(intelligence_metadata.scale, "n/a")
+            keynotes = list(intelligence_metadata.keynotes)
+            general_notes = list(intelligence_metadata.general_notes)
+            intelligence_confidence = round(float(intelligence_metadata.confidence), 3)
+
         ref_equipment = [
             eq
             for eq in equipment_rows
@@ -1685,6 +1758,18 @@ def _workspace_objects(
                     _safe_text(rfi.get("rfi_id"), _safe_text(rfi.get("title"), "rfi"))
                     for rfi in ref_rfis
                 ],
+                "referenced_drawings": referenced_drawings,
+                "detail_references": detail_references,
+                "view_references": view_references,
+                "sheet_category": sheet_category,
+                "sheet_sequence": sheet_sequence,
+                "drawing_scale": drawing_scale,
+                "keynotes": keynotes,
+                "general_notes": general_notes,
+                "drawing_intelligence_confidence": intelligence_confidence,
+                "intelligence_relationships": relationships_by_source.get(
+                    drawing_key, []
+                ),
                 "referenced_evidence": [
                     f"{_safe_text(evidence.get('source_file'), 'file')} p.{evidence.get('page', 'n/a')}"
                     for evidence in ref_evidence
@@ -1880,6 +1965,10 @@ def _workspace_objects(
         "models": [{"model": item} for item in models],
         "drawing_ids": drawing_ids,
         "spec_ids": spec_ids,
+        "drawing_index": drawing_index_payload,
+        "drawing_hierarchy": drawing_hierarchy_payload,
+        "drawing_relationships": drawing_relationship_payload,
+        "drawing_intelligence_confidence": drawing_intelligence_confidence,
     }
 
 
@@ -1894,7 +1983,7 @@ def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any
                 "kind": "Drawing",
                 "name": _safe_text(item.get("drawing_number"), "Drawing"),
                 "subtitle": _safe_text(item.get("title"), ""),
-                "page": "Drawings",
+                "page": "Drawing Explorer",
                 "selection_kind": "drawing",
                 "data": item,
             }
@@ -2243,6 +2332,74 @@ def _build_knowledge_graph(
             "high",
             _safe_text(item.get("source_file"), "n/a"),
         )
+
+    for item in objects.get("drawings", []):
+        drawing_id = _safe_text(item.get("drawing_number"), "unknown")
+        drawing_node = f"drawing:{drawing_id}"
+        relationship_confidence = _safe_text(
+            item.get("drawing_intelligence_confidence"),
+            _safe_text(item.get("extraction_quality"), "n/a"),
+        )
+
+        for target_sheet in list(item.get("referenced_drawings") or []):
+            target_node = f"drawing:{target_sheet}"
+            _add_edge(
+                drawing_node,
+                target_node,
+                "Drawing to Drawing",
+                relationship_confidence,
+                drawing_id,
+            )
+
+        for detail_ref in list(item.get("detail_references") or []):
+            detail_node = f"drawing_detail:{drawing_id}:{detail_ref}"
+            _add_node(
+                detail_node,
+                "Drawing Detail",
+                f"{drawing_id} · Detail {detail_ref}",
+                "Drawing Explorer",
+                "drawing",
+                data={
+                    "drawing_number": drawing_id,
+                    "detail_reference": detail_ref,
+                },
+                metadata={
+                    "source_file": _safe_text(item.get("source_file"), "n/a"),
+                    "source_page": "n/a",
+                    "sheet_number": drawing_id,
+                    "specification_section": "n/a",
+                    "extraction_confidence": relationship_confidence,
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                drawing_node,
+                detail_node,
+                "Drawing to Detail",
+                relationship_confidence,
+                detail_ref,
+            )
+
+        for spec_ref in list(item.get("referenced_specifications") or []):
+            spec_node = f"spec:{spec_ref}"
+            _add_edge(
+                drawing_node,
+                spec_node,
+                "Drawing to Specification",
+                relationship_confidence,
+                _safe_text(item.get("source_file"), "n/a"),
+            )
+
+        for system_ref in list(item.get("referenced_systems") or []):
+            system_node = f"system:{system_ref}"
+            _add_edge(
+                drawing_node,
+                system_node,
+                "Drawing to System",
+                relationship_confidence,
+                _safe_text(item.get("source_file"), "n/a"),
+            )
 
     for item in objects.get("specifications", []):
         spec_node = f"spec:{item.get('section', 'unknown')}"
@@ -2818,6 +2975,74 @@ def _build_knowledge_graph(
                 _safe_text(conflict.severity, "n/a"),
                 ", ".join(conflict.evidence_ids) or "n/a",
             )
+
+    intelligence_result = None
+    if review is not None:
+        try:
+            intelligence_result = EngineeringInsightsService().build(
+                review=review,
+                knowledge_graph={"nodes": list(nodes), "edges": list(edges)},
+                estimator_brief=context.get("brief") if context else None,
+            )
+        except Exception:
+            intelligence_result = None
+
+    if intelligence_result is not None:
+        for insight in list(intelligence_result.insights or []):
+            insight_node = f"engineering_insight:{insight.insight_id}"
+            _add_node(
+                insight_node,
+                "Engineering Insight",
+                _safe_text(insight.title, "Engineering Insight"),
+                "Engineering Intelligence",
+                "project",
+                data=insight.to_dict(),
+                metadata={
+                    "source_file": _safe_text(
+                        context.get("package_location") if context else None, "n/a"
+                    ),
+                    "source_page": "n/a",
+                    "sheet_number": "n/a",
+                    "specification_section": "n/a",
+                    "extraction_confidence": _safe_text(insight.confidence, "n/a"),
+                    "creation_timestamp": created_at,
+                    "last_update": updated_at,
+                },
+            )
+            _add_edge(
+                project_id,
+                insight_node,
+                "Project to Engineering Insight",
+                _safe_text(insight.confidence, "n/a"),
+                _safe_text(insight.title, "n/a"),
+            )
+
+            support_blob = " ".join(
+                [
+                    str(item)
+                    for item in list(insight.supporting_objects or [])
+                    + list(insight.evidence_refs or [])
+                ]
+            )
+            for drawing in objects.get("drawings", []):
+                drawing_number = _safe_text(drawing.get("drawing_number"), "")
+                if not drawing_number:
+                    continue
+                if _contains_any(
+                    support_blob,
+                    [
+                        drawing_number,
+                        _safe_text(drawing.get("source_file"), ""),
+                        _safe_text(drawing.get("title"), ""),
+                    ],
+                ):
+                    _add_edge(
+                        f"drawing:{drawing_number}",
+                        insight_node,
+                        "Drawing to Engineering Insight",
+                        _safe_text(insight.confidence, "n/a"),
+                        _safe_text(insight.title, "n/a"),
+                    )
 
     file_diags = list(import_summary.get("file_diagnostics") or [])
     for diag in file_diags:
@@ -4340,7 +4565,14 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
         st.info("No drawing objects available.")
         return
 
-    st.caption("Each drawing is a first-class object with relationship links.")
+    explorer_col, confidence_col = st.columns([3, 2])
+    with explorer_col:
+        st.caption("Each drawing is a first-class object with relationship links.")
+    with confidence_col:
+        st.caption(
+            f"Drawing intelligence confidence: {_safe_text(objects.get('drawing_intelligence_confidence'), 'n/a')}"
+        )
+
     summary_rows = [
         {
             "drawing number": item["drawing_number"],
@@ -4348,6 +4580,10 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
             "revision": item["revision"],
             "issue date": item["issue_date"],
             "discipline": item["discipline"],
+            "category": item.get("sheet_category", "other"),
+            "sequence": item.get("sheet_sequence", "n/a"),
+            "drawing refs": len(item.get("referenced_drawings", [])),
+            "detail refs": len(item.get("detail_references", [])),
             "equipment": len(item["referenced_equipment"]),
             "specifications": len(item["referenced_specifications"]),
             "systems": len(item["referenced_systems"]),
@@ -4376,10 +4612,28 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
                 {"property": "Revision", "value": selected["revision"]},
                 {"property": "Issue Date", "value": selected["issue_date"]},
                 {"property": "Discipline", "value": selected["discipline"]},
+                {
+                    "property": "Sheet Category",
+                    "value": _safe_text(selected.get("sheet_category"), "other"),
+                },
+                {
+                    "property": "Sheet Sequence",
+                    "value": _safe_text(selected.get("sheet_sequence"), "n/a"),
+                },
+                {
+                    "property": "Drawing Scale",
+                    "value": _safe_text(selected.get("drawing_scale"), "n/a"),
+                },
                 {"property": "OCR Status", "value": selected["ocr_status"]},
                 {
                     "property": "Extraction Quality",
                     "value": selected["extraction_quality"],
+                },
+                {
+                    "property": "Intelligence Confidence",
+                    "value": _safe_text(
+                        selected.get("drawing_intelligence_confidence"), "n/a"
+                    ),
                 },
             ],
             use_container_width=True,
@@ -4389,6 +4643,20 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
         st.markdown("Referenced Objects")
         st.dataframe(
             [
+                {
+                    "relationship": "Drawings",
+                    "objects": ", ".join(selected.get("referenced_drawings", []))
+                    or "n/a",
+                },
+                {
+                    "relationship": "Details",
+                    "objects": ", ".join(selected.get("detail_references", []))
+                    or "n/a",
+                },
+                {
+                    "relationship": "Views",
+                    "objects": ", ".join(selected.get("view_references", [])) or "n/a",
+                },
                 {
                     "relationship": "Equipment",
                     "objects": ", ".join(selected["referenced_equipment"]) or "n/a",
@@ -4428,8 +4696,70 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
                 "Preview placeholder: drawing metadata available, source preview not embedded."
             )
 
+        st.markdown("#### Deterministic Sheet Navigation")
+        ordered_rows = sorted(
+            rows,
+            key=lambda item: (
+                (
+                    10**6
+                    if not isinstance(item.get("sheet_sequence"), int)
+                    else int(item.get("sheet_sequence", 0))
+                ),
+                _safe_text(item.get("drawing_number"), ""),
+            ),
+        )
+        selected_index = next(
+            (
+                index
+                for index, item in enumerate(ordered_rows)
+                if _safe_text(item.get("drawing_number"), "")
+                == _safe_text(selected.get("drawing_number"), "")
+            ),
+            0,
+        )
+        previous_sheet = (
+            ordered_rows[selected_index - 1] if selected_index > 0 else None
+        )
+        next_sheet = (
+            ordered_rows[selected_index + 1]
+            if selected_index + 1 < len(ordered_rows)
+            else None
+        )
+        nav_rows = [
+            {
+                "target": "Previous",
+                "drawing": _safe_text(
+                    previous_sheet.get("drawing_number") if previous_sheet else None,
+                    "n/a",
+                ),
+            },
+            {
+                "target": "Next",
+                "drawing": _safe_text(
+                    next_sheet.get("drawing_number") if next_sheet else None,
+                    "n/a",
+                ),
+            },
+            {
+                "target": "Referenced Sheets",
+                "drawing": ", ".join(selected.get("referenced_drawings", [])) or "n/a",
+            },
+            {
+                "target": "Referenced Details",
+                "drawing": ", ".join(selected.get("detail_references", [])) or "n/a",
+            },
+            {
+                "target": "Referenced Views",
+                "drawing": ", ".join(selected.get("view_references", [])) or "n/a",
+            },
+        ]
+        st.dataframe(nav_rows, use_container_width=True, hide_index=True)
+
     with nav_col:
         st.markdown("#### Quick Navigation")
+        if st.button("Open Drawing Explorer", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Drawing Explorer"
+            st.rerun()
         if st.button("Open Equipment", use_container_width=True):
             st.session_state["atlas_active_page"] = "Equipment"
             st.rerun()
@@ -4442,6 +4772,215 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
         if st.button("Open Evidence", use_container_width=True):
             st.session_state["atlas_active_page"] = "Evidence"
             st.rerun()
+
+
+def _render_drawing_explorer_page(st: Any, context: dict[str, Any] | None) -> None:
+    st.subheader("Drawing Explorer")
+    objects = _workspace_objects(context)
+    rows = list(objects.get("drawings", []))
+    if not rows:
+        st.info("No drawing objects available.")
+        return
+
+    hierarchy = dict(objects.get("drawing_hierarchy") or {})
+    discipline_options = sorted(
+        {_safe_text(item.get("discipline"), "unknown") for item in rows}
+    )
+    category_options = sorted(
+        {_safe_text(item.get("sheet_category"), "other") for item in rows}
+    )
+
+    filter_col, search_col, sort_col = st.columns([1.6, 1.6, 1.2])
+    with filter_col:
+        discipline_filter = st.multiselect(
+            "Discipline",
+            options=discipline_options,
+            default=[],
+            key="atlas_drawing_explorer_discipline",
+        )
+        category_filter = st.multiselect(
+            "Sheet Category",
+            options=category_options,
+            default=[],
+            key="atlas_drawing_explorer_category",
+        )
+    with search_col:
+        query = (
+            st.text_input(
+                "Search sheets",
+                key="atlas_drawing_explorer_search",
+                value=st.session_state.get("atlas_drawing_explorer_search", ""),
+            )
+            .strip()
+            .lower()
+        )
+    with sort_col:
+        sort_field = st.selectbox(
+            "Sort by",
+            options=["sheet_sequence", "drawing_number", "title", "discipline"],
+            key="atlas_drawing_explorer_sort",
+        )
+        descending = (
+            st.selectbox(
+                "Order",
+                options=["Ascending", "Descending"],
+                key="atlas_drawing_explorer_order",
+            )
+            == "Descending"
+        )
+
+    def _sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
+        if sort_field == "sheet_sequence":
+            sequence = item.get("sheet_sequence")
+            normalized = 10**6 if not isinstance(sequence, int) else int(sequence)
+            return (normalized, _safe_text(item.get("drawing_number"), ""))
+        return (_safe_text(item.get(sort_field), ""),)
+
+    filtered = [
+        item
+        for item in rows
+        if (
+            (
+                _safe_text(item.get("discipline"), "unknown") in discipline_filter
+                if discipline_filter
+                else True
+            )
+            and (
+                _safe_text(item.get("sheet_category"), "other") in category_filter
+                if category_filter
+                else True
+            )
+            and (
+                not query
+                or _contains_any(
+                    f"{_safe_text(item.get('drawing_number'), '')} {_safe_text(item.get('title'), '')} {_safe_text(item.get('discipline'), '')} {_safe_text(item.get('sheet_category'), '')}",
+                    [query],
+                )
+            )
+        )
+    ]
+    filtered.sort(key=_sort_key, reverse=descending)
+
+    st.dataframe(
+        [
+            {
+                "drawing number": item["drawing_number"],
+                "title": item["title"],
+                "discipline": item["discipline"],
+                "category": item.get("sheet_category", "other"),
+                "sequence": item.get("sheet_sequence", "n/a"),
+                "drawing refs": len(item.get("referenced_drawings", [])),
+                "detail refs": len(item.get("detail_references", [])),
+                "view refs": len(item.get("view_references", [])),
+                "systems": len(item.get("referenced_systems", [])),
+                "specs": len(item.get("referenced_specifications", [])),
+                "evidence": len(item.get("referenced_evidence", [])),
+            }
+            for item in filtered
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    if not filtered:
+        st.info("No drawings match current filters.")
+        return
+
+    labels = [f"{item['drawing_number']} · {item['title']}" for item in filtered]
+    selected_label = st.selectbox("Select Sheet", options=labels)
+    selected = filtered[labels.index(selected_label)]
+    _set_context_selection(st, "drawing", selected)
+
+    detail_col, hierarchy_col = st.columns([2.2, 1.8])
+    with detail_col:
+        st.markdown("#### Sheet Navigation")
+        ordered = sorted(
+            rows,
+            key=lambda item: (
+                (
+                    10**6
+                    if not isinstance(item.get("sheet_sequence"), int)
+                    else int(item.get("sheet_sequence", 0))
+                ),
+                _safe_text(item.get("drawing_number"), ""),
+            ),
+        )
+        index = next(
+            (
+                pos
+                for pos, item in enumerate(ordered)
+                if _safe_text(item.get("drawing_number"), "")
+                == _safe_text(selected.get("drawing_number"), "")
+            ),
+            0,
+        )
+        prev_sheet = ordered[index - 1] if index > 0 else None
+        next_sheet = ordered[index + 1] if index + 1 < len(ordered) else None
+
+        nav_rows = [
+            {
+                "target": "Previous",
+                "sheet": _safe_text(
+                    prev_sheet.get("drawing_number") if prev_sheet else None,
+                    "n/a",
+                ),
+            },
+            {
+                "target": "Next",
+                "sheet": _safe_text(
+                    next_sheet.get("drawing_number") if next_sheet else None,
+                    "n/a",
+                ),
+            },
+            {
+                "target": "References",
+                "sheet": ", ".join(selected.get("referenced_drawings", [])) or "n/a",
+            },
+        ]
+        st.dataframe(nav_rows, use_container_width=True, hide_index=True)
+
+        st.markdown("#### Detail / View / Schedule Links")
+        st.dataframe(
+            [
+                {
+                    "type": "Detail",
+                    "values": ", ".join(selected.get("detail_references", [])) or "n/a",
+                },
+                {
+                    "type": "View",
+                    "values": ", ".join(selected.get("view_references", [])) or "n/a",
+                },
+                {
+                    "type": "Systems",
+                    "values": ", ".join(selected.get("referenced_systems", []))
+                    or "n/a",
+                },
+                {
+                    "type": "Specifications",
+                    "values": ", ".join(selected.get("referenced_specifications", []))
+                    or "n/a",
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with hierarchy_col:
+        st.markdown("#### Discipline Hierarchy")
+        discipline_sets = dict(hierarchy.get("disciplines") or {})
+        hierarchy_rows = [
+            {
+                "discipline": discipline,
+                "drawing set": drawing_set,
+                "sheets": ", ".join(sheets),
+            }
+            for discipline, sets in discipline_sets.items()
+            for drawing_set, sheets in dict(sets or {}).items()
+        ]
+        if hierarchy_rows:
+            st.dataframe(hierarchy_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No hierarchy groups available yet.")
 
 
 def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None:
@@ -5881,6 +6420,8 @@ def _render_main_content(
         _render_project_files_page(st, workspace_service, record, context)
     elif page == "Drawings":
         _render_drawings_page(st, context)
+    elif page == "Drawing Explorer":
+        _render_drawing_explorer_page(st, context)
     elif page == "Specifications":
         _render_specifications_page(st, context)
     elif page == "Equipment":
