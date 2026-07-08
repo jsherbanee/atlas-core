@@ -1,7 +1,7 @@
 # Atlas
 
 ## Purpose
-Provide a local project-centric workspace shell for estimators to run Atlas Intake and inspect deterministic project review outputs.
+Provide a local action-oriented workspace shell for estimators to run Atlas Intake, inspect deterministic project review outputs, and move directly to the next recommended engineering task.
 
 This interface is local-only:
 - No authentication.
@@ -24,13 +24,12 @@ Header includes:
 - Atlas logo/title
 - Project selector
 - Global Search (project-wide object search)
-- Notifications placeholder
+- Actions placeholder
 - Settings
 - User/profile placeholder
-- Atlas version
-- Project lifecycle stage
-- Project status
-- breadcrumb trail for current workspace location
+- Current page context
+
+System metadata (version/commit/stage/status) remains available in the status bar.
 
 ## Atlas Intake (Local)
 The GUI now supports local drag-and-drop intake for estimator bid packages.
@@ -65,7 +64,7 @@ Selector options include:
 - Reference Project: Music Academy of the West (`[Reference]` badge)
 
 Selecting project actions routes to project-centric pages:
-- Home
+- Mission Control
 - Projects
 - Reference Projects
 - Recent Projects
@@ -115,31 +114,51 @@ If expected folders are missing, Atlas shows a warning and still attempts determ
 
 ## Navigation
 
-Project Manager:
-- Home
+Mission Control:
+- Mission Control
+
+Projects:
 - Projects
+- Pinned Projects
 - Reference Projects
 - Recent Projects
 - Create New Project
 - Open Existing Project
 
-Project:
+Engineering:
 - Overview
-- Executive Summary
+- Engineering Workbench
+- Engineering Notebook
 - Project Files
 - Drawings
+- Drawing Explorer
 - Specifications
+- Specification Explorer
 - Equipment
 - Systems
+- Engineering Resolver
+- Resolver Conflict Center
+- Engineering Intelligence
+- Coordination Review
 
-Bid Intelligence:
-- Readiness
+Knowledge:
+- Relationship Visualization
+- Relationship Explorer
+- Evidence
+- Timeline
+- Master Library Explorer
+
+Reports:
+- Reports
 - Estimator Brief
-- RFI Candidates
+- Readiness
 - Labor Estimate
 - Revision Comparison
-- Engineering Assumptions
-- Evidence
+- Exports
+
+Administration:
+- Project Settings
+- Application Settings
 
 Project Lifecycle (disabled, Coming Soon):
 - Engineering
@@ -149,20 +168,16 @@ Project Lifecycle (disabled, Coming Soon):
 - Closeout
 - Service
 
-Reports:
-- Reports
-- Exports
-
-Settings:
-- Project Settings
-- Application Settings
-
 ## Responsive Navigation
 - Desktop: persistent sidebar
 - Tablet: collapsible sidebar with navigation popover
 - Mobile: drawer-style navigation popover
 
 The current page, selected project, and breadcrumb remain visible in all modes.
+
+Context panel behavior:
+- Mission Control: the right column is replaced by global panels (Action Center, Recent Activity, Upcoming Timeline, Projects Requiring Attention).
+- All other pages: the right column remains the object-level context panel.
 
 ## Upload Flow
 1. Open `Project Files`.
@@ -191,8 +206,16 @@ The current page, selected project, and breadcrumb remain visible in all modes.
 For existing local intake snapshots, the sidebar includes `Use Existing Intake Snapshot` in uploaded mode.
 This allows browsing `intake_snapshot.json` files already generated under local outputs/examples folders.
 
-## Overview (Mission Control)
-Overview displays project health at a glance:
+## Mission Control
+Mission Control displays engineering priorities at a glance:
+- Continue Working shortcuts
+- Action Center with deterministic recommendations and target pages
+- Active Projects status table
+- Projects Requiring Attention table
+- Recent Activity and Upcoming Timeline panels
+
+## Overview
+Overview displays current project health at a glance:
 - project metadata (name, owner, architect/consultants, project number, dates)
 - lifecycle stage and project status
 - import status

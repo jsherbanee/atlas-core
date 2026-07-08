@@ -35,7 +35,7 @@ from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 from atlas_core.services.master_library import MasterLibraryService
 
 PROJECT_MANAGER_PAGES = [
-    "Home",
+    "Mission Control",
     "Projects",
     "Pinned Projects",
     "Reference Projects",
@@ -44,12 +44,10 @@ PROJECT_MANAGER_PAGES = [
     "Open Existing Project",
 ]
 
-PROJECT_PAGES = [
+ENGINEERING_PAGES = [
     "Overview",
     "Engineering Workbench",
     "Engineering Notebook",
-    "Master Library Explorer",
-    "Executive Summary",
     "Project Files",
     "Drawings",
     "Drawing Explorer",
@@ -61,19 +59,32 @@ PROJECT_PAGES = [
     "Resolver Conflict Center",
     "Engineering Intelligence",
     "Coordination Review",
-    "Relationship Explorer",
+]
+
+KNOWLEDGE_PAGES = [
     "Relationship Visualization",
+    "Relationship Explorer",
+    "Evidence",
     "Timeline",
-    "Project Detail",
-    "Drawing Detail",
-    "Specification Detail",
-    "Equipment Detail",
-    "System Detail",
-    "Room Detail",
-    "Manufacturer Detail",
-    "Evidence Detail",
+    "Master Library Explorer",
     "Metadata Inspector",
 ]
+
+PROJECT_PAGES = (
+    ENGINEERING_PAGES
+    + KNOWLEDGE_PAGES
+    + [
+        "Executive Summary",
+        "Project Detail",
+        "Drawing Detail",
+        "Specification Detail",
+        "Equipment Detail",
+        "System Detail",
+        "Room Detail",
+        "Manufacturer Detail",
+        "Evidence Detail",
+    ]
+)
 
 BID_INTELLIGENCE_PAGES = [
     "Readiness",
@@ -94,7 +105,14 @@ DISABLED_LIFECYCLE_PAGES = [
     "Service",
 ]
 
-REPORT_PAGES = ["Reports", "Exports"]
+REPORT_PAGES = [
+    "Reports",
+    "Estimator Brief",
+    "Readiness",
+    "Labor Estimate",
+    "Revision Comparison",
+    "Exports",
+]
 SETTINGS_PAGES = ["Project Settings", "Application Settings"]
 
 NOTEBOOK_ENTRY_TYPES = [
@@ -560,7 +578,7 @@ def _current_commit() -> str:
 
 def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_active_workspace_id", None)
-    st.session_state.setdefault("atlas_active_page", "Home")
+    st.session_state.setdefault("atlas_active_page", "Mission Control")
     st.session_state.setdefault("atlas_layout_mode", "Desktop")
     st.session_state.setdefault("atlas_navigation_collapsed", False)
     st.session_state.setdefault("atlas_project_selector", "Recent Projects")
@@ -820,21 +838,34 @@ def _apply_selector_choice(
 
 
 def _group_for_page(page: str) -> str:
-    if page in PROJECT_MANAGER_PAGES:
-        return "Project Manager"
-    if page in PROJECT_PAGES:
-        return "Project"
+    if page == "Mission Control":
+        return "Mission Control"
+    if page in {
+        "Projects",
+        "Pinned Projects",
+        "Reference Projects",
+        "Recent Projects",
+        "Create New Project",
+        "Open Existing Project",
+    }:
+        return "Projects"
+    if page in ENGINEERING_PAGES:
+        return "Engineering"
+    if page in KNOWLEDGE_PAGES:
+        return "Knowledge"
     if page in BID_INTELLIGENCE_PAGES:
-        return "Bid Intelligence"
+        return "Reports"
     if page in REPORT_PAGES:
         return "Reports"
     if page in SETTINGS_PAGES:
-        return "Settings"
+        return "Administration"
     return "Workspace"
 
 
 def _breadcrumb(record: ProjectWorkspaceRecord, page: str) -> str:
-    return f"Projects / {record.project.name} / {_group_for_page(page)} / {page}"
+    if page == "Mission Control":
+        return "Atlas / Mission Control"
+    return f"Atlas / {record.project.name} / {_group_for_page(page)} / {page}"
 
 
 def _render_header(
@@ -852,71 +883,101 @@ def _render_header(
     if st.session_state.get("atlas_project_selector") not in labels:
         st.session_state["atlas_project_selector"] = labels[0]
 
-    st.markdown(
-        "<div class='atlas-title'>Atlas Workspace</div>", unsafe_allow_html=True
-    )
+    st.markdown("<div class='atlas-title'>Atlas</div>", unsafe_allow_html=True)
 
-    cols = st.columns([2.6, 1.0, 2.7, 1.6, 0.9, 0.9, 1.1, 1.2, 1.4, 1.6])
+    cols = st.columns([3.0, 3.2, 1.1, 1.0, 1.2, 1.9])
     selected = cols[0].selectbox(
-        "Current Project",
+        "Project",
         options=labels,
         key="atlas_project_selector",
     )
     _apply_selector_choice(st, workspace_service, selected, options)
 
-    cols[1].selectbox(
-        "Layout", ["Desktop", "Tablet", "Mobile"], key="atlas_layout_mode"
-    )
-    cols[2].text_input(
+    cols[1].text_input(
         "Global Search",
         key="atlas_global_search",
         placeholder="Search drawings, specs, equipment, systems, RFIs, evidence",
     )
-    quick_jump_options = ["Current Page"] + list(ALL_ACTIVE_PAGES)
-    selected_jump = cols[3].selectbox(
-        "Quick Jump",
-        options=quick_jump_options,
-        key="atlas_quick_jump",
-    )
-    if selected_jump != "Current Page":
-        st.session_state["atlas_active_page"] = selected_jump
-        st.session_state["atlas_quick_jump"] = "Current Page"
-        st.rerun()
-
-    cols[4].button("Alerts", disabled=True, use_container_width=True)
-    cols[5].button("Settings", use_container_width=True)
-    cols[6].selectbox("Profile", ["User"], index=0)
-    cols[7].markdown(
-        f"<div class='atlas-muted'>Atlas v{__version__}</div>", unsafe_allow_html=True
-    )
-    cols[8].markdown(
-        f"<div class='atlas-muted'>Stage: {_project_stage(record)}</div>",
-        unsafe_allow_html=True,
-    )
-    cols[9].markdown(
-        f"<div class='atlas-muted'>Status: {_project_status(context)}</div>",
+    cols[2].button("Actions", disabled=True, use_container_width=True)
+    cols[3].button("Settings", use_container_width=True)
+    cols[4].selectbox("Profile", ["User"], index=0)
+    cols[5].markdown(
+        f"<div class='atlas-muted'>Page: {st.session_state.get('atlas_active_page', 'Mission Control')}</div>",
         unsafe_allow_html=True,
     )
 
 
 def _nav_buttons(st: Any, host: Any, mode: str) -> None:
-    active_page = st.session_state.get("atlas_active_page", "Home")
+    active_page = st.session_state.get("atlas_active_page", "Mission Control")
 
     host.markdown("### Navigation")
-    groups: list[tuple[str, list[str]]] = [
-        ("PROJECT MANAGER", PROJECT_MANAGER_PAGES),
-        ("PROJECT", PROJECT_PAGES),
-        ("BID INTELLIGENCE", BID_INTELLIGENCE_PAGES),
-        ("REPORTS", REPORT_PAGES),
-        ("SETTINGS", SETTINGS_PAGES),
+    groups: list[tuple[str, list[tuple[str, str]]]] = [
+        (
+            "MISSION CONTROL",
+            [("Mission Control", "Mission Control")],
+        ),
+        (
+            "PROJECTS",
+            [
+                ("Projects", "Projects"),
+                ("Pinned Projects", "Pinned Projects"),
+                ("Reference Projects", "Reference Projects"),
+                ("Recent Projects", "Recent Projects"),
+                ("Create New Project", "Create New Project"),
+                ("Open Existing Project", "Open Existing Project"),
+            ],
+        ),
+        (
+            "ENGINEERING",
+            [
+                ("Workbench", "Engineering Workbench"),
+                ("Drawings", "Drawings"),
+                ("Specifications", "Specifications"),
+                ("Equipment", "Equipment"),
+                ("Systems", "Systems"),
+                ("Resolver", "Engineering Resolver"),
+                ("Coordination", "Coordination Review"),
+                ("Notebook", "Engineering Notebook"),
+            ],
+        ),
+        (
+            "KNOWLEDGE",
+            [
+                ("Knowledge Graph", "Relationship Visualization"),
+                ("Relationships", "Relationship Explorer"),
+                ("Evidence", "Evidence"),
+                ("Timeline", "Timeline"),
+                ("Master Library", "Master Library Explorer"),
+            ],
+        ),
+        (
+            "REPORTS",
+            [
+                ("Estimator Brief", "Estimator Brief"),
+                ("Readiness", "Readiness"),
+                ("Labor Estimate", "Labor Estimate"),
+                ("Revision Comparison", "Revision Comparison"),
+                ("Exports", "Exports"),
+            ],
+        ),
+        (
+            "ADMINISTRATION",
+            [
+                ("Repository", "Project Settings"),
+                ("Settings", "Application Settings"),
+            ],
+        ),
     ]
 
-    for group_name, pages in groups:
-        with host.expander(group_name, expanded=active_page in pages):
-            for page in pages:
+    for group_name, entries in groups:
+        with host.expander(
+            group_name,
+            expanded=active_page in [item[1] for item in entries],
+        ):
+            for label, page in entries:
                 if host.button(
-                    page,
-                    key=f"atlas_nav_{mode}_{group_name}_{page}",
+                    label,
+                    key=f"atlas_nav_{mode}_{group_name}_{label}_{page}",
                     type="primary" if active_page == page else "secondary",
                     use_container_width=True,
                 ):
@@ -944,11 +1005,15 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
     selected_specification = selected_data if selected_kind == "specification" else None
 
     return {
-        "last_open_page": str(st.session_state.get("atlas_active_page") or "Home"),
+        "last_open_page": str(
+            st.session_state.get("atlas_active_page") or "Mission Control"
+        ),
         "selected_drawing": selected_drawing,
         "selected_specification": selected_specification,
         "expanded_navigation": [
-            _group_for_page(str(st.session_state.get("atlas_active_page") or "Home"))
+            _group_for_page(
+                str(st.session_state.get("atlas_active_page") or "Mission Control")
+            )
         ],
         "filters": {
             "file_search": str(st.session_state.get("atlas_file_search") or ""),
@@ -993,7 +1058,9 @@ def _restore_workspace_state(
         st.session_state["atlas_loaded_workspace_state_for"] = record.workspace_id
         return
 
-    st.session_state["atlas_active_page"] = str(state.get("last_open_page") or "Home")
+    st.session_state["atlas_active_page"] = str(
+        state.get("last_open_page") or "Mission Control"
+    )
 
     filters = dict(state.get("filters") or {})
     st.session_state["atlas_file_search"] = str(filters.get("file_search") or "")
@@ -1113,48 +1180,410 @@ def _metric_card(st: Any, title: str, value: str) -> None:
     )
 
 
-def _render_home_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
-    _render_page_header(
-        st,
-        "Home",
-        "Project-centric launch point for Atlas Workspace.",
+def _priority_rank(value: str) -> int:
+    normalized = value.strip().lower()
+    if normalized == "critical":
+        return 0
+    if normalized == "high":
+        return 1
+    if normalized == "medium":
+        return 2
+    return 3
+
+
+def _collect_workspace_signals(
+    workspace_service: ProjectWorkspaceService,
+    limit: int = 12,
+) -> list[dict[str, Any]]:
+    records = workspace_service.list_recent_workspaces(limit=limit)
+    signals: list[dict[str, Any]] = []
+    for record in records:
+        manifest: dict[str, Any] = {}
+        health: dict[str, Any] = {}
+        history: list[dict[str, Any]] = []
+        try:
+            manifest = workspace_service.read_manifest(record.workspace_id)
+        except Exception:
+            manifest = {}
+        try:
+            health = workspace_service.project_health(record.workspace_id)
+        except Exception:
+            health = {}
+        try:
+            history = workspace_service.list_history(record.workspace_id, limit=8)
+        except Exception:
+            history = []
+
+        errors = len(list(health.get("errors") or []))
+        warnings = len(list(health.get("warnings") or []))
+        document_count = sum(
+            int(value) for value in dict(manifest.get("document_counts") or {}).values()
+        )
+        review_artifacts = sum(
+            int(value)
+            for value in dict(manifest.get("review_artifact_counts") or {}).values()
+        )
+        last_event = dict(history[0]) if history else {}
+
+        attention_score = 0
+        if errors > 0:
+            attention_score += 90
+        if warnings > 0:
+            attention_score += 20
+        if review_artifacts == 0:
+            attention_score += 50
+        if document_count == 0:
+            attention_score += 35
+
+        status = "Active"
+        reason = "Ready for engineering review."
+        destination = "Engineering Workbench"
+        if errors > 0:
+            status = "Blocked"
+            reason = "Repository health errors need attention."
+            destination = "Project Settings"
+        elif warnings > 0:
+            status = "Needs Attention"
+            reason = "Repository warnings should be resolved."
+            destination = "Project Settings"
+        elif review_artifacts == 0:
+            status = "Needs Review"
+            reason = "No review artifacts available yet."
+            destination = "Engineering Workbench"
+
+        signals.append(
+            {
+                "workspace_id": record.workspace_id,
+                "project": record.project.name,
+                "project_id": record.project.project_id,
+                "status": status,
+                "stage": _project_stage(record),
+                "updated_at": record.updated_at,
+                "errors": errors,
+                "warnings": warnings,
+                "documents": document_count,
+                "review_artifacts": review_artifacts,
+                "attention_score": attention_score,
+                "reason": reason,
+                "destination": destination,
+                "last_event": _safe_text(last_event.get("event_type"), "n/a"),
+                "last_event_at": _safe_text(last_event.get("timestamp"), "n/a"),
+                "history_events": len(history),
+                "manifest": manifest,
+            }
+        )
+
+    signals.sort(
+        key=lambda item: (
+            int(item.get("attention_score", 0)),
+            _safe_text(item.get("updated_at"), ""),
+        ),
+        reverse=True,
+    )
+    return signals
+
+
+def _build_mission_control_payload(
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> dict[str, Any]:
+    signals = _collect_workspace_signals(workspace_service, limit=12)
+    signal_by_id = {item["workspace_id"]: item for item in signals}
+    active_signal = signal_by_id.get(record.workspace_id)
+
+    actions: list[dict[str, Any]] = []
+    workspace_state = workspace_service.load_workspace_state(record.workspace_id)
+    last_page = _safe_text(
+        workspace_state.get("last_open_page"), "Engineering Workbench"
+    )
+    actions.append(
+        {
+            "title": "Continue active review",
+            "project": record.project.name,
+            "priority": "High",
+            "reason": f"Resume work where you left off on {last_page}.",
+            "count": "",
+            "related_page": last_page,
+            "destination": last_page,
+        }
     )
 
-    recent = workspace_service.list_recent_workspaces(limit=8)
-    references = workspace_service.list_reference_workspaces()
+    review = context.get("review") if context else None
+    import_summary = dict(context.get("import_summary") or {}) if context else {}
+    resolver_result = _build_engineering_resolver(record, context)
+    objects = _workspace_objects(context)
+    revision = context.get("revision_comparison") if context else None
+    brief = context.get("brief") if context else None
+
+    conflicts = []
+    if resolver_result is not None:
+        conflicts = [
+            item.to_dict()
+            for item in list(getattr(resolver_result, "conflicts", []) or [])
+        ]
+    manufacturer_model_conflicts = [
+        item
+        for item in conflicts
+        if "manufacturer" in _safe_text(item.get("message"), "").lower()
+        or "model" in _safe_text(item.get("message"), "").lower()
+    ]
+    if manufacturer_model_conflicts:
+        actions.append(
+            {
+                "title": "Resolve manufacturer/model conflicts",
+                "project": record.project.name,
+                "priority": "Critical",
+                "reason": "Resolver found canonical conflicts that may affect takeoff accuracy.",
+                "count": str(len(manufacturer_model_conflicts)),
+                "related_page": "Resolver Conflict Center",
+                "destination": "Resolver Conflict Center",
+            }
+        )
+
+    coordination_findings = list(objects.get("coordination_findings") or [])
+    critical_coordination = [
+        item
+        for item in coordination_findings
+        if _safe_text(item.get("severity"), "").lower() in {"critical", "high"}
+    ]
+    if critical_coordination:
+        actions.append(
+            {
+                "title": "Review critical coordination findings",
+                "project": record.project.name,
+                "priority": "Critical",
+                "reason": "Cross-discipline conflicts require engineering resolution.",
+                "count": str(len(critical_coordination)),
+                "related_page": "Coordination Review",
+                "destination": "Coordination Review",
+            }
+        )
+
+    documents_requiring_ocr = int(import_summary.get("documents_requiring_ocr", 0) or 0)
+    if documents_requiring_ocr > 0:
+        actions.append(
+            {
+                "title": "Process OCR-required documents",
+                "project": record.project.name,
+                "priority": "High",
+                "reason": "Some documents need OCR before extraction can complete.",
+                "count": str(documents_requiring_ocr),
+                "related_page": "Project Files",
+                "destination": "Project Files",
+            }
+        )
+
+    if review is not None and brief is None:
+        actions.append(
+            {
+                "title": "Generate estimator brief",
+                "project": record.project.name,
+                "priority": "Medium",
+                "reason": "Estimator brief is missing for bid planning.",
+                "count": "",
+                "related_page": "Estimator Brief",
+                "destination": "Estimator Brief",
+            }
+        )
+
+    if review is not None and revision is None:
+        actions.append(
+            {
+                "title": "Run revision comparison",
+                "project": record.project.name,
+                "priority": "Medium",
+                "reason": "No revision delta is available in this workspace.",
+                "count": "",
+                "related_page": "Revision Comparison",
+                "destination": "Revision Comparison",
+            }
+        )
+
+    for signal in signals:
+        if signal["workspace_id"] == record.workspace_id:
+            continue
+        if signal["status"] not in {"Blocked", "Needs Attention"}:
+            continue
+        actions.append(
+            {
+                "title": f"Unblock {signal['project']}",
+                "project": signal["project"],
+                "priority": "Critical" if signal["errors"] > 0 else "High",
+                "reason": signal["reason"],
+                "count": str(signal["errors"] or signal["warnings"]),
+                "related_page": signal["destination"],
+                "destination": signal["destination"],
+            }
+        )
+
+    actions.sort(
+        key=lambda item: (_priority_rank(_safe_text(item.get("priority"), "Low"))),
+    )
+
+    timeline = _timeline_events(record, context)
+    pending_timeline = [
+        item
+        for item in timeline
+        if _safe_text(item.get("status"), "").lower() in {"pending", "not available"}
+    ]
+
+    return {
+        "signals": signals,
+        "active_signal": active_signal,
+        "actions": actions,
+        "timeline": timeline,
+        "pending_timeline": pending_timeline,
+    }
+
+
+def _render_home_page(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+    mission_control_payload: dict[str, Any] | None = None,
+) -> None:
+    payload = mission_control_payload or _build_mission_control_payload(
+        workspace_service,
+        record,
+        context,
+    )
+    signals = list(payload.get("signals") or [])
+    actions = list(payload.get("actions") or [])
+    active_signal = dict(payload.get("active_signal") or {})
+
+    _render_page_header(
+        st,
+        "Mission Control",
+        "Action-oriented command center for what to do next.",
+    )
+
+    attention_projects = [
+        item for item in signals if item.get("status") in {"Blocked", "Needs Attention"}
+    ]
+    active_projects = [item for item in signals if item.get("status") == "Active"]
+
     summary_cols = st.columns(4)
-    _metric_card(summary_cols[0], "Recent Projects", str(len(recent)))
-    _metric_card(summary_cols[1], "Reference Projects", str(len(references)))
-    _metric_card(summary_cols[2], "Active Modules", "Phase 2")
-    _metric_card(summary_cols[3], "Lifecycle Modules", "Coming Soon")
+    _metric_card(summary_cols[0], "Action Items", str(len(actions)))
+    _metric_card(summary_cols[1], "Active Projects", str(len(active_projects)))
+    _metric_card(summary_cols[2], "Needs Attention", str(len(attention_projects)))
+    _metric_card(summary_cols[3], "Recent Workspaces", str(len(signals)))
 
-    st.markdown("Quick Start")
-    quick_cols = st.columns(4)
-    if quick_cols[0].button("Projects", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Projects"
-    if quick_cols[1].button("Reference Projects", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Reference Projects"
-    if quick_cols[2].button("Create New Project", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Create New Project"
-    if quick_cols[3].button("Open Existing Project", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Open Existing Project"
+    st.markdown("### Continue Working")
+    continue_cols = st.columns(3)
+    if continue_cols[0].button(
+        "Open Engineering Workbench", type="primary", use_container_width=True
+    ):
+        st.session_state["atlas_active_page"] = "Engineering Workbench"
+        st.rerun()
+    if continue_cols[1].button(
+        "Open Resolver Conflict Center", use_container_width=True
+    ):
+        st.session_state["atlas_active_page"] = "Resolver Conflict Center"
+        st.rerun()
+    if continue_cols[2].button("Open Coordination Review", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Coordination Review"
+        st.rerun()
 
-    if recent:
-        st.markdown("Recent Projects")
+    st.markdown("### Action Center")
+    if actions:
         st.dataframe(
             [
                 {
-                    "project": record.project.name,
-                    "id": record.project.project_id,
-                    "status": _project_stage(record),
-                    "source": record.source_label,
-                    "updated": record.updated_at,
+                    "Action": item["title"],
+                    "Project": item["project"],
+                    "Priority": item["priority"],
+                    "Reason": item["reason"],
+                    "Count": item["count"],
+                    "Related Page": item["related_page"],
+                    "Recommended Destination": item["destination"],
                 }
-                for record in recent
+                for item in actions[:14]
             ],
             use_container_width=True,
             hide_index=True,
         )
+
+        action_targets = [
+            item["destination"]
+            for item in actions
+            if item["destination"] in ALL_ACTIVE_PAGES
+        ]
+        if action_targets:
+            selected_destination = st.selectbox(
+                "Take action",
+                options=action_targets,
+                index=0,
+                key="atlas_mission_control_action_target",
+            )
+            if st.button("Go to selected action", type="primary"):
+                st.session_state["atlas_active_page"] = selected_destination
+                st.rerun()
+    else:
+        st.info("No priority actions detected. Continue from Engineering Workbench.")
+
+    st.markdown("### Active Projects")
+    if signals:
+        st.dataframe(
+            [
+                {
+                    "Project": item["project"],
+                    "Status": item["status"],
+                    "Lifecycle": item["stage"],
+                    "Reason": item["reason"],
+                    "Documents": item["documents"],
+                    "Review Artifacts": item["review_artifacts"],
+                    "Updated": item["updated_at"],
+                }
+                for item in signals[:12]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No recent projects available.")
+
+    st.markdown("### Projects Requiring Attention")
+    if attention_projects:
+        st.dataframe(
+            [
+                {
+                    "Project": item["project"],
+                    "Status": item["status"],
+                    "Errors": item["errors"],
+                    "Warnings": item["warnings"],
+                    "Action": item["destination"],
+                }
+                for item in attention_projects[:8]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.success("No blocked projects in the recent workspace set.")
+
+    if active_signal:
+        st.caption(
+            "Current workspace status: "
+            f"{active_signal.get('status', 'Active')} · "
+            f"{active_signal.get('reason', 'Ready for engineering review.')}",
+        )
+
+    quick_cols = st.columns(4)
+    st.markdown("### Workspace Actions")
+    if quick_cols[0].button("Projects", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Projects"
+        st.rerun()
+    if quick_cols[1].button("Reference Projects", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Reference Projects"
+        st.rerun()
+    if quick_cols[2].button("Create New Project", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Create New Project"
+        st.rerun()
+    if quick_cols[3].button("Open Existing Project", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Open Existing Project"
+        st.rerun()
 
 
 def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
@@ -1237,7 +1666,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
                 "atlas_active_workspace_id"
             ):
                 st.session_state["atlas_active_workspace_id"] = None
-                st.session_state["atlas_active_page"] = "Home"
+                st.session_state["atlas_active_page"] = "Mission Control"
             st.rerun()
 
         st.markdown("#### Rename Project")
@@ -1285,7 +1714,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
                 "atlas_active_workspace_id"
             ):
                 st.session_state["atlas_active_workspace_id"] = None
-                st.session_state["atlas_active_page"] = "Home"
+                st.session_state["atlas_active_page"] = "Mission Control"
             st.rerun()
 
 
@@ -9291,7 +9720,10 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
         context.get("sample_project_name") if context else None,
         "Project",
     )
-    current_page = _safe_text(st.session_state.get("atlas_active_page"), "Home")
+    current_page = _safe_text(
+        st.session_state.get("atlas_active_page"),
+        "Mission Control",
+    )
     st.dataframe(
         [
             {"field": "Current Project", "value": project_name},
@@ -9732,11 +10164,18 @@ def _render_main_content(
     workspace_service: ProjectWorkspaceService,
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
+    mission_control_payload: dict[str, Any] | None = None,
 ) -> None:
-    page = st.session_state.get("atlas_active_page", "Home")
+    page = st.session_state.get("atlas_active_page", "Mission Control")
 
-    if page == "Home":
-        _render_home_page(st, workspace_service)
+    if page == "Mission Control":
+        _render_home_page(
+            st,
+            workspace_service,
+            record,
+            context,
+            mission_control_payload,
+        )
     elif page == "Projects":
         _render_projects_page(st, workspace_service)
     elif page == "Pinned Projects":
@@ -9869,6 +10308,89 @@ def _render_main_content(
         _render_settings_page(st, page, workspace_service, record)
 
 
+def _render_mission_control_panels(
+    st: Any,
+    mission_control_payload: dict[str, Any] | None,
+) -> None:
+    payload = mission_control_payload or {}
+    actions = list(payload.get("actions") or [])
+    signals = list(payload.get("signals") or [])
+    timeline = list(payload.get("timeline") or [])
+    pending_timeline = list(payload.get("pending_timeline") or [])
+
+    st.markdown("### Action Center")
+    if actions:
+        st.dataframe(
+            [
+                {
+                    "Priority": item.get("priority"),
+                    "Action": item.get("title"),
+                    "Project": item.get("project"),
+                    "Go To": item.get("destination"),
+                }
+                for item in actions[:6]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.caption("No high-priority actions detected.")
+
+    st.markdown("### Recent Activity")
+    if timeline:
+        st.dataframe(
+            [
+                {
+                    "Event": item.get("event"),
+                    "Status": item.get("status"),
+                    "Timestamp": item.get("timestamp"),
+                }
+                for item in timeline[:8]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.caption("No activity yet.")
+
+    st.markdown("### Upcoming Timeline")
+    if pending_timeline:
+        st.dataframe(
+            [
+                {
+                    "Event": item.get("event"),
+                    "Status": item.get("status"),
+                    "Details": item.get("details"),
+                }
+                for item in pending_timeline[:8]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.caption("No pending timeline items.")
+
+    st.markdown("### Projects Requiring Attention")
+    attention = [
+        item for item in signals if item.get("status") in {"Blocked", "Needs Attention"}
+    ]
+    if attention:
+        st.dataframe(
+            [
+                {
+                    "Project": item.get("project"),
+                    "Status": item.get("status"),
+                    "Reason": item.get("reason"),
+                }
+                for item in attention[:8]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.caption("No blocked projects in recent workspaces.")
+
+
 def _render_shell(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -9879,7 +10401,15 @@ def _render_shell(
     _sync_notebook_state_to_context(st, context)
     _render_global_search_panel(st, record, context)
 
-    current_page = st.session_state.get("atlas_active_page", "Home")
+    current_page = st.session_state.get("atlas_active_page", "Mission Control")
+    mission_control_payload = None
+    if current_page == "Mission Control":
+        mission_control_payload = _build_mission_control_payload(
+            workspace_service,
+            record,
+            context,
+        )
+
     st.markdown(
         f"<div class='atlas-breadcrumb'>{_breadcrumb(record, current_page)}</div>",
         unsafe_allow_html=True,
@@ -9893,9 +10423,18 @@ def _render_shell(
         with nav_col:
             _nav_buttons(st, st, "desktop")
         with main_col:
-            _render_main_content(st, workspace_service, record, context)
+            _render_main_content(
+                st,
+                workspace_service,
+                record,
+                context,
+                mission_control_payload,
+            )
         with context_col:
-            _render_context_panel(st, context)
+            if current_page == "Mission Control":
+                _render_mission_control_panels(st, mission_control_payload)
+            else:
+                _render_context_panel(st, context)
 
     elif layout_mode == "Tablet":
         ctrl_cols = st.columns([2.2, 7.8])
@@ -9907,26 +10446,53 @@ def _render_shell(
             _nav_buttons(st, nav_popover, "tablet")
             main_col, context_col = st.columns([7.1, 2.9])
             with main_col:
-                _render_main_content(st, workspace_service, record, context)
+                _render_main_content(
+                    st,
+                    workspace_service,
+                    record,
+                    context,
+                    mission_control_payload,
+                )
             with context_col:
-                _render_context_panel(st, context)
+                if current_page == "Mission Control":
+                    _render_mission_control_panels(st, mission_control_payload)
+                else:
+                    _render_context_panel(st, context)
         else:
             nav_col, main_col, context_col = st.columns([2.3, 5.5, 2.2])
             with nav_col:
                 _nav_buttons(st, st, "tablet")
             with main_col:
-                _render_main_content(st, workspace_service, record, context)
+                _render_main_content(
+                    st,
+                    workspace_service,
+                    record,
+                    context,
+                    mission_control_payload,
+                )
             with context_col:
-                _render_context_panel(st, context)
+                if current_page == "Mission Control":
+                    _render_mission_control_panels(st, mission_control_payload)
+                else:
+                    _render_context_panel(st, context)
 
     else:
         nav_drawer = st.popover("Open Navigation")
         _nav_buttons(st, nav_drawer, "mobile")
         main_col, context_col = st.columns([6.7, 3.3])
         with main_col:
-            _render_main_content(st, workspace_service, record, context)
+            _render_main_content(
+                st,
+                workspace_service,
+                record,
+                context,
+                mission_control_payload,
+            )
         with context_col:
-            _render_context_panel(st, context)
+            if current_page == "Mission Control":
+                _render_mission_control_panels(st, mission_control_payload)
+            else:
+                _render_context_panel(st, context)
 
     _render_status_bar(st, record, context)
 
@@ -9967,7 +10533,7 @@ def main() -> None:
         )
 
     if st.session_state.get("atlas_active_page") not in ALL_ACTIVE_PAGES:
-        st.session_state["atlas_active_page"] = "Home"
+        st.session_state["atlas_active_page"] = "Mission Control"
 
     _render_shell(st, workspace_service, record, context)
     workspace_service.save_workspace_state(

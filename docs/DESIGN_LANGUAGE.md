@@ -213,6 +213,7 @@ Consistency should outrank novelty.
 Atlas should follow these permanent design principles:
 
 - Design for engineers.
+- Atlas should always recommend the next engineering action.
 - Atlas highlights decisions rather than displaying data.
 - Atlas reduces engineering uncertainty.
 - Relationships are more valuable than isolated metrics.
