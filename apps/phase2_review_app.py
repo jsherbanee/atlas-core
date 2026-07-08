@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 import hashlib
 from pathlib import Path
 import subprocess
@@ -45,6 +46,7 @@ PROJECT_MANAGER_PAGES = [
 PROJECT_PAGES = [
     "Overview",
     "Engineering Workbench",
+    "Engineering Notebook",
     "Executive Summary",
     "Project Files",
     "Drawings",
@@ -92,6 +94,24 @@ DISABLED_LIFECYCLE_PAGES = [
 
 REPORT_PAGES = ["Reports", "Exports"]
 SETTINGS_PAGES = ["Project Settings", "Application Settings"]
+
+NOTEBOOK_ENTRY_TYPES = [
+    "Engineering Note",
+    "Observation",
+    "Decision",
+    "Assumption",
+    "Question",
+    "Follow-up",
+    "Customer Clarification",
+    "Consultant Clarification",
+    "Internal Coordination",
+    "Site Visit",
+    "Meeting Note",
+    "Review Summary",
+]
+
+NOTEBOOK_PRIORITIES = ["Critical", "High", "Medium", "Low"]
+NOTEBOOK_STATUSES = ["Open", "In Review", "Resolved", "Approved"]
 
 INVESTIGATION_SELECTION_KINDS = {
     "drawing",
@@ -294,6 +314,202 @@ def _set_context_cached(
         bucket[cache_key] = value
 
 
+def _now_iso() -> str:
+    return datetime.utcnow().replace(microsecond=0).isoformat()
+
+
+def _date_prefix(value: Any) -> str:
+    text = _safe_text(value, "")
+    if len(text) >= 10:
+        return text[:10]
+    return ""
+
+
+def _notebook_sort_key(entry: dict[str, Any]) -> str:
+    return _safe_text(entry.get("created_at"), "")
+
+
+def _is_decision_log_entry(entry: dict[str, Any]) -> bool:
+    entry_type = _safe_text(entry.get("entry_type"), "").strip().lower()
+    status = _safe_text(entry.get("status"), "").strip().lower()
+    if entry_type == "decision":
+        return True
+    if entry_type == "assumption" and status == "approved":
+        return True
+    if entry_type in {"customer clarification", "consultant clarification"}:
+        return status == "resolved"
+    return False
+
+
+def _atlas_generated_notebook_entries(
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if context is None:
+        return []
+
+    review = context.get("review")
+    readiness = getattr(review, "readiness", None) if review is not None else None
+    brief = context.get("brief")
+    revision = context.get("revision_comparison")
+    resolver = _build_engineering_resolver(record=None, context=context)
+    objects = _workspace_objects(context)
+
+    entries: list[dict[str, Any]] = []
+    created_at = _safe_text(record.updated_at, _now_iso())
+    project_ref = f"project:{record.project.project_id}"
+
+    def _add(
+        key: str,
+        title: str,
+        body: str,
+        entry_type: str = "Review Summary",
+        priority: str = "Medium",
+        status: str = "Resolved",
+        related_objects: list[str] | None = None,
+        evidence_refs: list[str] | None = None,
+        tags: list[str] | None = None,
+    ) -> None:
+        entries.append(
+            {
+                "entry_id": f"atlas:{key}:{_safe_text(record.updated_at, 'current')}",
+                "created_at": created_at,
+                "author": "Atlas",
+                "title": title,
+                "body": body,
+                "entry_type": entry_type,
+                "priority": priority,
+                "status": status,
+                "related_objects": sorted({project_ref, *(related_objects or [])}),
+                "evidence_refs": list(evidence_refs or []),
+                "tags": ["Atlas Generated", *(tags or [])],
+                "created_by_engine_version": f"atlas-workspace/{__version__}",
+                "read_only": True,
+                "system_generated": True,
+            }
+        )
+
+    if review is not None:
+        _add(
+            key="engineering-review-completed",
+            title="Engineering Review Completed",
+            body="Deterministic engineering review outputs were generated for the active project context.",
+            related_objects=[project_ref],
+            tags=["Milestone"],
+        )
+
+    if resolver is not None:
+        conflicts = list(getattr(resolver, "conflicts", []) or [])
+        if conflicts:
+            _add(
+                key="resolver-conflicts",
+                title="Resolver Generated Conflicts",
+                body=f"Engineering Resolver generated {len(conflicts)} conflict records requiring review.",
+                priority="High",
+                related_objects=[
+                    f"resolver_conflict:{_safe_text(item.conflict_id, 'conflict')}"
+                    for item in conflicts[:6]
+                ],
+                tags=["Resolver"],
+            )
+
+    if readiness is not None:
+        blockers = list(getattr(readiness, "blocking_issues", []) or [])
+        _add(
+            key="readiness-updated",
+            title="Readiness Updated",
+            body=(
+                f"Readiness level is {_safe_text(getattr(getattr(readiness, 'readiness_level', None), 'value', None), 'unknown')} "
+                f"with {len(blockers)} blocking issues."
+            ),
+            priority="High" if blockers else "Medium",
+            status="In Review" if blockers else "Resolved",
+            tags=["Readiness"],
+        )
+
+    if brief is not None:
+        _add(
+            key="estimator-brief",
+            title="Estimator Brief Generated",
+            body="Estimator brief was generated with prioritized reviewer actions and traceability references.",
+            related_objects=["labor_estimate:current"],
+            tags=["Estimator Brief"],
+        )
+
+    if revision is not None:
+        _add(
+            key="revision-comparison",
+            title="Revision Comparison Executed",
+            body=(
+                f"Revision comparison completed with {len(list(getattr(revision, 'changes', []) or []))} tracked changes."
+            ),
+            related_objects=[
+                f"revision:{_safe_text(getattr(revision, 'comparison_revision_id', None), 'current')}"
+            ],
+            tags=["Revision"],
+        )
+
+    coordination_findings = list(objects.get("coordination_findings") or [])
+    if coordination_findings:
+        _add(
+            key="coordination-review",
+            title="Coordination Review Completed",
+            body=(
+                f"Coordination review generated {len(coordination_findings)} findings across drawing/spec/equipment/system relationships."
+            ),
+            entry_type="Observation",
+            priority="High",
+            related_objects=[
+                f"coordination_finding:{_safe_text(item.get('finding_id'), 'finding')}"
+                for item in coordination_findings[:6]
+            ],
+            tags=["Coordination"],
+        )
+
+    entries.sort(key=_notebook_sort_key, reverse=True)
+    return entries
+
+
+def _notebook_entries(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    user_entries = list(st.session_state.get("atlas_notebook_entries") or [])
+    generated = _atlas_generated_notebook_entries(record, context)
+    merged = {str(item.get("entry_id")): dict(item) for item in generated}
+    for item in user_entries:
+        merged[str(item.get("entry_id"))] = dict(item)
+    entries = list(merged.values())
+    entries.sort(key=_notebook_sort_key, reverse=True)
+    return entries
+
+
+def _sync_notebook_state_to_context(st: Any, context: dict[str, Any] | None) -> None:
+    if context is None:
+        return
+    _set_context_cached(
+        context,
+        "notebook_user_entries",
+        list(st.session_state.get("atlas_notebook_entries") or []),
+    )
+
+
+def _entry_matches_date_window(
+    entry: dict[str, Any],
+    start_date: str,
+    end_date: str,
+) -> bool:
+    date_value = _date_prefix(entry.get("created_at"))
+    if not date_value:
+        return True
+    if start_date and date_value < start_date:
+        return False
+    if end_date and date_value > end_date:
+        return False
+    return True
+
+
 def _first_text(*values: Any) -> str | None:
     for value in values:
         if isinstance(value, str):
@@ -367,6 +583,9 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_duplicate_project_id", "")
     st.session_state.setdefault("atlas_duplicate_project_name", "")
     st.session_state.setdefault("atlas_loaded_workspace_state_for", None)
+    st.session_state.setdefault("atlas_notebook_entries", [])
+    st.session_state.setdefault("atlas_notebook_search", "")
+    st.session_state.setdefault("atlas_notebook_draft", {})
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -751,6 +970,9 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
             ),
         },
         "context_selection": selection,
+        "engineering_notebook_entries": list(
+            st.session_state.get("atlas_notebook_entries") or []
+        ),
     }
 
 
@@ -801,6 +1023,10 @@ def _restore_workspace_state(
     context_selection = state.get("context_selection")
     if isinstance(context_selection, dict):
         st.session_state["atlas_context_selection"] = dict(context_selection)
+
+    notebook_entries = state.get("engineering_notebook_entries")
+    if isinstance(notebook_entries, list):
+        st.session_state["atlas_notebook_entries"] = list(notebook_entries)
 
     st.session_state["atlas_loaded_workspace_state_for"] = record.workspace_id
 
@@ -2597,6 +2823,20 @@ def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any
                 "data": item,
             }
         )
+    user_notebook_entries = list(
+        _context_cached(context, "notebook_user_entries") or []
+    )
+    for item in user_notebook_entries:
+        entries.append(
+            {
+                "kind": "Notebook Entry",
+                "name": _safe_text(item.get("title"), "Notebook Entry"),
+                "subtitle": _safe_text(item.get("entry_type"), ""),
+                "page": "Engineering Notebook",
+                "selection_kind": "notebook_entry",
+                "data": item,
+            }
+        )
     if resolver_result is not None:
         for item in list(getattr(resolver_result, "resolved_objects", []) or []):
             item_dict = item.to_dict()
@@ -2651,6 +2891,13 @@ def _timeline_events(
     coordination_summary = dict(
         _workspace_objects(context).get("coordination_summary") or {}
     )
+    user_notebook_entries = list(
+        _context_cached(context, "notebook_user_entries")
+        or list(
+            (record.workspace_state or {}).get("engineering_notebook_entries") or []
+        )
+    )
+    generated_notebook_entries = _atlas_generated_notebook_entries(record, context)
 
     events = [
         {
@@ -2740,7 +2987,29 @@ def _timeline_events(
             "details": f"{import_summary.get('total_files', 0)} files",
         },
     ]
-    return events
+
+    for item in list(getattr(revision, "changes", []) or [])[:8]:
+        events.append(
+            {
+                "event": "Revision Change Detected",
+                "timestamp": record.updated_at,
+                "status": _safe_text(getattr(item, "severity", None), "medium").title(),
+                "details": _safe_text(getattr(item, "title", None), "revision change"),
+            }
+        )
+
+    for entry in generated_notebook_entries + user_notebook_entries:
+        events.append(
+            {
+                "event": f"Notebook · {_safe_text(entry.get('title'), 'Entry')}",
+                "timestamp": _safe_text(entry.get("created_at"), record.updated_at),
+                "status": _safe_text(entry.get("status"), "Open"),
+                "details": _safe_text(entry.get("entry_type"), "Engineering Note"),
+            }
+        )
+
+    events.sort(key=lambda item: _safe_text(item.get("timestamp"), ""), reverse=True)
+    return events[:80]
 
 
 def _build_knowledge_graph(
@@ -4329,6 +4598,20 @@ def _metadata_for_selection(
         project_id = _safe_text(data.get("project_id"), "")
         if project_id:
             candidates.append(f"project:{project_id}")
+    elif kind == "notebook_entry":
+        return {
+            "label": _safe_text(data.get("title"), "Notebook Entry"),
+            "type": _safe_text(data.get("entry_type"), "Notebook Entry"),
+            "source_file": "Engineering Notebook",
+            "source_page": _safe_text(data.get("created_at"), "n/a"),
+            "sheet_number": "n/a",
+            "specification_section": "n/a",
+            "extraction_confidence": "n/a",
+            "creation_timestamp": _safe_text(data.get("created_at"), "n/a"),
+            "last_update": _safe_text(data.get("updated_at"), "n/a"),
+            "relationship_count": len(list(data.get("related_objects") or [])),
+            "evidence_count": len(list(data.get("evidence_refs") or [])),
+        }
 
     for node_id in candidates:
         node = _node_by_id(graph, node_id)
@@ -4418,7 +4701,143 @@ def _selection_node_id(kind: str, data: dict[str, Any]) -> str | None:
         return f"resolver_conflict:{_safe_text(data.get('conflict_id'), '')}"
     if kind == "project":
         return f"project:{_safe_text(data.get('project_id'), '')}"
+    if kind == "notebook_entry":
+        return f"notebook:{_safe_text(data.get('entry_id'), '')}"
     return None
+
+
+def _notebook_object_reference_options(
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> list[str]:
+    objects = _workspace_objects(context)
+    options: list[str] = [f"project:{record.project.project_id}"]
+    options.extend(
+        [
+            f"drawing:{_safe_text(item.get('drawing_number'), '')}"
+            for item in list(objects.get("drawings") or [])
+            if _safe_text(item.get("drawing_number"), "")
+        ]
+    )
+    options.extend(
+        [
+            f"spec:{_safe_text(item.get('section'), '')}"
+            for item in list(objects.get("specifications") or [])
+            if _safe_text(item.get("section"), "")
+        ]
+    )
+    options.extend(
+        [
+            f"equipment:{_safe_text(item.get('equipment_id'), '')}"
+            for item in list(objects.get("equipment") or [])
+            if _safe_text(item.get("equipment_id"), "")
+        ]
+    )
+    options.extend(
+        [
+            f"system:{_safe_text(item.get('system'), '')}"
+            for item in list(objects.get("systems") or [])
+            if _safe_text(item.get("system"), "")
+        ]
+    )
+    options.extend(
+        [
+            f"room:{_safe_text(item.get('room'), '')}"
+            for item in list(objects.get("rooms") or [])
+            if _safe_text(item.get("room"), "")
+        ]
+    )
+    options.extend(
+        [
+            f"rfi:{_safe_text(item.get('rfi_id'), _safe_text(item.get('title'), 'rfi'))}"
+            for item in list(objects.get("rfis") or [])
+        ]
+    )
+    options.extend(
+        [
+            f"resolver_conflict:{_safe_text(item.get('conflict_id'), '')}"
+            for item in _build_resolver_conflict_rows(
+                _build_engineering_resolver(record=None, context=context)
+            )
+            if _safe_text(item.get("conflict_id"), "")
+        ]
+    )
+    options.extend(
+        [
+            f"coordination_finding:{_safe_text(item.get('finding_id'), '')}"
+            for item in list(objects.get("coordination_findings") or [])
+            if _safe_text(item.get("finding_id"), "")
+        ]
+    )
+    intelligence = _build_engineering_intelligence(record=None, context=context)
+    if intelligence is not None:
+        options.extend(
+            [
+                f"engineering_insight:{_safe_text(item.insight_id, '')}"
+                for item in list(getattr(intelligence, "insights", []) or [])
+                if _safe_text(getattr(item, "insight_id", None), "")
+            ]
+        )
+    options.append("labor_estimate:current")
+    options.extend(
+        [
+            f"evidence:{_safe_text(item.get('source_file'), 'file')}:{item.get('page', 'n/a')}"
+            for item in list(objects.get("evidence") or [])
+        ]
+    )
+    return sorted({item for item in options if item and not item.endswith(":")})
+
+
+def _open_linked_object(st: Any, ref: str) -> None:
+    value = _safe_text(ref, "")
+    if not value or ":" not in value:
+        return
+    prefix, object_id = value.split(":", 1)
+
+    if prefix == "project":
+        st.session_state["atlas_active_page"] = "Overview"
+        _set_context_selection(st, "project", {"project_id": object_id})
+    elif prefix == "drawing":
+        st.session_state["atlas_active_page"] = "Drawing Explorer"
+        _set_context_selection(st, "drawing", {"drawing_number": object_id})
+    elif prefix == "spec":
+        st.session_state["atlas_active_page"] = "Specification Explorer"
+        _set_context_selection(st, "specification", {"section": object_id})
+    elif prefix == "equipment":
+        st.session_state["atlas_active_page"] = "Equipment"
+        _set_context_selection(st, "equipment", {"equipment_id": object_id})
+    elif prefix == "system":
+        st.session_state["atlas_active_page"] = "Systems"
+        _set_context_selection(st, "system", {"system": object_id})
+    elif prefix == "room":
+        st.session_state["atlas_active_page"] = "Equipment"
+        _set_context_selection(st, "room", {"room": object_id})
+    elif prefix == "rfi":
+        st.session_state["atlas_active_page"] = "RFI Candidates"
+        _set_context_selection(st, "rfi", {"rfi_id": object_id})
+    elif prefix == "resolver_conflict":
+        st.session_state["atlas_active_page"] = "Resolver Conflict Center"
+        _set_context_selection(st, "resolver_conflict", {"conflict_id": object_id})
+    elif prefix == "engineering_insight":
+        st.session_state["atlas_active_page"] = "Engineering Intelligence"
+        _set_context_selection(st, "project", {"insight_id": object_id})
+    elif prefix == "coordination_finding":
+        st.session_state["atlas_active_page"] = "Coordination Review"
+        _set_context_selection(st, "project", {"finding_id": object_id})
+    elif prefix == "labor_estimate":
+        st.session_state["atlas_active_page"] = "Labor Estimate"
+        _set_context_selection(st, "project", {"project_id": object_id})
+    elif prefix == "evidence":
+        parts = value.split(":")
+        source_file = parts[1] if len(parts) > 1 else "file"
+        page = parts[2] if len(parts) > 2 else "n/a"
+        st.session_state["atlas_active_page"] = "Evidence"
+        _set_context_selection(
+            st,
+            "evidence",
+            {"source_file": source_file, "page": page},
+        )
+    st.rerun()
 
 
 def _scope_tokens(
@@ -4938,6 +5357,23 @@ def _render_engineering_workbench_page(
         st.markdown("### Investigation Mode")
         subgraph = _relationship_subgraph(graph, selected_node_id, depth=2)
 
+        if st.button(
+            "Create Investigation Note",
+            key="atlas_create_investigation_note",
+            use_container_width=True,
+        ):
+            st.session_state["atlas_notebook_draft"] = {
+                "title": f"Investigation Note · {_safe_text(selected_node.get('label'), 'Object')}",
+                "body": "Document observations, assumptions, and follow-up actions for this object.",
+                "related_objects": [selected_node_id],
+                "entry_type": "Engineering Note",
+                "priority": "Medium",
+                "status": "Open",
+                "tags": ["Investigation"],
+            }
+            st.session_state["atlas_active_page"] = "Engineering Notebook"
+            st.rerun()
+
         st.markdown("#### Object Summary")
         st.dataframe(
             [dict(selected_node.get("data") or {})],
@@ -5183,6 +5619,461 @@ def _top_reference_counts(
         {"object": item[0].split(":", 1)[1], "references": item[1]}
         for item in ranked[:limit]
     ]
+
+
+def _upsert_notebook_entry(st: Any, entry: dict[str, Any]) -> None:
+    entries = list(st.session_state.get("atlas_notebook_entries") or [])
+    existing_index = next(
+        (
+            index
+            for index, item in enumerate(entries)
+            if _safe_text(item.get("entry_id"), "")
+            == _safe_text(entry.get("entry_id"), "")
+        ),
+        None,
+    )
+    if existing_index is None:
+        entries.append(entry)
+    else:
+        entries[existing_index] = entry
+    st.session_state["atlas_notebook_entries"] = entries
+
+
+def _render_engineering_notebook_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    _render_page_header(
+        st,
+        "Engineering Notebook",
+        "Record engineering observations, decisions, assumptions, and review history with traceability.",
+    )
+
+    draft = dict(st.session_state.get("atlas_notebook_draft") or {})
+    entries = _notebook_entries(st, record, context)
+    entry_types = sorted(
+        {
+            _safe_text(item.get("entry_type"), "")
+            for item in entries
+            if _safe_text(item.get("entry_type"), "")
+        }
+    )
+    tags = sorted(
+        {
+            _safe_text(tag, "")
+            for item in entries
+            for tag in list(item.get("tags") or [])
+            if _safe_text(tag, "")
+        }
+    )
+    object_options = sorted(
+        {
+            _safe_text(ref, "")
+            for item in entries
+            for ref in list(item.get("related_objects") or [])
+            if _safe_text(ref, "")
+        }
+        | set(_notebook_object_reference_options(record, context))
+    )
+
+    filter_cols = st.columns([2.0, 1.5, 1.4, 1.4, 1.2, 1.2])
+    search_query = filter_cols[0].text_input(
+        "Search",
+        value=st.session_state.get("atlas_notebook_search", ""),
+        key="atlas_notebook_search",
+        placeholder="title, body, tags, linked objects",
+    )
+    type_filter = filter_cols[1].multiselect(
+        "Entry Type",
+        options=entry_types,
+        default=[],
+    )
+    tag_filter = filter_cols[2].multiselect(
+        "Tags",
+        options=tags,
+        default=[],
+    )
+    object_filter = filter_cols[3].multiselect(
+        "Object",
+        options=object_options,
+        default=[],
+    )
+    start_date = filter_cols[4].text_input(
+        "Start Date", value="", placeholder="YYYY-MM-DD"
+    )
+    end_date = filter_cols[5].text_input("End Date", value="", placeholder="YYYY-MM-DD")
+
+    filtered = [
+        item
+        for item in entries
+        if (
+            (
+                not search_query
+                or _contains_any(
+                    str(item),
+                    [search_query],
+                )
+            )
+            and (
+                not type_filter or _safe_text(item.get("entry_type"), "") in type_filter
+            )
+            and (
+                not tag_filter
+                or any(
+                    _safe_text(tag, "") in tag_filter
+                    for tag in list(item.get("tags") or [])
+                )
+            )
+            and (
+                not object_filter
+                or any(
+                    _safe_text(ref, "") in object_filter
+                    for ref in list(item.get("related_objects") or [])
+                )
+            )
+            and _entry_matches_date_window(item, start_date.strip(), end_date.strip())
+        )
+    ]
+
+    filtered.sort(key=_notebook_sort_key, reverse=True)
+
+    tabs = st.tabs(["Notebook Entries", "Engineering Decisions"])
+
+    with tabs[0]:
+        st.dataframe(
+            [
+                {
+                    "created": _safe_text(item.get("created_at"), "n/a"),
+                    "type": _safe_text(item.get("entry_type"), "n/a"),
+                    "priority": _safe_text(item.get("priority"), "n/a"),
+                    "status": _safe_text(item.get("status"), "n/a"),
+                    "title": _safe_text(item.get("title"), "n/a"),
+                    "author": _safe_text(item.get("author"), "n/a"),
+                    "objects": len(list(item.get("related_objects") or [])),
+                    "read only": "yes" if item.get("read_only") else "no",
+                }
+                for item in filtered
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        if filtered:
+            labels = [
+                f"{_safe_text(item.get('created_at'), 'n/a')} · {_safe_text(item.get('entry_type'), 'Entry')} · {_safe_text(item.get('title'), 'Untitled')}"
+                for item in filtered
+            ]
+            selected_label = st.selectbox(
+                "Select Notebook Entry",
+                options=labels,
+                key="atlas_notebook_selected",
+            )
+            selected_entry = filtered[labels.index(selected_label)]
+            _set_context_selection(st, "notebook_entry", selected_entry)
+
+            detail_col, link_col = st.columns([2.3, 1.7])
+            with detail_col:
+                st.markdown("#### Entry Detail")
+                st.dataframe(
+                    [
+                        {
+                            "field": "Entry ID",
+                            "value": _safe_text(selected_entry.get("entry_id"), "n/a"),
+                        },
+                        {
+                            "field": "Created",
+                            "value": _safe_text(
+                                selected_entry.get("created_at"), "n/a"
+                            ),
+                        },
+                        {
+                            "field": "Author",
+                            "value": _safe_text(selected_entry.get("author"), "n/a"),
+                        },
+                        {
+                            "field": "Type",
+                            "value": _safe_text(
+                                selected_entry.get("entry_type"), "n/a"
+                            ),
+                        },
+                        {
+                            "field": "Priority",
+                            "value": _safe_text(selected_entry.get("priority"), "n/a"),
+                        },
+                        {
+                            "field": "Status",
+                            "value": _safe_text(selected_entry.get("status"), "n/a"),
+                        },
+                        {
+                            "field": "Title",
+                            "value": _safe_text(selected_entry.get("title"), "n/a"),
+                        },
+                        {
+                            "field": "Body",
+                            "value": _safe_text(selected_entry.get("body"), "n/a"),
+                        },
+                        {
+                            "field": "Tags",
+                            "value": ", ".join(list(selected_entry.get("tags") or []))
+                            or "n/a",
+                        },
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                if not bool(selected_entry.get("read_only", False)):
+                    st.markdown("#### Edit Entry")
+                    edited_title = st.text_input(
+                        "Title",
+                        value=_safe_text(selected_entry.get("title"), ""),
+                        key=f"atlas_notebook_edit_title_{_safe_text(selected_entry.get('entry_id'), 'entry')}",
+                    )
+                    edited_body = st.text_area(
+                        "Body",
+                        value=_safe_text(selected_entry.get("body"), ""),
+                        key=f"atlas_notebook_edit_body_{_safe_text(selected_entry.get('entry_id'), 'entry')}",
+                    )
+                    edited_type = st.selectbox(
+                        "Entry Type",
+                        options=NOTEBOOK_ENTRY_TYPES,
+                        index=max(
+                            (
+                                NOTEBOOK_ENTRY_TYPES.index(
+                                    _safe_text(
+                                        selected_entry.get("entry_type"),
+                                        "Engineering Note",
+                                    )
+                                )
+                                if _safe_text(
+                                    selected_entry.get("entry_type"), "Engineering Note"
+                                )
+                                in NOTEBOOK_ENTRY_TYPES
+                                else 0
+                            ),
+                            0,
+                        ),
+                        key=f"atlas_notebook_edit_type_{_safe_text(selected_entry.get('entry_id'), 'entry')}",
+                    )
+                    edited_priority = st.selectbox(
+                        "Priority",
+                        options=NOTEBOOK_PRIORITIES,
+                        index=max(
+                            (
+                                NOTEBOOK_PRIORITIES.index(
+                                    _safe_text(selected_entry.get("priority"), "Medium")
+                                )
+                                if _safe_text(selected_entry.get("priority"), "Medium")
+                                in NOTEBOOK_PRIORITIES
+                                else 2
+                            ),
+                            0,
+                        ),
+                        key=f"atlas_notebook_edit_priority_{_safe_text(selected_entry.get('entry_id'), 'entry')}",
+                    )
+                    edited_status = st.selectbox(
+                        "Status",
+                        options=NOTEBOOK_STATUSES,
+                        index=max(
+                            (
+                                NOTEBOOK_STATUSES.index(
+                                    _safe_text(selected_entry.get("status"), "Open")
+                                )
+                                if _safe_text(selected_entry.get("status"), "Open")
+                                in NOTEBOOK_STATUSES
+                                else 0
+                            ),
+                            0,
+                        ),
+                        key=f"atlas_notebook_edit_status_{_safe_text(selected_entry.get('entry_id'), 'entry')}",
+                    )
+                    edited_tags_text = st.text_input(
+                        "Tags (comma-separated)",
+                        value=", ".join(list(selected_entry.get("tags") or [])),
+                        key=f"atlas_notebook_edit_tags_{_safe_text(selected_entry.get('entry_id'), 'entry')}",
+                    )
+
+                    if st.button(
+                        "Save Entry",
+                        key=f"atlas_notebook_save_{_safe_text(selected_entry.get('entry_id'), 'entry')}",
+                    ):
+                        updated_entry = dict(selected_entry)
+                        updated_entry["title"] = edited_title.strip() or _safe_text(
+                            selected_entry.get("title"), "Untitled"
+                        )
+                        updated_entry["body"] = edited_body.strip()
+                        updated_entry["entry_type"] = edited_type
+                        updated_entry["priority"] = edited_priority
+                        updated_entry["status"] = edited_status
+                        updated_entry["tags"] = [
+                            item.strip()
+                            for item in edited_tags_text.split(",")
+                            if item.strip()
+                        ]
+                        _upsert_notebook_entry(st, updated_entry)
+                        st.success("Notebook entry updated.")
+                        st.rerun()
+                else:
+                    st.caption("Atlas-generated entries are read-only.")
+
+            with link_col:
+                st.markdown("#### Linked Objects")
+                related_objects = list(selected_entry.get("related_objects") or [])
+                if related_objects:
+                    for ref in related_objects[:20]:
+                        if st.button(
+                            f"Open {_safe_text(ref, 'object')}",
+                            key=f"atlas_note_open_{_safe_text(selected_entry.get('entry_id'), 'entry')}_{_safe_text(ref, 'ref')}",
+                            use_container_width=True,
+                        ):
+                            _open_linked_object(st, ref)
+                else:
+                    st.info("No linked objects.")
+
+                st.markdown("#### Evidence Refs")
+                evidence_refs = list(selected_entry.get("evidence_refs") or [])
+                if evidence_refs:
+                    st.dataframe(
+                        [{"evidence_ref": item} for item in evidence_refs],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                else:
+                    st.info("No evidence references.")
+
+        st.markdown("#### Create Entry")
+        create_col1, create_col2 = st.columns([2.2, 1.8])
+        with create_col1:
+            title = st.text_input(
+                "Title",
+                value=_safe_text(draft.get("title"), ""),
+                key="atlas_notebook_create_title",
+            )
+            body = st.text_area(
+                "Body",
+                value=_safe_text(draft.get("body"), ""),
+                key="atlas_notebook_create_body",
+            )
+            entry_type = st.selectbox(
+                "Entry Type",
+                options=NOTEBOOK_ENTRY_TYPES,
+                index=(
+                    NOTEBOOK_ENTRY_TYPES.index(
+                        _safe_text(draft.get("entry_type"), "Engineering Note")
+                    )
+                    if _safe_text(draft.get("entry_type"), "Engineering Note")
+                    in NOTEBOOK_ENTRY_TYPES
+                    else 0
+                ),
+                key="atlas_notebook_create_type",
+            )
+            priority = st.selectbox(
+                "Priority",
+                options=NOTEBOOK_PRIORITIES,
+                index=(
+                    NOTEBOOK_PRIORITIES.index(
+                        _safe_text(draft.get("priority"), "Medium")
+                    )
+                    if _safe_text(draft.get("priority"), "Medium")
+                    in NOTEBOOK_PRIORITIES
+                    else 2
+                ),
+                key="atlas_notebook_create_priority",
+            )
+            status = st.selectbox(
+                "Status",
+                options=NOTEBOOK_STATUSES,
+                index=(
+                    NOTEBOOK_STATUSES.index(_safe_text(draft.get("status"), "Open"))
+                    if _safe_text(draft.get("status"), "Open") in NOTEBOOK_STATUSES
+                    else 0
+                ),
+                key="atlas_notebook_create_status",
+            )
+
+        with create_col2:
+            default_related = [
+                item
+                for item in list(draft.get("related_objects") or [])
+                if item in object_options
+            ]
+            related_objects = st.multiselect(
+                "Related Objects",
+                options=object_options,
+                default=default_related,
+                key="atlas_notebook_create_related",
+            )
+            evidence_options = [
+                f"{_safe_text(item.get('source_file'), 'file')} p.{item.get('page', 'n/a')}"
+                for item in list(_workspace_objects(context).get("evidence") or [])
+            ]
+            evidence_refs = st.multiselect(
+                "Evidence Refs",
+                options=sorted(set(evidence_options)),
+                default=[],
+                key="atlas_notebook_create_evidence_refs",
+            )
+            tags_text = st.text_input(
+                "Tags (comma-separated)",
+                value=", ".join(list(draft.get("tags") or [])),
+                key="atlas_notebook_create_tags",
+            )
+
+        create_actions = st.columns(3)
+        if create_actions[0].button(
+            "Create Note", type="primary", use_container_width=True
+        ):
+            entry_id = f"note:{record.workspace_id}:{hashlib.sha1(f'{title}|{_now_iso()}'.encode('utf-8')).hexdigest()[:10]}"
+            new_entry = {
+                "entry_id": entry_id,
+                "created_at": _now_iso(),
+                "author": "Engineer",
+                "title": title.strip() or "Untitled Note",
+                "body": body.strip(),
+                "entry_type": entry_type,
+                "priority": priority,
+                "status": status,
+                "related_objects": list(related_objects),
+                "evidence_refs": list(evidence_refs),
+                "tags": [item.strip() for item in tags_text.split(",") if item.strip()],
+                "created_by_engine_version": "",
+                "read_only": False,
+                "system_generated": False,
+            }
+            _upsert_notebook_entry(st, new_entry)
+            st.session_state["atlas_notebook_draft"] = {}
+            st.success("Notebook entry created.")
+            st.rerun()
+        if create_actions[1].button("Clear Draft", use_container_width=True):
+            st.session_state["atlas_notebook_draft"] = {}
+            st.rerun()
+        if create_actions[2].button("Open Timeline", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Timeline"
+            st.rerun()
+
+    with tabs[1]:
+        decision_rows = [item for item in filtered if _is_decision_log_entry(item)]
+        st.dataframe(
+            [
+                {
+                    "created": _safe_text(item.get("created_at"), "n/a"),
+                    "type": _safe_text(item.get("entry_type"), "n/a"),
+                    "status": _safe_text(item.get("status"), "n/a"),
+                    "priority": _safe_text(item.get("priority"), "n/a"),
+                    "title": _safe_text(item.get("title"), "n/a"),
+                    "author": _safe_text(item.get("author"), "n/a"),
+                }
+                for item in decision_rows
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        if not decision_rows:
+            _render_empty_state(
+                st,
+                "No decision-log entries found. Decision Log includes Decision, Approved Assumption, and Resolved Clarification.",
+            )
 
 
 def _render_coordination_review_page(
@@ -8268,6 +9159,50 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
         )
         return
 
+    if kind == "notebook_entry":
+        st.markdown("#### Notebook Entry")
+        st.dataframe(
+            [
+                {"field": "Entry ID", "value": _safe_text(data.get("entry_id"), "n/a")},
+                {
+                    "field": "Created",
+                    "value": _safe_text(data.get("created_at"), "n/a"),
+                },
+                {"field": "Author", "value": _safe_text(data.get("author"), "n/a")},
+                {"field": "Type", "value": _safe_text(data.get("entry_type"), "n/a")},
+                {"field": "Priority", "value": _safe_text(data.get("priority"), "n/a")},
+                {"field": "Status", "value": _safe_text(data.get("status"), "n/a")},
+                {"field": "Title", "value": _safe_text(data.get("title"), "n/a")},
+                {"field": "Body", "value": _safe_text(data.get("body"), "n/a")},
+                {
+                    "field": "Tags",
+                    "value": ", ".join(list(data.get("tags") or [])) or "n/a",
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        linked = list(data.get("related_objects") or [])
+        if linked:
+            st.markdown("Linked Objects")
+            for ref in linked[:12]:
+                if st.button(
+                    f"Open {_safe_text(ref, 'object')}",
+                    key=f"atlas_ctx_notebook_open_{_safe_text(data.get('entry_id'), 'entry')}_{_safe_text(ref, 'ref')}",
+                    use_container_width=True,
+                ):
+                    _open_linked_object(st, ref)
+
+        nav_cols = st.columns(2)
+        if nav_cols[0].button("Open Notebook", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Engineering Notebook"
+            st.rerun()
+        if nav_cols[1].button("Open Timeline", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Timeline"
+            st.rerun()
+        return
+
     st.markdown("#### Project")
     if context is None:
         st.info(
@@ -8396,6 +9331,8 @@ def _render_main_content(
         _render_overview_page(st, record, context)
     elif page == "Engineering Workbench":
         _render_engineering_workbench_page(st, record, context)
+    elif page == "Engineering Notebook":
+        _render_engineering_notebook_page(st, record, context)
     elif page == "Executive Summary":
         _render_executive_summary_page(st, context)
     elif page == "Project Files":
@@ -8515,6 +9452,7 @@ def _render_shell(
     context: dict[str, Any] | None,
 ) -> None:
     _render_header(st, workspace_service, record, context)
+    _sync_notebook_state_to_context(st, context)
     _render_global_search_panel(st, record, context)
 
     current_page = st.session_state.get("atlas_active_page", "Home")
