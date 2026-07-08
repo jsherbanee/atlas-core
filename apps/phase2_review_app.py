@@ -256,6 +256,44 @@ def _safe_text(value: Any, default: str = "Unknown") -> str:
     return str(value)
 
 
+def _render_page_header(st: Any, title: str, subtitle: str) -> None:
+    st.subheader(title)
+    st.caption(subtitle)
+
+
+def _render_empty_state(st: Any, message: str) -> None:
+    st.info(message)
+
+
+def _context_cache_bucket(context: dict[str, Any] | None) -> dict[str, Any]:
+    if context is None:
+        return {}
+    bucket = context.get("_atlas_ui_cache")
+    if isinstance(bucket, dict):
+        return bucket
+    bucket = {}
+    context["_atlas_ui_cache"] = bucket
+    return bucket
+
+
+def _context_cached(
+    context: dict[str, Any] | None,
+    cache_key: str,
+) -> Any | None:
+    bucket = _context_cache_bucket(context)
+    return bucket.get(cache_key)
+
+
+def _set_context_cached(
+    context: dict[str, Any] | None,
+    cache_key: str,
+    value: Any,
+) -> None:
+    bucket = _context_cache_bucket(context)
+    if bucket is not None:
+        bucket[cache_key] = value
+
+
 def _first_text(*values: Any) -> str | None:
     for value in values:
         if isinstance(value, str):
@@ -321,6 +359,7 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_file_search", "")
     st.session_state.setdefault("atlas_global_search", "")
     st.session_state.setdefault("atlas_global_search_index", 0)
+    st.session_state.setdefault("atlas_quick_jump", "Current Page")
     st.session_state.setdefault("atlas_equipment_search", "")
     st.session_state.setdefault("atlas_search_type_filters", [])
     st.session_state.setdefault("atlas_relationship_search_enabled", False)
@@ -595,7 +634,7 @@ def _render_header(
         "<div class='atlas-title'>Atlas Workspace</div>", unsafe_allow_html=True
     )
 
-    cols = st.columns([2.8, 1.2, 3.2, 1.0, 1.0, 1.2, 1.4, 1.6, 1.7])
+    cols = st.columns([2.6, 1.0, 2.7, 1.6, 0.9, 0.9, 1.1, 1.2, 1.4, 1.6])
     selected = cols[0].selectbox(
         "Current Project",
         options=labels,
@@ -611,17 +650,28 @@ def _render_header(
         key="atlas_global_search",
         placeholder="Search drawings, specs, equipment, systems, RFIs, evidence",
     )
-    cols[3].button("Alerts", disabled=True, use_container_width=True)
-    cols[4].button("Settings", use_container_width=True)
-    cols[5].selectbox("Profile", ["User"], index=0)
-    cols[6].markdown(
+    quick_jump_options = ["Current Page"] + list(ALL_ACTIVE_PAGES)
+    selected_jump = cols[3].selectbox(
+        "Quick Jump",
+        options=quick_jump_options,
+        key="atlas_quick_jump",
+    )
+    if selected_jump != "Current Page":
+        st.session_state["atlas_active_page"] = selected_jump
+        st.session_state["atlas_quick_jump"] = "Current Page"
+        st.rerun()
+
+    cols[4].button("Alerts", disabled=True, use_container_width=True)
+    cols[5].button("Settings", use_container_width=True)
+    cols[6].selectbox("Profile", ["User"], index=0)
+    cols[7].markdown(
         f"<div class='atlas-muted'>Atlas v{__version__}</div>", unsafe_allow_html=True
     )
-    cols[7].markdown(
+    cols[8].markdown(
         f"<div class='atlas-muted'>Stage: {_project_stage(record)}</div>",
         unsafe_allow_html=True,
     )
-    cols[8].markdown(
+    cols[9].markdown(
         f"<div class='atlas-muted'>Status: {_project_status(context)}</div>",
         unsafe_allow_html=True,
     )
@@ -835,8 +885,11 @@ def _metric_card(st: Any, title: str, value: str) -> None:
 
 
 def _render_home_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
-    st.subheader("Home")
-    st.caption("Project-centric launch point for Atlas Workspace.")
+    _render_page_header(
+        st,
+        "Home",
+        "Project-centric launch point for Atlas Workspace.",
+    )
 
     recent = workspace_service.list_recent_workspaces(limit=8)
     references = workspace_service.list_reference_workspaces()
@@ -876,7 +929,9 @@ def _render_home_page(st: Any, workspace_service: ProjectWorkspaceService) -> No
 
 
 def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
-    st.subheader("Projects")
+    _render_page_header(
+        st, "Projects", "Open, manage, and curate local Atlas projects."
+    )
     include_archived = st.checkbox("Show archived projects", value=False)
     records = workspace_service.list_workspaces(
         include_archived=include_archived,
@@ -1009,7 +1064,7 @@ def _render_pinned_projects_page(
     st: Any,
     workspace_service: ProjectWorkspaceService,
 ) -> None:
-    st.subheader("Pinned Projects")
+    _render_page_header(st, "Pinned Projects", "Fast access to prioritized projects.")
     records = workspace_service.list_pinned_workspaces(limit=200)
     if not records:
         st.info("No pinned projects yet.")
@@ -1044,7 +1099,11 @@ def _render_reference_projects_page(
     st: Any,
     workspace_service: ProjectWorkspaceService,
 ) -> None:
-    st.subheader("Reference Projects")
+    _render_page_header(
+        st,
+        "Reference Projects",
+        "Load deterministic benchmark reference workspaces.",
+    )
     references = workspace_service.list_reference_workspaces(include_archived=False)
     if references:
         st.dataframe(
@@ -1090,7 +1149,7 @@ def _render_reference_projects_page(
 def _render_recent_projects_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    st.subheader("Recent Projects")
+    _render_page_header(st, "Recent Projects", "Resume recent project investigations.")
     records = workspace_service.list_recent_workspaces(limit=20)
     if not records:
         st.info("No recent projects yet.")
@@ -1115,7 +1174,11 @@ def _render_recent_projects_page(
 def _render_create_project_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    st.subheader("Create New Project")
+    _render_page_header(
+        st,
+        "Create New Project",
+        "Initialize a local project workspace for deterministic intake and review.",
+    )
     with st.form("atlas_create_project_form", clear_on_submit=False):
         project_id = st.text_input("Project ID", key="atlas_new_project_id")
         name = st.text_input("Project Name", key="atlas_new_project_name")
@@ -1169,7 +1232,11 @@ def _render_create_project_page(
 def _render_open_existing_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    st.subheader("Open Existing Project")
+    _render_page_header(
+        st,
+        "Open Existing Project",
+        "Open an existing project record, snapshot, or package directory.",
+    )
     path_text = st.text_input(
         "Workspace file, intake snapshot, or package folder",
         key="atlas_pending_open_path",
@@ -1231,10 +1298,94 @@ def _render_open_existing_page(
     )
 
 
+def _workflow_validation_rows(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    objects = _workspace_objects(context)
+    review = context.get("review") if context else None
+    readiness = getattr(review, "readiness", None) if review is not None else None
+    resolver = _build_engineering_resolver(record=None, context=context)
+    intelligence = _build_engineering_intelligence(record=None, context=context)
+
+    stages = [
+        ("New Project", True),
+        ("Document Intake", int(context is not None)),
+        (
+            "Drawing Intelligence",
+            int(len(list(objects.get("drawings") or [])) > 0),
+        ),
+        (
+            "Specification Intelligence",
+            int(len(list(objects.get("specifications") or [])) > 0),
+        ),
+        (
+            "Knowledge Graph",
+            int(
+                len(
+                    list(
+                        _build_knowledge_graph(record=None, context=context).get(
+                            "nodes"
+                        )
+                        or []
+                    )
+                )
+                > 0
+            ),
+        ),
+        (
+            "Resolver",
+            int(resolver is not None),
+        ),
+        (
+            "Engineering Intelligence",
+            int(intelligence is not None),
+        ),
+        (
+            "Coordination Review",
+            int(len(list(objects.get("coordination_findings") or [])) > 0),
+        ),
+        ("Engineering Workbench", 1),
+        (
+            "Estimator Brief",
+            int(context is not None and context.get("brief") is not None),
+        ),
+    ]
+
+    rows: list[dict[str, Any]] = []
+    for stage, status in stages:
+        rows.append(
+            {
+                "stage": stage,
+                "status": _status_chip("Ready" if status else "Needs Review"),
+                "decision focus": (
+                    "Proceed"
+                    if status
+                    else "Review source coverage and traceability before proceeding"
+                ),
+            }
+        )
+
+    rows.append(
+        {
+            "stage": "Readiness State",
+            "status": _status_chip(
+                _safe_text(
+                    getattr(getattr(readiness, "readiness_level", None), "value", None),
+                    "Needs Review",
+                ).title()
+            ),
+            "decision focus": "Confirm blockers and reviewer actions before final estimate",
+        }
+    )
+    return rows
+
+
 def _render_overview_page(
     st: Any, record: ProjectWorkspaceRecord, context: dict[str, Any] | None
 ) -> None:
-    st.subheader("Mission Control")
+    _render_page_header(
+        st,
+        "Mission Control",
+        "Decision-focused project overview for estimator and engineering review.",
+    )
 
     review = context.get("review") if context else None
     readiness = getattr(review, "readiness", None) if review is not None else None
@@ -1410,11 +1561,22 @@ def _render_overview_page(
     if quick[3].button("RFI Candidates", use_container_width=True):
         st.session_state["atlas_active_page"] = "RFI Candidates"
 
+    st.markdown("Workflow Validation")
+    st.dataframe(
+        _workflow_validation_rows(context),
+        use_container_width=True,
+        hide_index=True,
+    )
+
 
 def _render_executive_summary_page(st: Any, context: dict[str, Any] | None) -> None:
-    st.subheader("Executive Summary")
+    _render_page_header(
+        st,
+        "Executive Summary",
+        "Action-ready summary of package health, risks, and reviewer priorities.",
+    )
     if context is None:
-        st.info("No review context available.")
+        _render_empty_state(st, "No review context available.")
         return
 
     review = context.get("review")
@@ -1476,7 +1638,34 @@ def _render_executive_summary_page(st: Any, context: dict[str, Any] | None) -> N
     if actions:
         st.dataframe(actions, use_container_width=True, hide_index=True)
     else:
-        st.info("No prioritized reviewer actions available.")
+        _render_empty_state(st, "No prioritized reviewer actions available.")
+
+    objects = _workspace_objects(context)
+    coordination = list(objects.get("coordination_findings") or [])
+    high_priority = [
+        item
+        for item in coordination
+        if _safe_text(item.get("severity"), "") in {"critical", "high"}
+    ]
+    st.markdown("Decision Queue")
+    if high_priority:
+        st.dataframe(
+            [
+                {
+                    "severity": _safe_text(item.get("severity"), "n/a"),
+                    "decision": _safe_text(item.get("title"), "n/a"),
+                    "action": _safe_text(item.get("recommended_action"), "n/a"),
+                }
+                for item in high_priority[:8]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        _render_empty_state(
+            st,
+            "No high-severity coordination decisions are currently open.",
+        )
 
 
 def _files_by_folder(context: dict[str, Any] | None) -> dict[str, list[dict[str, Any]]]:
@@ -1757,6 +1946,10 @@ def _workspace_objects(
             "coordination_summary": {},
             "coordination_confidence": "n/a",
         }
+
+    cached = _context_cached(context, "workspace_objects")
+    if isinstance(cached, dict):
+        return cached
 
     review = context.get("review")
     snapshot = context.get("intake_snapshot")
@@ -2249,7 +2442,7 @@ def _workspace_objects(
         except Exception:
             coordination_result = None
 
-    return {
+    result = {
         "drawings": drawings,
         "specifications": specifications,
         "equipment": equipment,
@@ -2290,9 +2483,15 @@ def _workspace_objects(
             else "n/a"
         ),
     }
+    _set_context_cached(context, "workspace_objects", result)
+    return result
 
 
 def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    cached = _context_cached(context, "global_search_entries")
+    if isinstance(cached, list):
+        return cached
+
     objects = _workspace_objects(context)
     resolver_result = _build_engineering_resolver(record=None, context=context)
     entries: list[dict[str, Any]] = []
@@ -2435,6 +2634,7 @@ def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any
             }
         )
 
+    _set_context_cached(context, "global_search_entries", entries)
     return entries
 
 
@@ -2448,7 +2648,9 @@ def _timeline_events(
     revision = context.get("revision_comparison") if context else None
     resolver_result = _build_engineering_resolver(record, context)
     intelligence = _build_engineering_intelligence(record, context)
-    coordination_summary = dict(_workspace_objects(context).get("coordination_summary") or {})
+    coordination_summary = dict(
+        _workspace_objects(context).get("coordination_summary") or {}
+    )
 
     events = [
         {
@@ -2545,6 +2747,10 @@ def _build_knowledge_graph(
     record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> dict[str, Any]:
+    cached = _context_cached(context, "knowledge_graph")
+    if isinstance(cached, dict):
+        return cached
+
     objects = _workspace_objects(context)
     import_summary = dict(context.get("import_summary") or {}) if context else {}
     review = context.get("review") if context else None
@@ -4000,7 +4206,7 @@ def _build_knowledge_graph(
         node.setdefault("metadata", {})["relationship_count"] = count
         node.setdefault("metadata", {})["evidence_count"] = evidence_counts[node_id]
 
-    return {
+    graph = {
         "nodes": nodes,
         "edges": edges,
         "resolver_result": (
@@ -4010,6 +4216,8 @@ def _build_knowledge_graph(
             resolver_result.summary if resolver_result is not None else {}
         ),
     }
+    _set_context_cached(context, "knowledge_graph", graph)
+    return graph
 
 
 def _node_by_id(graph: dict[str, Any], node_id: str) -> dict[str, Any] | None:
@@ -4143,13 +4351,19 @@ def _build_engineering_intelligence(
     if review is None:
         return None
 
+    cached = _context_cached(context, "engineering_intelligence")
+    if cached is not None:
+        return cached
+
     brief = context.get("brief")
     graph = _build_knowledge_graph(record=record, context=context)
-    return EngineeringInsightsService().build(
+    result = EngineeringInsightsService().build(
         review=review,
         knowledge_graph=graph,
         estimator_brief=brief,
     )
+    _set_context_cached(context, "engineering_intelligence", result)
+    return result
 
 
 def _build_engineering_resolver(
@@ -4163,9 +4377,15 @@ def _build_engineering_resolver(
     if review is None:
         return None
 
-    return EngineeringResolver().resolve(
+    cached = _context_cached(context, "engineering_resolver")
+    if cached is not None:
+        return cached
+
+    result = EngineeringResolver().resolve(
         ResolverContext(review=review, knowledge_graph=context.get("knowledge_graph"))
     )
+    _set_context_cached(context, "engineering_resolver", result)
+    return result
 
 
 def _selection_node_id(kind: str, data: dict[str, Any]) -> str | None:
@@ -4454,15 +4674,22 @@ def _render_engineering_workbench_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader("Engineering Workbench")
+    _render_page_header(
+        st,
+        "Engineering Workbench",
+        "Investigate conflicts, trace evidence, and prioritize engineering decisions.",
+    )
     if context is None:
-        st.info("Engineering Workbench requires a loaded project review context.")
+        _render_empty_state(
+            st, "Engineering Workbench requires a loaded project review context."
+        )
         return
 
-    graph = _build_knowledge_graph(record, context)
-    resolver_result = _build_engineering_resolver(record, context)
-    intelligence = _build_engineering_intelligence(record, context)
-    objects = _workspace_objects(context)
+    with st.spinner("Loading engineering workspace..."):
+        graph = _build_knowledge_graph(record, context)
+        resolver_result = _build_engineering_resolver(record, context)
+        intelligence = _build_engineering_intelligence(record, context)
+        objects = _workspace_objects(context)
     brief = context.get("brief")
 
     selection = dict(
@@ -4962,15 +5189,21 @@ def _render_coordination_review_page(
     st: Any,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader("Coordination Review")
-    objects = _workspace_objects(context)
+    _render_page_header(
+        st,
+        "Coordination Review",
+        "Validate drawing/spec/equipment/system agreement, conflicts, and gaps.",
+    )
+    with st.spinner("Loading coordination findings..."):
+        objects = _workspace_objects(context)
     findings = list(objects.get("coordination_findings", []))
     issues = list(objects.get("coordination_issues", []))
     summary = dict(objects.get("coordination_summary") or {})
 
     if not findings:
-        st.info(
-            "No coordination findings are available for the current project context."
+        _render_empty_state(
+            st,
+            "No coordination findings are available for the current project context.",
         )
         return
 
@@ -5159,11 +5392,17 @@ def _render_engineering_intelligence_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader("Engineering Intelligence")
-    intelligence = _build_engineering_intelligence(record, context)
+    _render_page_header(
+        st,
+        "Engineering Intelligence",
+        "Decision-oriented engineering health, risks, and recommendations.",
+    )
+    with st.spinner("Loading engineering intelligence..."):
+        intelligence = _build_engineering_intelligence(record, context)
     if intelligence is None:
-        st.info(
-            "Engineering insights are unavailable until a project review context is loaded."
+        _render_empty_state(
+            st,
+            "Engineering insights are unavailable until a project review context is loaded.",
         )
         return
 
@@ -5671,7 +5910,11 @@ def _render_project_files_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader("Project Explorer")
+    _render_page_header(
+        st,
+        "Project Explorer",
+        "Inspect intake artifacts, extraction health, and file-level traceability.",
+    )
     _render_upload_panel(st, workspace_service, record)
 
     folders = _files_by_folder(context)
@@ -5715,7 +5958,7 @@ def _render_project_files_page(
     ]
 
     if not display_rows:
-        st.info("No files match the current filters.")
+        _render_empty_state(st, "No files match the current filters.")
         return
 
     st.dataframe(display_rows, use_container_width=True, hide_index=True)
@@ -7597,7 +7840,11 @@ def _render_reports_page(
     page: str,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader(page)
+    _render_page_header(
+        st,
+        page,
+        "Estimator-facing summary outputs and export navigation.",
+    )
     if page == "Reports":
         objects = _workspace_objects(context)
         summary = dict(objects.get("coordination_summary") or {})
@@ -7637,10 +7884,31 @@ def _render_reports_page(
             use_container_width=True,
             hide_index=True,
         )
+        nav_cols = st.columns(3)
+        if nav_cols[0].button("Open Coordination Review", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Coordination Review"
+            st.rerun()
+        if nav_cols[1].button("Open Engineering Workbench", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Engineering Workbench"
+            st.rerun()
+        if nav_cols[2].button("Open Estimator Brief", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Estimator Brief"
+            st.rerun()
     else:
-        st.info(
-            "Exports module scaffolded. Current deterministic export services remain unchanged."
+        _render_empty_state(
+            st,
+            "Exports module scaffolded. Use Reports, Estimator Brief, or Evidence for current review outputs.",
         )
+        nav_cols = st.columns(3)
+        if nav_cols[0].button("Open Reports", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Reports"
+            st.rerun()
+        if nav_cols[1].button("Open Evidence", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Evidence"
+            st.rerun()
+        if nav_cols[2].button("Open Project Files", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Project Files"
+            st.rerun()
 
 
 def _render_settings_page(
@@ -7776,6 +8044,20 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
         _build_knowledge_graph(record=None, context=context)
         if context
         else {"nodes": [], "edges": []}
+    )
+
+    project_name = _safe_text(
+        context.get("sample_project_name") if context else None,
+        "Project",
+    )
+    current_page = _safe_text(st.session_state.get("atlas_active_page"), "Home")
+    st.dataframe(
+        [
+            {"field": "Current Project", "value": project_name},
+            {"field": "Current Page", "value": current_page},
+        ],
+        use_container_width=True,
+        hide_index=True,
     )
 
     def _render_object_context(
