@@ -33,6 +33,7 @@ from atlas_core.services.specification_intelligence import (
 from atlas_core.services.coordination_intelligence import CoordinationIntelligenceEngine
 from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 from atlas_core.services.master_library import MasterLibraryService
+from atlas_core.services.bom_review_service import BomReviewService
 
 PROJECT_MANAGER_PAGES = [
     "Mission Control",
@@ -759,6 +760,143 @@ def _build_project_analysis_summary(
         "coordination_findings": coordination_findings,
         "resolver_rows": resolver_rows,
     }
+
+
+def _canonical_bom_items(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if context is None:
+        return []
+
+    cached = _context_cached(context, "canonical_bom_items")
+    if isinstance(cached, list):
+        return cached
+
+    review = context.get("review")
+    snapshot = context.get("intake_snapshot")
+    equipment_rows = _to_rows(list(getattr(review, "equipment", []) or []))
+    rfi_rows = _to_rows(list(getattr(review, "rfi_candidates", []) or []))
+    source_references = _to_rows(list(getattr(snapshot, "source_references", []) or []))
+    resolver_rows = _build_resolver_conflict_rows(
+        _build_engineering_resolver(record=None, context=context)
+    )
+    items = BomReviewService().build_items(
+        equipment_rows=equipment_rows,
+        resolver_rows=resolver_rows,
+        source_references=source_references,
+        rfi_rows=rfi_rows,
+    )
+    rows = [item.to_dict() for item in items]
+    _set_context_cached(context, "canonical_bom_items", rows)
+    return rows
+
+
+def _canonical_bom_metrics(bom_rows: list[dict[str, Any]]) -> dict[str, int]:
+    total = len(bom_rows)
+    complete = sum(
+        1 for item in bom_rows if item.get("completeness_status") == "complete"
+    )
+    conflicting = sum(
+        1
+        for item in bom_rows
+        if item.get("completeness_status") == "conflicting_quantity"
+    )
+    incomplete = sum(
+        1
+        for item in bom_rows
+        if item.get("completeness_status") not in {"complete", "conflicting_quantity"}
+    )
+    return {
+        "total_candidate_bom_lines": total,
+        "complete_lines": complete,
+        "incomplete_lines": incomplete,
+        "conflicting_lines": conflicting,
+        "drawing_only_items": sum(
+            1 for item in bom_rows if item.get("completeness_status") == "drawing_only"
+        ),
+        "specification_only_items": sum(
+            1
+            for item in bom_rows
+            if item.get("completeness_status") == "specification_only"
+        ),
+        "unresolved_items": sum(
+            1 for item in bom_rows if item.get("completeness_status") == "unresolved"
+        ),
+    }
+
+
+def _canonical_bom_export_payload(
+    bom_rows: list[dict[str, Any]],
+) -> tuple[str, str]:
+    ordered = sorted(
+        [dict(item) for item in bom_rows],
+        key=lambda row: _safe_text(row.get("bom_item_id"), ""),
+    )
+
+    headers = [
+        "bom_item_id",
+        "manufacturer",
+        "model",
+        "description",
+        "quantity",
+        "system",
+        "room_or_area",
+        "source_documents",
+        "source_pages",
+        "drawing_references",
+        "specification_references",
+        "confidence",
+        "quantity_confidence",
+        "scope_status",
+        "responsibility",
+        "completeness_status",
+        "warnings",
+        "related_rfi_candidates",
+    ]
+
+    csv_rows = []
+    for row in ordered:
+        csv_rows.append(
+            {
+                "bom_item_id": _safe_text(row.get("bom_item_id"), ""),
+                "manufacturer": _safe_text(row.get("manufacturer"), ""),
+                "model": _safe_text(row.get("model"), ""),
+                "description": _safe_text(row.get("description"), ""),
+                "quantity": _safe_text(row.get("quantity"), ""),
+                "system": _safe_text(row.get("system"), ""),
+                "room_or_area": _safe_text(row.get("room_or_area"), ""),
+                "source_documents": "|".join(sorted(row.get("source_documents") or [])),
+                "source_pages": "|".join(sorted(row.get("source_pages") or [])),
+                "drawing_references": "|".join(
+                    sorted(row.get("drawing_references") or [])
+                ),
+                "specification_references": "|".join(
+                    sorted(row.get("specification_references") or [])
+                ),
+                "confidence": row.get("confidence", 0.0),
+                "quantity_confidence": row.get("quantity_confidence", 0.0),
+                "scope_status": _safe_text(row.get("scope_status"), ""),
+                "responsibility": _safe_text(row.get("responsibility"), ""),
+                "completeness_status": _safe_text(row.get("completeness_status"), ""),
+                "warnings": "|".join(sorted(row.get("warnings") or [])),
+                "related_rfi_candidates": "|".join(
+                    sorted(row.get("related_rfi_candidates") or [])
+                ),
+            }
+        )
+
+    import csv
+    import io
+    import json
+
+    csv_buffer = io.StringIO()
+    writer = csv.DictWriter(csv_buffer, fieldnames=headers)
+    writer.writeheader()
+    writer.writerows(csv_rows)
+
+    json_payload = {
+        "bom_items": csv_rows,
+        "metrics": _canonical_bom_metrics(ordered),
+    }
+    return csv_buffer.getvalue(), json.dumps(json_payload, indent=2, sort_keys=True)
 
 
 def _current_commit() -> str:
@@ -2331,47 +2469,273 @@ def _render_bom_review_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    summary = _build_project_analysis_summary(record, context)
     _render_page_header(
         st,
         "BOM Review",
-        "Review extracted equipment and possible BOM items before downstream estimating work.",
+        "Review canonical candidate BOM lines with completeness status, conflict visibility, and source traceability.",
     )
 
-    cards = st.columns(3)
-    _metric_card(
-        cards[0], "Equipment Items Found", str(summary["equipment_items_found"])
-    )
-    _metric_card(cards[1], "Possible BOM Items", str(summary["possible_bom_items"]))
-    _metric_card(
-        cards[2],
-        "Unresolved Manufacturer/Model References",
-        str(summary["unresolved_manufacturer_model_refs"]),
-    )
-
-    equipment_rows = list(_workspace_objects(context).get("equipment") or [])
-    if not equipment_rows:
+    bom_rows = _canonical_bom_items(context)
+    if not bom_rows:
         st.info(
             "No BOM items available yet. Upload documents and run project analysis first."
         )
         return
 
-    st.dataframe(
-        [
-            {
-                "Equipment ID": item.get("equipment_id"),
-                "Manufacturer": item.get("manufacturer"),
-                "Model": item.get("model"),
-                "Description": item.get("description"),
-                "System": item.get("system"),
-                "Room": item.get("room"),
-                "Status": item.get("current_status"),
-                "Confidence": item.get("confidence"),
-            }
-            for item in equipment_rows
-        ],
+    metrics = _canonical_bom_metrics(bom_rows)
+    cards_top = st.columns(4)
+    _metric_card(
+        cards_top[0],
+        "Total Candidate BOM Lines",
+        str(metrics["total_candidate_bom_lines"]),
+    )
+    _metric_card(cards_top[1], "Complete Lines", str(metrics["complete_lines"]))
+    _metric_card(cards_top[2], "Incomplete Lines", str(metrics["incomplete_lines"]))
+    _metric_card(cards_top[3], "Conflicting Lines", str(metrics["conflicting_lines"]))
+
+    cards_bottom = st.columns(3)
+    _metric_card(
+        cards_bottom[0], "Drawing-only Items", str(metrics["drawing_only_items"])
+    )
+    _metric_card(
+        cards_bottom[1],
+        "Specification-only Items",
+        str(metrics["specification_only_items"]),
+    )
+    _metric_card(cards_bottom[2], "Unresolved Items", str(metrics["unresolved_items"]))
+
+    st.markdown("### Candidate BOM Lines")
+    search_text = st.text_input(
+        "Search BOM lines",
+        key="atlas_bom_search",
+        placeholder="equipment id, manufacturer, model, description, system, room",
+    ).strip()
+
+    filter_cols = st.columns(5)
+    systems = sorted(
+        {
+            _safe_text(item.get("system"), "Unknown")
+            for item in bom_rows
+            if _safe_text(item.get("system"), "")
+        }
+    )
+    rooms = sorted(
+        {
+            _safe_text(item.get("room_or_area"), "Unknown")
+            for item in bom_rows
+            if _safe_text(item.get("room_or_area"), "")
+        }
+    )
+    manufacturers = sorted(
+        {
+            _safe_text(item.get("manufacturer"), "Unknown")
+            for item in bom_rows
+            if _safe_text(item.get("manufacturer"), "")
+        }
+    )
+    completeness_states = sorted(
+        {_safe_text(item.get("completeness_status"), "unresolved") for item in bom_rows}
+    )
+
+    selected_systems = filter_cols[0].multiselect(
+        "System",
+        options=systems,
+        key="atlas_bom_filter_system",
+    )
+    selected_rooms = filter_cols[1].multiselect(
+        "Room",
+        options=rooms,
+        key="atlas_bom_filter_room",
+    )
+    selected_manufacturers = filter_cols[2].multiselect(
+        "Manufacturer",
+        options=manufacturers,
+        key="atlas_bom_filter_manufacturer",
+    )
+    selected_completeness = filter_cols[3].multiselect(
+        "Completeness",
+        options=completeness_states,
+        key="atlas_bom_filter_completeness",
+    )
+    confidence_threshold = filter_cols[4].slider(
+        "Min Confidence",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.0,
+        step=0.05,
+        key="atlas_bom_confidence_threshold",
+    )
+
+    filtered_rows: list[dict[str, Any]] = []
+    for row in bom_rows:
+        if (
+            selected_systems
+            and _safe_text(row.get("system"), "") not in selected_systems
+        ):
+            continue
+        if (
+            selected_rooms
+            and _safe_text(row.get("room_or_area"), "") not in selected_rooms
+        ):
+            continue
+        if (
+            selected_manufacturers
+            and _safe_text(row.get("manufacturer"), "") not in selected_manufacturers
+        ):
+            continue
+        if (
+            selected_completeness
+            and _safe_text(row.get("completeness_status"), "")
+            not in selected_completeness
+        ):
+            continue
+        confidence = row.get("confidence")
+        numeric_confidence = (
+            float(confidence) if isinstance(confidence, (int, float)) else 0.0
+        )
+        if numeric_confidence < confidence_threshold:
+            continue
+        if search_text and search_text.lower() not in str(row).lower():
+            continue
+        filtered_rows.append(row)
+
+    if not filtered_rows:
+        st.info("No BOM lines match the current search and filters.")
+        return
+
+    view_mode = st.radio(
+        "View",
+        options=["Table", "Group by System", "Group by Room", "Group by Manufacturer"],
+        horizontal=True,
+        key="atlas_bom_view_mode",
+    )
+
+    if view_mode == "Table":
+        st.dataframe(
+            [
+                {
+                    "BOM Item ID": row.get("bom_item_id"),
+                    "Manufacturer": row.get("manufacturer"),
+                    "Model": row.get("model"),
+                    "Description": row.get("description"),
+                    "Quantity": row.get("quantity"),
+                    "System": row.get("system"),
+                    "Room/Area": row.get("room_or_area"),
+                    "Confidence": row.get("confidence"),
+                    "Quantity Confidence": row.get("quantity_confidence"),
+                    "Completeness": row.get("completeness_status"),
+                    "Scope Status": row.get("scope_status"),
+                }
+                for row in filtered_rows
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        group_key = "system"
+        group_label = "System"
+        if view_mode == "Group by Room":
+            group_key = "room_or_area"
+            group_label = "Room"
+        elif view_mode == "Group by Manufacturer":
+            group_key = "manufacturer"
+            group_label = "Manufacturer"
+
+        grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in filtered_rows:
+            grouped[_safe_text(row.get(group_key), "Unknown")].append(row)
+
+        st.dataframe(
+            [
+                {
+                    group_label: name,
+                    "Line Count": len(rows),
+                    "Complete": sum(
+                        1
+                        for item in rows
+                        if item.get("completeness_status") == "complete"
+                    ),
+                    "Conflicting": sum(
+                        1
+                        for item in rows
+                        if item.get("completeness_status") == "conflicting_quantity"
+                    ),
+                    "Incomplete": sum(
+                        1
+                        for item in rows
+                        if item.get("completeness_status")
+                        not in {"complete", "conflicting_quantity"}
+                    ),
+                }
+                for name, rows in sorted(grouped.items())
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown("### Line Evidence")
+    selected_bom_id = st.selectbox(
+        "Select BOM line",
+        options=[_safe_text(item.get("bom_item_id"), "") for item in filtered_rows],
+        key="atlas_bom_selected_item",
+    )
+    selected_row = next(
+        (row for row in filtered_rows if row.get("bom_item_id") == selected_bom_id),
+        None,
+    )
+    if selected_row is not None:
+        st.dataframe(
+            [
+                {
+                    "BOM Item ID": selected_row.get("bom_item_id"),
+                    "Completeness": selected_row.get("completeness_status"),
+                    "Warnings": ", ".join(list(selected_row.get("warnings") or []))
+                    or "None",
+                    "Related RFIs": ", ".join(
+                        list(selected_row.get("related_rfi_candidates") or [])
+                    )
+                    or "None",
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.dataframe(
+            [
+                {
+                    "Source Document": source_file,
+                    "Page": page,
+                    "Drawing References": ", ".join(
+                        list(selected_row.get("drawing_references") or [])
+                    ),
+                    "Specification References": ", ".join(
+                        list(selected_row.get("specification_references") or [])
+                    ),
+                }
+                for source_file in list(selected_row.get("source_documents") or ["n/a"])
+                for page in list(selected_row.get("source_pages") or ["n/a"])
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown("### Export")
+    export_csv, export_json = _canonical_bom_export_payload(filtered_rows)
+    export_cols = st.columns(2)
+    export_cols[0].download_button(
+        "Download Candidate BOM CSV",
+        data=export_csv,
+        file_name=f"{record.project.project_id}_candidate_bom.csv",
+        mime="text/csv",
         use_container_width=True,
-        hide_index=True,
+    )
+    export_cols[1].download_button(
+        "Download Candidate BOM JSON",
+        data=export_json,
+        file_name=f"{record.project.project_id}_candidate_bom.json",
+        mime="application/json",
+        use_container_width=True,
     )
 
 

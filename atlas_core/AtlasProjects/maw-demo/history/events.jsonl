@@ -232,3 +232,13 @@
 {"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:50:29.603563+00:00"}
 {"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-08T03:50:29.664082+00:00"}
 {"event_type": "workspace_opened", "payload": {"last_open_page": "Mission Control"}, "timestamp": "2026-07-08T03:50:29.695496+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-11T04:08:59.016231+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-11T04:08:59.017208+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-11T04:09:17.258356+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-11T04:09:17.334422+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-11T04:09:19.348384+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-11T04:09:19.413323+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-11T04:09:22.532019+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-11T04:09:22.598359+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-11T04:09:30.660632+00:00"}
+{"event_type": "review_executed", "payload": {"project_id": "maw-demo", "source_mode": "seed_fixture_fallback"}, "timestamp": "2026-07-11T04:09:30.728108+00:00"}
