@@ -2,13 +2,13 @@
   "atlas_version": "0.1.0",
   "checksum_summary": {
     "documents": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-    "history": "4c67b3aae13009489871aea7b2112d9117525cc1",
-    "metadata.json": "2e8111a27f093f30d6dd650ca6205a0b71095230",
+    "history": "5c1533a84b7a75dc21d362ef89cb93968eb23709",
+    "metadata.json": "90ca21eb98a0327e97dd507b54de2f4df380c37b",
     "project.json": "ecef24e0a05ea63f954e00a0cf0916e6fe24eb16",
-    "review": "a36e9f8eb618133a336b651ee0c9ba401651bb50",
-    "workspace.json": "0715f21d9f4ec1adf8def2cfc77e03fb1399cf27"
+    "review": "09768385212d040d0111789e1ae175be6d8ef2c3",
+    "workspace.json": "e74bf0f4b07ebc6bf9c198502a96fd5c79f34957"
   },
-  "created_at": "2026-07-11T04:09:30.684336+00:00",
+  "created_at": "2026-07-08T03:50:29.633905+00:00",
   "document_counts": {
     "addenda": 0,
     "drawings": 0,
@@ -17,12 +17,12 @@
     "schedules": 0,
     "specifications": 0
   },
-  "history_event_count": 244,
+  "history_event_count": 234,
   "intelligence_artifact_counts": {
     "engineering_intelligence": 1,
     "knowledge_graph": 1
   },
-  "last_opened_at": "2026-07-11T04:09:30.684551+00:00",
+  "last_opened_at": "2026-07-08T03:50:29.634074+00:00",
   "lifecycle_stage": "intake",
   "owner": "MAW Music Education Center Plan Review",
   "project_id": "maw-demo",
@@ -40,5 +40,5 @@
   "schema_version": "1.0",
   "status": "intake",
   "storage_version": "1.0",
-  "updated_at": "2026-07-11T04:09:30.684551+00:00"
+  "updated_at": "2026-07-08T03:50:29.690654+00:00"
 }

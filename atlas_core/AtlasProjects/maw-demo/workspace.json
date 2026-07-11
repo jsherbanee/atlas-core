@@ -1,10 +1,10 @@
 {
   "archived": false,
-  "created_at": "2026-07-11T04:09:30.684336+00:00",
+  "created_at": "2026-07-08T03:50:29.633905+00:00",
   "import_summary": {},
   "intake_snapshot_path": null,
   "is_reference": false,
-  "last_opened_at": "2026-07-11T04:09:30.684551+00:00",
+  "last_opened_at": "2026-07-08T03:50:29.634074+00:00",
   "metadata": {},
   "package_location": ".",
   "pinned": false,
@@ -35,7 +35,7 @@
   "source_label": "Seed fixture fallback",
   "source_mode": "seed_fixture_fallback",
   "source_path": ".",
-  "updated_at": "2026-07-11T04:09:30.684551+00:00",
+  "updated_at": "2026-07-08T03:50:29.690654+00:00",
   "warnings": [
     "No supported files were found in .. Using curated seed fixture data instead of the full drawing/specification package.",
     "This view is using curated seed fixture data, not the full drawing/specification package."
