@@ -4,47 +4,22 @@
 Provide a local project-analysis workspace for estimators and reviewers to create or open a project, upload documents, run analysis, review BOM and risk conclusions, and export a concise internal report.
 
 This interface is local-only:
-- No authentication.
-- No cloud persistence.
 - Local file-backed project repository persistence under `AtlasProjects/`.
 - No procurement/RFQ/submittal/invoice/execution/closeout/vendor communication workflows.
 
 Atlas Workspace v1 (Sprint 8) launches into a persistent interactive engineering shell.
 
-Shell layout:
-- Header
-- Sidebar navigation
-- Main content
-- Context panel
 - Status bar
 
 The shell remains visible while page content changes.
 
-Header includes:
-- Atlas logo button (returns to Mission Control)
-- History shortcut
-- Settings
 
 System metadata (version/commit/stage/status) remains available in the status bar.
 
-## Atlas Intake (Local)
-The GUI now supports local drag-and-drop intake for estimator bid packages.
-
-Atlas Intake panel:
 - Drag your project here
 - Supported formats: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, JPEG, PNG, TIFF, TXT, RTF, JSON, ZIP
-- Or browse files
-
-Uploaded files are staged under:
-- outputs/uploads/<session_id>
-
 Files are automatically classified into:
 - drawings/
-- specifications/
-- schedules/
-- addenda/
-- images/
-- metadata/
 - unsupported/
 
 After classification, Atlas runs deterministic intake, saves the workspace locally, and then executes the existing project review pipeline.
@@ -52,56 +27,19 @@ After classification, Atlas runs deterministic intake, saves the workspace local
 ## Primary Workflow
 The primary user workflow is:
 
-1. Create or open a project
-2. Upload drawings, specifications, schedules, addenda, and supporting documents
-3. Run project analysis
-4. Review extracted BOM
-5. Review missing or undeveloped scope
-6. Review engineering and commercial risks
-7. Review recommended next actions
-8. Export a concise internal report
 
 Primary workspace navigation includes:
-- Project Summary
-- Documents
-- BOM Review
-- Scope & Risk
-- Engineering Review
-- Reports
-
 Project-management pages remain available separately for create/open/manage tasks.
 
-Advanced or unfinished functionality is intentionally hidden from the primary workflow and moved under `Advanced` navigation.
-Examples include:
-- Knowledge Graph
 - Relationship Explorer
 - Resolver internals
 - Detailed history and evidence drill-down
 - Experimental or low-level engineering workspaces
 
-## Data Sources
-The workspace supports two explicit source modes.
-
-Reference Project:
-- Music Academy of the West (Reference Project)
-- Default behavior attempts real package intake from examples/music_academy_of_the_west
-- Data Source label shows `Real package intake` when loaded from full package files
-- If package is missing/incomplete/unreadable, Atlas falls back to seed fixture data
 - Data Source label shows `Seed fixture fallback` for fallback mode
 - Fallback mode explicitly warns that curated fixture data is in use
-
-Uploaded Project:
-- User-provided files or ZIP package from Atlas Intake
-- Banner shows detected project name when available
-- Banner shows package location
-- Import summary table is shown
-- Extraction diagnostics are shown (pages with/without embedded text, files requiring OCR)
-- Per-file extraction status is shown (`extracted`, `partial`, `requires_ocr`, `unsupported`, `failed`)
 - Extraction warnings are shown
 
-MAW remains reference data only and is not product-specific business logic.
-
-## MAW Package Placement
 Place the full MAW package under:
 - examples/music_academy_of_the_west/
 - examples/music_academy_of_the_west/metadata.json

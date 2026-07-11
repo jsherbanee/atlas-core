@@ -15,7 +15,7 @@ It represents the current implementation state of Atlas Core.
 - [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)
 
 ## Current State
-Atlas Core is in active Phase 2 Bid Intelligence development with a stabilization baseline candidate prepared and a new persistent Atlas workspace shell in progress.
+Atlas Core is in active Phase 2 Bid Intelligence development with a stabilization baseline candidate prepared and a project-specific Atlas workspace shell implemented.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
@@ -40,9 +40,10 @@ Current MAW reference-project behavior:
 - GUI labels explicitly indicate whether Reference Project is using Real package intake or Seed fixture fallback.
 
 Current workspace behavior:
-- Atlas launches to a Home screen with New Project, Open Project, and Recent Projects actions.
+- Atlas uses an Application Workspace for Mission Control, project management, knowledge, reports, and administration.
+- Opening a project switches Atlas into a dedicated Project Workspace with project-specific navigation.
 - Local project records are stored under AtlasProjects/.
-- The active project view uses left navigation for overview, brief, files, readiness, revision, assumptions, and evidence sections.
+- Project Workspace emphasizes Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate (advisory), Notebook, Reports, and project details/settings pages.
 
 ## Latest Completed Feature
 - Estimator Brief Enhancements (deterministic executive summary, prioritized reviewer actions, and evidence traceability)

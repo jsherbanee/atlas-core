@@ -217,7 +217,69 @@ ALL_ACTIVE_PAGES = (
     + BID_INTELLIGENCE_PAGES
     + REPORT_PAGES
     + SETTINGS_PAGES
+    + [
+        "Knowledge",
+        "Administration",
+        "Estimate",
+        "Notebook",
+        "Timeline",
+        "Relationships",
+        "Project Metadata",
+        "Repository",
+        "Workspace Settings",
+        "Schedules",
+        "Addenda",
+    ]
 )
+
+APPLICATION_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
+    (
+        "Application Workspace",
+        [
+            ("Mission Control", "Mission Control"),
+            ("Projects", "Projects"),
+            ("Knowledge", "Knowledge"),
+            ("Reports", "Reports"),
+            ("Administration", "Administration"),
+        ],
+    )
+]
+
+PROJECT_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
+    (
+        "Project",
+        [
+            ("Overview", "Overview"),
+            ("Documents", "Documents"),
+            ("BOM Review", "BOM Review"),
+            ("Scope & Risk", "Scope & Risk"),
+            ("Engineering Review", "Engineering Review"),
+            ("Estimate", "Estimate"),
+            ("Notebook", "Notebook"),
+            ("Reports", "Reports"),
+        ],
+    ),
+    (
+        "Project Details",
+        [
+            ("Drawings", "Drawings"),
+            ("Specifications", "Specifications"),
+            ("Schedules", "Schedules"),
+            ("Addenda", "Addenda"),
+            ("Evidence", "Evidence"),
+            ("Timeline", "Timeline"),
+            ("Relationships", "Relationships"),
+        ],
+    ),
+    (
+        "Project Settings",
+        [
+            ("Project Metadata", "Project Metadata"),
+            ("Repository", "Repository"),
+            ("Workspace Settings", "Workspace Settings"),
+        ],
+    ),
+]
 
 SUPPORTED_UPLOAD_TYPES = [
     "pdf",
@@ -1204,21 +1266,17 @@ def _load_context_for_record(record: ProjectWorkspaceRecord) -> dict[str, Any] |
 def _ensure_active_workspace(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    if st.session_state.get("atlas_active_workspace_id"):
+    active_id = st.session_state.get("atlas_active_workspace_id")
+    if not active_id:
         return
 
-    recent = workspace_service.list_recent_workspaces(limit=1)
-    if recent:
-        st.session_state["atlas_active_workspace_id"] = recent[0].workspace_id
-        return
-
-    context = build_reference_project_context(DEFAULT_MAW_REFERENCE_PACKAGE)
-    record = _build_record_from_context(context)
-    record.is_reference = True
-    record.source_label = "Reference Project"
-    workspace_service.save_record(record)
-    workspace_service.set_reference_project(record.workspace_id, reference=True)
-    st.session_state["atlas_active_workspace_id"] = record.workspace_id
+    exists = any(
+        item.workspace_id == active_id
+        for item in workspace_service.list_workspaces(include_archived=True, limit=2000)
+    )
+    if not exists:
+        st.session_state["atlas_active_workspace_id"] = None
+        st.session_state["atlas_active_page"] = "Mission Control"
 
 
 def _active_record(
@@ -1312,7 +1370,25 @@ def _apply_selector_choice(
         st.session_state["atlas_active_page"] = "Open Existing Project"
 
 
-def _group_for_page(page: str) -> str:
+def _navigation_groups(
+    record: ProjectWorkspaceRecord | None,
+) -> list[tuple[str, list[tuple[str, str]]]]:
+    if record is None:
+        return APPLICATION_NAV_GROUPS
+    return PROJECT_NAV_GROUPS
+
+
+def _group_for_page(page: str, record: ProjectWorkspaceRecord | None) -> str:
+    if record is None:
+        for group_name, entries in APPLICATION_NAV_GROUPS:
+            if page in [item[1] for item in entries]:
+                return group_name
+        return "Application Workspace"
+
+    for group_name, entries in PROJECT_NAV_GROUPS:
+        if page in [item[1] for item in entries]:
+            return group_name
+
     if page == "Mission Control":
         return "Mission Control"
     if page in WORKFLOW_PAGES:
@@ -1336,38 +1412,100 @@ def _group_for_page(page: str) -> str:
         return "Reports"
     if page in SETTINGS_PAGES:
         return "Advanced"
-    return "Workspace"
+    return "Project Workspace"
 
 
-def _breadcrumb(record: ProjectWorkspaceRecord, page: str) -> str:
+def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
     if page == "Mission Control":
-        return "Atlas / Mission Control"
-    return f"Atlas / {record.project.name} / {_group_for_page(page)} / {page}"
+        return "Atlas / Application Workspace / Mission Control"
+    if record is None:
+        return f"Atlas / Application Workspace / {_group_for_page(page, None)} / {page}"
+    return (
+        f"Atlas / Project Workspace / {record.project.name} / "
+        f"{_group_for_page(page, record)} / {page}"
+    )
 
 
 def _render_header(
     st: Any,
     workspace_service: ProjectWorkspaceService,
-    record: ProjectWorkspaceRecord,
+    record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> None:
-    cols = st.columns([2.2, 0.9, 0.9])
+    del workspace_service
+    current_page = _safe_text(
+        st.session_state.get("atlas_active_page"), "Mission Control"
+    )
+
+    cols = st.columns([2.0, 1.3, 1.3, 1.3])
     if cols[0].button("Atlas", use_container_width=True, type="secondary"):
         st.session_state["atlas_active_page"] = "Mission Control"
         st.rerun()
 
-    if cols[2].button("History", use_container_width=True):
-        st.session_state["atlas_active_page"] = "History"
-        st.rerun()
-    if cols[2].button("Settings", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Application Settings"
+    if cols[1].button("Return to Mission Control", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Mission Control"
         st.rerun()
 
+    if cols[2].button("Timeline", use_container_width=True):
+        if record is not None:
+            st.session_state["atlas_active_page"] = "Timeline"
+        else:
+            st.session_state["atlas_active_page"] = "Reports"
+        st.rerun()
 
-def _nav_buttons(st: Any, host: Any, mode: str) -> None:
+    if cols[3].button("Settings", use_container_width=True):
+        st.session_state["atlas_active_page"] = (
+            "Workspace Settings" if record is not None else "Administration"
+        )
+        st.rerun()
+
+    if record is None:
+        st.caption(f"Application Workspace · Current Page: {current_page}")
+        return
+
+    summary = _build_project_analysis_summary(record, context)
+    review = context.get("review") if context else None
+    confidence = getattr(review, "confidence", None)
+    confidence_text = "n/a"
+    if isinstance(confidence, (int, float)):
+        confidence_text = f"{int(confidence * 100)}%"
+    elif confidence is not None:
+        confidence_text = _safe_text(confidence, "n/a")
+
+    st.dataframe(
+        [
+            {
+                "Project Name": record.project.name,
+                "Customer": _safe_text(summary.get("customer"), "n/a"),
+                "Lifecycle Stage": _project_stage(record),
+                "Current Status": _project_status(context),
+                "Last Analysis": _safe_text(record.updated_at, "n/a"),
+                "Confidence": confidence_text,
+                "Primary Action": _safe_text(
+                    summary.get("recommended_next_action"),
+                    "Review project overview",
+                ),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+def _nav_buttons(
+    st: Any,
+    host: Any,
+    mode: str,
+    record: ProjectWorkspaceRecord | None,
+) -> None:
     active_page = st.session_state.get("atlas_active_page", "Mission Control")
+    nav_groups = (
+        APPLICATION_NAV_GROUPS
+        if active_page == "Mission Control"
+        else _navigation_groups(record)
+    )
 
-    for group_name, entries in NAV_DROPDOWN_GROUPS:
+    for group_name, entries in nav_groups:
         with host.expander(
             group_name,
             expanded=active_page in [item[1] for item in entries],
@@ -1402,7 +1540,8 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
         "selected_specification": selected_specification,
         "expanded_navigation": [
             _group_for_page(
-                str(st.session_state.get("atlas_active_page") or "Mission Control")
+                str(st.session_state.get("atlas_active_page") or "Mission Control"),
+                None,
             )
         ],
         "filters": {
@@ -1449,8 +1588,8 @@ def _restore_workspace_state(
         return
 
     restored_page = str(state.get("last_open_page") or "Mission Control")
-    if restored_page == "Timeline":
-        restored_page = "History"
+    if restored_page == "History":
+        restored_page = "Timeline"
     st.session_state["atlas_active_page"] = restored_page
 
     filters = dict(state.get("filters") or {})
@@ -1831,17 +1970,14 @@ def _build_mission_control_payload(
 def _render_home_page(
     st: Any,
     workspace_service: ProjectWorkspaceService,
-    record: ProjectWorkspaceRecord,
+    record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
     mission_control_payload: dict[str, Any] | None = None,
 ) -> None:
-    del workspace_service, mission_control_payload
-    summary = _build_project_analysis_summary(record, context)
-
     _render_page_header(
         st,
-        "Atlas Project Analysis",
-        "Create or open a project, upload documents, run analysis, review findings, and export a concise internal report.",
+        "Mission Control",
+        "Application-level workspace for project selection, portfolio awareness, and administration.",
     )
 
     action_cols = st.columns(3)
@@ -1859,45 +1995,142 @@ def _render_home_page(
         st.session_state["atlas_active_page"] = "Projects"
         st.rerun()
 
-    st.markdown("### Current Project")
+    st.markdown("### Application Areas")
     st.dataframe(
         [
+            {"Area": "Mission Control", "Purpose": "Portfolio-level action center."},
             {
-                "Project": summary["project_name"],
-                "Customer": summary["customer"],
-                "Project Type": summary["project_type"],
-                "Analysis Status": summary["analysis_status"],
-                "Recommended Next Action": summary["recommended_next_action"],
-            }
+                "Area": "Projects",
+                "Purpose": "Create, open, and manage project workspaces.",
+            },
+            {"Area": "Knowledge", "Purpose": "Cross-project references and standards."},
+            {"Area": "Reports", "Purpose": "Cross-project reporting and signals."},
+            {
+                "Area": "Administration",
+                "Purpose": "Workspace preferences and repository controls.",
+            },
         ],
         use_container_width=True,
         hide_index=True,
     )
 
-    cards = st.columns(4)
-    _metric_card(cards[0], "Documents", str(summary["document_count"]))
-    _metric_card(cards[1], "BOM Items", str(summary["bom_item_count"]))
-    _metric_card(cards[2], "Scope Issues", str(summary["unresolved_scope_issue_count"]))
-    _metric_card(cards[3], "High-Risk Issues", str(summary["high_risk_issue_count"]))
+    if record is not None:
+        summary = _build_project_analysis_summary(record, context)
+        st.markdown("### Active Project Snapshot")
+        st.dataframe(
+            [
+                {
+                    "Project": summary["project_name"],
+                    "Customer": summary["customer"],
+                    "Project Type": summary["project_type"],
+                    "Analysis Status": summary["analysis_status"],
+                    "Recommended Next Action": summary["recommended_next_action"],
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        if st.button(
+            "Open Project Workspace", type="primary", use_container_width=True
+        ):
+            st.session_state["atlas_active_page"] = "Overview"
+            st.rerun()
+    else:
+        st.info(
+            "No project is open. Open a project to enter Project Workspace navigation."
+        )
 
-    if st.button("Open Project Summary", type="primary", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Project Summary"
-        st.rerun()
+    if mission_control_payload:
+        st.markdown("### Portfolio Signals")
+        _render_mission_control_panels(st, mission_control_payload)
 
-    st.markdown("### Workflow")
+
+def _render_application_knowledge_page(
+    st: Any, workspace_service: ProjectWorkspaceService
+) -> None:
+    _render_page_header(
+        st,
+        "Knowledge",
+        "Application-level knowledge and reusable references across project workspaces.",
+    )
+
+    references = workspace_service.list_reference_workspaces()[:20]
     st.dataframe(
         [
-            {"Step": "1", "Action": "Create or open a project"},
             {
-                "Step": "2",
-                "Action": "Upload drawings, specifications, schedules, addenda, and supporting documents",
+                "Reference Project": item.project.name,
+                "Project ID": item.project.project_id,
+                "Updated": item.updated_at,
+            }
+            for item in references
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.caption(
+        "Open a project to review project-specific Drawings, Specifications, Relationships, and Evidence."
+    )
+
+
+def _render_application_reports_page(
+    st: Any, workspace_service: ProjectWorkspaceService
+) -> None:
+    _render_page_header(
+        st,
+        "Reports",
+        "Application-level project pipeline and health reporting.",
+    )
+    rows = _collect_workspace_signals(workspace_service, limit=30)
+    if not rows:
+        st.info("No projects available for application-level reporting.")
+        return
+    st.dataframe(
+        [
+            {
+                "Project": item.get("project"),
+                "Status": item.get("status"),
+                "Stage": item.get("stage"),
+                "Reason": item.get("reason"),
+                "Documents": item.get("documents"),
+                "Review Artifacts": item.get("review_artifacts"),
+                "Updated": item.get("updated_at"),
+            }
+            for item in rows
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+def _render_application_administration_page(
+    st: Any, workspace_service: ProjectWorkspaceService
+) -> None:
+    _render_page_header(
+        st,
+        "Administration",
+        "Application-level settings and local repository controls.",
+    )
+    st.dataframe(
+        [
+            {
+                "Setting": "Workspace Root",
+                "Value": str(workspace_service.workspace_root),
             },
-            {"Step": "3", "Action": "Run analysis"},
-            {"Step": "4", "Action": "Review extracted BOM"},
-            {"Step": "5", "Action": "Review missing or undeveloped scope"},
-            {"Step": "6", "Action": "Review engineering and commercial risks"},
-            {"Step": "7", "Action": "Review recommended next actions"},
-            {"Step": "8", "Action": "Export a concise internal report"},
+            {
+                "Setting": "Layout Mode",
+                "Value": _safe_text(
+                    st.session_state.get("atlas_layout_mode"), "Desktop"
+                ),
+            },
+            {
+                "Setting": "Navigation Behavior",
+                "Value": (
+                    "Persistent sidebar"
+                    if _safe_text(st.session_state.get("atlas_layout_mode"), "Desktop")
+                    == "Desktop"
+                    else "Collapsed navigation"
+                ),
+            },
         ],
         use_container_width=True,
         hide_index=True,
@@ -1954,7 +2187,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         action_cols = st.columns(4)
         if action_cols[0].button("Open Selected Project", type="primary"):
             st.session_state["atlas_active_workspace_id"] = selected.workspace_id
-            st.session_state["atlas_active_page"] = "Project Summary"
+            st.session_state["atlas_active_page"] = "Overview"
             st.rerun()
 
         pin_label = "Unpin" if selected.pinned else "Pin"
@@ -2035,270 +2268,75 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
                 st.session_state["atlas_active_page"] = "Mission Control"
             st.rerun()
 
-    def _render_project_summary_page(
-        st: Any,
-        record: ProjectWorkspaceRecord,
-        context: dict[str, Any] | None,
-    ) -> None:
-        summary = _build_project_analysis_summary(record, context)
-        _render_page_header(
-            st,
-            "Project Summary",
-            "Project health, analysis status, and the next recommended action.",
-        )
 
-        cards = st.columns(5)
-        _metric_card(cards[0], "Document Count", str(summary["document_count"]))
-        _metric_card(cards[1], "Analysis Status", summary["analysis_status"])
-        _metric_card(cards[2], "BOM Items", str(summary["bom_item_count"]))
-        _metric_card(
-            cards[3], "Scope Issues", str(summary["unresolved_scope_issue_count"])
-        )
-        _metric_card(
-            cards[4], "High-Risk Issues", str(summary["high_risk_issue_count"])
-        )
+def _render_project_folder_page(
+    st: Any,
+    context: dict[str, Any] | None,
+    folder_name: str,
+    title: str,
+) -> None:
+    _render_page_header(
+        st,
+        title,
+        f"Project document explorer for {folder_name.lower()} files.",
+    )
+    folders = _files_by_folder(context)
+    rows = list(folders.get(folder_name, []))
+    if not rows:
+        st.info(f"No files are currently classified under {folder_name}.")
+        return
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+    file_labels = [item.get("filename") for item in rows]
+    selected_file = st.selectbox("Select file", options=file_labels)
+    selected = next(item for item in rows if item.get("filename") == selected_file)
+    _set_context_selection(st, "file", {"folder": folder_name, "file": selected})
 
-        st.dataframe(
-            [
-                {
-                    "Project Name": summary["project_name"],
-                    "Customer": summary["customer"],
-                    "Project Type": summary["project_type"],
-                    "Documents Requiring OCR": summary["documents_requiring_ocr"],
-                    "Recommended Next Action": summary["recommended_next_action"],
-                }
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
 
-        if st.button("Run Project Analysis", type="primary", use_container_width=True):
-            st.session_state["atlas_active_page"] = "Documents"
-            st.rerun()
+def _render_estimate_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    _render_page_header(
+        st,
+        "Estimate",
+        "Advisory labor and preliminary cost coverage only. No proposal generation or financial records.",
+    )
+    review = context.get("review") if context else None
+    labor_estimate = getattr(review, "labor_estimate", None) if review else None
+    bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+    known_cost_lines = sum(1 for row in bom_rows if row.get("known_cost") is not None)
+    total_lines = len(bom_rows)
 
-        if context is None:
-            st.info(
-                "Upload project documents and run analysis to populate BOM, scope, risk, and reporting results."
-            )
-            return
-
-        st.markdown("### Analysis Result Summary")
-        st.dataframe(
-            [
-                {
-                    "Equipment Items Found": summary["equipment_items_found"],
-                    "Possible BOM Items": summary["possible_bom_items"],
-                    "Scope Gaps": summary["scope_gaps"],
-                    "Quantity Conflicts": summary["quantity_conflicts"],
-                    "Responsibility Ambiguities": summary["responsibility_ambiguities"],
-                    "Missing Specifications": summary["missing_specifications"],
-                    "Unresolved Manufacturer/Model References": summary[
-                        "unresolved_manufacturer_model_refs"
-                    ],
-                }
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-
-    def _render_bom_review_page(
-        st: Any,
-        record: ProjectWorkspaceRecord,
-        context: dict[str, Any] | None,
-    ) -> None:
-        summary = _build_project_analysis_summary(record, context)
-        _render_page_header(
-            st,
-            "BOM Review",
-            "Review extracted equipment and possible BOM items before downstream estimating work.",
-        )
-
-        cards = st.columns(3)
-        _metric_card(
-            cards[0], "Equipment Items Found", str(summary["equipment_items_found"])
-        )
-        _metric_card(cards[1], "Possible BOM Items", str(summary["possible_bom_items"]))
-        _metric_card(
-            cards[2],
-            "Unresolved Manufacturer/Model References",
-            str(summary["unresolved_manufacturer_model_refs"]),
-        )
-
-        equipment_rows = list(_workspace_objects(context).get("equipment") or [])
-        if not equipment_rows:
-            st.info(
-                "No BOM items available yet. Upload documents and run project analysis first."
-            )
-            return
-
-        st.dataframe(
-            [
-                {
-                    "Equipment ID": item.get("equipment_id"),
-                    "Manufacturer": item.get("manufacturer"),
-                    "Model": item.get("model"),
-                    "Description": item.get("description"),
-                    "System": item.get("system"),
-                    "Room": item.get("room"),
-                    "Status": item.get("current_status"),
-                    "Confidence": item.get("confidence"),
-                }
-                for item in equipment_rows
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-
-    def _render_scope_risk_page(
-        st: Any,
-        record: ProjectWorkspaceRecord,
-        context: dict[str, Any] | None,
-    ) -> None:
-        summary = _build_project_analysis_summary(record, context)
-        _render_page_header(
-            st,
-            "Scope & Risk",
-            "Review missing scope, commercial risk, and unresolved conflicts before estimate release.",
-        )
-
-        cards = st.columns(4)
-        _metric_card(cards[0], "Scope Gaps", str(summary["scope_gaps"]))
-        _metric_card(
-            cards[1], "High-Risk Issues", str(summary["high_risk_issue_count"])
-        )
-        _metric_card(cards[2], "Quantity Conflicts", str(summary["quantity_conflicts"]))
-        _metric_card(
-            cards[3],
-            "Responsibility Ambiguities",
-            str(summary["responsibility_ambiguities"]),
-        )
-
-        review = context.get("review") if context else None
-        readiness = getattr(review, "readiness", None) if review is not None else None
-        blockers = list(getattr(readiness, "blocking_issues", []) or [])
-        st.markdown("### Unresolved Scope Issues")
-        if blockers:
-            st.dataframe(
-                [{"Issue": item} for item in blockers],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.info("No unresolved scope issues detected.")
-
-        st.markdown("### High-Risk Issues")
-        if summary["risk_rows"]:
-            st.dataframe(
-                summary["risk_rows"][:12], use_container_width=True, hide_index=True
-            )
-        else:
-            st.info("No high-risk issues detected.")
-
-        missing_spec_rows = [
+    st.dataframe(
+        [
             {
-                "Equipment ID": item.get("equipment_id"),
-                "Manufacturer": item.get("manufacturer"),
-                "Model": item.get("model"),
-                "System": item.get("system"),
+                "Project": record.project.name,
+                "Total BOM Lines": total_lines,
+                "Lines With Known Cost": known_cost_lines,
+                "Preliminary Cost Coverage": (
+                    f"{int((known_cost_lines / total_lines) * 100)}%"
+                    if total_lines
+                    else "0%"
+                ),
+                "Labor Confidence": _safe_text(
+                    getattr(labor_estimate, "confidence", None),
+                    "n/a",
+                ),
+                "Estimate Mode": "Advisory",
             }
-            for item in list(_workspace_objects(context).get("equipment") or [])
-            if not list(item.get("specification_references") or [])
-        ]
-        st.markdown("### Missing Specifications")
-        if missing_spec_rows:
-            st.dataframe(
-                missing_spec_rows[:12], use_container_width=True, hide_index=True
-            )
-        else:
-            st.info("No missing specification links detected.")
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
 
-    def _render_engineering_review_page(
-        st: Any,
-        record: ProjectWorkspaceRecord,
-        context: dict[str, Any] | None,
-    ) -> None:
-        summary = _build_project_analysis_summary(record, context)
-        _render_page_header(
-            st,
-            "Engineering Review",
-            "Review engineering conclusions, recommended next actions, and traceable unresolved conflicts.",
-        )
-
+    if labor_estimate is not None and hasattr(labor_estimate, "to_dict"):
+        st.markdown("### Labor Detail")
         st.dataframe(
-            [
-                {
-                    "Equipment Items Found": summary["equipment_items_found"],
-                    "Possible BOM Items": summary["possible_bom_items"],
-                    "Scope Gaps": summary["scope_gaps"],
-                    "Quantity Conflicts": summary["quantity_conflicts"],
-                    "Responsibility Ambiguities": summary["responsibility_ambiguities"],
-                    "Missing Specifications": summary["missing_specifications"],
-                    "Unresolved Manufacturer/Model References": summary[
-                        "unresolved_manufacturer_model_refs"
-                    ],
-                }
-            ],
-            use_container_width=True,
-            hide_index=True,
+            [labor_estimate.to_dict()], use_container_width=True, hide_index=True
         )
-
-        st.markdown("### Recommended Next Actions")
-        if summary["recommended_actions"]:
-            st.dataframe(
-                summary["recommended_actions"][:12],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.dataframe(
-                [{"action": summary["recommended_next_action"]}],
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        unresolved_rows = [
-            row
-            for row in summary["resolver_rows"]
-            if _contains_any(row.get("field"), ["manufacturer", "model", "quantity"])
-        ]
-        st.markdown("### Unresolved Engineering References")
-        if unresolved_rows:
-            st.dataframe(
-                unresolved_rows[:12], use_container_width=True, hide_index=True
-            )
-        else:
-            st.info(
-                "No unresolved engineering reference conflicts are currently detected."
-            )
-
-    def _render_workflow_reports_page(
-        st: Any,
-        record: ProjectWorkspaceRecord,
-        context: dict[str, Any] | None,
-    ) -> None:
-        summary = _build_project_analysis_summary(record, context)
-        _render_page_header(
-            st,
-            "Reports",
-            "Export a concise internal report after BOM, scope, risk, and engineering review are complete.",
-        )
-
-        st.dataframe(
-            [
-                {
-                    "Project": summary["project_name"],
-                    "Analysis Status": summary["analysis_status"],
-                    "BOM Items": summary["bom_item_count"],
-                    "Scope Issues": summary["unresolved_scope_issue_count"],
-                    "High-Risk Issues": summary["high_risk_issue_count"],
-                    "Recommended Next Action": summary["recommended_next_action"],
-                }
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        _render_reports_page(st, "Reports", context)
+    else:
+        st.info("No labor estimate output is available yet.")
 
 
 def _render_pinned_projects_page(
@@ -2332,7 +2370,7 @@ def _render_pinned_projects_page(
     selected = records[labels.index(selected_label)]
     if st.button("Open Pinned Project", type="primary"):
         st.session_state["atlas_active_workspace_id"] = selected.workspace_id
-        st.session_state["atlas_active_page"] = "Project Summary"
+        st.session_state["atlas_active_page"] = "Overview"
         st.rerun()
 
 
@@ -2367,7 +2405,7 @@ def _render_reference_projects_page(
         selected = references[labels.index(selected_label)]
         if st.button("Open Selected Reference", type="primary"):
             st.session_state["atlas_active_workspace_id"] = selected.workspace_id
-            st.session_state["atlas_active_page"] = "Project Summary"
+            st.session_state["atlas_active_page"] = "Overview"
             st.rerun()
 
     st.markdown(
@@ -2383,7 +2421,7 @@ def _render_reference_projects_page(
         workspace_service.save_record(record)
         workspace_service.set_reference_project(record.workspace_id, reference=True)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Project Summary"
+        st.session_state["atlas_active_page"] = "Overview"
         st.rerun()
 
 
@@ -2408,7 +2446,7 @@ def _render_recent_projects_page(
                 use_container_width=True,
             ):
                 st.session_state["atlas_active_workspace_id"] = record.workspace_id
-                st.session_state["atlas_active_page"] = "Project Summary"
+                st.session_state["atlas_active_page"] = "Overview"
                 st.rerun()
 
 
@@ -2465,7 +2503,7 @@ def _render_create_project_page(
     )
     workspace_service.save_record(record)
     st.session_state["atlas_active_workspace_id"] = record.workspace_id
-    st.session_state["atlas_active_page"] = "Project Summary"
+    st.session_state["atlas_active_page"] = "Overview"
     st.success(f"Created project {record.project.name}.")
     st.rerun()
 
@@ -2496,7 +2534,7 @@ def _render_open_existing_page(
         record = workspace_service.load_record(path / "project.json")
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Project Summary"
+        st.session_state["atlas_active_page"] = "Overview"
         st.rerun()
         return
 
@@ -2504,7 +2542,7 @@ def _render_open_existing_page(
         record = workspace_service.load_record(path / "workspace.json")
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Project Summary"
+        st.session_state["atlas_active_page"] = "Overview"
         st.rerun()
         return
 
@@ -2512,7 +2550,7 @@ def _render_open_existing_page(
         record = workspace_service.load_record(path)
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Project Summary"
+        st.session_state["atlas_active_page"] = "Overview"
         st.rerun()
         return
 
@@ -2521,7 +2559,7 @@ def _render_open_existing_page(
         record = _build_record_from_context(context)
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Project Summary"
+        st.session_state["atlas_active_page"] = "Overview"
         st.rerun()
         return
 
@@ -2530,7 +2568,7 @@ def _render_open_existing_page(
         record = _build_record_from_context(context)
         workspace_service.save_record(record)
         st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Project Summary"
+        st.session_state["atlas_active_page"] = "Overview"
         st.rerun()
         return
 
@@ -3148,55 +3186,182 @@ def _render_engineering_review_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    summary = _build_project_analysis_summary(record, context)
+    review = _sales_design_review(st, record, context)
     _render_page_header(
         st,
         "Engineering Review",
-        "Review engineering conclusions, recommended next actions, and traceable unresolved conflicts.",
+        "Internal Sales / Design Engineer review with concise conclusions, risks, and actionable next steps.",
     )
+
+    if review is None:
+        st.info("Run project analysis to generate the internal engineering review.")
+        return
+
+    summary = dict(review.get("project_summary") or {})
+    bom_summary = dict(review.get("bom_summary") or {})
+    cost_coverage = dict(review.get("preliminary_cost_coverage") or {})
 
     st.dataframe(
         [
             {
-                "Equipment Items Found": summary["equipment_items_found"],
-                "Possible BOM Items": summary["possible_bom_items"],
-                "Scope Gaps": summary["scope_gaps"],
-                "Quantity Conflicts": summary["quantity_conflicts"],
-                "Responsibility Ambiguities": summary["responsibility_ambiguities"],
-                "Missing Specifications": summary["missing_specifications"],
-                "Unresolved Manufacturer/Model References": summary[
-                    "unresolved_manufacturer_model_refs"
-                ],
+                "Project": _safe_text(summary.get("project_name"), "n/a"),
+                "Project Type": _safe_text(review.get("project_type"), "Unspecified"),
+                "Overall Confidence": f"{int(float(review.get('overall_confidence', 0.0)) * 100)}%",
+                "Primary Action": _safe_text(
+                    summary.get("recommended_next_action"),
+                    "Review project findings",
+                ),
             }
         ],
         use_container_width=True,
         hide_index=True,
     )
 
-    st.markdown("### Recommended Next Actions")
-    if summary["recommended_actions"]:
-        st.dataframe(
-            summary["recommended_actions"][:12],
-            use_container_width=True,
-            hide_index=True,
-        )
-    else:
-        st.dataframe(
-            [{"action": summary["recommended_next_action"]}],
-            use_container_width=True,
-            hide_index=True,
-        )
+    st.markdown("### 1. What Atlas Found")
+    st.dataframe(
+        [
+            {
+                "Stakeholders (Inferred)": ", ".join(
+                    list(
+                        review.get("inferred_customer_and_stakeholder_information")
+                        or []
+                    )
+                )
+                or "None",
+                "Major Systems": ", ".join(list(review.get("major_systems") or []))
+                or "None",
+                "BOM Summary": (
+                    f"total={int(bom_summary.get('total_lines', 0) or 0)}, "
+                    f"complete={int(bom_summary.get('complete_lines', 0) or 0)}, "
+                    f"incomplete={int(bom_summary.get('incomplete_lines', 0) or 0)}, "
+                    f"conflicts={int(bom_summary.get('conflicting_lines', 0) or 0)}"
+                ),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
 
-    unresolved_rows = [
-        row
-        for row in summary["resolver_rows"]
-        if _contains_any(row.get("field"), ["manufacturer", "model", "quantity"])
+    st.markdown("### 2. What Appears Complete")
+    st.dataframe(
+        [
+            {
+                "Complete BOM Lines": int(bom_summary.get("complete_lines", 0) or 0),
+                "Known Cost Coverage": _safe_text(
+                    cost_coverage.get("known_cost_coverage_ratio"),
+                    "0%",
+                ),
+                "Labor Confidence": _safe_text(review.get("labor_confidence"), "n/a"),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("### 3. What Is Missing")
+    missing_rows = [
+        {"Missing Detail": item}
+        for item in (
+            list(review.get("missing_bom_detail") or [])
+            + list(review.get("undeveloped_scope") or [])
+        )
     ]
-    st.markdown("### Unresolved Engineering References")
-    if unresolved_rows:
-        st.dataframe(unresolved_rows[:12], use_container_width=True, hide_index=True)
+    if missing_rows:
+        st.dataframe(missing_rows[:20], use_container_width=True, hide_index=True)
     else:
-        st.info("No unresolved engineering reference conflicts are currently detected.")
+        st.info("No major missing scope or BOM details detected.")
+
+    st.markdown("### 4. What Is Risky")
+    risky_rows = [
+        {"Major Risk Area": item}
+        for item in (
+            list(review.get("major_risk_areas") or [])
+            + list(review.get("product_lifecycle_warnings") or [])
+        )
+    ]
+    if risky_rows:
+        st.dataframe(risky_rows[:20], use_container_width=True, hide_index=True)
+    else:
+        st.info("No major risk areas detected from available evidence.")
+
+    st.markdown("### 5. What Needs Clarification")
+    clarification_rows = [
+        {"Clarification Needed": item}
+        for item in (
+            list(review.get("responsibility_gaps") or [])
+            + [
+                f"Quantity conflict: {item}"
+                for item in list(review.get("quantity_conflicts") or [])
+            ]
+            + [
+                f"Drawing/specification coordination: {item}"
+                for item in list(
+                    review.get("drawing_specification_coordination_issues") or []
+                )
+            ]
+        )
+    ]
+    if clarification_rows:
+        st.dataframe(clarification_rows[:20], use_container_width=True, hide_index=True)
+    else:
+        st.info("No major clarification items detected.")
+
+    st.markdown("### 6. What Should Happen Next")
+    next_action_rows = [
+        {"Recommended Next Action": item}
+        for item in list(review.get("recommended_next_actions") or [])
+    ]
+    if next_action_rows:
+        st.dataframe(next_action_rows[:12], use_container_width=True, hide_index=True)
+    else:
+        st.info("No recommended next actions generated.")
+
+    st.markdown("### Recommended RFIs")
+    rfi_rows = [
+        {"RFI (Internal Draft)": item}
+        for item in list(review.get("recommended_rfis") or [])
+    ]
+    if rfi_rows:
+        st.dataframe(rfi_rows[:12], use_container_width=True, hide_index=True)
+    else:
+        st.info("No recommended RFIs generated.")
+
+    st.markdown("### Limitations")
+    st.dataframe(
+        [{"Limitation": item} for item in list(review.get("limitations") or [])],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("### Export")
+    review_obj = SalesDesignReviewService().build_review(
+        summary=_build_project_analysis_summary(record, context),
+        bom_rows=_enriched_bom_rows(st, _canonical_bom_items(context)),
+        scope_findings=_scope_risk_findings(context),
+    )
+    export_cols = st.columns(3)
+    project_id = _safe_text(record.project.project_id, "project")
+    export_cols[0].download_button(
+        "Download Review Markdown",
+        data=SalesDesignReviewService().to_markdown(review_obj),
+        file_name=f"{project_id}_sales_design_review.md",
+        mime="text/markdown",
+        use_container_width=True,
+    )
+    export_cols[1].download_button(
+        "Download Review JSON",
+        data=SalesDesignReviewService().to_json(review_obj),
+        file_name=f"{project_id}_sales_design_review.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+    export_cols[2].download_button(
+        "Download Review HTML",
+        data=SalesDesignReviewService().to_html(review_obj),
+        file_name=f"{project_id}_sales_design_review.html",
+        mime="text/html",
+        use_container_width=True,
+    )
 
 
 def _render_workflow_reports_page(
@@ -3314,189 +3479,76 @@ def _render_overview_page(
 ) -> None:
     _render_page_header(
         st,
-        "Mission Control",
-        "Decision-focused project overview for estimator and engineering review.",
+        "Overview",
+        "Concise project workspace landing page with status, readiness, and next actions.",
     )
 
-    review = context.get("review") if context else None
-    readiness = getattr(review, "readiness", None) if review is not None else None
+    summary = _build_project_analysis_summary(record, context)
     import_summary = dict(context.get("import_summary") or {}) if context else {}
-    warnings = list(context.get("warnings") or []) if context else []
-    metadata = (
-        dict(getattr(context.get("intake_snapshot"), "metadata", {}) or {})
-        if context
-        else {}
-    )
+    bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+    bom_metrics = _canonical_bom_metrics(bom_rows)
+    scope_rows = _scope_risk_findings(context)
+    engineering_review = _sales_design_review(st, record, context)
+    timeline = _timeline_events(record, context)
 
-    row1 = st.columns(4)
-    _metric_card(row1[0], "Project", _safe_text(record.project.name, "n/a"))
-    _metric_card(row1[1], "Lifecycle Stage", _project_stage(record))
-    _metric_card(row1[2], "Current Status", _status_chip(_project_status(context)))
-    _metric_card(
-        row1[3],
-        "Import Status",
-        _safe_text(context.get("data_source_label") if context else "Manual", "Manual"),
-    )
-
-    row2 = st.columns(4)
-    readiness_score = getattr(readiness, "readiness_score", None)
-    readiness_level = _safe_text(
-        getattr(getattr(readiness, "readiness_level", None), "value", None),
-        "n/a",
-    ).title()
-    _metric_card(
-        row2[0],
-        "Readiness",
-        f"{readiness_score:.2f}" if readiness_score is not None else "n/a",
-    )
-    _metric_card(row2[1], "Readiness Level", _status_chip(readiness_level))
-    _metric_card(
-        row2[2], "Current Confidence", str(getattr(review, "confidence", "n/a"))
-    )
-    _metric_card(
-        row2[3],
-        "Top Risks",
-        str(len(getattr(review, "estimator_risks", []) or [])) if review else "0",
-    )
-
-    metadata_rows = [
-        {
-            "field": "Owner",
-            "value": _safe_text(
-                _first_text(
-                    metadata.get("owner"), metadata.get("client"), record.project.client
-                ),
-                "n/a",
-            ),
-        },
-        {
-            "field": "Architect",
-            "value": _safe_text(metadata.get("architect"), "n/a"),
-        },
-        {
-            "field": "Consultants",
-            "value": _safe_text(metadata.get("consultants"), "n/a"),
-        },
-        {
-            "field": "Project Number",
-            "value": _safe_text(
-                _first_text(
-                    metadata.get("project_number"),
-                    metadata.get("project_id"),
-                    record.project.project_id,
-                ),
-                "n/a",
-            ),
-        },
-        {
-            "field": "Issue Date",
-            "value": _safe_text(metadata.get("issue_date"), "n/a"),
-        },
-        {
-            "field": "Bid Date",
-            "value": _safe_text(
-                _first_text(metadata.get("bid_date"), record.project.bid_date), "n/a"
-            ),
-        },
-    ]
-    st.dataframe(metadata_rows, use_container_width=True, hide_index=True)
-
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown("Top Blockers")
-        blockers = list(getattr(readiness, "blocking_issues", []) or [])
-        if blockers:
-            st.dataframe(
-                [{"blocker": item} for item in blockers[:8]],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.info("No active blockers.")
-
-        st.markdown("Top Risks")
-        risks = (
-            _to_rows(list(getattr(review, "estimator_risks", []) or []))
-            if review
-            else []
-        )
-        if risks:
-            st.dataframe(risks[:8], use_container_width=True, hide_index=True)
-        else:
-            st.info("No active risks.")
-
-    with col_b:
-        st.markdown("Import Summary")
-        st.dataframe(
-            [
-                {
-                    "metric": "total files",
-                    "value": import_summary.get("total_files", 0),
-                },
-                {
-                    "metric": "total pages",
-                    "value": import_summary.get("total_pages", 0),
-                },
-                {
-                    "metric": "documents requiring OCR",
-                    "value": import_summary.get("documents_requiring_ocr", 0),
-                },
-                {
-                    "metric": "drawing count",
-                    "value": import_summary.get("drawing_count", 0),
-                },
-                {
-                    "metric": "specification count",
-                    "value": import_summary.get("specification_count", 0),
-                },
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        st.markdown("Current Warnings")
-        if warnings:
-            st.dataframe(
-                [{"warning": item} for item in warnings[:8]],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.info("No warnings.")
-
-    st.markdown("Recent Activity")
+    st.markdown("### Project Summary")
     st.dataframe(
         [
             {
-                "event": "Workspace opened",
-                "timestamp": record.last_opened_at or record.updated_at,
-            },
-            {
-                "event": "Last intake",
-                "timestamp": _safe_text(import_summary.get("package_location"), "n/a"),
-            },
-            {"event": "Last review", "timestamp": record.updated_at},
+                "Project": summary["project_name"],
+                "Customer": summary["customer"],
+                "Project Type": summary["project_type"],
+                "Current Status": summary["analysis_status"],
+                "Recommended Next Action": summary["recommended_next_action"],
+            }
         ],
         use_container_width=True,
         hide_index=True,
     )
 
-    st.markdown("Quick Actions")
-    quick = st.columns(4)
-    if quick[0].button("Project Files", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Project Files"
-    if quick[1].button("Readiness", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Readiness"
-    if quick[2].button("Executive Summary", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Executive Summary"
-    if quick[3].button("RFI Candidates", use_container_width=True):
-        st.session_state["atlas_active_page"] = "RFI Candidates"
+    cards = st.columns(4)
+    _metric_card(cards[0], "Document Status", str(summary["document_count"]))
+    _metric_card(cards[1], "BOM Summary", str(bom_metrics["total_candidate_bom_lines"]))
+    _metric_card(cards[2], "Scope & Risk Summary", str(len(scope_rows)))
+    _metric_card(
+        cards[3],
+        "Engineering Review Status",
+        "Ready" if engineering_review else "Needs Review",
+    )
 
-    st.markdown("Workflow Validation")
+    st.markdown("### Estimate Status")
+    known_cost_lines = sum(1 for row in bom_rows if row.get("known_cost") is not None)
     st.dataframe(
-        _workflow_validation_rows(context),
+        [
+            {
+                "Lines With Known Cost": known_cost_lines,
+                "Preliminary Cost Coverage": (
+                    f"{int((known_cost_lines / max(len(bom_rows), 1)) * 100)}%"
+                    if bom_rows
+                    else "0%"
+                ),
+                "Advisory Mode": "Enabled",
+            }
+        ],
         use_container_width=True,
         hide_index=True,
+    )
+
+    st.markdown("### Recent Project Activity")
+    if timeline:
+        st.dataframe(timeline[:10], use_container_width=True, hide_index=True)
+    else:
+        st.info("No recent activity yet.")
+
+    st.markdown("### Recommended Next Action")
+    st.dataframe(
+        [{"Action": summary["recommended_next_action"]}],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.caption(
+        f"Document status snapshot: total files={import_summary.get('total_files', 0)}, drawings={import_summary.get('drawing_count', 0)}, specifications={import_summary.get('specification_count', 0)}, schedules={import_summary.get('schedule_count', 0)}."
     )
 
 
@@ -11001,14 +11053,14 @@ def _render_reports_page(
             hide_index=True,
         )
         nav_cols = st.columns(3)
-        if nav_cols[0].button("Open Coordination Review", use_container_width=True):
-            st.session_state["atlas_active_page"] = "Coordination Review"
+        if nav_cols[0].button("Open Scope & Risk", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Scope & Risk"
             st.rerun()
-        if nav_cols[1].button("Open Engineering Workbench", use_container_width=True):
-            st.session_state["atlas_active_page"] = "Engineering Workbench"
+        if nav_cols[1].button("Open Engineering Review", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Engineering Review"
             st.rerun()
-        if nav_cols[2].button("Open Estimator Brief", use_container_width=True):
-            st.session_state["atlas_active_page"] = "Estimator Brief"
+        if nav_cols[2].button("Open Estimate", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Estimate"
             st.rerun()
     else:
         _render_empty_state(
@@ -11023,7 +11075,7 @@ def _render_reports_page(
             st.session_state["atlas_active_page"] = "Evidence"
             st.rerun()
         if nav_cols[2].button("Open Project Files", use_container_width=True):
-            st.session_state["atlas_active_page"] = "Project Files"
+            st.session_state["atlas_active_page"] = "Documents"
             st.rerun()
 
 
@@ -11424,10 +11476,10 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
 
         nav_cols = st.columns(2)
         if nav_cols[0].button("Open Notebook", use_container_width=True):
-            st.session_state["atlas_active_page"] = "Engineering Notebook"
+            st.session_state["atlas_active_page"] = "Notebook"
             st.rerun()
         if nav_cols[1].button("Open History", use_container_width=True):
-            st.session_state["atlas_active_page"] = "History"
+            st.session_state["atlas_active_page"] = "Timeline"
             st.rerun()
         return
 
@@ -11590,16 +11642,22 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
 
 
 def _render_status_bar(
-    st: Any, record: ProjectWorkspaceRecord, context: dict[str, Any] | None
+    st: Any,
+    record: ProjectWorkspaceRecord | None,
+    context: dict[str, Any] | None,
 ) -> None:
     st.markdown("<div class='atlas-statusbar'></div>", unsafe_allow_html=True)
     intake = _safe_text(context.get("package_location") if context else None, "n/a")
-    review_time = record.updated_at
+    review_time = _safe_text(record.updated_at if record else None, "n/a")
     commit = _current_commit()
 
     cols = st.columns(5)
-    cols[0].caption(f"Current project: {record.project.name}")
-    cols[1].caption(f"Lifecycle stage: {_project_stage(record)}")
+    cols[0].caption(
+        f"Current project: {record.project.name if record is not None else 'None selected'}"
+    )
+    cols[1].caption(
+        f"Lifecycle stage: {_project_stage(record) if record is not None else 'Application Workspace'}"
+    )
     cols[2].caption(f"Last intake: {intake}")
     cols[3].caption(f"Last review: {review_time}")
     cols[4].caption(f"Atlas v{__version__} · commit {commit}")
@@ -11608,7 +11666,7 @@ def _render_status_bar(
 def _render_main_content(
     st: Any,
     workspace_service: ProjectWorkspaceService,
-    record: ProjectWorkspaceRecord,
+    record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
     mission_control_payload: dict[str, Any] | None = None,
 ) -> None:
@@ -11622,150 +11680,84 @@ def _render_main_content(
             context,
             mission_control_payload,
         )
-    elif page == "Project Summary":
+        return
+
+    if page == "Knowledge":
+        _render_application_knowledge_page(st, workspace_service)
+        return
+
+    if page == "Administration":
+        _render_application_administration_page(st, workspace_service)
+        return
+
+    if page == "Reports" and record is None:
+        _render_application_reports_page(st, workspace_service)
+        return
+
+    if page in {
+        "Projects",
+        "Pinned Projects",
+        "Reference Projects",
+        "Recent Projects",
+        "Create New Project",
+        "Open Existing Project",
+    }:
+        if page == "Projects":
+            _render_projects_page(st, workspace_service)
+        elif page == "Pinned Projects":
+            _render_pinned_projects_page(st, workspace_service)
+        elif page == "Reference Projects":
+            _render_reference_projects_page(st, workspace_service)
+        elif page == "Recent Projects":
+            _render_recent_projects_page(st, workspace_service)
+        elif page == "Create New Project":
+            _render_create_project_page(st, workspace_service)
+        else:
+            _render_open_existing_page(st, workspace_service)
+        return
+
+    if record is None:
+        st.info(
+            "Open a project from Projects or Mission Control to enter Project Workspace."
+        )
+        return
+
+    if page == "Project Summary" or page == "Project Metadata":
         _render_project_summary_page(st, record, context)
     elif page == "Documents":
         _render_project_files_page(st, workspace_service, record, context)
-    elif page == "Price List Library":
-        _render_price_list_library_page(st, record, context)
     elif page == "BOM Review":
         _render_bom_review_page(st, record, context)
     elif page == "Scope & Risk":
         _render_scope_risk_page(st, record, context)
     elif page == "Engineering Review":
         _render_engineering_review_page(st, record, context)
-    elif page == "Projects":
-        _render_projects_page(st, workspace_service)
-    elif page == "Pinned Projects":
-        _render_pinned_projects_page(st, workspace_service)
-    elif page == "Reference Projects":
-        _render_reference_projects_page(st, workspace_service)
-    elif page == "Recent Projects":
-        _render_recent_projects_page(st, workspace_service)
-    elif page == "Create New Project":
-        _render_create_project_page(st, workspace_service)
-    elif page == "Open Existing Project":
-        _render_open_existing_page(st, workspace_service)
+    elif page == "Estimate":
+        _render_estimate_page(st, record, context)
+    elif page == "Notebook":
+        _render_engineering_notebook_page(st, record, context)
     elif page == "Overview":
         _render_overview_page(st, record, context)
-    elif page == "Engineering Workbench":
-        _render_engineering_workbench_page(st, record, context)
-    elif page == "Engineering Notebook":
-        _render_engineering_notebook_page(st, record, context)
-    elif page == "Master Library Explorer":
-        _render_master_library_explorer_page(st, context)
-    elif page == "Executive Summary":
-        _render_executive_summary_page(st, context)
-    elif page == "Project Files":
-        _render_project_files_page(st, workspace_service, record, context)
     elif page == "Drawings":
         _render_drawings_page(st, context)
-    elif page == "Drawing Explorer":
-        _render_drawing_explorer_page(st, context)
     elif page == "Specifications":
         _render_specifications_page(st, context)
-    elif page == "Specification Explorer":
-        _render_specification_explorer_page(st, context)
-    elif page == "Equipment":
-        _render_equipment_page(st, context)
-    elif page == "Systems":
-        _render_systems_page(st, record, context)
-    elif page == "Engineering Resolver":
-        _render_engineering_resolver_page(st, record, context)
-    elif page == "Resolver Conflict Center":
-        _render_resolver_conflict_center_page(st, record, context)
-    elif page == "Engineering Intelligence":
-        _render_engineering_intelligence_page(st, record, context)
-    elif page == "Coordination Review":
-        _render_coordination_review_page(st, context)
-    elif page == "Relationship Explorer":
+    elif page == "Schedules":
+        _render_project_folder_page(st, context, "Schedules", "Schedules")
+    elif page == "Addenda":
+        _render_project_folder_page(st, context, "Addenda", "Addenda")
+    elif page == "Relationships":
         _render_relationship_explorer_page(st, record, context)
-    elif page == "Relationship Visualization":
-        _render_relationship_visualization_page(st, record, context)
-    elif page == "History":
+    elif page == "Timeline":
         _render_timeline_page(st, record, context)
-    elif page == "Project Detail":
-        _render_object_detail_page(
-            st,
-            title="Project Detail",
-            node_type="Project",
-            fallback_kind="project",
-            record=record,
-            context=context,
-        )
-    elif page == "Drawing Detail":
-        _render_object_detail_page(
-            st,
-            title="Drawing Detail",
-            node_type="Drawing",
-            fallback_kind="drawing",
-            record=record,
-            context=context,
-        )
-    elif page == "Specification Detail":
-        _render_object_detail_page(
-            st,
-            title="Specification Detail",
-            node_type="Specification",
-            fallback_kind="specification",
-            record=record,
-            context=context,
-        )
-    elif page == "Equipment Detail":
-        _render_object_detail_page(
-            st,
-            title="Equipment Detail",
-            node_type="Equipment",
-            fallback_kind="equipment",
-            record=record,
-            context=context,
-        )
-    elif page == "System Detail":
-        _render_object_detail_page(
-            st,
-            title="System Detail",
-            node_type="System",
-            fallback_kind="system",
-            record=record,
-            context=context,
-        )
-    elif page == "Room Detail":
-        _render_object_detail_page(
-            st,
-            title="Room Detail",
-            node_type="Room",
-            fallback_kind="room",
-            record=record,
-            context=context,
-        )
-    elif page == "Manufacturer Detail":
-        _render_object_detail_page(
-            st,
-            title="Manufacturer Detail",
-            node_type="Manufacturer",
-            fallback_kind="manufacturer",
-            record=record,
-            context=context,
-        )
-    elif page == "Evidence Detail":
-        _render_object_detail_page(
-            st,
-            title="Evidence Detail",
-            node_type="Evidence",
-            fallback_kind="evidence",
-            record=record,
-            context=context,
-        )
-    elif page == "Metadata Inspector":
-        _render_metadata_inspector_page(st, record, context)
-    elif page in BID_INTELLIGENCE_PAGES:
-        _render_bid_page(st, page, context)
+    elif page == "Repository":
+        _render_settings_page(st, "Project Settings", workspace_service, record)
+    elif page == "Workspace Settings":
+        _render_settings_page(st, "Application Settings", workspace_service, record)
     elif page == "Reports":
         _render_workflow_reports_page(st, record, context)
-    elif page in REPORT_PAGES:
-        _render_reports_page(st, page, context)
-    elif page in SETTINGS_PAGES:
-        _render_settings_page(st, page, workspace_service, record)
+    else:
+        _render_empty_state(st, "Page is not available in the current workspace mode.")
 
 
 def _render_mission_control_panels(
@@ -11793,7 +11785,7 @@ def _render_mission_control_panels(
             hide_index=True,
         )
         if st.button("View all action items", key="atlas_side_view_actions"):
-            st.session_state["atlas_active_page"] = "Engineering Workbench"
+            st.session_state["atlas_active_page"] = "Overview"
             st.rerun()
     else:
         st.caption("No high-priority actions detected.")
@@ -11813,7 +11805,7 @@ def _render_mission_control_panels(
             hide_index=True,
         )
         if st.button("View full activity", key="atlas_side_view_activity"):
-            st.session_state["atlas_active_page"] = "History"
+            st.session_state["atlas_active_page"] = "Timeline"
             st.rerun()
     else:
         st.caption("No activity yet.")
@@ -11833,7 +11825,7 @@ def _render_mission_control_panels(
             hide_index=True,
         )
         if st.button("View full timeline", key="atlas_side_view_timeline"):
-            st.session_state["atlas_active_page"] = "History"
+            st.session_state["atlas_active_page"] = "Timeline"
             st.rerun()
     else:
         st.caption("No pending timeline items.")
@@ -11865,7 +11857,7 @@ def _render_mission_control_panels(
 def _render_shell(
     st: Any,
     workspace_service: ProjectWorkspaceService,
-    record: ProjectWorkspaceRecord,
+    record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> None:
     _render_header(st, workspace_service, record, context)
@@ -11874,11 +11866,19 @@ def _render_shell(
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
     mission_control_payload = None
     if current_page == "Mission Control":
-        mission_control_payload = _build_mission_control_payload(
-            workspace_service,
-            record,
-            context,
-        )
+        if record is not None:
+            mission_control_payload = _build_mission_control_payload(
+                workspace_service,
+                record,
+                context,
+            )
+        else:
+            mission_control_payload = {
+                "signals": _collect_workspace_signals(workspace_service, limit=12),
+                "actions": [],
+                "timeline": [],
+                "pending_timeline": [],
+            }
 
     st.markdown(
         f"<div class='atlas-breadcrumb'>{_breadcrumb(record, current_page)}</div>",
@@ -11891,7 +11891,7 @@ def _render_shell(
         if current_page == "Mission Control":
             nav_col, main_col = st.columns([2.4, 7.6])
             with nav_col:
-                _nav_buttons(st, st, "desktop")
+                _nav_buttons(st, st, "desktop", record)
             with main_col:
                 _render_main_content(
                     st,
@@ -11903,7 +11903,7 @@ def _render_shell(
         else:
             nav_col, main_col, context_col = st.columns([2.3, 6.4, 2.3])
             with nav_col:
-                _nav_buttons(st, st, "desktop")
+                _nav_buttons(st, st, "desktop", record)
             with main_col:
                 _render_main_content(
                     st,
@@ -11913,11 +11913,12 @@ def _render_shell(
                     mission_control_payload,
                 )
             with context_col:
-                _render_context_panel(st, context)
+                if record is not None:
+                    _render_context_panel(st, context)
 
     elif layout_mode == "Tablet":
         nav_popover = st.popover("Navigation")
-        _nav_buttons(st, nav_popover, "tablet")
+        _nav_buttons(st, nav_popover, "tablet", record)
         _render_main_content(
             st,
             workspace_service,
@@ -11925,13 +11926,13 @@ def _render_shell(
             context,
             mission_control_payload,
         )
-        if current_page != "Mission Control":
+        if current_page != "Mission Control" and record is not None:
             st.markdown("---")
             _render_context_panel(st, context)
 
     else:
         nav_drawer = st.popover("Open Navigation")
-        _nav_buttons(st, nav_drawer, "mobile")
+        _nav_buttons(st, nav_drawer, "mobile", record)
         _render_main_content(
             st,
             workspace_service,
@@ -11939,7 +11940,7 @@ def _render_shell(
             context,
             mission_control_payload,
         )
-        if current_page != "Mission Control":
+        if current_page != "Mission Control" and record is not None:
             st.markdown("---")
             _render_context_panel(st, context)
 
@@ -11956,14 +11957,11 @@ def main() -> None:
     _ensure_active_workspace(st, workspace_service)
 
     record = _active_record(st, workspace_service)
-    if record is None:
-        st.error("No active project workspace available.")
-        return
+    if record is not None:
+        _restore_workspace_state(st, workspace_service, record)
 
-    _restore_workspace_state(st, workspace_service, record)
-
-    context = _load_context_for_record(record)
-    if context is not None:
+    context = _load_context_for_record(record) if record is not None else None
+    if record is not None and context is not None:
         record = _build_record_from_context(context, existing_record=record)
         record.workspace_state = workspace_service.load_workspace_state(
             record.workspace_id
@@ -11984,11 +11982,26 @@ def main() -> None:
     if st.session_state.get("atlas_active_page") not in ALL_ACTIVE_PAGES:
         st.session_state["atlas_active_page"] = "Mission Control"
 
+    if record is None and st.session_state.get("atlas_active_page") not in {
+        "Mission Control",
+        "Projects",
+        "Pinned Projects",
+        "Reference Projects",
+        "Recent Projects",
+        "Create New Project",
+        "Open Existing Project",
+        "Knowledge",
+        "Reports",
+        "Administration",
+    }:
+        st.session_state["atlas_active_page"] = "Mission Control"
+
     _render_shell(st, workspace_service, record, context)
-    workspace_service.save_workspace_state(
-        record.workspace_id,
-        _workspace_state_snapshot(st),
-    )
+    if record is not None:
+        workspace_service.save_workspace_state(
+            record.workspace_id,
+            _workspace_state_snapshot(st),
+        )
 
 
 if __name__ == "__main__":

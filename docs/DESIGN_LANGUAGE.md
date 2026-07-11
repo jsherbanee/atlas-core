@@ -123,6 +123,12 @@ Cards should be used only when they improve comprehension. Tables should remain 
 
 Atlas is project-centric, not document-centric and not estimate-centric.
 
+Atlas navigation uses two explicit workspace layers:
+- Application Workspace for Mission Control, project management, portfolio reporting, and administration.
+- Project Workspace for project-specific review and decision pages after a project is opened.
+
+Mission Control remains application-level even when a project is active.
+
 Navigation should always help answer four questions:
 
 - Where am I?
