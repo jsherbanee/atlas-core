@@ -16,12 +16,13 @@ It represents the current implementation state of Atlas Core.
 
 ## Current State
 Atlas Core is in active Phase 2 Bid Intelligence development with a stabilization baseline candidate prepared and a project-specific Atlas workspace shell implemented.
+Sprint 3 UX delivery adds guided project review progression, explicit review status modeling, checklist visibility, and a concise project summary report center with deterministic exports.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: 917 passed
+- pytest: 934 passed
 
 ## Tooling Status
 - GitHub Actions configured
@@ -44,6 +45,10 @@ Current workspace behavior:
 - Opening a project switches Atlas into a dedicated Project Workspace with project-specific navigation.
 - Local project records are stored under AtlasProjects/.
 - Project Workspace emphasizes Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate (advisory), Notebook, Reports, and project details/settings pages.
+- Project Workspace now includes a non-blocking guided review sequence with statuses (not started/ready/needs review/blocked/complete).
+- Overview and Reports expose a deterministic project review checklist and specific next-step navigation.
+- Reports now provide Project Summary, Estimator Brief, BOM Export, Scope and Risk Export, and Engineering Review Export views.
+- Project Summary report exports are deterministic Markdown/JSON/HTML for internal review use.
 
 ## Latest Completed Feature
 - Estimator Brief Enhancements (deterministic executive summary, prioritized reviewer actions, and evidence traceability)

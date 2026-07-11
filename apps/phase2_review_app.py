@@ -417,14 +417,23 @@ def _inject_styles(st: Any) -> None:
 
 def _status_chip(value: str) -> str:
     normalized = value.strip().lower()
-    if normalized in {"healthy", "ready", "high", "extracted", "green"}:
+    if normalized in {
+        "healthy",
+        "ready",
+        "high",
+        "extracted",
+        "green",
+        "complete",
+    }:
         return "🟢 " + value
     if normalized in {"processing", "in progress", "blue"}:
         return "🔵 " + value
     if normalized in {"needs review", "warning", "partial", "amber"}:
         return "🟠 " + value
-    if normalized in {"critical", "failed", "requires_ocr", "red"}:
+    if normalized in {"critical", "failed", "requires_ocr", "red", "blocked"}:
         return "🔴 " + value
+    if normalized in {"not started"}:
+        return "⚪ " + value
     return "⚪ " + value
 
 
@@ -730,6 +739,645 @@ def _keyword_count(
     return count
 
 
+def _review_flags_state(st: Any) -> dict[str, Any]:
+    state = st.session_state.get("atlas_review_flags")
+    if isinstance(state, dict):
+        return state
+    state = {}
+    st.session_state["atlas_review_flags"] = state
+    return state
+
+
+def _set_review_flag(st: Any, key: str, value: Any) -> None:
+    flags = dict(_review_flags_state(st))
+    flags[key] = value
+    st.session_state["atlas_review_flags"] = flags
+
+
+def _review_step_definitions() -> list[dict[str, str]]:
+    return [
+        {
+            "key": "documents",
+            "step": "Review Documents",
+            "page": "Documents",
+            "why": "Document processing quality determines all downstream review confidence.",
+        },
+        {
+            "key": "bom",
+            "step": "Review BOM",
+            "page": "BOM Review",
+            "why": "BOM completeness and conflicts drive coverage and scope certainty.",
+        },
+        {
+            "key": "scope_risk",
+            "step": "Review Scope and Risk",
+            "page": "Scope & Risk",
+            "why": "Scope gaps and ownership ambiguity are primary estimate and execution risks.",
+        },
+        {
+            "key": "engineering",
+            "step": "Review Engineering Findings",
+            "page": "Engineering Review",
+            "why": "Engineering findings consolidate major concerns and required clarifications.",
+        },
+        {
+            "key": "estimate",
+            "step": "Review Estimate Coverage",
+            "page": "Estimate",
+            "why": "Coverage validates whether pricing/labor assumptions are usable for planning.",
+        },
+        {
+            "key": "summary_report",
+            "step": "Generate Summary Report",
+            "page": "Reports",
+            "why": "A concise project summary aligns reviewers on decisions, risks, and limitations.",
+        },
+    ]
+
+
+def _review_step_status_rows(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> list[dict[str, str]]:
+    flags = _review_flags_state(st)
+    review = context.get("review") if context else None
+    review_exists = review is not None
+    summary = _build_project_analysis_summary(record, context)
+    document_count = int(summary.get("document_count", 0) or 0)
+    documents_requiring_ocr = int(summary.get("documents_requiring_ocr", 0) or 0)
+
+    bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+    bom_metrics = _canonical_bom_metrics(bom_rows)
+    unresolved_bom_count = int(bom_metrics.get("unresolved_items", 0) or 0) + int(
+        bom_metrics.get("conflicting_lines", 0) or 0
+    )
+
+    scope_rows = _scope_risk_findings(context)
+    critical_scope_count = sum(
+        1
+        for item in scope_rows
+        if _safe_text(item.get("severity"), "").lower() in {"critical", "high"}
+    )
+    responsibility_ambiguity_count = _keyword_count(
+        scope_rows,
+        ["responsib", "owner", "ownership", "delegat", "by others"],
+        ["section", "category", "title", "recommended_action"],
+    )
+    recommended_rfi_count = sum(
+        1 for item in scope_rows if _safe_text(item.get("candidate_rfi_text"), "")
+    )
+
+    engineering_review = _sales_design_review(st, record, context)
+    engineering_risk_count = len(
+        list((engineering_review or {}).get("major_risk_areas") or [])
+    ) + len(list((engineering_review or {}).get("product_lifecycle_warnings") or []))
+
+    total_bom_lines = len(bom_rows)
+    known_cost_lines = sum(1 for row in bom_rows if row.get("known_cost") is not None)
+
+    rows: list[dict[str, str]] = []
+    for step in _review_step_definitions():
+        key = _safe_text(step.get("key"), "")
+        status = "ready"
+        detail = ""
+
+        if key == "documents":
+            if document_count == 0:
+                status = "not started"
+                detail = "No project documents uploaded yet."
+            elif documents_requiring_ocr == document_count and document_count > 0:
+                status = "blocked"
+                detail = "All uploaded documents currently require OCR handling."
+            elif flags.get("documents_reviewed"):
+                status = "complete"
+                detail = "Documents and extraction status were reviewed."
+            elif documents_requiring_ocr > 0:
+                status = "needs review"
+                detail = "OCR-required documents are present and should be reviewed."
+            else:
+                status = "ready"
+                detail = "Documents are available for review."
+
+        elif key == "bom":
+            if not review_exists or total_bom_lines == 0:
+                status = "blocked"
+                detail = "Run project analysis to generate canonical BOM lines."
+            elif flags.get("bom_reviewed"):
+                status = "complete"
+                detail = "BOM lines and exceptions were reviewed."
+            elif unresolved_bom_count > 0:
+                status = "needs review"
+                detail = "Unresolved or conflicting BOM lines need review."
+            else:
+                status = "ready"
+                detail = "BOM appears complete and is ready for confirmation."
+
+        elif key == "scope_risk":
+            if not review_exists:
+                status = "blocked"
+                detail = "Run project analysis to produce scope and risk findings."
+            elif flags.get("scope_risk_reviewed"):
+                status = "complete"
+                detail = (
+                    "Scope gaps, ownership ambiguity, and RFI candidates were reviewed."
+                )
+            elif (
+                critical_scope_count > 0
+                or responsibility_ambiguity_count > 0
+                or recommended_rfi_count > 0
+            ):
+                status = "needs review"
+                detail = "Critical scope findings or clarifications are still open."
+            else:
+                status = "ready"
+                detail = "Scope and risk findings are ready for reviewer confirmation."
+
+        elif key == "engineering":
+            if engineering_review is None:
+                status = "blocked"
+                detail = "Engineering review output is not available yet."
+            elif flags.get("engineering_reviewed"):
+                status = "complete"
+                detail = "Engineering findings and recommendations were reviewed."
+            elif engineering_risk_count > 0:
+                status = "needs review"
+                detail = "High-priority engineering findings still need attention."
+            else:
+                status = "ready"
+                detail = "Engineering findings are ready for final review."
+
+        elif key == "estimate":
+            if not review_exists or total_bom_lines == 0:
+                status = "blocked"
+                detail = "Estimate coverage requires BOM output from analysis."
+            elif flags.get("estimate_reviewed"):
+                status = "complete"
+                detail = "Estimate coverage assumptions were reviewed."
+            elif known_cost_lines < total_bom_lines:
+                status = "needs review"
+                detail = "Cost coverage is partial and should be reviewed."
+            else:
+                status = "ready"
+                detail = "Estimate coverage appears complete for current data."
+
+        elif key == "summary_report":
+            if not review_exists:
+                status = "blocked"
+                detail = (
+                    "Summary report generation requires completed project analysis."
+                )
+            elif bool(flags.get("summary_report_generated")):
+                status = "complete"
+                detail = "Project summary report was generated/exported."
+            else:
+                prior_rows = list(rows)
+                if any(
+                    item.get("status") in {"not started", "blocked"}
+                    for item in prior_rows
+                ):
+                    status = "blocked"
+                    detail = "Complete upstream review steps before generating final summary."
+                elif any(
+                    item.get("status") in {"ready", "needs review"}
+                    for item in prior_rows
+                ):
+                    status = "needs review"
+                    detail = (
+                        "Generate summary after reviewer confirmation of key sections."
+                    )
+                else:
+                    status = "ready"
+                    detail = "Ready to generate the concise project summary report."
+
+        rows.append(
+            {
+                "key": key,
+                "step": _safe_text(step.get("step"), "Step"),
+                "page": _safe_text(step.get("page"), "Overview"),
+                "status": status,
+                "why_it_matters": _safe_text(step.get("why"), ""),
+                "detail": detail,
+            }
+        )
+
+    return rows
+
+
+def _next_review_action(
+    step_rows: list[dict[str, str]],
+) -> dict[str, str]:
+    for row in step_rows:
+        status = _safe_text(row.get("status"), "").lower()
+        if status != "complete":
+            return {
+                "step": _safe_text(row.get("step"), "Review Step"),
+                "page": _safe_text(row.get("page"), "Overview"),
+                "status": status,
+                "why": _safe_text(row.get("why_it_matters"), ""),
+                "detail": _safe_text(row.get("detail"), ""),
+            }
+
+    return {
+        "step": "Generate Summary Report",
+        "page": "Reports",
+        "status": "complete",
+        "why": "All guided review steps are complete.",
+        "detail": "Project summary report can be regenerated any time for updated context.",
+    }
+
+
+def _review_checklist_rows(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+    step_rows: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    review = context.get("review") if context else None
+    summary = _build_project_analysis_summary(record, context)
+    document_count = int(summary.get("document_count", 0) or 0)
+    documents_requiring_ocr = int(summary.get("documents_requiring_ocr", 0) or 0)
+
+    status_by_key = {
+        row.get("key"): _safe_text(row.get("status"), "") for row in step_rows
+    }
+    scope_rows = _scope_risk_findings(context)
+    critical_scope_count = sum(
+        1
+        for item in scope_rows
+        if _safe_text(item.get("severity"), "").lower() in {"critical", "high"}
+    )
+    responsibility_ambiguity_count = _keyword_count(
+        scope_rows,
+        ["responsib", "owner", "ownership", "delegat", "by others"],
+        ["section", "category", "title", "recommended_action"],
+    )
+    recommended_rfi_count = sum(
+        1 for item in scope_rows if _safe_text(item.get("candidate_rfi_text"), "")
+    )
+
+    bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+    bom_metrics = _canonical_bom_metrics(bom_rows)
+    unresolved_bom_count = int(bom_metrics.get("unresolved_items", 0) or 0) + int(
+        bom_metrics.get("conflicting_lines", 0) or 0
+    )
+
+    engineering_review = _sales_design_review(st, record, context)
+    high_risk_engineering_count = len(
+        list((engineering_review or {}).get("major_risk_areas") or [])
+    ) + len(list((engineering_review or {}).get("product_lifecycle_warnings") or []))
+
+    known_cost_lines = sum(1 for row in bom_rows if row.get("known_cost") is not None)
+    total_bom_lines = len(bom_rows)
+
+    checklist = [
+        {
+            "Checklist Item": "all documents processed",
+            "Status": (
+                "complete"
+                if review is not None and document_count > 0
+                else "needs review" if document_count > 0 else "not started"
+            ),
+            "Detail": f"documents={document_count}",
+        },
+        {
+            "Checklist Item": "OCR-required documents identified",
+            "Status": (
+                "complete"
+                if review is not None and document_count > 0
+                else "not started" if document_count == 0 else "ready"
+            ),
+            "Detail": f"documents_requiring_ocr={documents_requiring_ocr}",
+        },
+        {
+            "Checklist Item": "BOM reviewed",
+            "Status": status_by_key.get("bom", "not started"),
+            "Detail": f"candidate_lines={total_bom_lines}",
+        },
+        {
+            "Checklist Item": "unresolved BOM items reviewed",
+            "Status": (
+                "complete"
+                if unresolved_bom_count == 0
+                else status_by_key.get("bom", "needs review")
+            ),
+            "Detail": f"unresolved_or_conflicting={unresolved_bom_count}",
+        },
+        {
+            "Checklist Item": "critical scope gaps reviewed",
+            "Status": (
+                "complete"
+                if critical_scope_count == 0
+                else status_by_key.get("scope_risk", "needs review")
+            ),
+            "Detail": f"critical_or_high_scope_findings={critical_scope_count}",
+        },
+        {
+            "Checklist Item": "responsibility ambiguities reviewed",
+            "Status": (
+                "complete"
+                if responsibility_ambiguity_count == 0
+                else status_by_key.get("scope_risk", "needs review")
+            ),
+            "Detail": f"responsibility_ambiguities={responsibility_ambiguity_count}",
+        },
+        {
+            "Checklist Item": "high-risk engineering findings reviewed",
+            "Status": (
+                "complete"
+                if high_risk_engineering_count == 0
+                else status_by_key.get("engineering", "needs review")
+            ),
+            "Detail": f"high_risk_engineering_findings={high_risk_engineering_count}",
+        },
+        {
+            "Checklist Item": "recommended RFIs reviewed",
+            "Status": (
+                "complete"
+                if recommended_rfi_count == 0
+                else status_by_key.get("scope_risk", "needs review")
+            ),
+            "Detail": f"recommended_rfis={recommended_rfi_count}",
+        },
+        {
+            "Checklist Item": "estimate coverage reviewed",
+            "Status": status_by_key.get("estimate", "not started"),
+            "Detail": f"known_cost_lines={known_cost_lines}/{total_bom_lines}",
+        },
+        {
+            "Checklist Item": "summary report generated",
+            "Status": status_by_key.get("summary_report", "not started"),
+            "Detail": _safe_text(
+                _review_flags_state(st).get("summary_report_generated_at"),
+                "not generated",
+            ),
+        },
+    ]
+
+    return checklist
+
+
+def _summary_report_payload(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> dict[str, Any]:
+    summary = _build_project_analysis_summary(record, context)
+    step_rows = _review_step_status_rows(st, record, context)
+    checklist = _review_checklist_rows(st, record, context, step_rows)
+    next_action = _next_review_action(step_rows)
+
+    import_summary = dict(context.get("import_summary") or {}) if context else {}
+    bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+    bom_metrics = _canonical_bom_metrics(bom_rows)
+    missing_bom_rows = [
+        row
+        for row in bom_rows
+        if _safe_text(row.get("completeness_status"), "").lower()
+        not in {"complete", "drawing_only", "specification_only"}
+    ]
+
+    scope_rows = _scope_risk_findings(context)
+    sections = _scope_risk_sections(scope_rows)
+    scope_gaps = list(sections.get("Missing Scope") or [])
+    responsibility_risks = list(sections.get("Responsibility Gaps") or [])
+    engineering_risks = list(sections.get("Engineering Gaps") or []) + list(
+        sections.get("Commercial Risks") or []
+    )
+    recommended_rfis = [
+        item for item in scope_rows if _safe_text(item.get("candidate_rfi_text"), "")
+    ]
+
+    engineering_review = _sales_design_review(st, record, context) or {}
+    known_limitations = list(engineering_review.get("limitations") or [])
+    known_limitations.extend(list(context.get("warnings") or []) if context else [])
+
+    known_cost_lines = sum(1 for row in bom_rows if row.get("known_cost") is not None)
+    total_lines = len(bom_rows)
+    review = context.get("review") if context else None
+    labor_estimate = getattr(review, "labor_estimate", None) if review else None
+    labor_confidence = _safe_text(getattr(labor_estimate, "confidence", None), "n/a")
+    estimate_coverage = {
+        "total_bom_lines": total_lines,
+        "known_cost_lines": known_cost_lines,
+        "coverage_percent": (
+            int((known_cost_lines / total_lines) * 100) if total_lines else 0
+        ),
+        "labor_confidence": labor_confidence,
+    }
+
+    return {
+        "project_overview": {
+            "project_name": summary.get("project_name"),
+            "customer": summary.get("customer"),
+            "project_type": summary.get("project_type"),
+            "analysis_status": summary.get("analysis_status"),
+        },
+        "documents_reviewed": {
+            "total_files": int(import_summary.get("total_files", 0) or 0),
+            "documents_requiring_ocr": int(
+                import_summary.get("documents_requiring_ocr", 0) or 0
+            ),
+            "supported_files": int(import_summary.get("supported_files", 0) or 0),
+            "unsupported_files": int(import_summary.get("unsupported_files", 0) or 0),
+        },
+        "bom_summary": bom_metrics,
+        "missing_or_incomplete_bom_detail": missing_bom_rows,
+        "scope_gaps": scope_gaps,
+        "responsibility_risks": responsibility_risks,
+        "engineering_risks": engineering_risks,
+        "recommended_rfis": recommended_rfis,
+        "estimate_coverage": estimate_coverage,
+        "recommended_next_actions": [
+            {
+                "step": item.get("step"),
+                "page": item.get("page"),
+                "status": item.get("status"),
+                "detail": item.get("detail"),
+            }
+            for item in step_rows
+            if _safe_text(item.get("status"), "") != "complete"
+        ],
+        "known_limitations": sorted(
+            {_safe_text(item, "") for item in known_limitations}
+        ),
+        "guided_review_steps": step_rows,
+        "review_checklist": checklist,
+        "recommended_next_action": next_action,
+        "generated_at": _now_iso(),
+    }
+
+
+def _summary_report_markdown(payload: dict[str, Any]) -> str:
+    overview = dict(payload.get("project_overview") or {})
+    documents = dict(payload.get("documents_reviewed") or {})
+    bom_summary = dict(payload.get("bom_summary") or {})
+    estimate = dict(payload.get("estimate_coverage") or {})
+
+    lines = [
+        "# Project Summary Report",
+        "",
+        "## Project Overview",
+        f"- Project: {_safe_text(overview.get('project_name'), 'n/a')}",
+        f"- Customer: {_safe_text(overview.get('customer'), 'n/a')}",
+        f"- Project Type: {_safe_text(overview.get('project_type'), 'n/a')}",
+        f"- Analysis Status: {_safe_text(overview.get('analysis_status'), 'n/a')}",
+        "",
+        "## Documents Reviewed",
+        f"- Total files: {int(documents.get('total_files', 0) or 0)}",
+        f"- Documents requiring OCR: {int(documents.get('documents_requiring_ocr', 0) or 0)}",
+        f"- Supported files: {int(documents.get('supported_files', 0) or 0)}",
+        f"- Unsupported files: {int(documents.get('unsupported_files', 0) or 0)}",
+        "",
+        "## BOM Summary",
+        f"- Candidate lines: {int(bom_summary.get('total_candidate_bom_lines', 0) or 0)}",
+        f"- Complete lines: {int(bom_summary.get('complete_lines', 0) or 0)}",
+        f"- Incomplete lines: {int(bom_summary.get('incomplete_lines', 0) or 0)}",
+        f"- Conflicting lines: {int(bom_summary.get('conflicting_lines', 0) or 0)}",
+        "",
+        "## Missing or Incomplete BOM Detail",
+    ]
+
+    for row in list(payload.get("missing_or_incomplete_bom_detail") or [])[:15]:
+        lines.append(
+            "- "
+            + _safe_text(row.get("bom_item_id"), "Unknown BOM line")
+            + " | "
+            + _safe_text(row.get("completeness_status"), "unresolved")
+            + " | "
+            + _safe_text(row.get("description"), "n/a")
+        )
+
+    lines.extend(["", "## Scope Gaps"])
+    for row in list(payload.get("scope_gaps") or [])[:15]:
+        lines.append(
+            "- "
+            + _safe_text(row.get("title"), "Scope finding")
+            + " | "
+            + _safe_text(row.get("recommended_action"), "review required")
+        )
+
+    lines.extend(["", "## Responsibility Risks"])
+    for row in list(payload.get("responsibility_risks") or [])[:15]:
+        lines.append(
+            "- "
+            + _safe_text(row.get("title"), "Responsibility finding")
+            + " | "
+            + _safe_text(row.get("likely_owner"), "owner not assigned")
+        )
+
+    lines.extend(["", "## Engineering Risks"])
+    for row in list(payload.get("engineering_risks") or [])[:15]:
+        lines.append(
+            "- "
+            + _safe_text(row.get("title"), "Engineering risk")
+            + " | "
+            + _safe_text(row.get("recommended_action"), "review required")
+        )
+
+    lines.extend(["", "## Recommended RFIs"])
+    for row in list(payload.get("recommended_rfis") or [])[:15]:
+        lines.append(
+            "- "
+            + _safe_text(row.get("title"), "RFI")
+            + " | "
+            + _safe_text(row.get("candidate_rfi_text"), "internal draft")
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Estimate Coverage",
+            f"- Total BOM lines: {int(estimate.get('total_bom_lines', 0) or 0)}",
+            f"- Known cost lines: {int(estimate.get('known_cost_lines', 0) or 0)}",
+            f"- Coverage percent: {int(estimate.get('coverage_percent', 0) or 0)}%",
+            f"- Labor confidence: {_safe_text(estimate.get('labor_confidence'), 'n/a')}",
+            "",
+            "## Recommended Next Actions",
+        ]
+    )
+    for row in list(payload.get("recommended_next_actions") or [])[:12]:
+        lines.append(
+            "- "
+            + _safe_text(row.get("step"), "Next step")
+            + " ("
+            + _safe_text(row.get("page"), "Overview")
+            + "): "
+            + _safe_text(row.get("detail"), "review required")
+        )
+
+    lines.extend(["", "## Known Limitations"])
+    for item in list(payload.get("known_limitations") or []):
+        lines.append("- " + _safe_text(item, "n/a"))
+
+    return "\n".join(lines) + "\n"
+
+
+def _summary_report_html(payload: dict[str, Any]) -> str:
+    import html
+
+    markdown = _summary_report_markdown(payload)
+    return (
+        "<html><head><meta charset='utf-8'><title>Project Summary Report</title></head><body>"
+        + "<pre>"
+        + html.escape(markdown)
+        + "</pre></body></html>"
+    )
+
+
+def _render_review_transition(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+    step_key: str,
+    *,
+    mark_label: str,
+) -> None:
+    step_rows = _review_step_status_rows(st, record, context)
+    current = next((row for row in step_rows if row.get("key") == step_key), None)
+    next_action = _next_review_action(step_rows)
+
+    if current is None:
+        return
+
+    st.markdown("### Review Progress")
+    st.dataframe(
+        [
+            {
+                "Current Step": current.get("step"),
+                "Status": _status_chip(_safe_text(current.get("status"), "").title()),
+                "Detail": current.get("detail"),
+            },
+            {
+                "Current Step": "Recommended Next",
+                "Status": _status_chip(
+                    _safe_text(next_action.get("status"), "").title()
+                ),
+                "Detail": _safe_text(next_action.get("step"), "")
+                + " - "
+                + _safe_text(next_action.get("detail"), ""),
+            },
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    action_cols = st.columns(2)
+    if action_cols[0].button(mark_label, use_container_width=True):
+        _set_review_flag(st, f"{step_key}_reviewed", True)
+        st.rerun()
+
+    if action_cols[1].button(
+        f"Continue to {_safe_text(next_action.get('step'), 'Next Step')}",
+        use_container_width=True,
+    ):
+        st.session_state["atlas_active_page"] = _safe_text(
+            next_action.get("page"),
+            "Overview",
+        )
+        st.rerun()
+
+
 def _build_project_analysis_summary(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
@@ -810,17 +1458,23 @@ def _build_project_analysis_summary(
         analysis_status = "Analysis complete"
 
     if document_count == 0:
-        recommended_next_action = "Upload project documents to start analysis."
+        recommended_next_action = (
+            "Open Documents to upload files and start deterministic project analysis."
+        )
     elif review is None:
-        recommended_next_action = "Run Project Analysis."
+        recommended_next_action = "Open Documents and run Project Analysis."
     elif documents_requiring_ocr > 0:
-        recommended_next_action = "Review documents requiring OCR."
+        recommended_next_action = (
+            "Open Documents to review OCR-required files before finalizing conclusions."
+        )
     elif unresolved_scope_issue_count > 0:
-        recommended_next_action = "Review missing or undeveloped scope."
+        recommended_next_action = "Open Scope & Risk to review critical gaps, ownership ambiguity, and draft RFIs."
     elif high_risk_issue_count > 0:
-        recommended_next_action = "Review engineering and commercial risks."
+        recommended_next_action = "Open Engineering Review to resolve high-risk findings and recommended actions."
     else:
-        recommended_next_action = "Export a concise internal report."
+        recommended_next_action = (
+            "Open Reports to generate and export the concise project summary report."
+        )
 
     return {
         "project_name": record.project.name,
@@ -1172,6 +1826,7 @@ def _init_session_state(st: Any) -> None:
         "atlas_price_list_library", _default_price_list_library_state()
     )
     st.session_state.setdefault("atlas_price_list_signature", "")
+    st.session_state.setdefault("atlas_review_flags", {})
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -1590,6 +2245,7 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
         "engineering_notebook_entries": list(
             st.session_state.get("atlas_notebook_entries") or []
         ),
+        "review_flags": dict(st.session_state.get("atlas_review_flags") or {}),
     }
 
 
@@ -1647,6 +2303,10 @@ def _restore_workspace_state(
     notebook_entries = state.get("engineering_notebook_entries")
     if isinstance(notebook_entries, list):
         st.session_state["atlas_notebook_entries"] = list(notebook_entries)
+
+    review_flags = state.get("review_flags")
+    if isinstance(review_flags, dict):
+        st.session_state["atlas_review_flags"] = dict(review_flags)
 
     st.session_state["atlas_loaded_workspace_state_for"] = record.workspace_id
 
@@ -2358,6 +3018,14 @@ def _render_estimate_page(
     else:
         st.info("No labor estimate output is available yet.")
 
+    _render_review_transition(
+        st,
+        record,
+        context,
+        "estimate",
+        mark_label="Mark Estimate Coverage Reviewed",
+    )
+
 
 def _render_pinned_projects_page(
     st: Any,
@@ -3004,6 +3672,14 @@ def _render_bom_review_page(
         use_container_width=True,
     )
 
+    _render_review_transition(
+        st,
+        record,
+        context,
+        "bom",
+        mark_label="Mark BOM Review Complete",
+    )
+
 
 def _render_scope_risk_page(
     st: Any,
@@ -3183,6 +3859,14 @@ def _render_scope_risk_page(
                 use_container_width=True,
                 hide_index=True,
             )
+
+    _render_review_transition(
+        st,
+        record,
+        context,
+        "scope_risk",
+        mark_label="Mark Scope and Risk Reviewed",
+    )
 
 
 def _render_price_list_library_page(
@@ -3495,35 +4179,467 @@ def _render_engineering_review_page(
         use_container_width=True,
     )
 
+    _render_review_transition(
+        st,
+        record,
+        context,
+        "engineering",
+        mark_label="Mark Engineering Findings Reviewed",
+    )
+
 
 def _render_workflow_reports_page(
     st: Any,
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
+    import json
+
     summary = _build_project_analysis_summary(record, context)
+    step_rows = _review_step_status_rows(st, record, context)
+    checklist_rows = _review_checklist_rows(st, record, context, step_rows)
+    next_action = _next_review_action(step_rows)
+    completed_steps = sum(
+        1 for row in step_rows if _safe_text(row.get("status"), "") == "complete"
+    )
+
     _render_page_header(
         st,
         "Reports",
-        "Export a concise internal report after BOM, scope, risk, and engineering review are complete.",
+        "Project report center for guided review completion and deterministic exports.",
     )
 
+    st.markdown("### Guided Review Progress")
+    st.progress(completed_steps / max(len(step_rows), 1))
     st.dataframe(
         [
             {
-                "Project": summary["project_name"],
-                "Analysis Status": summary["analysis_status"],
-                "BOM Items": summary["bom_item_count"],
-                "Scope Issues": summary["unresolved_scope_issue_count"],
-                "High-Risk Issues": summary["high_risk_issue_count"],
-                "Recommended Next Action": summary["recommended_next_action"],
+                "Step": row.get("step"),
+                "Status": _status_chip(_safe_text(row.get("status"), "").title()),
+                "Page": row.get("page"),
+                "Detail": row.get("detail"),
             }
+            for row in step_rows
         ],
         use_container_width=True,
         hide_index=True,
     )
 
-    _render_reports_page(st, "Reports", context)
+    st.markdown("### Recommended Next Action")
+    st.markdown(
+        "<div class='atlas-primary-action'>"
+        "<strong>Next Review Step</strong>"
+        f"{_safe_text(next_action.get('step'), 'Generate Summary Report')}"
+        "<br/>"
+        f"{_safe_text(next_action.get('detail'), _safe_text(summary.get('recommended_next_action'), 'Generate project summary report.'))}"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    action_cols = st.columns(2)
+    if action_cols[0].button(
+        f"Open {_safe_text(next_action.get('page'), 'Overview')}",
+        use_container_width=True,
+        type="primary",
+    ):
+        st.session_state["atlas_active_page"] = _safe_text(
+            next_action.get("page"),
+            "Overview",
+        )
+        st.rerun()
+    action_cols[1].caption(_safe_text(next_action.get("why"), ""))
+
+    st.markdown("### Project Review Checklist")
+    st.dataframe(
+        [
+            {
+                "Checklist": row.get("Checklist Item"),
+                "Status": _status_chip(_safe_text(row.get("Status"), "").title()),
+                "Detail": row.get("Detail"),
+            }
+            for row in checklist_rows
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    report_views = [
+        "Project Summary",
+        "Estimator Brief",
+        "BOM Export",
+        "Scope and Risk Export",
+        "Engineering Review Export",
+    ]
+    report_view = st.radio(
+        "Reports Navigation",
+        options=report_views,
+        horizontal=True,
+        key="atlas_reports_view",
+    )
+
+    if report_view == "Project Summary":
+        payload = _summary_report_payload(st, record, context)
+        markdown_report = _summary_report_markdown(payload)
+        json_report = json.dumps(payload, indent=2, sort_keys=True)
+        html_report = _summary_report_html(payload)
+
+        st.markdown("### Project Overview")
+        st.dataframe(
+            [dict(payload.get("project_overview") or {})],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("### Documents Reviewed")
+        st.dataframe(
+            [dict(payload.get("documents_reviewed") or {})],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("### BOM Summary")
+        st.dataframe(
+            [dict(payload.get("bom_summary") or {})],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("### Missing or Incomplete BOM Detail")
+        missing_bom = list(payload.get("missing_or_incomplete_bom_detail") or [])
+        if missing_bom:
+            st.dataframe(
+                [
+                    {
+                        "BOM Item ID": item.get("bom_item_id"),
+                        "Completeness": item.get("completeness_status"),
+                        "Description": item.get("description"),
+                        "Warnings": ", ".join(list(item.get("warnings") or []))
+                        or "None",
+                    }
+                    for item in missing_bom[:12]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No incomplete BOM details are currently open.")
+
+        st.markdown("### Scope Gaps")
+        scope_gaps = list(payload.get("scope_gaps") or [])
+        if scope_gaps:
+            st.dataframe(
+                [
+                    {
+                        "Severity": item.get("severity"),
+                        "Title": item.get("title"),
+                        "Action": item.get("recommended_action"),
+                    }
+                    for item in scope_gaps[:10]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No scope gaps currently open.")
+
+        st.markdown("### Responsibility Risks")
+        responsibility = list(payload.get("responsibility_risks") or [])
+        if responsibility:
+            st.dataframe(
+                [
+                    {
+                        "Severity": item.get("severity"),
+                        "Title": item.get("title"),
+                        "Likely Owner": item.get("likely_owner"),
+                    }
+                    for item in responsibility[:10]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No responsibility risks currently open.")
+
+        st.markdown("### Engineering Risks")
+        engineering_risks = list(payload.get("engineering_risks") or [])
+        if engineering_risks:
+            st.dataframe(
+                [
+                    {
+                        "Severity": item.get("severity"),
+                        "Title": item.get("title"),
+                        "Action": item.get("recommended_action"),
+                    }
+                    for item in engineering_risks[:10]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No engineering risks currently open.")
+
+        st.markdown("### Recommended RFIs")
+        rfis = list(payload.get("recommended_rfis") or [])
+        if rfis:
+            st.dataframe(
+                [
+                    {
+                        "Title": item.get("title"),
+                        "Severity": item.get("severity"),
+                        "Internal Draft": item.get("candidate_rfi_text"),
+                    }
+                    for item in rfis[:10]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No recommended RFIs currently open.")
+
+        st.markdown("### Estimate Coverage")
+        st.dataframe(
+            [dict(payload.get("estimate_coverage") or {})],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("### Recommended Next Actions")
+        st.dataframe(
+            list(payload.get("recommended_next_actions") or [])[:12],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("### Known Limitations")
+        limitations = list(payload.get("known_limitations") or [])
+        if limitations:
+            st.dataframe(
+                [{"limitation": item} for item in limitations],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No known limitations were captured.")
+
+        with st.expander("Expanded Detail", expanded=False):
+            st.markdown("#### Guided Review Steps")
+            st.dataframe(
+                list(payload.get("guided_review_steps") or []),
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.markdown("#### Full Checklist")
+            st.dataframe(
+                list(payload.get("review_checklist") or []),
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.markdown("#### BOM Exception Detail")
+            st.dataframe(
+                list(payload.get("missing_or_incomplete_bom_detail") or [])[:100],
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.markdown("#### Confidence Calculations")
+            st.dataframe(
+                [
+                    {
+                        "Analysis Status": summary.get("analysis_status"),
+                        "Unresolved Scope Issues": summary.get(
+                            "unresolved_scope_issue_count"
+                        ),
+                        "High Risk Issues": summary.get("high_risk_issue_count"),
+                        "Documents Requiring OCR": summary.get(
+                            "documents_requiring_ocr"
+                        ),
+                    }
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        st.markdown("### Export Project Summary")
+        export_cols = st.columns(3)
+        exported_md = export_cols[0].download_button(
+            "Download Project Summary Markdown",
+            data=markdown_report,
+            file_name=f"{record.project.project_id}_project_summary_report.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
+        exported_json = export_cols[1].download_button(
+            "Download Project Summary JSON",
+            data=json_report,
+            file_name=f"{record.project.project_id}_project_summary_report.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+        exported_html = export_cols[2].download_button(
+            "Download Project Summary HTML",
+            data=html_report,
+            file_name=f"{record.project.project_id}_project_summary_report.html",
+            mime="text/html",
+            use_container_width=True,
+        )
+        if exported_md or exported_json or exported_html:
+            _set_review_flag(st, "summary_report_generated", True)
+            _set_review_flag(st, "summary_report_generated_at", _now_iso())
+
+        _render_review_transition(
+            st,
+            record,
+            context,
+            "summary_report",
+            mark_label="Mark Summary Report Generated",
+        )
+
+    elif report_view == "Estimator Brief":
+        brief = context.get("brief") if context else None
+        if brief is None:
+            _render_guided_empty_state(
+                st,
+                why_empty="Estimator brief is not available for this project context.",
+                action_to_populate="Run project analysis and revisit Reports.",
+                next_location="Go to Documents and run project analysis.",
+            )
+        else:
+            brief_dict = brief.to_dict() if hasattr(brief, "to_dict") else {}
+            st.dataframe([brief_dict], use_container_width=True, hide_index=True)
+            brief_json = json.dumps(brief_dict, indent=2, sort_keys=True)
+            brief_markdown = "# Estimator Brief\n\n```json\n" + brief_json + "\n```\n"
+            export_cols = st.columns(2)
+            export_cols[0].download_button(
+                "Download Estimator Brief Markdown",
+                data=brief_markdown,
+                file_name=f"{record.project.project_id}_estimator_brief.md",
+                mime="text/markdown",
+                use_container_width=True,
+            )
+            export_cols[1].download_button(
+                "Download Estimator Brief JSON",
+                data=brief_json,
+                file_name=f"{record.project.project_id}_estimator_brief.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+    elif report_view == "BOM Export":
+        bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+        if not bom_rows:
+            _render_guided_empty_state(
+                st,
+                why_empty="BOM export is unavailable because no BOM lines exist yet.",
+                action_to_populate="Run project analysis and review BOM lines.",
+                next_location="Go to Documents, run analysis, then BOM Review.",
+            )
+        else:
+            st.dataframe(
+                [dict(_canonical_bom_metrics(bom_rows))],
+                use_container_width=True,
+                hide_index=True,
+            )
+            export_csv, export_json = _canonical_bom_export_payload(bom_rows)
+            export_cols = st.columns(2)
+            export_cols[0].download_button(
+                "Download Candidate BOM CSV",
+                data=export_csv,
+                file_name=f"{record.project.project_id}_candidate_bom.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+            export_cols[1].download_button(
+                "Download Candidate BOM JSON",
+                data=export_json,
+                file_name=f"{record.project.project_id}_candidate_bom.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+    elif report_view == "Scope and Risk Export":
+        findings = _scope_risk_findings(context)
+        if not findings:
+            _render_guided_empty_state(
+                st,
+                why_empty="Scope and risk export is unavailable because no findings were generated.",
+                action_to_populate="Run project analysis and review Scope & Risk.",
+                next_location="Go to Documents, run analysis, then Scope & Risk.",
+            )
+        else:
+            metrics = _scope_risk_metrics(findings)
+            export_payload = {
+                "metrics": metrics,
+                "findings": findings,
+            }
+            json_payload = json.dumps(export_payload, indent=2, sort_keys=True)
+            markdown_lines = [
+                "# Scope and Risk Export",
+                "",
+                f"- Total findings: {int(metrics.get('total', 0) or 0)}",
+                f"- Critical findings: {int(metrics.get('critical', 0) or 0)}",
+                f"- High severity findings: {int(metrics.get('high', 0) or 0)}",
+                "",
+                "## Findings",
+            ]
+            for item in findings[:40]:
+                markdown_lines.append(
+                    "- "
+                    + _safe_text(item.get("finding_id"), "finding")
+                    + " | "
+                    + _safe_text(item.get("severity"), "n/a")
+                    + " | "
+                    + _safe_text(item.get("title"), "n/a")
+                )
+            markdown_payload = "\n".join(markdown_lines) + "\n"
+            st.dataframe(findings[:20], use_container_width=True, hide_index=True)
+            export_cols = st.columns(2)
+            export_cols[0].download_button(
+                "Download Scope and Risk Markdown",
+                data=markdown_payload,
+                file_name=f"{record.project.project_id}_scope_risk.md",
+                mime="text/markdown",
+                use_container_width=True,
+            )
+            export_cols[1].download_button(
+                "Download Scope and Risk JSON",
+                data=json_payload,
+                file_name=f"{record.project.project_id}_scope_risk.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+    else:
+        review_obj = SalesDesignReviewService().build_review(
+            summary=_build_project_analysis_summary(record, context),
+            bom_rows=_enriched_bom_rows(st, _canonical_bom_items(context)),
+            scope_findings=_scope_risk_findings(context),
+        )
+        st.dataframe(
+            [review_obj.to_dict() if hasattr(review_obj, "to_dict") else {}],
+            use_container_width=True,
+            hide_index=True,
+        )
+        export_cols = st.columns(3)
+        project_id = _safe_text(record.project.project_id, "project")
+        export_cols[0].download_button(
+            "Download Engineering Review Markdown",
+            data=SalesDesignReviewService().to_markdown(review_obj),
+            file_name=f"{project_id}_sales_design_review.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
+        export_cols[1].download_button(
+            "Download Engineering Review JSON",
+            data=SalesDesignReviewService().to_json(review_obj),
+            file_name=f"{project_id}_sales_design_review.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+        export_cols[2].download_button(
+            "Download Engineering Review HTML",
+            data=SalesDesignReviewService().to_html(review_obj),
+            file_name=f"{project_id}_sales_design_review.html",
+            mime="text/html",
+            use_container_width=True,
+        )
 
 
 def _workflow_validation_rows(context: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -3622,15 +4738,53 @@ def _render_overview_page(
     scope_rows = _scope_risk_findings(context)
     engineering_review = _sales_design_review(st, record, context)
     timeline = _timeline_events(record, context)
+    step_rows = _review_step_status_rows(st, record, context)
+    checklist_rows = _review_checklist_rows(st, record, context, step_rows)
+    next_action = _next_review_action(step_rows)
+    completed_steps = sum(
+        1 for row in step_rows if _safe_text(row.get("status"), "") == "complete"
+    )
 
     st.markdown("### Recommended Next Action")
     st.markdown(
         "<div class='atlas-primary-action'>"
         "<strong>Do This Next</strong>"
-        f"{_safe_text(summary.get('recommended_next_action'), 'Open Documents and run project analysis.')}"
+        f"{_safe_text(next_action.get('step'), 'Review Documents')}"
+        "<br/>"
+        f"{_safe_text(next_action.get('detail'), _safe_text(summary.get('recommended_next_action'), 'Open Documents and run project analysis.'))}"
         "</div>",
         unsafe_allow_html=True,
     )
+    link_cols = st.columns(2)
+    if link_cols[0].button(
+        f"Open {_safe_text(next_action.get('page'), 'Documents')}",
+        use_container_width=True,
+        type="primary",
+    ):
+        st.session_state["atlas_active_page"] = _safe_text(
+            next_action.get("page"),
+            "Documents",
+        )
+        st.rerun()
+    link_cols[1].caption(_safe_text(next_action.get("why"), ""))
+
+    st.markdown("### Guided Project Review")
+    st.progress(completed_steps / max(len(step_rows), 1))
+    st.caption(f"{completed_steps} of {len(step_rows)} steps complete")
+    st.dataframe(
+        [
+            {
+                "Step": row.get("step"),
+                "Status": _status_chip(_safe_text(row.get("status"), "").title()),
+                "Page": row.get("page"),
+                "Detail": row.get("detail"),
+            }
+            for row in step_rows
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
     primary_actions = st.columns(4)
     if primary_actions[0].button("Open Documents", use_container_width=True):
         st.session_state["atlas_active_page"] = "Documents"
@@ -3644,6 +4798,20 @@ def _render_overview_page(
     if primary_actions[3].button("Open Engineering Review", use_container_width=True):
         st.session_state["atlas_active_page"] = "Engineering Review"
         st.rerun()
+
+    st.markdown("### Project Review Checklist")
+    st.dataframe(
+        [
+            {
+                "Checklist": row.get("Checklist Item"),
+                "Status": _status_chip(_safe_text(row.get("Status"), "").title()),
+                "Detail": row.get("Detail"),
+            }
+            for row in checklist_rows
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
 
     st.markdown("### Critical Issues")
     critical_scope = [
@@ -9035,6 +10203,14 @@ def _render_project_files_page(
     selected_file = st.selectbox("Select file", options=file_labels)
     selected = next(item for item in filtered if item["filename"] == selected_file)
     _set_context_selection(st, "file", {"folder": folder_name, "file": selected})
+
+    _render_review_transition(
+        st,
+        record,
+        context,
+        "documents",
+        mark_label="Mark Documents Reviewed",
+    )
 
 
 def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:

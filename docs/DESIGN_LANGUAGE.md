@@ -145,6 +145,12 @@ Project Workspace pages should follow an action-first hierarchy:
 - Summary metrics
 - Drill-down evidence
 
+Project Workspace review should also provide a visible, non-blocking guided sequence (Documents, BOM, Scope and Risk, Engineering Findings, Estimate Coverage, Summary Report) so users always know progress without being forced through a wizard.
+
+Guided steps should use explicit statuses: not started, ready, needs review, blocked, complete.
+
+Recommended next action should target the next incomplete review step, explain why it matters, and provide direct navigation.
+
 Desktop should only show a dedicated context column when a concrete object/evidence selection is active. Otherwise, the workspace should prioritize a larger main decision area.
 
 ## 13. Data Visualization
@@ -184,6 +190,8 @@ Atlas components should be optimized for engineering clarity.
 - The context panel should expose canonical values, supporting evidence, and uncertainty.
 - Empty states should explain why data is empty, how to populate it, and what the next step is.
 - Detailed diagnostics should be discoverable through drill-down, not forced into the default page view.
+- Checklist-driven review summaries should make completion state understandable at a glance.
+- Internal summary reports should default to concise decision support and expose long evidence/detail through expansion, not by default verbosity.
 
 ## 17. Themes
 

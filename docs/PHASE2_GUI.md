@@ -221,6 +221,88 @@ Primary workflow pages now default to summary views first and keep deep detail i
    - top-level "What Should Happen Next" action is promoted with direct page actions
    - full narrative sections remain available below
 
+## Guided Project Review (Sprint 3)
+Project Workspace now guides review as an ordered, non-blocking sequence:
+
+1. Review Documents
+2. Review BOM
+3. Review Scope and Risk
+4. Review Engineering Findings
+5. Review Estimate Coverage
+6. Generate Summary Report
+
+Users can still navigate freely. Atlas does not enforce a rigid wizard.
+
+Progress behavior:
+- Overview and Reports display guided-step progress with status and detail.
+- Each workflow page includes a local "mark reviewed" transition panel.
+- Transition panel shows current step status, next recommended action, and a direct continue link.
+
+## Review Status Model
+Each guided step uses one status:
+- not started
+- ready
+- needs review
+- blocked
+- complete
+
+Status is derived from existing project data and current review completion markers.
+
+Examples:
+- Documents can be blocked when all files are OCR-required.
+- BOM can be needs review when unresolved/conflicting lines remain.
+- Scope and Risk can be needs review when critical gaps/ambiguities/RFIs are open.
+- Summary Report is blocked until upstream analysis/review prerequisites are present.
+
+## Project Review Checklist
+Overview and Reports include a deterministic checklist:
+- all documents processed
+- OCR-required documents identified
+- BOM reviewed
+- unresolved BOM items reviewed
+- critical scope gaps reviewed
+- responsibility ambiguities reviewed
+- high-risk engineering findings reviewed
+- recommended RFIs reviewed
+- estimate coverage reviewed
+- summary report generated
+
+Checklist status is traceable to current workspace data and review markers.
+
+## Reports Center (Project Workspace)
+Inside project Reports, navigation now explicitly includes:
+- Project Summary
+- Estimator Brief
+- BOM Export
+- Scope and Risk Export
+- Engineering Review Export
+
+## Project Summary Report
+Project Summary is an internal engineering report (not a proposal).
+
+Default sections:
+- Project Overview
+- Documents Reviewed
+- BOM Summary
+- Missing or Incomplete BOM Detail
+- Scope Gaps
+- Responsibility Risks
+- Engineering Risks
+- Recommended RFIs
+- Estimate Coverage
+- Recommended Next Actions
+- Known Limitations
+
+Concise-by-default behavior:
+- Main report remains compact.
+- Expanded detail is available via drill-down sections for evidence, long issue lists, BOM exceptions, and confidence calculations.
+
+Export behavior:
+- Project Summary export supports deterministic Markdown, JSON, and HTML.
+- BOM Export supports deterministic CSV and JSON.
+- Scope and Risk Export supports deterministic Markdown and JSON.
+- Engineering Review Export supports deterministic Markdown, JSON, and HTML.
+
 ## Executive Summary
 Executive Summary consolidates:
 - overall health
