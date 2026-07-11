@@ -138,6 +138,15 @@ Navigation should always help answer four questions:
 
 Navigation should be persistent, require minimal clicks, and maintain a predictable hierarchy. The interface should feel like a workspace, not a maze.
 
+Project Workspace pages should follow an action-first hierarchy:
+- Recommended next action
+- Primary actions
+- Critical issues and blockers
+- Summary metrics
+- Drill-down evidence
+
+Desktop should only show a dedicated context column when a concrete object/evidence selection is active. Otherwise, the workspace should prioritize a larger main decision area.
+
 ## 13. Data Visualization
 
 Charts should exist only when they improve engineering understanding.
@@ -173,6 +182,8 @@ Atlas components should be optimized for engineering clarity.
 - Navigation should remain persistent and predictable.
 - Search should help users move from object discovery to decision context.
 - The context panel should expose canonical values, supporting evidence, and uncertainty.
+- Empty states should explain why data is empty, how to populate it, and what the next step is.
+- Detailed diagnostics should be discoverable through drill-down, not forced into the default page view.
 
 ## 17. Themes
 

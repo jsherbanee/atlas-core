@@ -129,6 +129,8 @@ Context panel behavior:
 - Primary workflow pages emphasize summary conclusions first.
 - Evidence and traceability remain available through drill-down pages instead of appearing by default.
 - Advanced pages continue to expose lower-level context and diagnostics when needed.
+- Desktop now uses a conditional context column: it appears only when a specific object/evidence selection is active.
+- Workflow pages default to two-column emphasis (navigation + main work area) unless context drill-down is requested.
 
 Responsive behavior:
 - Desktop: persistent navigation with summary-first workflow pages.
@@ -180,14 +182,44 @@ It also exposes one prominent action button:
 
 ## Overview
 Overview displays current project health at a glance:
-- project metadata (name, owner, architect/consultants, project number, dates)
-- lifecycle stage and project status
-- import status
-- readiness score and readiness level
-- confidence and top risk counts
-- recent activity
-- import summary
-- quick actions
+- a prominent Recommended Next Action block at top of page
+- primary navigation actions for Documents, BOM Review, Scope & Risk, and Engineering Review
+- critical issues table first (critical/high scope findings)
+- project metadata and engineering summary after action/risk context
+- recent activity and import summary for situational awareness
+
+Hierarchy order is fixed:
+1. recommended next action
+2. primary actions
+3. critical issues
+4. project summary and metrics
+5. recent activity and supporting detail
+
+This keeps the first screen action-oriented rather than report-oriented.
+
+## Guided Empty States
+Workflow pages now use guided empty states instead of generic placeholders.
+
+Each empty state explicitly answers:
+- why data is empty
+- what action will populate it
+- where to go next
+
+This pattern is used in Overview activity, Documents filters, BOM Review, Scope & Risk, and Engineering Review.
+
+## Workflow Page Density
+Primary workflow pages now default to summary views first and keep deep detail in optional drill-down sections.
+
+- BOM Review:
+   - priority summary appears above detailed line exploration
+   - line evidence moved into a collapsed drill-down panel
+- Scope & Risk:
+   - priority risks (critical/high) are shown first
+   - lower-priority categories are collapsed into drill-down
+   - finding-level full detail is collapsed by default
+- Engineering Review:
+   - top-level "What Should Happen Next" action is promoted with direct page actions
+   - full narrative sections remain available below
 
 ## Executive Summary
 Executive Summary consolidates:

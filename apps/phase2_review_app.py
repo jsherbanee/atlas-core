@@ -395,6 +395,20 @@ def _inject_styles(st: Any) -> None:
             color: #1d4ed8;
             font-size: 0.8rem;
         }
+        .atlas-primary-action {
+            border: 1px solid #bfdbfe;
+            background: #eff6ff;
+            border-radius: 10px;
+            padding: 0.7rem 0.85rem;
+            margin: 0.45rem 0 0.6rem 0;
+        }
+        .atlas-primary-action strong {
+            display: block;
+            color: #1e3a8a;
+            font-size: 0.78rem;
+            margin-bottom: 0.2rem;
+            letter-spacing: 0.01rem;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -430,6 +444,20 @@ def _render_page_header(st: Any, title: str, subtitle: str) -> None:
 
 def _render_empty_state(st: Any, message: str) -> None:
     st.info(message)
+
+
+def _render_guided_empty_state(
+    st: Any,
+    *,
+    why_empty: str,
+    action_to_populate: str,
+    next_location: str,
+) -> None:
+    st.info(
+        f"{why_empty}\n\n"
+        f"Action to populate: {action_to_populate}\n\n"
+        f"Next: {next_location}"
+    )
 
 
 def _context_cache_bucket(context: dict[str, Any] | None) -> dict[str, Any]:
@@ -1437,26 +1465,13 @@ def _render_header(
         st.session_state.get("atlas_active_page"), "Mission Control"
     )
 
-    cols = st.columns([2.0, 1.3, 1.3, 1.3])
+    cols = st.columns([2.2, 2.0])
     if cols[0].button("Atlas", use_container_width=True, type="secondary"):
         st.session_state["atlas_active_page"] = "Mission Control"
         st.rerun()
 
     if cols[1].button("Return to Mission Control", use_container_width=True):
         st.session_state["atlas_active_page"] = "Mission Control"
-        st.rerun()
-
-    if cols[2].button("Timeline", use_container_width=True):
-        if record is not None:
-            st.session_state["atlas_active_page"] = "Timeline"
-        else:
-            st.session_state["atlas_active_page"] = "Reports"
-        st.rerun()
-
-    if cols[3].button("Settings", use_container_width=True):
-        st.session_state["atlas_active_page"] = (
-            "Workspace Settings" if record is not None else "Administration"
-        )
         st.rerun()
 
     if record is None:
@@ -1504,6 +1519,11 @@ def _nav_buttons(
         if active_page == "Mission Control"
         else _navigation_groups(record)
     )
+
+    if record is not None and active_page != "Mission Control":
+        host.markdown("### Active Project")
+        host.caption(record.project.name)
+        host.markdown("---")
 
     for group_name, entries in nav_groups:
         with host.expander(
@@ -2653,8 +2673,11 @@ def _render_bom_review_page(
 
     bom_rows = _canonical_bom_items(context)
     if not bom_rows:
-        st.info(
-            "No BOM items available yet. Upload documents and run project analysis first."
+        _render_guided_empty_state(
+            st,
+            why_empty="No BOM items are available because Atlas has not produced canonical BOM lines yet.",
+            action_to_populate="Upload documents and run project analysis from Documents.",
+            next_location="Go to Documents and run project analysis.",
         )
         return
 
@@ -2681,6 +2704,38 @@ def _render_bom_review_page(
         str(metrics["specification_only_items"]),
     )
     _metric_card(cards_bottom[2], "Unresolved Items", str(metrics["unresolved_items"]))
+
+    missing_manufacturer = sum(
+        1
+        for item in bom_rows
+        if item.get("completeness_status") == "missing_manufacturer"
+    )
+    missing_model = sum(
+        1 for item in bom_rows if item.get("completeness_status") == "missing_model"
+    )
+    needing_review = sum(
+        1
+        for item in bom_rows
+        if item.get("completeness_status")
+        not in {"complete", "drawing_only", "specification_only"}
+    )
+
+    st.markdown("### Priority Summary")
+    st.dataframe(
+        [
+            {
+                "Complete Items": metrics["complete_lines"],
+                "Incomplete Items": metrics["incomplete_lines"],
+                "Unresolved Items": metrics["unresolved_items"],
+                "Quantity Conflicts": metrics["conflicting_lines"],
+                "Missing Manufacturer": missing_manufacturer,
+                "Missing Model": missing_model,
+                "Items Requiring Review": needing_review,
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
 
     st.markdown("### Candidate BOM Lines")
     search_text = st.text_input(
@@ -2778,7 +2833,12 @@ def _render_bom_review_page(
         filtered_rows.append(row)
 
     if not filtered_rows:
-        st.info("No BOM lines match the current search and filters.")
+        _render_guided_empty_state(
+            st,
+            why_empty="No BOM lines match the current filters.",
+            action_to_populate="Relax search/filter criteria or clear completeness and confidence filters.",
+            next_location="Use the filter controls above to broaden results.",
+        )
         return
 
     view_mode = st.radio(
@@ -2861,65 +2921,70 @@ def _render_bom_review_page(
             hide_index=True,
         )
 
-    st.markdown("### Line Evidence")
-    selected_bom_id = st.selectbox(
-        "Select BOM line",
-        options=[_safe_text(item.get("bom_item_id"), "") for item in filtered_rows],
-        key="atlas_bom_selected_item",
-    )
-    selected_row = next(
-        (row for row in filtered_rows if row.get("bom_item_id") == selected_bom_id),
-        None,
-    )
-    if selected_row is not None:
-        st.dataframe(
-            [
-                {
-                    "BOM Item ID": selected_row.get("bom_item_id"),
-                    "Completeness": selected_row.get("completeness_status"),
-                    "Warnings": ", ".join(list(selected_row.get("warnings") or []))
-                    or "None",
-                    "Related RFIs": ", ".join(
-                        list(selected_row.get("related_rfi_candidates") or [])
-                    )
-                    or "None",
-                    "Matched Manufacturer Product": selected_row.get(
-                        "matched_manufacturer_product"
-                    )
-                    or "None",
-                    "Matched Vendor Offer": selected_row.get("matched_vendor_offer")
-                    or "None",
-                    "List Price": selected_row.get("list_price"),
-                    "Known Cost": selected_row.get("known_cost"),
-                    "Pricing Source": selected_row.get("pricing_source") or "None",
-                    "Pricing Effective Date": selected_row.get("pricing_effective_date")
-                    or "None",
-                    "Match Confidence": selected_row.get("match_confidence"),
-                    "Pricing Warning": selected_row.get("pricing_warning") or "None",
-                }
-            ],
-            use_container_width=True,
-            hide_index=True,
+    with st.expander("Line Evidence (Drill-down)", expanded=False):
+        selected_bom_id = st.selectbox(
+            "Select BOM line",
+            options=[_safe_text(item.get("bom_item_id"), "") for item in filtered_rows],
+            key="atlas_bom_selected_item",
         )
+        selected_row = next(
+            (row for row in filtered_rows if row.get("bom_item_id") == selected_bom_id),
+            None,
+        )
+        if selected_row is not None:
+            st.dataframe(
+                [
+                    {
+                        "BOM Item ID": selected_row.get("bom_item_id"),
+                        "Completeness": selected_row.get("completeness_status"),
+                        "Warnings": ", ".join(list(selected_row.get("warnings") or []))
+                        or "None",
+                        "Related RFIs": ", ".join(
+                            list(selected_row.get("related_rfi_candidates") or [])
+                        )
+                        or "None",
+                        "Matched Manufacturer Product": selected_row.get(
+                            "matched_manufacturer_product"
+                        )
+                        or "None",
+                        "Matched Vendor Offer": selected_row.get("matched_vendor_offer")
+                        or "None",
+                        "List Price": selected_row.get("list_price"),
+                        "Known Cost": selected_row.get("known_cost"),
+                        "Pricing Source": selected_row.get("pricing_source") or "None",
+                        "Pricing Effective Date": selected_row.get(
+                            "pricing_effective_date"
+                        )
+                        or "None",
+                        "Match Confidence": selected_row.get("match_confidence"),
+                        "Pricing Warning": selected_row.get("pricing_warning")
+                        or "None",
+                    }
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
 
-        st.dataframe(
-            [
-                {
-                    "Source Document": source_file,
-                    "Page": page,
-                    "Drawing References": ", ".join(
-                        list(selected_row.get("drawing_references") or [])
-                    ),
-                    "Specification References": ", ".join(
-                        list(selected_row.get("specification_references") or [])
-                    ),
-                }
-                for source_file in list(selected_row.get("source_documents") or ["n/a"])
-                for page in list(selected_row.get("source_pages") or ["n/a"])
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
+            st.dataframe(
+                [
+                    {
+                        "Source Document": source_file,
+                        "Page": page,
+                        "Drawing References": ", ".join(
+                            list(selected_row.get("drawing_references") or [])
+                        ),
+                        "Specification References": ", ".join(
+                            list(selected_row.get("specification_references") or [])
+                        ),
+                    }
+                    for source_file in list(
+                        selected_row.get("source_documents") or ["n/a"]
+                    )
+                    for page in list(selected_row.get("source_pages") or ["n/a"])
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
 
     st.markdown("### Export")
     export_csv, export_json = _canonical_bom_export_payload(filtered_rows)
@@ -2953,8 +3018,11 @@ def _render_scope_risk_page(
 
     finding_rows = _scope_risk_findings(context)
     if not finding_rows:
-        st.info(
-            "No scope and risk findings yet. Run project analysis to generate estimator-facing findings."
+        _render_guided_empty_state(
+            st,
+            why_empty="No scope and risk findings are available yet.",
+            action_to_populate="Run project analysis and then return to Scope and Risk.",
+            next_location="Go to Documents and run project analysis.",
         )
         return
 
@@ -2965,9 +3033,31 @@ def _render_scope_risk_page(
     _metric_card(cards[2], "High Severity", str(metrics["high"]))
     _metric_card(cards[3], "Quantity Conflicts", str(metrics["quantity_conflicts"]))
 
-    st.caption(
-        "Candidate RFI language below is internal draft only and should be reviewed before external issue."
-    )
+    st.caption("Internal draft RFIs should be reviewed before external issue.")
+
+    st.markdown("### Priority Risks")
+    priority_rows = [
+        item
+        for item in finding_rows
+        if _safe_text(item.get("severity"), "").lower() in {"critical", "high"}
+    ]
+    if priority_rows:
+        st.dataframe(
+            [
+                {
+                    "Severity": item.get("severity"),
+                    "Category": item.get("category"),
+                    "Title": item.get("title"),
+                    "Impact": item.get("estimating_impact"),
+                    "Action": item.get("recommended_action"),
+                }
+                for item in priority_rows[:15]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No critical or high-priority findings are currently open.")
 
     sections = _scope_risk_sections(finding_rows)
 
@@ -2976,32 +3066,49 @@ def _render_scope_risk_page(
         "Missing Scope",
         "Responsibility Gaps",
         "Quantity Conflicts",
-        "Engineering Gaps",
-        "Commercial Risks",
     ]:
         st.markdown(f"### {section}")
         rows = list(sections.get(section) or [])
         if not rows:
             st.info(f"No findings currently classified under {section}.")
             continue
-
         st.dataframe(
             [
                 {
                     "Finding ID": item.get("finding_id"),
-                    "Category": item.get("category"),
                     "Severity": item.get("severity"),
-                    "Confidence": item.get("confidence"),
                     "Title": item.get("title"),
-                    "Estimating Impact": item.get("estimating_impact"),
+                    "Impact": item.get("estimating_impact"),
                     "Recommended Action": item.get("recommended_action"),
                     "Likely Owner": item.get("likely_owner"),
                 }
-                for item in rows[:10]
+                for item in rows[:12]
             ],
             use_container_width=True,
             hide_index=True,
         )
+
+    with st.expander("Lower Priority Findings", expanded=False):
+        for section in ["Engineering Gaps", "Commercial Risks"]:
+            st.markdown(f"#### {section}")
+            rows = list(sections.get(section) or [])
+            if not rows:
+                st.caption(f"No findings currently classified under {section}.")
+                continue
+            st.dataframe(
+                [
+                    {
+                        "Finding ID": item.get("finding_id"),
+                        "Severity": item.get("severity"),
+                        "Title": item.get("title"),
+                        "Impact": item.get("estimating_impact"),
+                        "Recommended Action": item.get("recommended_action"),
+                    }
+                    for item in rows[:12]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
 
     st.markdown("### Recommended RFIs")
     recommended_rfis = list(sections.get("Recommended RFIs") or [])
@@ -3014,68 +3121,68 @@ def _render_scope_risk_page(
     else:
         st.info("No internal draft RFI language generated yet.")
 
-    st.markdown("### Finding Drill-down")
-    finding_ids = [_safe_text(item.get("finding_id"), "") for item in finding_rows]
-    selected_finding_id = st.selectbox(
-        "Select finding",
-        options=finding_ids,
-        key="atlas_scope_risk_selected_finding",
-    )
-    selected_row = next(
-        (
-            item
-            for item in finding_rows
-            if item.get("finding_id") == selected_finding_id
-        ),
-        None,
-    )
-
-    if selected_row is not None:
-        st.dataframe(
-            [
-                {
-                    "Finding ID": selected_row.get("finding_id"),
-                    "Category": selected_row.get("category"),
-                    "Severity": selected_row.get("severity"),
-                    "Confidence": selected_row.get("confidence"),
-                    "Title": selected_row.get("title"),
-                    "Explanation": selected_row.get("concise_explanation"),
-                    "Estimating Impact": selected_row.get("estimating_impact"),
-                    "Recommended Action": selected_row.get("recommended_action"),
-                    "Likely Owner": selected_row.get("likely_owner"),
-                    "Candidate RFI (Internal Draft)": selected_row.get(
-                        "candidate_rfi_text"
-                    ),
-                }
-            ],
-            use_container_width=True,
-            hide_index=True,
+    with st.expander("Finding Drill-down", expanded=False):
+        finding_ids = [_safe_text(item.get("finding_id"), "") for item in finding_rows]
+        selected_finding_id = st.selectbox(
+            "Select finding",
+            options=finding_ids,
+            key="atlas_scope_risk_selected_finding",
+        )
+        selected_row = next(
+            (
+                item
+                for item in finding_rows
+                if item.get("finding_id") == selected_finding_id
+            ),
+            None,
         )
 
-        st.dataframe(
-            [
-                {
-                    "Affected BOM Items": ", ".join(
-                        selected_row.get("affected_bom_items") or []
-                    )
-                    or "None",
-                    "Affected Systems": ", ".join(
-                        selected_row.get("affected_systems") or []
-                    )
-                    or "None",
-                    "Affected Rooms": ", ".join(
-                        selected_row.get("affected_rooms") or []
-                    )
-                    or "None",
-                    "Source References": ", ".join(
-                        selected_row.get("source_references") or []
-                    )
-                    or "None",
-                }
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
+        if selected_row is not None:
+            st.dataframe(
+                [
+                    {
+                        "Finding ID": selected_row.get("finding_id"),
+                        "Category": selected_row.get("category"),
+                        "Severity": selected_row.get("severity"),
+                        "Confidence": selected_row.get("confidence"),
+                        "Title": selected_row.get("title"),
+                        "Explanation": selected_row.get("concise_explanation"),
+                        "Estimating Impact": selected_row.get("estimating_impact"),
+                        "Recommended Action": selected_row.get("recommended_action"),
+                        "Likely Owner": selected_row.get("likely_owner"),
+                        "Candidate RFI (Internal Draft)": selected_row.get(
+                            "candidate_rfi_text"
+                        ),
+                    }
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            st.dataframe(
+                [
+                    {
+                        "Affected BOM Items": ", ".join(
+                            selected_row.get("affected_bom_items") or []
+                        )
+                        or "None",
+                        "Affected Systems": ", ".join(
+                            selected_row.get("affected_systems") or []
+                        )
+                        or "None",
+                        "Affected Rooms": ", ".join(
+                            selected_row.get("affected_rooms") or []
+                        )
+                        or "None",
+                        "Source References": ", ".join(
+                            selected_row.get("source_references") or []
+                        )
+                        or "None",
+                    }
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
 
 
 def _render_price_list_library_page(
@@ -3194,7 +3301,12 @@ def _render_engineering_review_page(
     )
 
     if review is None:
-        st.info("Run project analysis to generate the internal engineering review.")
+        _render_guided_empty_state(
+            st,
+            why_empty="Engineering review is empty because Atlas does not yet have synthesized project conclusions.",
+            action_to_populate="Run project analysis and revisit Engineering Review.",
+            next_location="Go to Documents and run project analysis.",
+        )
         return
 
     summary = dict(review.get("project_summary") or {})
@@ -3216,6 +3328,26 @@ def _render_engineering_review_page(
         use_container_width=True,
         hide_index=True,
     )
+
+    prominent_next_actions = list(review.get("recommended_next_actions") or [])
+    st.markdown("### What Should Happen Next")
+    st.markdown(
+        "<div class='atlas-primary-action'>"
+        "<strong>Primary Recommended Action</strong>"
+        f"{_safe_text(prominent_next_actions[0] if prominent_next_actions else summary.get('recommended_next_action'), 'Review project findings and close critical gaps.')}"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    action_cols = st.columns(3)
+    if action_cols[0].button("Open Scope & Risk", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Scope & Risk"
+        st.rerun()
+    if action_cols[1].button("Open BOM Review", use_container_width=True):
+        st.session_state["atlas_active_page"] = "BOM Review"
+        st.rerun()
+    if action_cols[2].button("Open Estimate", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Estimate"
+        st.rerun()
 
     st.markdown("### 1. What Atlas Found")
     st.dataframe(
@@ -3491,6 +3623,51 @@ def _render_overview_page(
     engineering_review = _sales_design_review(st, record, context)
     timeline = _timeline_events(record, context)
 
+    st.markdown("### Recommended Next Action")
+    st.markdown(
+        "<div class='atlas-primary-action'>"
+        "<strong>Do This Next</strong>"
+        f"{_safe_text(summary.get('recommended_next_action'), 'Open Documents and run project analysis.')}"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    primary_actions = st.columns(4)
+    if primary_actions[0].button("Open Documents", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Documents"
+        st.rerun()
+    if primary_actions[1].button("Open BOM Review", use_container_width=True):
+        st.session_state["atlas_active_page"] = "BOM Review"
+        st.rerun()
+    if primary_actions[2].button("Open Scope & Risk", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Scope & Risk"
+        st.rerun()
+    if primary_actions[3].button("Open Engineering Review", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Engineering Review"
+        st.rerun()
+
+    st.markdown("### Critical Issues")
+    critical_scope = [
+        item
+        for item in scope_rows
+        if _safe_text(item.get("severity"), "").lower() in {"critical", "high"}
+    ]
+    if critical_scope:
+        st.dataframe(
+            [
+                {
+                    "Severity": item.get("severity"),
+                    "Issue": item.get("title"),
+                    "Impact": item.get("estimating_impact"),
+                    "Recommended Action": item.get("recommended_action"),
+                }
+                for item in critical_scope[:10]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.caption("No critical issues are currently open.")
+
     st.markdown("### Project Summary")
     st.dataframe(
         [
@@ -3507,9 +3684,9 @@ def _render_overview_page(
     )
 
     cards = st.columns(4)
-    _metric_card(cards[0], "Document Status", str(summary["document_count"]))
-    _metric_card(cards[1], "BOM Summary", str(bom_metrics["total_candidate_bom_lines"]))
-    _metric_card(cards[2], "Scope & Risk Summary", str(len(scope_rows)))
+    _metric_card(cards[0], "BOM Status", str(bom_metrics["total_candidate_bom_lines"]))
+    _metric_card(cards[1], "Scope & Risk", str(len(scope_rows)))
+    _metric_card(cards[2], "Document Health", str(summary["document_count"]))
     _metric_card(
         cards[3],
         "Engineering Review Status",
@@ -3538,14 +3715,12 @@ def _render_overview_page(
     if timeline:
         st.dataframe(timeline[:10], use_container_width=True, hide_index=True)
     else:
-        st.info("No recent activity yet.")
-
-    st.markdown("### Recommended Next Action")
-    st.dataframe(
-        [{"Action": summary["recommended_next_action"]}],
-        use_container_width=True,
-        hide_index=True,
-    )
+        _render_guided_empty_state(
+            st,
+            why_empty="Recent activity is empty because this workspace has no recorded events yet.",
+            action_to_populate="Upload documents or run project analysis to generate activity.",
+            next_location="Go to Documents and run project analysis.",
+        )
 
     st.caption(
         f"Document status snapshot: total files={import_summary.get('total_files', 0)}, drawings={import_summary.get('drawing_count', 0)}, specifications={import_summary.get('specification_count', 0)}, schedules={import_summary.get('schedule_count', 0)}."
@@ -8782,6 +8957,27 @@ def _render_project_files_page(
         "Documents",
         "Upload project documents, review extraction health, and run project analysis.",
     )
+
+    folder_counts = {
+        key: len(value) for key, value in _files_by_folder(context).items()
+    }
+    st.markdown("### Summary")
+    st.dataframe(
+        [
+            {
+                "Drawings": folder_counts.get("Drawings", 0),
+                "Specifications": folder_counts.get("Specifications", 0),
+                "Schedules": folder_counts.get("Schedules", 0),
+                "Addenda": folder_counts.get("Addenda", 0),
+                "Images": folder_counts.get("Images", 0),
+                "Other Documents": folder_counts.get("Other Documents", 0),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("### Primary Action")
     _render_upload_panel(st, workspace_service, record)
 
     folders = _files_by_folder(context)
@@ -8825,7 +9021,12 @@ def _render_project_files_page(
     ]
 
     if not display_rows:
-        _render_empty_state(st, "No files match the current filters.")
+        _render_guided_empty_state(
+            st,
+            why_empty="No files match your current folder filters.",
+            action_to_populate="Clear filters or select another document folder.",
+            next_location="Use Folder and status filters above.",
+        )
         return
 
     st.dataframe(display_rows, use_container_width=True, hide_index=True)
@@ -11901,20 +12102,38 @@ def _render_shell(
                     mission_control_payload,
                 )
         else:
-            nav_col, main_col, context_col = st.columns([2.3, 6.4, 2.3])
-            with nav_col:
-                _nav_buttons(st, st, "desktop", record)
-            with main_col:
-                _render_main_content(
-                    st,
-                    workspace_service,
-                    record,
-                    context,
-                    mission_control_payload,
-                )
-            with context_col:
-                if record is not None:
+            selected = dict(st.session_state.get("atlas_context_selection") or {})
+            selection_kind = _safe_text(selected.get("kind"), "project")
+            show_context_column = bool(
+                record is not None and selection_kind not in {"", "project"}
+            )
+
+            if show_context_column:
+                nav_col, main_col, context_col = st.columns([2.2, 6.6, 2.2])
+                with nav_col:
+                    _nav_buttons(st, st, "desktop", record)
+                with main_col:
+                    _render_main_content(
+                        st,
+                        workspace_service,
+                        record,
+                        context,
+                        mission_control_payload,
+                    )
+                with context_col:
                     _render_context_panel(st, context)
+            else:
+                nav_col, main_col = st.columns([2.4, 7.6])
+                with nav_col:
+                    _nav_buttons(st, st, "desktop", record)
+                with main_col:
+                    _render_main_content(
+                        st,
+                        workspace_service,
+                        record,
+                        context,
+                        mission_control_payload,
+                    )
 
     elif layout_mode == "Tablet":
         nav_popover = st.popover("Navigation")
