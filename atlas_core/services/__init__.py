@@ -106,6 +106,10 @@ from atlas_core.services.scope_reconciliation_service import (
     ReconciliationSeverity,
     ScopeReconciliationService,
 )
+from atlas_core.services.scope_risk_review_service import (
+    ScopeRiskFinding,
+    ScopeRiskReviewService,
+)
 from atlas_core.services.bid_completeness_service import (
     BidCompleteness,
     BidCompletenessService,
@@ -326,6 +330,8 @@ __all__ = [
     "ScopeGap",
     "ScopeGapService",
     "ScopeGapSeverity",
+    "ScopeRiskFinding",
+    "ScopeRiskReviewService",
     "ScopeReconciliationService",
     "SpecificationIndexerService",
     "SystemDetectionService",

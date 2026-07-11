@@ -34,6 +34,7 @@ from atlas_core.services.coordination_intelligence import CoordinationIntelligen
 from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 from atlas_core.services.master_library import MasterLibraryService
 from atlas_core.services.bom_review_service import BomReviewService
+from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 
 PROJECT_MANAGER_PAGES = [
     "Mission Control",
@@ -897,6 +898,88 @@ def _canonical_bom_export_payload(
         "metrics": _canonical_bom_metrics(ordered),
     }
     return csv_buffer.getvalue(), json.dumps(json_payload, indent=2, sort_keys=True)
+
+
+def _scope_risk_findings(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if context is None:
+        return []
+
+    cached = _context_cached(context, "scope_risk_findings")
+    if isinstance(cached, list):
+        return cached
+
+    review = context.get("review")
+    bom_rows = _canonical_bom_items(context)
+    resolver_rows = _build_resolver_conflict_rows(
+        _build_engineering_resolver(record=None, context=context)
+    )
+    objects = _workspace_objects(context)
+    coordination = list(objects.get("coordination_findings") or [])
+    risk_rows = _to_rows(list(getattr(review, "estimator_risks", []) or []))
+    rfi_rows = _to_rows(list(getattr(review, "rfi_candidates", []) or []))
+
+    findings = ScopeRiskReviewService().build_findings(
+        bom_rows=bom_rows,
+        resolver_rows=resolver_rows,
+        coordination_findings=coordination,
+        risk_rows=risk_rows,
+        rfi_rows=rfi_rows,
+    )
+    rows = [finding.to_dict() for finding in findings]
+    _set_context_cached(context, "scope_risk_findings", rows)
+    return rows
+
+
+def _scope_risk_metrics(finding_rows: list[dict[str, Any]]) -> dict[str, int]:
+    return {
+        "total": len(finding_rows),
+        "critical": sum(
+            1
+            for item in finding_rows
+            if _safe_text(item.get("severity"), "").lower() == "critical"
+        ),
+        "high": sum(
+            1
+            for item in finding_rows
+            if _safe_text(item.get("severity"), "").lower() == "high"
+        ),
+        "quantity_conflicts": sum(
+            1
+            for item in finding_rows
+            if _safe_text(item.get("category"), "") == "quantity_conflict"
+        ),
+    }
+
+
+def _scope_risk_sections(
+    finding_rows: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    ordered = [
+        "Critical Issues",
+        "Missing Scope",
+        "Responsibility Gaps",
+        "Quantity Conflicts",
+        "Engineering Gaps",
+        "Commercial Risks",
+        "Recommended RFIs",
+    ]
+    grouped: dict[str, list[dict[str, Any]]] = {section: [] for section in ordered}
+    for row in finding_rows:
+        section = _safe_text(row.get("section"), "Engineering Gaps")
+        grouped.setdefault(section, [])
+        grouped[section].append(row)
+
+    grouped["Recommended RFIs"] = [
+        {
+            "Finding": item.get("title"),
+            "Severity": item.get("severity"),
+            "Likely Owner": item.get("likely_owner"),
+            "Candidate RFI (Internal Draft)": item.get("candidate_rfi_text"),
+        }
+        for item in finding_rows
+        if _safe_text(item.get("candidate_rfi_text"), "")
+    ]
+    return grouped
 
 
 def _current_commit() -> str:
@@ -2744,59 +2827,137 @@ def _render_scope_risk_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    summary = _build_project_analysis_summary(record, context)
     _render_page_header(
         st,
         "Scope & Risk",
-        "Review missing scope, commercial risk, and unresolved conflicts before estimate release.",
+        "Focused bid risk review for incomplete scope, contradictions, ownership gaps, and commercial exposure.",
     )
 
+    finding_rows = _scope_risk_findings(context)
+    if not finding_rows:
+        st.info(
+            "No scope and risk findings yet. Run project analysis to generate estimator-facing findings."
+        )
+        return
+
+    metrics = _scope_risk_metrics(finding_rows)
     cards = st.columns(4)
-    _metric_card(cards[0], "Scope Gaps", str(summary["scope_gaps"]))
-    _metric_card(cards[1], "High-Risk Issues", str(summary["high_risk_issue_count"]))
-    _metric_card(cards[2], "Quantity Conflicts", str(summary["quantity_conflicts"]))
-    _metric_card(
-        cards[3],
-        "Responsibility Ambiguities",
-        str(summary["responsibility_ambiguities"]),
+    _metric_card(cards[0], "Total Findings", str(metrics["total"]))
+    _metric_card(cards[1], "Critical Issues", str(metrics["critical"]))
+    _metric_card(cards[2], "High Severity", str(metrics["high"]))
+    _metric_card(cards[3], "Quantity Conflicts", str(metrics["quantity_conflicts"]))
+
+    st.caption(
+        "Candidate RFI language below is internal draft only and should be reviewed before external issue."
     )
 
-    review = context.get("review") if context else None
-    readiness = getattr(review, "readiness", None) if review is not None else None
-    blockers = list(getattr(readiness, "blocking_issues", []) or [])
-    st.markdown("### Unresolved Scope Issues")
-    if blockers:
+    sections = _scope_risk_sections(finding_rows)
+
+    for section in [
+        "Critical Issues",
+        "Missing Scope",
+        "Responsibility Gaps",
+        "Quantity Conflicts",
+        "Engineering Gaps",
+        "Commercial Risks",
+    ]:
+        st.markdown(f"### {section}")
+        rows = list(sections.get(section) or [])
+        if not rows:
+            st.info(f"No findings currently classified under {section}.")
+            continue
+
         st.dataframe(
-            [{"Issue": item} for item in blockers],
+            [
+                {
+                    "Finding ID": item.get("finding_id"),
+                    "Category": item.get("category"),
+                    "Severity": item.get("severity"),
+                    "Confidence": item.get("confidence"),
+                    "Title": item.get("title"),
+                    "Estimating Impact": item.get("estimating_impact"),
+                    "Recommended Action": item.get("recommended_action"),
+                    "Likely Owner": item.get("likely_owner"),
+                }
+                for item in rows[:10]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown("### Recommended RFIs")
+    recommended_rfis = list(sections.get("Recommended RFIs") or [])
+    if recommended_rfis:
+        st.dataframe(
+            recommended_rfis[:12],
             use_container_width=True,
             hide_index=True,
         )
     else:
-        st.info("No unresolved scope issues detected.")
+        st.info("No internal draft RFI language generated yet.")
 
-    st.markdown("### High-Risk Issues")
-    if summary["risk_rows"]:
+    st.markdown("### Finding Drill-down")
+    finding_ids = [_safe_text(item.get("finding_id"), "") for item in finding_rows]
+    selected_finding_id = st.selectbox(
+        "Select finding",
+        options=finding_ids,
+        key="atlas_scope_risk_selected_finding",
+    )
+    selected_row = next(
+        (
+            item
+            for item in finding_rows
+            if item.get("finding_id") == selected_finding_id
+        ),
+        None,
+    )
+
+    if selected_row is not None:
         st.dataframe(
-            summary["risk_rows"][:12], use_container_width=True, hide_index=True
+            [
+                {
+                    "Finding ID": selected_row.get("finding_id"),
+                    "Category": selected_row.get("category"),
+                    "Severity": selected_row.get("severity"),
+                    "Confidence": selected_row.get("confidence"),
+                    "Title": selected_row.get("title"),
+                    "Explanation": selected_row.get("concise_explanation"),
+                    "Estimating Impact": selected_row.get("estimating_impact"),
+                    "Recommended Action": selected_row.get("recommended_action"),
+                    "Likely Owner": selected_row.get("likely_owner"),
+                    "Candidate RFI (Internal Draft)": selected_row.get(
+                        "candidate_rfi_text"
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
         )
-    else:
-        st.info("No high-risk issues detected.")
 
-    missing_spec_rows = [
-        {
-            "Equipment ID": item.get("equipment_id"),
-            "Manufacturer": item.get("manufacturer"),
-            "Model": item.get("model"),
-            "System": item.get("system"),
-        }
-        for item in list(_workspace_objects(context).get("equipment") or [])
-        if not list(item.get("specification_references") or [])
-    ]
-    st.markdown("### Missing Specifications")
-    if missing_spec_rows:
-        st.dataframe(missing_spec_rows[:12], use_container_width=True, hide_index=True)
-    else:
-        st.info("No missing specification links detected.")
+        st.dataframe(
+            [
+                {
+                    "Affected BOM Items": ", ".join(
+                        selected_row.get("affected_bom_items") or []
+                    )
+                    or "None",
+                    "Affected Systems": ", ".join(
+                        selected_row.get("affected_systems") or []
+                    )
+                    or "None",
+                    "Affected Rooms": ", ".join(
+                        selected_row.get("affected_rooms") or []
+                    )
+                    or "None",
+                    "Source References": ", ".join(
+                        selected_row.get("source_references") or []
+                    )
+                    or "None",
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 def _render_engineering_review_page(
