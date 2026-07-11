@@ -35,6 +35,7 @@ from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 from atlas_core.services.master_library import MasterLibraryService
 from atlas_core.services.bom_review_service import BomReviewService
 from atlas_core.services.pricing_service import PricingService
+from atlas_core.services.sales_design_review_service import SalesDesignReviewService
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 
 PROJECT_MANAGER_PAGES = [
@@ -1010,6 +1011,26 @@ def _enriched_bom_rows(st: Any, bom_rows: list[dict[str, Any]]) -> list[dict[str
         manufacturer_products=list(library.get("manufacturer_products") or []),
         vendor_offers=list(library.get("vendor_offers") or []),
     )
+
+
+def _sales_design_review(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if context is None:
+        return None
+
+    summary = _build_project_analysis_summary(record, context)
+    bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+    findings = _scope_risk_findings(context)
+
+    review = SalesDesignReviewService().build_review(
+        summary=summary,
+        bom_rows=bom_rows,
+        scope_findings=findings,
+    )
+    return review.to_dict()
 
 
 def _current_commit() -> str:
@@ -7255,77 +7276,250 @@ def _render_resolver_conflict_center_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader("Resolver Conflict Center")
+    review = _sales_design_review(st, record, context)
     resolver_result = _build_engineering_resolver(record, context)
     rows = _build_resolver_conflict_rows(resolver_result)
     if not rows:
-        st.info("No resolver conflicts are currently available.")
+        "Internal Sales / Design Engineer Review for estimator, sales engineering, design engineering, and bid strategy workflows.",
         return
 
-    cols = st.columns([1.8, 2.4, 1.8])
-    group_by = cols[0].selectbox(
-        "Group By",
-        options=[
-            "Manufacturer",
-            "Model",
-            "Quantity",
-            "Room",
-            "System",
-            "Specification",
-            "Drawing",
+    if review is None:
+        st.info("Run project analysis to generate an internal engineering review.")
+        return
+
+    summary = dict(review.get("project_summary") or {})
+    bom_summary = dict(review.get("bom_summary") or {})
+    cost_coverage = dict(review.get("preliminary_cost_coverage") or {})
+
+    cards = st.columns(4)
+    _metric_card(cards[0], "Project", _safe_text(summary.get("project_name"), "n/a"))
+    _metric_card(
+        cards[1],
+        "Analysis Status",
+        _safe_text(summary.get("analysis_status"), "n/a"),
+    )
+    _metric_card(
+        cards[2],
+        "Overall Confidence",
+        f"{int(float(review.get('overall_confidence', 0.0)) * 100)}%",
+    )
+    _metric_card(
+        cards[3],
+        "BOM Lines",
+        str(int(bom_summary.get("total_lines", 0) or 0)),
+    )
+
+    st.caption(
+        "Conclusions are traceable to BOM, scope/risk findings, resolver conflicts, and source references. Unsupported conclusions are labeled under limitations."
+    )
+
+    st.markdown("### 1. What Atlas Found")
+    st.dataframe(
+        [
+            {
+                "Project Summary": _safe_text(summary.get("project_name"), "n/a"),
+                "Project Type": _safe_text(review.get("project_type"), "Unspecified"),
+                "Stakeholders (Inferred)": ", ".join(
+                    list(
+                        review.get("inferred_customer_and_stakeholder_information")
+                        or []
+                    )
+                )
+                or "None",
+                "Major Systems": ", ".join(list(review.get("major_systems") or []))
+                or "None",
+                "BOM Summary": (
+                    f"total={int(bom_summary.get('total_lines', 0) or 0)}, "
+                    f"complete={int(bom_summary.get('complete_lines', 0) or 0)}, "
+                    f"incomplete={int(bom_summary.get('incomplete_lines', 0) or 0)}, "
+                    f"conflicts={int(bom_summary.get('conflicting_lines', 0) or 0)}"
+                ),
+                "Preliminary Cost Coverage": _safe_text(
+                    cost_coverage.get("known_cost_coverage_ratio"),
+                    "0%",
+                ),
+                "Labor Confidence": _safe_text(review.get("labor_confidence"), "n/a"),
+            }
         ],
-    )
-    status_filter = cols[1].multiselect(
-        "Status",
-        options=["Resolved", "Needs Review", "High Confidence", "Low Confidence"],
-        default=[],
-    )
-    severity_filter = cols[2].multiselect(
-        "Severity",
-        options=sorted({str(item.get("severity") or "medium") for item in rows}),
-        default=[],
+        use_container_width=True,
+        hide_index=True,
     )
 
-    key_map = {
-        "Manufacturer": "manufacturer",
-        "Model": "model",
-        "Quantity": "quantity",
-        "Room": "room",
-        "System": "system",
-        "Specification": "specification",
-        "Drawing": "drawing",
-    }
-    group_key = key_map[group_by]
+    st.markdown("### 2. What Appears Complete")
+    st.dataframe(
+        [
+            {
+                "Complete BOM Lines": int(bom_summary.get("complete_lines", 0) or 0),
+                "Known Cost Lines": int(
+                    cost_coverage.get("lines_with_known_cost", 0) or 0
+                ),
+                "List Price Lines": int(
+                    cost_coverage.get("lines_with_list_price", 0) or 0
+                ),
+                "Labor Confidence": _safe_text(review.get("labor_confidence"), "n/a"),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
 
-    filtered = [
-        item
-        for item in rows
-        if (not status_filter or item.get("status") in status_filter)
-        and (not severity_filter or item.get("severity") in severity_filter)
+    st.markdown("### 3. What Is Missing")
+    missing_rows = [
+        {"Missing Detail": item}
+        for item in (
+            list(review.get("missing_bom_detail") or [])
+            + list(review.get("undeveloped_scope") or [])
+        )
     ]
-    if not filtered:
-        st.info("No conflicts match the current filters.")
+    if missing_rows:
+        st.dataframe(missing_rows[:20], use_container_width=True, hide_index=True)
+    else:
+        st.info("No major missing scope or BOM detail detected.")
+
+    st.markdown("### 4. What Is Risky")
+    risk_rows = [
+        {"Major Risk Area": item}
+        for item in (
+            list(review.get("major_risk_areas") or [])
+            + list(review.get("product_lifecycle_warnings") or [])
+        )
+    ]
+    if risk_rows:
+        st.dataframe(risk_rows[:20], use_container_width=True, hide_index=True)
+    else:
+        st.info("No major risk areas detected from current evidence.")
+
+    st.markdown("### 5. What Needs Clarification")
+    clarification_rows = [
+        {"Clarification Needed": item}
+        for item in (
+            list(review.get("responsibility_gaps") or [])
+            + [
+                f"Quantity conflict: {item}"
+                for item in list(review.get("quantity_conflicts") or [])
+            ]
+            + [
+                f"Drawing/spec coordination: {item}"
+                for item in list(
+                    review.get("drawing_specification_coordination_issues") or []
+                )
+            ]
+        )
+    ]
+    if clarification_rows:
+        st.dataframe(
+            clarification_rows[:24],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No major clarification gaps detected.")
+
+    st.markdown("### 6. What Should Happen Next")
+    next_action_rows = [
+        {"Action": item} for item in list(review.get("recommended_next_actions") or [])
+    ]
+    if next_action_rows:
+        st.dataframe(next_action_rows[:12], use_container_width=True, hide_index=True)
+    else:
+        st.info("No next actions generated yet.")
+
+    st.markdown("### Recommended RFIs")
+    rfi_rows = [
+        {"RFI (Internal Draft)": item}
+        for item in list(review.get("recommended_rfis") or [])
+    ]
+    if rfi_rows:
+        st.dataframe(rfi_rows[:12], use_container_width=True, hide_index=True)
+    else:
+        st.info("No recommended RFIs generated.")
+
+    st.markdown("### Limitations")
+    limitation_rows = [
+        {"Limitation": item} for item in list(review.get("limitations") or [])
+    ]
+    st.dataframe(limitation_rows, use_container_width=True, hide_index=True)
+
+    st.markdown("### Export")
+    review_obj = SalesDesignReviewService().build_review(
+        summary=_build_project_analysis_summary(record, context),
+        bom_rows=_enriched_bom_rows(st, _canonical_bom_items(context)),
+        scope_findings=_scope_risk_findings(context),
+    )
+    markdown_payload = SalesDesignReviewService().to_markdown(review_obj)
+    json_payload = SalesDesignReviewService().to_json(review_obj)
+    html_payload = SalesDesignReviewService().to_html(review_obj)
+
+    export_cols = st.columns(3)
+    project_id = _safe_text(record.project.project_id, "project")
+    export_cols[0].download_button(
+        "Download Review Markdown",
+        data=markdown_payload,
+        file_name=f"{project_id}_sales_design_review.md",
+        mime="text/markdown",
+        use_container_width=True,
+    )
+    export_cols[1].download_button(
+        "Download Review JSON",
+        data=json_payload,
+        file_name=f"{project_id}_sales_design_review.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+    export_cols[2].download_button(
+        "Download Review HTML",
+        data=html_payload,
+        file_name=f"{project_id}_sales_design_review.html",
+        mime="text/html",
+        use_container_width=True,
+    )
+
+    with st.expander("Appendix: Detailed Evidence", expanded=False):
+        traceability = [
+            {"Traceability Note": item}
+            for item in list(review.get("traceability_notes") or [])
+        ]
+        if traceability:
+            st.dataframe(traceability, use_container_width=True, hide_index=True)
+
+        bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+        if bom_rows:
+            st.markdown("#### Canonical BOM Evidence")
+            st.dataframe(
+                [
+                    {
+                        "BOM Item": row.get("bom_item_id"),
+                        "System": row.get("system"),
+                        "Manufacturer": row.get("manufacturer"),
+                        "Model": row.get("model"),
+                        "Quantity": row.get("quantity"),
+                        "Completeness": row.get("completeness_status"),
+                        "Sources": ", ".join(row.get("source_documents") or []),
+                    }
+                    for row in bom_rows[:30]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        findings = _scope_risk_findings(context)
+        if findings:
+            st.markdown("#### Scope & Risk Evidence")
+            st.dataframe(
+                [
+                    {
+                        "Finding ID": row.get("finding_id"),
+                        "Category": row.get("category"),
+                        "Severity": row.get("severity"),
+                        "Title": row.get("title"),
+                        "References": ", ".join(row.get("source_references") or []),
+                    }
+                    for row in findings[:30]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
         return
-
-    grouped: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-    for item in filtered:
-        group_value = _safe_text(item.get(group_key), "n/a")
-        grouped[group_value].append(item)
-
-    for group_value in sorted(grouped.keys()):
-        st.markdown(f"#### {group_by}: {group_value}")
-        st.dataframe(grouped[group_value], use_container_width=True, hide_index=True)
-
-    labels = [
-        f"{_safe_text(item.get('field'), 'field')} · {_safe_text(item.get('target_id'), 'target')}"
-        for item in filtered
-    ]
-    selected_label = st.selectbox("Select Conflict", options=labels)
-    selected = filtered[labels.index(selected_label)]
-    if st.button("Open Conflict in Workbench", type="primary"):
-        _set_context_selection(st, "resolver_conflict", selected)
-        st.session_state["atlas_active_page"] = "Engineering Workbench"
-        st.rerun()
 
 
 def _top_reference_counts(

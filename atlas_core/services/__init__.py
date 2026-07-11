@@ -116,6 +116,10 @@ from atlas_core.services.pricing_service import (
     PriceListImportSummary,
     VendorProductOffer,
 )
+from atlas_core.services.sales_design_review_service import (
+    SalesDesignEngineerReview,
+    SalesDesignReviewService,
+)
 from atlas_core.services.bid_completeness_service import (
     BidCompleteness,
     BidCompletenessService,
@@ -344,6 +348,8 @@ __all__ = [
     "ManufacturerProduct",
     "PricingService",
     "PriceListImportSummary",
+    "SalesDesignEngineerReview",
+    "SalesDesignReviewService",
     "ProjectWorkspaceRecord",
     "ProjectWorkspaceService",
     "VendorProductOffer",
