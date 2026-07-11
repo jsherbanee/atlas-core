@@ -34,6 +34,7 @@ from atlas_core.services.coordination_intelligence import CoordinationIntelligen
 from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 from atlas_core.services.master_library import MasterLibraryService
 from atlas_core.services.bom_review_service import BomReviewService
+from atlas_core.services.pricing_service import PricingService
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 
 PROJECT_MANAGER_PAGES = [
@@ -49,6 +50,7 @@ PROJECT_MANAGER_PAGES = [
 WORKFLOW_PAGES = [
     "Project Summary",
     "Documents",
+    "Price List Library",
     "BOM Review",
     "Scope & Risk",
     "Engineering Review",
@@ -61,6 +63,7 @@ NAV_DROPDOWN_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
         [
             ("Project Summary", "Project Summary"),
             ("Documents", "Documents"),
+            ("Price List Library", "Price List Library"),
             ("BOM Review", "BOM Review"),
             ("Scope & Risk", "Scope & Risk"),
             ("Engineering Review", "Engineering Review"),
@@ -982,6 +985,33 @@ def _scope_risk_sections(
     return grouped
 
 
+def _default_price_list_library_state() -> dict[str, Any]:
+    return {
+        "uploaded_price_lists": [],
+        "manufacturer_products": [],
+        "vendor_offers": [],
+        "import_warnings": [],
+    }
+
+
+def _price_list_library_state(st: Any) -> dict[str, Any]:
+    state = st.session_state.get("atlas_price_list_library")
+    if isinstance(state, dict):
+        return state
+    state = _default_price_list_library_state()
+    st.session_state["atlas_price_list_library"] = state
+    return state
+
+
+def _enriched_bom_rows(st: Any, bom_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    library = _price_list_library_state(st)
+    return PricingService().enrich_bom_rows(
+        bom_rows=bom_rows,
+        manufacturer_products=list(library.get("manufacturer_products") or []),
+        vendor_offers=list(library.get("vendor_offers") or []),
+    )
+
+
 def _current_commit() -> str:
     try:
         result = subprocess.run(
@@ -1027,6 +1057,10 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_notebook_search", "")
     st.session_state.setdefault("atlas_notebook_draft", {})
     st.session_state.setdefault("atlas_master_library_search", "")
+    st.session_state.setdefault(
+        "atlas_price_list_library", _default_price_list_library_state()
+    )
+    st.session_state.setdefault("atlas_price_list_signature", "")
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -2565,6 +2599,8 @@ def _render_bom_review_page(
         )
         return
 
+    bom_rows = _enriched_bom_rows(st, bom_rows)
+
     metrics = _canonical_bom_metrics(bom_rows)
     cards_top = st.columns(4)
     _metric_card(
@@ -2708,6 +2744,16 @@ def _render_bom_review_page(
                     "Quantity Confidence": row.get("quantity_confidence"),
                     "Completeness": row.get("completeness_status"),
                     "Scope Status": row.get("scope_status"),
+                    "Matched Manufacturer Product": row.get(
+                        "matched_manufacturer_product"
+                    ),
+                    "Matched Vendor Offer": row.get("matched_vendor_offer"),
+                    "List Price": row.get("list_price"),
+                    "Known Cost": row.get("known_cost"),
+                    "Pricing Source": row.get("pricing_source"),
+                    "Pricing Effective Date": row.get("pricing_effective_date"),
+                    "Match Confidence": row.get("match_confidence"),
+                    "Pricing Warning": row.get("pricing_warning"),
                 }
                 for row in filtered_rows
             ],
@@ -2778,6 +2824,19 @@ def _render_bom_review_page(
                         list(selected_row.get("related_rfi_candidates") or [])
                     )
                     or "None",
+                    "Matched Manufacturer Product": selected_row.get(
+                        "matched_manufacturer_product"
+                    )
+                    or "None",
+                    "Matched Vendor Offer": selected_row.get("matched_vendor_offer")
+                    or "None",
+                    "List Price": selected_row.get("list_price"),
+                    "Known Cost": selected_row.get("known_cost"),
+                    "Pricing Source": selected_row.get("pricing_source") or "None",
+                    "Pricing Effective Date": selected_row.get("pricing_effective_date")
+                    or "None",
+                    "Match Confidence": selected_row.get("match_confidence"),
+                    "Pricing Warning": selected_row.get("pricing_warning") or "None",
                 }
             ],
             use_container_width=True,
@@ -2958,6 +3017,109 @@ def _render_scope_risk_page(
             use_container_width=True,
             hide_index=True,
         )
+
+
+def _render_price_list_library_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    _render_page_header(
+        st,
+        "Price List Library",
+        "Ingest manufacturer and vendor price lists and deterministically enrich BOM review.",
+    )
+    st.caption(
+        "This foundation is for pricing knowledge only. Procurement execution workflows are intentionally out of scope."
+    )
+
+    uploaded_files = st.file_uploader(
+        "Upload manufacturer/vendor price lists",
+        type=["xlsx", "xls", "csv", "pdf", "docx"],
+        accept_multiple_files=True,
+        key="atlas_price_list_uploads",
+        help="Supports XLSX, XLS, CSV, PDF (text/table extraction where practical), and DOCX where applicable.",
+    )
+    if uploaded_files:
+        signature = _uploaded_file_signature(uploaded_files)
+        if st.session_state.get("atlas_price_list_signature") != signature:
+            st.session_state["atlas_price_list_signature"] = signature
+
+    if st.button(
+        "Import Price Lists",
+        type="primary",
+        disabled=not uploaded_files,
+        use_container_width=True,
+    ):
+        with st.spinner("Importing and normalizing price lists..."):
+            result = PricingService().ingest_price_lists(
+                [
+                    (str(file.name), bytes(file.getvalue()))
+                    for file in list(uploaded_files or [])
+                ]
+            )
+            st.session_state["atlas_price_list_library"] = result
+
+    library = _price_list_library_state(st)
+    summaries = list(library.get("uploaded_price_lists") or [])
+    manufacturer_products = list(library.get("manufacturer_products") or [])
+    vendor_offers = list(library.get("vendor_offers") or [])
+
+    cards = st.columns(4)
+    _metric_card(cards[0], "Uploaded Price Lists", str(len(summaries)))
+    _metric_card(cards[1], "Manufacturer Products", str(len(manufacturer_products)))
+    _metric_card(cards[2], "Vendor Offers", str(len(vendor_offers)))
+    _metric_card(
+        cards[3],
+        "Expired Pricing",
+        str(sum(int(item.get("expired_pricing", 0) or 0) for item in summaries)),
+    )
+
+    st.markdown("### Upload Summary")
+    if summaries:
+        st.dataframe(
+            [
+                {
+                    "Uploaded Price List": item.get("source_file"),
+                    "Manufacturer": item.get("manufacturer"),
+                    "Vendor": item.get("vendor"),
+                    "Effective Date": item.get("effective_date"),
+                    "Product Count": item.get("product_count"),
+                    "Unmatched Rows": item.get("unmatched_rows"),
+                    "Duplicate Rows": item.get("duplicate_rows"),
+                    "Expired Pricing": item.get("expired_pricing"),
+                    "Import Warnings": "; ".join(item.get("import_warnings") or []),
+                }
+                for item in summaries
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No price lists imported yet.")
+
+    import_warnings = list(library.get("import_warnings") or [])
+    if import_warnings:
+        st.markdown("### Import Warnings")
+        st.dataframe(
+            [{"warning": warning} for warning in import_warnings],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with st.expander("Manufacturer Product Records", expanded=False):
+        if manufacturer_products:
+            st.dataframe(
+                manufacturer_products[:500], use_container_width=True, hide_index=True
+            )
+        else:
+            st.info("No manufacturer products imported.")
+
+    with st.expander("Vendor Product Offers", expanded=False):
+        if vendor_offers:
+            st.dataframe(vendor_offers[:500], use_container_width=True, hide_index=True)
+        else:
+            st.info("No vendor offers imported.")
 
 
 def _render_engineering_review_page(
@@ -11270,6 +11432,8 @@ def _render_main_content(
         _render_project_summary_page(st, record, context)
     elif page == "Documents":
         _render_project_files_page(st, workspace_service, record, context)
+    elif page == "Price List Library":
+        _render_price_list_library_page(st, record, context)
     elif page == "BOM Review":
         _render_bom_review_page(st, record, context)
     elif page == "Scope & Risk":

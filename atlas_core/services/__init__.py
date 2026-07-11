@@ -110,6 +110,12 @@ from atlas_core.services.scope_risk_review_service import (
     ScopeRiskFinding,
     ScopeRiskReviewService,
 )
+from atlas_core.services.pricing_service import (
+    ManufacturerProduct,
+    PricingService,
+    PriceListImportSummary,
+    VendorProductOffer,
+)
 from atlas_core.services.bid_completeness_service import (
     BidCompleteness,
     BidCompletenessService,
@@ -335,8 +341,12 @@ __all__ = [
     "ScopeReconciliationService",
     "SpecificationIndexerService",
     "SystemDetectionService",
+    "ManufacturerProduct",
+    "PricingService",
+    "PriceListImportSummary",
     "ProjectWorkspaceRecord",
     "ProjectWorkspaceService",
+    "VendorProductOffer",
     "EngineeringResolver",
     "ResolutionConflict",
     "ResolutionEvidence",
