@@ -13,6 +13,17 @@ Atlas Workspace v1 (Sprint 8) launches into a persistent interactive engineering
 
 The shell remains visible while page content changes.
 
+## Workspace Modes
+Atlas now operates in two navigation modes:
+- Application Workspace
+- Project Workspace
+
+Application Workspace is used for Mission Control and cross-project operations.
+Project Workspace is entered only after opening a specific project.
+
+Mission Control remains application-level.
+Opening a project switches Atlas into project-specific navigation.
+
 
 System metadata (version/commit/stage/status) remains available in the status bar.
 
@@ -63,7 +74,13 @@ Mission Control is now a simple landing page that explains the workflow and prov
 - Create New Project
 - Open Existing Project
 - Manage Projects
-- Open Project Summary for the active workspace
+
+Application navigation groups:
+- Mission Control
+- Projects
+- Knowledge
+- Reports
+- Administration
 
 Mission Control also shows the active project snapshot:
 - project name
@@ -71,6 +88,35 @@ Mission Control also shows the active project snapshot:
 - project type
 - analysis status
 - recommended next action
+
+Project-specific engineering pages are not shown while no project is open.
+
+## Project Workspace Navigation
+When a project is opened, Atlas switches to project navigation.
+
+Project:
+- Overview
+- Documents
+- BOM Review
+- Scope & Risk
+- Engineering Review
+- Estimate
+- Notebook
+- Reports
+
+Project Details:
+- Drawings
+- Specifications
+- Schedules
+- Addenda
+- Evidence
+- Timeline
+- Relationships
+
+Project Settings:
+- Project Metadata
+- Repository
+- Workspace Settings
 
 ## Responsive Navigation
 - Desktop: persistent sidebar
