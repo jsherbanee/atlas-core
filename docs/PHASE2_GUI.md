@@ -1,7 +1,7 @@
 # Atlas
 
 ## Purpose
-Provide a local action-oriented workspace shell for estimators to run Atlas Intake, inspect deterministic project review outputs, and move directly to the next recommended engineering task.
+Provide a local project-analysis workspace for estimators and reviewers to create or open a project, upload documents, run analysis, review BOM and risk conclusions, and export a concise internal report.
 
 This interface is local-only:
 - No authentication.
@@ -22,8 +22,7 @@ The shell remains visible while page content changes.
 
 Header includes:
 - Atlas logo button (returns to Mission Control)
-- Global Search (project-wide object search)
-- Alerts placeholder
+- History shortcut
 - Settings
 
 System metadata (version/commit/stage/status) remains available in the status bar.
@@ -50,17 +49,35 @@ Files are automatically classified into:
 
 After classification, Atlas runs deterministic intake, saves the workspace locally, and then executes the existing project review pipeline.
 
-## Navigation Intent
-Workspace navigation is mission-oriented at the top level.
+## Primary Workflow
+The primary user workflow is:
 
-Top-level navigation includes:
-- Mission Control
-- Projects
-- Knowledge
+1. Create or open a project
+2. Upload drawings, specifications, schedules, addenda, and supporting documents
+3. Run project analysis
+4. Review extracted BOM
+5. Review missing or undeveloped scope
+6. Review engineering and commercial risks
+7. Review recommended next actions
+8. Export a concise internal report
+
+Primary workspace navigation includes:
+- Project Summary
+- Documents
+- BOM Review
+- Scope & Risk
+- Engineering Review
 - Reports
-- Administration
 
-Engineering and project lifecycle work remain available inside project workflows rather than top-level navigation.
+Project-management pages remain available separately for create/open/manage tasks.
+
+Advanced or unfinished functionality is intentionally hidden from the primary workflow and moved under `Advanced` navigation.
+Examples include:
+- Knowledge Graph
+- Relationship Explorer
+- Resolver internals
+- Detailed history and evidence drill-down
+- Experimental or low-level engineering workspaces
 
 ## Data Sources
 The workspace supports two explicit source modes.
@@ -104,19 +121,18 @@ If expected folders are missing, Atlas shows a warning and still attempts determ
 3. Open `Reference Project` to verify MAW source mode.
 
 ## Mission Control Content
-Mission Control center column includes:
-- Top summary cards: Action Items, Active Projects, Needs Attention, Upcoming This Week
-- Continue Working project cards
-- Main Action Center table with priority and next-step routing
-- Active Projects table
-- Projects Requiring Attention table
-- Recent Activity
+Mission Control is now a simple landing page that explains the workflow and provides immediate access to:
+- Create New Project
+- Open Existing Project
+- Manage Projects
+- Open Project Summary for the active workspace
 
-Mission Control right panels include:
-- Action Center (compact)
-- Recent Activity
-- Upcoming Timeline
-- Projects Requiring Attention
+Mission Control also shows the active project snapshot:
+- project name
+- customer
+- project type
+- analysis status
+- recommended next action
 
 ## Responsive Navigation
 - Desktop: persistent sidebar
@@ -126,18 +142,20 @@ Mission Control right panels include:
 The current page, selected project, and breadcrumb remain visible in all modes.
 
 Context panel behavior:
-- Mission Control: the right column is replaced by global panels (Action Center, Recent Activity, Upcoming Timeline, Projects Requiring Attention).
-- All other pages: the right column remains the object-level context panel.
+- Primary workflow pages emphasize summary conclusions first.
+- Evidence and traceability remain available through drill-down pages instead of appearing by default.
+- Advanced pages continue to expose lower-level context and diagnostics when needed.
 
 Responsive behavior:
-- Desktop: three-column shell (navigation, content, right panel).
-- Tablet and mobile: navigation collapses to popover/hamburger and right panels stack below main content.
+- Desktop: persistent navigation with summary-first workflow pages.
+- Tablet and mobile: navigation collapses to popover/hamburger.
 
 ## Upload Flow
-1. Open `Project Files`.
+1. Open `Documents`.
 2. Drag files into Atlas Intake (single file, many files, or ZIP).
-3. Click `Run Atlas Intake`.
-4. Review import summary, warnings, and file explorer output.
+3. Click `Run Project Analysis`.
+4. Review import summary, warnings, and document status.
+5. Continue into BOM Review, Scope & Risk, Engineering Review, and Reports.
 
 ## Deterministic Extraction Rules
 - PDF: extract embedded text.
@@ -160,13 +178,21 @@ Responsive behavior:
 For existing local intake snapshots, the sidebar includes `Use Existing Intake Snapshot` in uploaded mode.
 This allows browsing `intake_snapshot.json` files already generated under local outputs/examples folders.
 
-## Mission Control
-Mission Control displays engineering priorities at a glance:
-- Continue Working shortcuts
-- Action Center with deterministic recommendations and target pages
-- Active Projects status table
-- Projects Requiring Attention table
-- Recent Activity and Upcoming Timeline panels
+## Project Summary
+Project Summary shows:
+- project name
+- customer
+- project type
+- document count
+- analysis status
+- BOM item count
+- unresolved scope issue count
+- high-risk issue count
+- documents requiring OCR
+- recommended next action
+
+It also exposes one prominent action button:
+- Run Project Analysis
 
 ## Overview
 Overview displays current project health at a glance:
