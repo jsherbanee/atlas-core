@@ -66,3 +66,9 @@ class AtlasProjectManager:
 
     def health_check(self, project_id: str) -> dict[str, Any]:
         return self.project_repository.health_check(project_id)
+
+    def allocate_bid_id(self, year: int | None = None) -> str:
+        return self.project_repository.allocate_bid_id(year=year)
+
+    def preview_next_bid_id(self, year: int | None = None) -> str:
+        return self.project_repository.peek_next_bid_id(year=year)

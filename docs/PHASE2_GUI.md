@@ -19,7 +19,7 @@ Atlas Workspace Sprint 7.5 performs UI repair and runtime-state isolation: share
 
 Atlas Workspace Sprint A-04 consolidates workstation UX: shared workspace section headers, recommendation deduplication/grouping, filter reset consistency in dense tables, object-link continuity from estimate snapshot context, and terminology normalization for Products (Master Library).
 Atlas Workspace Sprint X-02 refines project creation and identity workflows with deterministic Atlas Bid ID preview/allocation and explicit project identifier surfaces.
-X-02 amendment adds bid-document upload directly in Create New Project with explicit create/upload actions and deterministic intake diagnostics.
+Sprint X-03 hardens onboarding and stakeholder workflows with a strict two-step create-then-upload path, shared organization directory linking, and deterministic pending-upload behavior.
 
 - Status bar
 
@@ -67,7 +67,7 @@ Project identity display (X-02):
 - Client Project Number and Internal Project Number are shown as explicit secondary identifiers.
 - Search across project libraries includes Atlas Bid ID, client project number, and internal project number.
 
-## Create New Project (X-02)
+## Create New Project (X-03)
 
 Create New Project behavior is optimized for bid workspace startup:
 - Atlas Bid ID is generated deterministically and shown as non-consuming preview.
@@ -76,18 +76,21 @@ Create New Project behavior is optimized for bid workspace startup:
 - Optional identity/detail inputs remain available through expandable details.
 - Primary action label: Create Bid Workspace.
 
-Create workflow amendment:
-- Bid document panel is embedded in Create New Project (drag/drop and browse).
-- Supported onboarding formats: PDF, XLS, XLSX, DOC, DOCX, ZIP, JPG, JPEG.
-- Selected files are reviewed before submission with validation and duplicate diagnostics.
-- Primary action changes to Create Bid Workspace & Upload when files are selected.
-- Files are not uploaded automatically on drop/browse; explicit action is required.
+Create workflow behavior in X-03:
+- Step 1 is metadata-first Quick Start only.
+- Document uploader is not shown before workspace creation.
+- Owner / Client lookup-first selection is available before create.
+- Primary action remains Create Bid Workspace.
+- Successful create routes directly to Documents (Step 2).
 
-Partial-success behavior:
-- Project creation is independent from per-file intake outcomes.
-- If some files are valid and some invalid, project is created and valid files import while rejected files surface diagnostics.
-- If all selected files are invalid, combined create/upload action is blocked until files are corrected or cleared.
-- Retry for rejected/failed files continues in the Documents workspace.
+Step 2 upload behavior (Documents):
+- Supported onboarding formats: PDF, CSV, XLS, XLSX, DOC, DOCX, ZIP, JPG, JPEG.
+- Selections append to a pending upload queue across multiple chooser interactions.
+- Pending queue uses deterministic dedupe identity (normalized filename + size + source hash).
+- Users can remove selected pending files or clear all pending files.
+- Upload execution is explicit through Upload Pending Files.
+- Partial success is deterministic: accepted files import, rejected files remain visible via diagnostics/warnings.
+- Failed/rejected files can be retried through subsequent pending selections.
 
 ZIP handling behavior:
 - Archive inspection occurs before extraction.
@@ -96,7 +99,7 @@ ZIP handling behavior:
 - Nested archive depth is bounded.
 - Contained relative paths are preserved in intake-source metadata.
 
-## Project Settings Identity Workflow (X-02)
+## Project Settings Identity Workflow (X-03)
 
 Project Settings now includes controlled metadata editing for identity fields:
 - Atlas Bid ID (read-only)
@@ -105,6 +108,15 @@ Project Settings now includes controlled metadata editing for identity fields:
 - Lifecycle stage updates persisted through project identity metadata service path
 
 If lifecycle stage is awarded/execution and internal project number is missing, deterministic advisory messaging is shown.
+
+## Stakeholder Directory Workflow (X-03)
+
+Project Settings includes stakeholder linkage backed by shared Organizations:
+- lookup existing organizations by canonical name or aliases
+- create organization inline when no existing match is suitable
+- duplicate warning requires explicit confirmation before creating a likely duplicate
+- link one organization across multiple project roles
+- preserve legacy free-text stakeholder metadata for compatibility while new links are added
 
 ## Knowledge Workspace Scope
 Knowledge is application-wide and cross-project.
@@ -378,12 +390,15 @@ Responsive behavior:
 - Tablet: collapsible navigation popover and inline detail sections.
 - Mobile: drawer-style navigation and stacked list/detail flow.
 
-## Upload Flow
-1. Open `Documents`.
-2. Drag files into Atlas Intake (single file, many files, or ZIP).
-3. Click `Run Project Analysis`.
-4. Review import summary, warnings, and document status.
-5. Continue into BOM Review, Scope & Risk, Engineering Review, and Reports.
+## Upload Flow (X-03)
+1. Create workspace from Quick Start (Step 1).
+2. Open Documents (automatic route after create).
+3. Add first file selection.
+4. Add second and later selections; pending queue accumulates rather than replacing prior pending files.
+5. Review deterministic diagnostics/warnings and pending file list.
+6. Remove selected pending files or clear all if needed.
+7. Click Upload Pending Files for explicit intake execution.
+8. Review imported-file status and continue into BOM Review, Scope & Risk, Engineering Review, and Reports.
 
 ## Deterministic Extraction Rules
 - PDF: extract embedded text.

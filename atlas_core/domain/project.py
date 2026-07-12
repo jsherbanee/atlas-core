@@ -30,9 +30,14 @@ class Project:
     project_id: str
     name: str
     client: str
+    atlas_bid_id: str | None = None
     client_project_number: str | None = None
     internal_project_number: str | None = None
+    consultant: str | None = None
+    architect: str | None = None
+    engineers: list[str] = field(default_factory=list)
     location: str | None = None
+    issue_date: str | None = None
     bid_date: str | None = None
     status: ProjectStatus = ProjectStatus.INTAKE
     buildings: list[str] = field(default_factory=list)
@@ -47,6 +52,25 @@ class Project:
         self._validate_required_text("project_id", self.project_id)
         self._validate_required_text("name", self.name)
         self._validate_required_text("client", self.client)
+        self.atlas_bid_id = self._normalize_optional_text(self.atlas_bid_id)
+        if self.atlas_bid_id is None:
+            self.atlas_bid_id = self.project_id
+        self.client_project_number = self._normalize_optional_text(
+            self.client_project_number
+        )
+        self.internal_project_number = self._normalize_optional_text(
+            self.internal_project_number
+        )
+        self.consultant = self._normalize_optional_text(self.consultant)
+        self.architect = self._normalize_optional_text(self.architect)
+        self.issue_date = self._normalize_optional_text(self.issue_date)
+        self.location = self._normalize_optional_text(self.location)
+        self.bid_date = self._normalize_optional_text(self.bid_date)
+        self.engineers = [
+            item.strip()
+            for item in self.engineers
+            if isinstance(item, str) and item.strip()
+        ]
 
         if (
             not isinstance(self.target_margin, (int, float))
@@ -150,9 +174,14 @@ class Project:
             "project_id": self.project_id,
             "name": self.name,
             "client": self.client,
+            "atlas_bid_id": self.atlas_bid_id,
             "client_project_number": self.client_project_number,
             "internal_project_number": self.internal_project_number,
+            "consultant": self.consultant,
+            "architect": self.architect,
+            "engineers": list(self.engineers),
             "location": self.location,
+            "issue_date": self.issue_date,
             "bid_date": self.bid_date,
             "status": self.status.value,
             "buildings": list(self.buildings),
@@ -171,13 +200,18 @@ class Project:
             project_id=str(payload.get("project_id") or ""),
             name=str(payload.get("name") or ""),
             client=str(payload.get("client") or ""),
+            atlas_bid_id=(str(payload.get("atlas_bid_id") or "") or None),
             client_project_number=(
                 str(payload.get("client_project_number") or "") or None
             ),
             internal_project_number=(
                 str(payload.get("internal_project_number") or "") or None
             ),
+            consultant=(str(payload.get("consultant") or "") or None),
+            architect=(str(payload.get("architect") or "") or None),
+            engineers=[str(item) for item in list(payload.get("engineers") or [])],
             location=payload.get("location"),
+            issue_date=(str(payload.get("issue_date") or "") or None),
             bid_date=payload.get("bid_date"),
             status=payload.get("status") or ProjectStatus.INTAKE,
             buildings=[str(item) for item in list(payload.get("buildings") or [])],
@@ -215,6 +249,29 @@ class Project:
     def _validate_required_text(field_name: str, value: str) -> None:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{field_name} cannot be blank")
+
+    @staticmethod
+    def _normalize_optional_text(value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    def __getattr__(self, name: str) -> Any:
+        compatibility_defaults: dict[str, Any] = {
+            "atlas_bid_id": self.project_id,
+            "client_project_number": None,
+            "internal_project_number": None,
+            "consultant": None,
+            "architect": None,
+            "engineers": [],
+            "issue_date": None,
+        }
+        if name in compatibility_defaults:
+            return compatibility_defaults[name]
+        raise AttributeError(name)
 
     @staticmethod
     def _normalize_lifecycle_event(

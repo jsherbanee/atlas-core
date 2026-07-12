@@ -15,6 +15,11 @@ from atlas_core.domain.manufacturer import (
     ManufacturerTier,
 )
 from atlas_core.domain.project import Project, ProjectStatus
+from atlas_core.domain.organization import (
+    Organization,
+    OrganizationRole,
+    ProjectStakeholder,
+)
 from atlas_core.domain.project_lifecycle import ProjectLifecycleEvent
 from atlas_core.domain.purchase_order import (
     PurchaseOrder,
@@ -195,6 +200,9 @@ __all__ = [
     "BidPackageReview",
     "Project",
     "ProjectStatus",
+    "Organization",
+    "OrganizationRole",
+    "ProjectStakeholder",
     "ProjectLifecycleEvent",
     "EstimateBaseline",
     "EstimateBaselineStatus",

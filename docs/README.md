@@ -2,11 +2,11 @@
 
 Atlas documentation defines the platform vision, architecture, engineering-intelligence surfaces, and implementation status for Atlas Core.
 
-Current implementation sprint focus: Sprint X-02 Project Creation and Bid Identity Refinement (active).
+Current implementation sprint focus: Sprint X-03 Onboarding and Stakeholder Workflow Hardening (active).
 Deferred in current sprint scope: Epic E and post-D feature-epic implementation (not started).
 
-Current UX stream: Epic X Product Hardening continuation (A-05 and X-01 completed; X-02 active).
-Scope: controlled hardening for project identity and creation workflows in already-implemented capabilities only.
+Current UX stream: Epic X Product Hardening continuation (A-05 and X-01/X-02 completed; X-03 active).
+Scope: controlled hardening for onboarding, stakeholder linkage, and project identity workflows in already-implemented capabilities only.
 
 These documents are intended to be used as a cohesive reference library, not isolated notes.
 

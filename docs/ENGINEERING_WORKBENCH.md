@@ -115,6 +115,12 @@ X-02 introduces project identity and creation hardening in shared workspace flow
 
 Workbench impact in X-02 is limited to consistent project identity context continuity from shared header/search/navigation surfaces.
 
+## Sprint X-03 Scope Boundary Note
+
+X-03 continues workflow hardening in project onboarding and stakeholder linkage and does not add new Engineering Workbench intelligence features.
+
+Workbench impact in X-03 remains limited to context continuity from improved project identity and shared organization linkage in existing project shells.
+
 ## Resolver Conflict Center
 
 Resolver Conflict Center provides a dedicated conflict workspace.

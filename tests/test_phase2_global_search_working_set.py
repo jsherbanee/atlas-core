@@ -5,10 +5,13 @@ import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 import sys
-from typing import Any
+from typing import Any, Literal
 
 from atlas_core.domain import Project, ProjectStatus
-from atlas_core.services.project_workspace_service import ProjectWorkspaceRecord
+from atlas_core.services.project_workspace_service import (
+    ProjectWorkspaceRecord,
+    ProjectWorkspaceService,
+)
 import pytest
 
 _MODULE_PATH = Path(__file__).resolve().parents[1] / "apps" / "phase2_review_app.py"
@@ -40,6 +43,260 @@ class _FakeWorkspaceService:
         limit: int = 1000,
     ) -> list[ProjectWorkspaceRecord]:
         return list(self._records)[:limit]
+
+    def preview_next_bid_id(self) -> str:
+        return "BID-2099-0001"
+
+
+class _NullContext:
+    def __enter__(self) -> _NullContext:
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> Literal[False]:
+        _ = (exc_type, exc, tb)
+        return False
+
+
+class _CreatePageStreamlit:
+    def __init__(
+        self,
+        *,
+        submit: bool,
+        project_name: str = "",
+        client_name: str = "",
+        uploaded_files: list[Any] | None = None,
+        button_presses: dict[str, bool] | None = None,
+    ) -> None:
+        self.submit = submit
+        self.project_name = project_name
+        self.client_name = client_name
+        self.uploaded_files = list(uploaded_files or [])
+        self.button_presses = dict(button_presses or {})
+        self.session_state: dict[str, Any] = {}
+        self.select_options: dict[str, list[str]] = {}
+        self.infos: list[str] = []
+        self.errors: list[str] = []
+        self.warnings: list[str] = []
+        self.successes: list[str] = []
+        self.captions: list[str] = []
+        self.rerun_called = False
+
+    def subheader(self, _text: str) -> None:
+        return None
+
+    def caption(self, text: str) -> None:
+        self.captions.append(text)
+
+    def info(self, text: str) -> None:
+        self.infos.append(text)
+
+    def error(self, text: str) -> None:
+        self.errors.append(text)
+
+    def warning(self, text: str) -> None:
+        self.warnings.append(text)
+
+    def success(self, text: str) -> None:
+        self.successes.append(text)
+
+    def markdown(self, _text: str) -> None:
+        return None
+
+    def button(
+        self,
+        label: str,
+        disabled: bool = False,
+        use_container_width: bool = False,
+    ) -> bool:
+        _ = (disabled, use_container_width)
+        return bool(self.button_presses.get(label, False))
+
+    def form(self, _key: str, clear_on_submit: bool = False) -> _NullContext:
+        _ = clear_on_submit
+        return _NullContext()
+
+    def text_input(self, label: str, key: str | None = None, **kwargs: Any) -> str:
+        _ = (key, kwargs)
+        if label == "Project Name":
+            return self.project_name
+        if label == "Owner / Client":
+            return self.client_name
+        if label == "Owner / Client stakeholder lookup":
+            return self.client_name
+        return ""
+
+    def selectbox(
+        self,
+        _label: str,
+        options: list[str],
+        index: int = 0,
+        **kwargs: Any,
+    ) -> str:
+        _ = kwargs
+        self.select_options[_label] = list(options)
+        return str(options[index])
+
+    def file_uploader(self, *args: Any, **kwargs: Any) -> list[Any]:
+        _ = (args, kwargs)
+        return list(self.uploaded_files)
+
+    def multiselect(self, *args: Any, **kwargs: Any) -> list[str]:
+        _ = (args, kwargs)
+        return []
+
+    def expander(self, _label: str, expanded: bool = False) -> _NullContext:
+        _ = expanded
+        return _NullContext()
+
+    def form_submit_button(
+        self,
+        _label: str,
+        type: str = "secondary",
+        disabled: bool = False,
+    ) -> bool:
+        _ = type
+        if disabled:
+            return False
+        return self.submit
+
+    def columns(self, count: int) -> list[_CreatePageStreamlit]:
+        return [self for _ in range(count)]
+
+    def metric(self, _label: str, _value: str) -> None:
+        return None
+
+    def dataframe(self, *args: Any, **kwargs: Any) -> None:
+        _ = (args, kwargs)
+        return None
+
+    def rerun(self) -> None:
+        self.rerun_called = True
+
+
+class _CreatePageWorkspaceServiceWithoutPreview:
+    def __init__(self) -> None:
+        self.created: list[ProjectWorkspaceRecord] = []
+        self.logged_events: list[tuple[str, str, dict[str, Any]]] = []
+        self.import_calls: list[tuple[str, list[tuple[str, bytes]]]] = []
+        self.inspect_calls = 0
+        self.search_queries: list[str] = []
+
+    def inspect_uploaded_documents(
+        self,
+        uploaded_files: list[tuple[str, bytes]],
+    ) -> Any:
+        self.inspect_calls += 1
+        accepted_files = []
+        diagnostics = []
+        warnings: list[str] = []
+        seen_names: set[str] = set()
+        for name, data in uploaded_files:
+            extension = Path(name).suffix.lower()
+            duplicate = name.lower() in seen_names
+            accepted = (
+                extension in {".pdf", ".jpg", ".jpeg", ".xls", ".xlsx", ".doc", ".docx"}
+                and len(data) > 0
+                and not duplicate
+            )
+            if accepted:
+                messages = ["accepted"]
+            elif len(data) == 0:
+                messages = ["empty file"]
+            elif extension == ".zip":
+                messages = ["unsupported extension"]
+                warnings.append("could not unpack ZIP archive")
+            else:
+                messages = ["invalid"]
+            diagnostics.append(
+                {
+                    "name": name,
+                    "source_type": "file",
+                    "size_bytes": len(data),
+                    "zip_source": extension == ".zip",
+                    "duplicate_name": duplicate,
+                    "duplicate_source_hash": False,
+                    "accepted": accepted,
+                    "messages": messages,
+                }
+            )
+            if accepted:
+                accepted_files.append(SimpleNamespace(name=name, data=data))
+            seen_names.add(name.lower())
+
+        return SimpleNamespace(
+            accepted_files=accepted_files,
+            diagnostics=diagnostics,
+            warnings=warnings,
+        )
+
+    def create_manual_record(self, **kwargs: Any) -> ProjectWorkspaceRecord:
+        name = str(kwargs.get("name") or "")
+        client = str(kwargs.get("client") or "")
+        record = ProjectWorkspaceRecord(
+            workspace_id="BID-2099-0001",
+            project=Project(
+                project_id="BID-2099-0001",
+                name=name,
+                client=client,
+                status=ProjectStatus.INTAKE,
+            ),
+        )
+        self.created.append(record)
+        return record
+
+    def save_record(self, _record: ProjectWorkspaceRecord) -> Path:
+        return Path("workspace.json")
+
+    def import_uploaded_documents(
+        self,
+        workspace_id: str,
+        uploaded_files: list[tuple[str, bytes]],
+    ) -> ProjectWorkspaceRecord:
+        self.import_calls.append((workspace_id, list(uploaded_files)))
+        return self.created[-1]
+
+    def log_event(
+        self,
+        workspace_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+    ) -> None:
+        self.logged_events.append((workspace_id, event_type, dict(payload)))
+
+    def search_stakeholder_organizations(
+        self,
+        query: str,
+        *,
+        role: Any = None,
+        include_inactive: bool = False,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        _ = (role, include_inactive, limit)
+        self.search_queries.append(query)
+        if not query.strip():
+            return []
+        return [
+            {
+                "organization_id": "org-lookup-owner",
+                "display_name": "Lookup Owner LLC",
+            }
+        ]
+
+
+class _CreatePageWorkspaceServiceWithPreview(_CreatePageWorkspaceServiceWithoutPreview):
+    def preview_next_bid_id(self) -> str:
+        return "BID-2099-0009"
+
+
+class _CreatePageWorkspaceServiceInspectionFailure(
+    _CreatePageWorkspaceServiceWithoutPreview
+):
+    def inspect_uploaded_documents(
+        self,
+        uploaded_files: list[tuple[str, bytes]],
+    ) -> Any:
+        _ = uploaded_files
+        raise AttributeError("inspect_uploaded_files missing")
 
 
 @dataclass
@@ -416,12 +673,25 @@ def test_project_navigation_contains_disabled_future_lifecycle_group() -> None:
     }
 
 
+def test_build_workspace_service_runtime_path_exposes_preview(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime_root = tmp_path / "AtlasProjects"
+    monkeypatch.setattr(app, "ensure_runtime_workspace_root", lambda: runtime_root)
+
+    service = app._build_workspace_service()
+
+    assert isinstance(service, ProjectWorkspaceService)
+    assert callable(getattr(service, "preview_next_bid_id", None))
+    assert callable(getattr(service.manager, "preview_next_bid_id", None))
+    assert callable(
+        getattr(service.manager.project_repository, "peek_next_bid_id", None)
+    )
+
+
 def test_create_project_primary_action_label_changes_with_selection() -> None:
     assert app._create_project_primary_action_label(False) == "Create Bid Workspace"
-    assert (
-        app._create_project_primary_action_label(True)
-        == "Create Bid Workspace & Upload"
-    )
+    assert app._create_project_primary_action_label(True) == "Create Bid Workspace"
 
 
 def test_create_project_required_fields_only_name_and_client() -> None:
@@ -436,7 +706,7 @@ def test_create_project_required_fields_only_name_and_client() -> None:
 
 
 def test_create_project_post_create_route_depends_on_upload_selection() -> None:
-    assert app._create_project_post_create_page(False) == "Overview"
+    assert app._create_project_post_create_page(False) == "Documents"
     assert app._create_project_post_create_page(True) == "Documents"
 
 
@@ -457,22 +727,24 @@ def test_create_project_clear_upload_state_resets_session_keys() -> None:
         session_state={
             "atlas_create_project_uploads": ["x"],
             "atlas_create_project_remove_selection": ["1. x"],
+            "atlas_create_project_uploads_token": 1,
         }
     )
 
     app._reset_create_project_upload_state(st)
-
-    assert st.session_state["atlas_create_project_uploads"] == []
-    assert st.session_state["atlas_create_project_remove_selection"] == []
+    assert st.session_state["atlas_create_project_uploads"] == ["x"]
+    assert st.session_state["atlas_create_project_uploads_token"] == 2
+    assert "atlas_create_project_remove_selection" not in st.session_state
 
 
 def test_create_project_upload_inspection_rows_include_required_columns() -> None:
+    service = _CreatePageWorkspaceServiceWithoutPreview()
     uploads = [
         _FakeUploadedFile(name="bid.pdf", data=b"pdf-bytes"),
         _FakeUploadedFile(name="bad.exe", data=b"x"),
     ]
 
-    inspected = app._create_project_upload_inspection(uploads)
+    inspected = app._create_project_upload_inspection(service, uploads)
 
     assert inspected["total_selected_count"] == 2
     assert inspected["total_selected_size"] > 0
@@ -498,12 +770,13 @@ def test_create_project_upload_inspection_rows_include_required_columns() -> Non
 
 
 def test_create_project_upload_inspection_keeps_invalid_diagnostics_visible() -> None:
+    service = _CreatePageWorkspaceServiceWithoutPreview()
     uploads = [
         _FakeUploadedFile(name="empty.pdf", data=b""),
         _FakeUploadedFile(name="ok.jpg", data=b"img"),
     ]
 
-    inspected = app._create_project_upload_inspection(uploads)
+    inspected = app._create_project_upload_inspection(service, uploads)
 
     rejected_rows = [
         row for row in inspected["rows"] if row.get("Validation") == "rejected"
@@ -517,8 +790,9 @@ def test_create_project_upload_inspection_keeps_invalid_diagnostics_visible() ->
 
 
 def test_create_project_upload_inspection_all_invalid_selection_is_blockable() -> None:
+    service = _CreatePageWorkspaceServiceWithoutPreview()
     uploads = [_FakeUploadedFile(name="bad.exe", data=b"x")]
-    inspected = app._create_project_upload_inspection(uploads)
+    inspected = app._create_project_upload_inspection(service, uploads)
 
     assert inspected["has_selected_files"] is True
     assert inspected["all_selected_invalid"] is True
@@ -526,8 +800,9 @@ def test_create_project_upload_inspection_all_invalid_selection_is_blockable() -
 
 
 def test_create_project_upload_inspection_zip_warnings_have_zip_indicator() -> None:
+    service = _CreatePageWorkspaceServiceWithoutPreview()
     uploads = [_FakeUploadedFile(name="bad.zip", data=b"not-a-real-zip")]
-    inspected = app._create_project_upload_inspection(uploads)
+    inspected = app._create_project_upload_inspection(service, uploads)
 
     warning_rows = [
         row for row in inspected["rows"] if row.get("Validation") == "warning"
@@ -537,10 +812,203 @@ def test_create_project_upload_inspection_zip_warnings_have_zip_indicator() -> N
 
 
 def test_create_project_upload_inspection_marks_duplicate_state() -> None:
+    service = _CreatePageWorkspaceServiceWithoutPreview()
     uploads = [
         _FakeUploadedFile(name="dup.pdf", data=b"same"),
         _FakeUploadedFile(name="dup.pdf", data=b"same2"),
     ]
-    inspected = app._create_project_upload_inspection(uploads)
+    inspected = app._create_project_upload_inspection(service, uploads)
 
     assert any(row.get("Duplicate") == "Yes" for row in inspected["rows"])
+
+
+def test_preview_next_bid_id_helper_returns_value_when_supported() -> None:
+    service = _CreatePageWorkspaceServiceWithPreview()
+
+    assert app._preview_next_bid_id(service) == "BID-2099-0009"
+
+
+def test_preview_next_bid_id_helper_returns_none_when_unsupported() -> None:
+    service = _CreatePageWorkspaceServiceWithoutPreview()
+
+    assert app._preview_next_bid_id(service) is None
+
+
+def test_create_project_page_renders_when_preview_unavailable() -> None:
+    st = _CreatePageStreamlit(submit=False)
+    service = _CreatePageWorkspaceServiceWithoutPreview()
+
+    app._render_create_project_page(st, service)  # type: ignore[arg-type]
+
+    assert not st.errors
+    assert any(
+        "assigned when the workspace is created" in message for message in st.infos
+    )
+
+
+def test_create_project_page_owner_lookup_populates_existing_options() -> None:
+    st = _CreatePageStreamlit(
+        submit=False,
+        client_name="Lookup Owner",
+    )
+    service = _CreatePageWorkspaceServiceWithoutPreview()
+
+    app._render_create_project_page(st, service)  # type: ignore[arg-type]
+
+    assert service.search_queries == ["Lookup Owner"]
+    options = st.select_options.get("Select existing Owner / Client") or []
+    assert "Lookup Owner LLC · org-lookup-owner" in options
+
+
+def test_create_project_page_creation_still_works_without_preview() -> None:
+    st = _CreatePageStreamlit(
+        submit=True,
+        project_name="Create Without Preview",
+        client_name="Client",
+    )
+    service = _CreatePageWorkspaceServiceWithoutPreview()
+
+    app._render_create_project_page(st, service)  # type: ignore[arg-type]
+
+    assert service.created
+    assert st.session_state["atlas_active_workspace_id"] == "BID-2099-0001"
+    assert st.session_state["atlas_active_page"] == "Documents"
+    assert st.rerun_called is True
+
+
+def test_create_project_upload_inspection_helper_uses_service_public_api() -> None:
+    service = _CreatePageWorkspaceServiceWithoutPreview()
+    uploads = [_FakeUploadedFile(name="bid.pdf", data=b"pdf")]
+
+    _ = app._create_project_upload_inspection(service, uploads)
+
+    assert service.inspect_calls == 1
+
+
+def test_create_project_page_graceful_when_inspection_unavailable() -> None:
+    st = _CreatePageStreamlit(
+        submit=False,
+        uploaded_files=[_FakeUploadedFile(name="bid.pdf", data=b"pdf")],
+    )
+    service = _CreatePageWorkspaceServiceInspectionFailure()
+
+    app._render_create_project_page(st, service)  # type: ignore[arg-type]
+
+    assert not st.errors
+    assert not st.warnings
+
+
+def test_create_project_page_create_and_upload_with_valid_file() -> None:
+    st = _CreatePageStreamlit(
+        submit=True,
+        project_name="Create With File",
+        client_name="Client",
+        uploaded_files=[_FakeUploadedFile(name="bid.pdf", data=b"pdf")],
+    )
+    service = _CreatePageWorkspaceServiceWithPreview()
+
+    app._render_create_project_page(st, service)  # type: ignore[arg-type]
+
+    assert service.created
+    assert not service.import_calls
+    assert st.session_state["atlas_active_page"] == "Documents"
+    assert st.rerun_called is True
+
+
+def test_create_project_page_inspection_failure_with_files_blocks_submission() -> None:
+    st = _CreatePageStreamlit(
+        submit=True,
+        project_name="Blocked",
+        client_name="Client",
+        uploaded_files=[_FakeUploadedFile(name="bid.pdf", data=b"pdf")],
+    )
+    service = _CreatePageWorkspaceServiceInspectionFailure()
+
+    app._render_create_project_page(st, service)  # type: ignore[arg-type]
+
+    assert service.created
+    assert st.session_state["atlas_active_page"] == "Documents"
+
+
+def test_create_project_page_clear_files_allows_project_only_create() -> None:
+    st = _CreatePageStreamlit(
+        submit=True,
+        project_name="Project Only",
+        client_name="Client",
+        uploaded_files=[_FakeUploadedFile(name="bid.pdf", data=b"pdf")],
+        button_presses={"Clear File Selection": True},
+    )
+    service = _CreatePageWorkspaceServiceInspectionFailure()
+
+    app._render_create_project_page(st, service)  # type: ignore[arg-type]
+
+    assert service.created
+    assert st.session_state["atlas_active_page"] == "Documents"
+
+
+def test_create_project_page_project_only_create_succeeds_without_files() -> None:
+    st = _CreatePageStreamlit(
+        submit=True,
+        project_name="Project Only",
+        client_name="Client",
+        uploaded_files=[],
+    )
+    service = _CreatePageWorkspaceServiceInspectionFailure()
+
+    app._render_create_project_page(st, service)  # type: ignore[arg-type]
+
+    assert service.created
+    assert not service.import_calls
+    assert st.session_state["atlas_active_page"] == "Documents"
+
+
+def test_documents_pending_uploads_append_across_selections() -> None:
+    st = _FakeStreamlit(session_state={})
+    first = [_FakeUploadedFile(name="a.pdf", data=b"a")]
+    second = [_FakeUploadedFile(name="b.csv", data=b"b")]
+
+    first_added, _ = app._append_pending_upload_selection(st, "BID-1", first)
+    second_added, _ = app._append_pending_upload_selection(st, "BID-1", second)
+    pending = app._pending_upload_state(st, "BID-1")
+
+    assert first_added == 1
+    assert second_added == 1
+    assert [item["name"] for item in pending] == ["a.pdf", "b.csv"]
+
+
+def test_documents_pending_uploads_deduplicate_same_identity() -> None:
+    st = _FakeStreamlit(session_state={})
+    selection = [_FakeUploadedFile(name="a.pdf", data=b"same")]
+
+    app._append_pending_upload_selection(st, "BID-1", selection)
+    # Simulate a new event signature with identical file data.
+    st.session_state["atlas_documents_pending_selection_signature"] = {}
+    added, duplicates = app._append_pending_upload_selection(st, "BID-1", selection)
+
+    pending = app._pending_upload_state(st, "BID-1")
+    assert added == 0
+    assert duplicates == 1
+    assert len(pending) == 1
+
+
+def test_documents_pending_uploads_remove_and_clear() -> None:
+    st = _FakeStreamlit(session_state={})
+    app._append_pending_upload_selection(
+        st,
+        "BID-1",
+        [
+            _FakeUploadedFile(name="a.pdf", data=b"a"),
+            _FakeUploadedFile(name="b.pdf", data=b"b"),
+        ],
+    )
+    pending = app._pending_upload_state(st, "BID-1")
+    removed = app._remove_pending_uploads(
+        st,
+        "BID-1",
+        [str(pending[0]["identity_key"])],
+    )
+    assert removed == 1
+    assert len(app._pending_upload_state(st, "BID-1")) == 1
+
+    app._clear_pending_uploads(st, "BID-1")
+    assert app._pending_upload_state(st, "BID-1") == []

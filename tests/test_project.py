@@ -58,10 +58,15 @@ def test_to_dict_output():
 
     assert project.to_dict() == {
         "project_id": "p-001",
+        "atlas_bid_id": "p-001",
         "name": "City Hall Refresh",
         "client": "Acme",
         "client_project_number": None,
         "internal_project_number": None,
+        "consultant": None,
+        "architect": None,
+        "engineers": [],
+        "issue_date": None,
         "location": "Oakland, CA",
         "bid_date": "2026-07-15",
         "status": "estimating",

@@ -93,6 +93,21 @@ Status legend:
 - Relationships: has many Contact, Opportunity, Project, Contract, Purchase Order.
 - Lifecycle Role: Persistent legal and operational identity across all phases.
 
+X-03 implementation note:
+- Atlas now uses shared Organization records for project stakeholder linkage in bid-workspace flows.
+- Organization role classification supports Owner/Client, General Contractor, Electrical Contractor, Architect, Consultant, Engineer, and Other.
+- Lookup uses normalized canonical names plus alias matching with deterministic duplicate checks.
+
+### ProjectStakeholder
+- Purpose: Explicit relationship model linking Project to Organization with role semantics.
+- Relationships: belongs to Project and Organization.
+- Lifecycle Role: Replaces one-off stakeholder duplication by enabling reusable organization relationships across projects and roles.
+
+X-03 implementation note:
+- One organization may be linked to a project in multiple roles.
+- Primary role flag is explicit (for example, Owner/Client primary linkage).
+- Legacy free-text stakeholder metadata remains readable for backward compatibility and migration-safe operation.
+
 ### Contact
 - Purpose: Person-level stakeholder identity.
 - Relationships: belongs to Organization; linked to Opportunity, Project, RFI, Service Ticket.
@@ -124,6 +139,10 @@ Status legend:
 	- Client Project Number: optional external/customer identifier.
 	- Internal Project Number: optional internal execution identifier, typically assigned after award/execution transition.
 - These fields refine identity clarity inside existing project/bid lifecycle surfaces and do not introduce new post-award execution workflows.
+
+### Sprint X-03 Compatibility Hardening
+- Legacy Project payloads missing optional newer fields (for example Atlas Bid ID, client/internal numbers, consultant/architect/engineers/issue date) are loaded with deterministic defaults.
+- Compatibility behavior is centralized in domain/service/repository boundaries rather than scattered UI-only fallback logic.
 
 ### Bid Package
 - Purpose: Intake bundle of bid source artifacts.

@@ -9,7 +9,16 @@ from typing import Any
 
 from atlas_core import __version__
 from atlas_core.domain import Project, ProjectStatus
+from atlas_core.domain import OrganizationRole, ProjectStakeholder
 from atlas_core.repository import AtlasProjectManager
+from atlas_core.services.document_intake_service import (
+    DocumentIntakeService,
+    UploadInspectionResult,
+    UploadedIntakeFile,
+)
+from atlas_core.services.organization_directory_service import (
+    OrganizationDirectoryService,
+)
 
 
 @dataclass
@@ -72,7 +81,11 @@ class ProjectWorkspaceRecord:
         self.last_opened_at = self._normalize_optional_text(self.last_opened_at)
 
         if not isinstance(self.project, Project):
-            self.project = Project.from_dict(self.project)
+            if isinstance(self.project, dict):
+                payload = dict(self.project)
+            else:
+                payload = dict(getattr(self.project, "__dict__", {}) or {})
+            self.project = Project.from_dict(payload)
 
     @property
     def project_id(self) -> str:
@@ -155,6 +168,7 @@ class ProjectWorkspaceService:
     def __init__(self, workspace_root: str | Path = "AtlasProjects") -> None:
         self.workspace_root = Path(workspace_root)
         self.manager = AtlasProjectManager(str(self.workspace_root))
+        self.organization_directory = OrganizationDirectoryService(self.workspace_root)
 
     def list_recent_workspaces(self, limit: int = 10) -> list[ProjectWorkspaceRecord]:
         records = self.list_workspaces(include_archived=False)
@@ -256,6 +270,8 @@ class ProjectWorkspaceService:
         bid_date: str | None = None,
         status: ProjectStatus | None = None,
         consultant: str | None = None,
+        general_contractor: str | None = None,
+        electrical_contractor: str | None = None,
         architect: str | None = None,
         engineers: list[str] | None = None,
         client_project_number: str | None = None,
@@ -264,9 +280,7 @@ class ProjectWorkspaceService:
         lifecycle_stage: str | None = None,
     ) -> ProjectWorkspaceRecord:
         atlas_bid_id = (
-            self.manager.project_repository.allocate_bid_id()
-            if project_id is None
-            else project_id
+            self.manager.allocate_bid_id() if project_id is None else project_id
         )
         lifecycle = status or ProjectStatus.INTAKE
         project = Project(
@@ -288,6 +302,8 @@ class ProjectWorkspaceService:
                 "project_name": name,
                 "owner": client,
                 "consultant": consultant,
+                "general_contractor": general_contractor,
+                "electrical_contractor": electrical_contractor,
                 "architect": architect,
                 "engineers": list(engineers or []),
                 "atlas_bid_id": atlas_bid_id,
@@ -303,7 +319,113 @@ class ProjectWorkspaceService:
         )
 
     def preview_next_bid_id(self) -> str:
-        return self.manager.project_repository.peek_next_bid_id()
+        return self.manager.preview_next_bid_id()
+
+    def inspect_uploaded_documents(
+        self,
+        uploaded_files: list[tuple[str, bytes]],
+    ) -> UploadInspectionResult:
+        intake_files = [
+            UploadedIntakeFile(name=name, data=data) for name, data in uploaded_files
+        ]
+        return DocumentIntakeService().inspect_uploaded_files(intake_files)
+
+    def search_stakeholder_organizations(
+        self,
+        query: str,
+        *,
+        role: OrganizationRole | None = None,
+        include_inactive: bool = False,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        rows = self.organization_directory.search_organizations(
+            query,
+            role=role,
+            include_inactive=include_inactive,
+            limit=limit,
+        )
+        return [item.to_dict() for item in rows]
+
+    def find_likely_organization_duplicates(self, name: str) -> list[dict[str, Any]]:
+        rows = self.organization_directory.find_likely_duplicates(name)
+        return [item.to_dict() for item in rows]
+
+    def create_stakeholder_organization(
+        self,
+        *,
+        name: str,
+        role: OrganizationRole,
+        website: str | None = None,
+        phone: str | None = None,
+        email: str | None = None,
+        address: str | None = None,
+        notes: str | None = None,
+        aliases: list[str] | None = None,
+    ) -> dict[str, Any]:
+        created = self.organization_directory.create_organization(
+            name=name,
+            role=role,
+            website=website,
+            phone=phone,
+            email=email,
+            address=address,
+            notes=notes,
+            aliases=aliases,
+        )
+        return created.to_dict()
+
+    def list_project_stakeholders(self, workspace_id: str) -> list[dict[str, Any]]:
+        rows = self.organization_directory.list_project_stakeholders(workspace_id)
+        organizations = {
+            item.organization_id: item
+            for item in self.organization_directory.list_organizations(
+                include_inactive=True
+            )
+        }
+        enriched: list[dict[str, Any]] = []
+        for item in rows:
+            payload = item.to_dict()
+            org = organizations.get(item.organization_id)
+            payload["organization_display_name"] = (
+                org.display_name if org is not None else ""
+            )
+            payload["organization_aliases"] = list(org.aliases) if org else []
+            enriched.append(payload)
+        return enriched
+
+    def replace_project_stakeholders(
+        self,
+        workspace_id: str,
+        stakeholders: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        domain_rows: list[ProjectStakeholder] = [
+            ProjectStakeholder.from_dict(item) for item in stakeholders
+        ]
+        updated = self.organization_directory.replace_project_stakeholders(
+            workspace_id,
+            domain_rows,
+        )
+        return [item.to_dict() for item in updated]
+
+    def link_project_stakeholder(
+        self,
+        *,
+        workspace_id: str,
+        organization_id: str,
+        role: OrganizationRole,
+        is_primary: bool = False,
+        contact_display: str | None = None,
+        project_notes: str | None = None,
+    ) -> dict[str, Any]:
+        linked = self.organization_directory.link_organization_to_project(
+            project_id=workspace_id,
+            organization_id=organization_id,
+            role=role,
+            is_primary=is_primary,
+            contact_display=contact_display,
+            project_notes=project_notes,
+        )
+        return linked.to_dict()
 
     def update_project_identity_metadata(
         self,
@@ -314,6 +436,8 @@ class ProjectWorkspaceService:
         client_project_number: str | None = None,
         internal_project_number: str | None = None,
         consultant: str | None = None,
+        general_contractor: str | None = None,
+        electrical_contractor: str | None = None,
         architect: str | None = None,
         engineers: list[str] | None = None,
         issue_date: str | None = None,
@@ -341,6 +465,12 @@ class ProjectWorkspaceService:
             record.project.internal_project_number = normalized_internal_number
         if consultant is not None:
             record.metadata["consultant"] = consultant.strip() or None
+        if general_contractor is not None:
+            record.metadata["general_contractor"] = general_contractor.strip() or None
+        if electrical_contractor is not None:
+            record.metadata["electrical_contractor"] = (
+                electrical_contractor.strip() or None
+            )
         if architect is not None:
             record.metadata["architect"] = architect.strip() or None
         if engineers is not None:
@@ -538,6 +668,8 @@ class ProjectWorkspaceService:
             "project_name": str(meta.get("project_name") or record.project.name),
             "owner": str(meta.get("owner") or record.project.client),
             "consultant": meta.get("consultant"),
+            "general_contractor": meta.get("general_contractor"),
+            "electrical_contractor": meta.get("electrical_contractor"),
             "architect": meta.get("architect"),
             "engineers": list(meta.get("engineers") or []),
             "atlas_bid_id": atlas_bid_id,
@@ -635,6 +767,19 @@ class ProjectWorkspaceService:
             normalized["internal_project_number"] = (
                 str(project_payload.get("internal_project_number") or "") or None
             )
+        if "owner" not in normalized:
+            normalized["owner"] = str(project_payload.get("client") or "") or None
+        for field_name in [
+            "consultant",
+            "general_contractor",
+            "electrical_contractor",
+            "architect",
+            "issue_date",
+        ]:
+            if field_name not in normalized:
+                normalized[field_name] = None
+        if "engineers" not in normalized:
+            normalized["engineers"] = []
         return normalized
 
     @staticmethod

@@ -130,6 +130,8 @@ metadata.json:
 - project name
 - owner
 - consultant
+- general contractor
+- electrical contractor
 - architect
 - engineers
 - project number (Atlas Bid ID compatibility alias)
@@ -174,7 +176,7 @@ Atlas persists the following state to workspace.json:
 
 On load, the workspace restores this state so the user returns to their last working context.
 
-## Create + Upload Recovery Behavior (X-02 Amendment)
+## Create + Upload Recovery Behavior (X-03)
 
 Project onboarding uses existing repository/intake paths and does not create a parallel upload subsystem.
 
@@ -184,6 +186,23 @@ Behavior guarantees:
 - valid files remain associated with the new project even when other files are rejected
 - rejected files surface structured diagnostics and can be retried from Documents workspace
 - runtime upload artifacts are written only under controlled project intake locations
+
+X-03 onboarding behavior:
+- Create New Project is Step 1 metadata-only onboarding and routes to Documents for Step 2 upload.
+- Upload execution is explicit from Documents (`Upload Pending Files`).
+- Pending files accumulate across multiple chooser selections until removed or uploaded.
+- Pending dedupe is deterministic by normalized filename + file size + source hash.
+- CSV is accepted in onboarding and flows through the same repository/intake path as other supported files.
+- Mixed valid/invalid pending batches preserve deterministic diagnostics/warnings.
+
+## Shared Stakeholder Persistence (X-03)
+
+X-03 introduces durable shared stakeholder records without replacing project metadata files:
+- `AtlasProjects/.atlas_organizations.json`: canonical shared organizations directory.
+- `AtlasProjects/.atlas_project_stakeholders.json`: project-to-organization role relationships.
+
+Compatibility note:
+- Legacy free-text stakeholder metadata fields remain supported and are preserved.
 
 ## ZIP Safety Rules (X-02 Amendment)
 

@@ -60,14 +60,14 @@ Completed outcomes:
 
 ## Phase 2: Bid Intelligence (Active)
 Current objective:
-Sprint X-02 Project Creation and Bid Identity Refinement is active.
+Sprint X-03 Onboarding and Stakeholder Workflow Hardening is active.
 
 Current UX hardening stream:
 
-- Epic X Product Hardening continuation (A-05 and X-01 complete, X-02 active)
+- Epic X Product Hardening continuation (A-05 and X-01/X-02 complete, X-03 active)
 - focused on estimator/project-engineer/design-engineer workflow usability hardening for existing capabilities
 - preserves D-03 scope boundaries and does not start Epic E or Commercial Intelligence implementation
-- includes identity model hardening for Atlas Bid ID, Client Project Number, and Internal Project Number in existing project-management workflows
+- includes onboarding/stakeholder hardening in existing project-management workflows and preserves prior X-02 identity model refinements
 
 Implemented in current baseline candidate:
 - Bid package review orchestration
@@ -92,7 +92,7 @@ Implemented in current baseline candidate:
 - Deterministic cost engine for acquisition cost selection, cost traceability, commercial coverage, and project-only quick-add product support
 
 Remaining Phase 2 refinements:
-- D-03/A-05/X-01 closeout verified: full quality-gate validation and architecture review complete
+- D-03/A-05/X-01/X-02 closeout verified: full quality-gate validation and architecture review complete
 - Epic E and post-D feature-epic implementation has not started in this pass
 - remaining UX debt: table-density/pagination consistency, progressive disclosure, and smaller-screen ergonomics
 - PDF ingestion and indexing robustness

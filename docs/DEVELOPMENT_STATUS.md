@@ -34,13 +34,13 @@ Sprint A-04 consolidates Engineering Workstation UX consistency with shared work
 Sprint A-05 performs end-to-end GUI validation and workflow refinement across Mission Control, Project Workspace, Knowledge, Estimate, and D-03 integration flows.
 Sprint X-01 performs pilot-readiness walkthrough validation and usability hardening for existing workflows.
 Sprint X-02 implements project creation and bid identity refinement with Atlas Bid ID allocation, explicit client/internal project identifiers, and metadata update workflows.
-Sprint X-02 amendment adds Create New Project bid-document upload with explicit create/upload action, safe ZIP inspection controls, structured intake diagnostics, and partial-success recovery behavior.
+Sprint X-03 hardens onboarding and stakeholder workflows with strict two-step create-then-upload behavior, pending-upload accumulation semantics, shared organization directory linkage, and compatibility-safe stakeholder persistence.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1077 tests)
+- pytest: full suite passing (1115 tests)
 
 ## Tooling Status
 - GitHub Actions configured
@@ -49,7 +49,7 @@ Sprint X-02 amendment adds Create New Project bid-document upload with explicit 
   - .pre-commit-config.yaml
 
 ## Active Focus
-Sprint X-02 project creation and bid identity refinement.
+Sprint X-03 onboarding and stakeholder workflow hardening.
 
 Secondary active focus:
 - low-risk UI helper refinement and consistency hardening in existing workspaces.
@@ -58,6 +58,8 @@ Secondary active focus:
 Current implementation scope note:
 - no Epic E implementation has started in this refinement pass
 - no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation features were introduced in X-02
+- no Epic E implementation has started in X-03
+- X-03 remains workflow hardening only and does not introduce new estimating/commercial/procurement/execution capabilities
 
 
 Lifecycle object definitions and cross-phase module boundaries are documented in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).

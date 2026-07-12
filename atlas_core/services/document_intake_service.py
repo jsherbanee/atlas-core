@@ -611,7 +611,11 @@ class DocumentIntakeService:
         group_name: str,
     ) -> tuple[list[dict[str, Any]], list[str]]:
         warnings: list[str] = []
-        pages = self.pdf_text_extraction_service.extract_pages(pdf_path)
+        try:
+            pages = self.pdf_text_extraction_service.extract_pages(pdf_path)
+        except Exception as exc:
+            warnings.append(f"{pdf_path.name}: PDF extraction failed ({exc}).")
+            return [], warnings
         page_records: list[dict[str, Any]] = []
         missing_text_pages = [page.page_number for page in pages if not page.has_text]
         if pages and not any(page.has_text for page in pages):

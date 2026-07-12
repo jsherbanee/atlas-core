@@ -1,6 +1,9 @@
 from pathlib import Path
+import json
+import re
 
 from atlas_core.domain import Project, ProjectLifecycleEvent, ProjectStatus
+from atlas_core.domain import OrganizationRole
 from atlas_core.services.project_workspace_service import (
     ProjectWorkspaceRecord,
     ProjectWorkspaceService,
@@ -144,20 +147,191 @@ def test_workspace_service_manifest_health_and_bundle(tmp_path: Path) -> None:
     assert Path(service.project_location("project-bundle")).exists()
 
 
-def test_workspace_service_preview_bid_id_is_non_consuming(tmp_path: Path) -> None:
+def test_workspace_service_runtime_wiring_exposes_preview_authority(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+
+    assert callable(getattr(service, "preview_next_bid_id", None))
+    assert callable(getattr(service.manager, "preview_next_bid_id", None))
+    assert callable(
+        getattr(service.manager.project_repository, "peek_next_bid_id", None)
+    )
+
+
+def test_workspace_service_runtime_wiring_exposes_upload_inspection_api(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+
+    assert callable(getattr(service, "inspect_uploaded_documents", None))
+
+
+def test_workspace_service_loads_legacy_project_without_identifier_fields(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="legacy-project",
+        name="Legacy Project",
+        client="Legacy Client",
+    )
+    service.save_record(record)
+
+    project_json = tmp_path / "AtlasProjects" / "legacy-project" / "project.json"
+    payload = json.loads(project_json.read_text(encoding="utf-8"))
+    payload.pop("client_project_number", None)
+    payload.pop("internal_project_number", None)
+    payload.pop("atlas_bid_id", None)
+    project_json.write_text(
+        json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+    loaded = service.load_record("legacy-project")
+
+    assert loaded.project.project_id == "legacy-project"
+    assert loaded.project.client_project_number is None
+    assert loaded.project.internal_project_number is None
+
+
+def test_workspace_service_upload_inspection_is_read_only(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    workspace_root = tmp_path / "AtlasProjects"
+    before = list(workspace_root.glob("**/*"))
+
+    inspected = service.inspect_uploaded_documents(
+        [
+            ("bid.pdf", b"pdf-content"),
+            ("bad.exe", b"bad"),
+        ]
+    )
+
+    after = list(workspace_root.glob("**/*"))
+    assert any(item.get("accepted", False) for item in inspected.diagnostics)
+    assert any(not item.get("accepted", False) for item in inspected.diagnostics)
+    assert before == after
+
+
+def test_workspace_service_stakeholder_directory_create_and_link(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="BID-2099-0001",
+        name="Stakeholder Project",
+        client="Client",
+    )
+    service.save_record(record)
+
+    created_org = service.create_stakeholder_organization(
+        name="Acme Owner",
+        role=OrganizationRole.OWNER_CLIENT,
+    )
+    linked = service.link_project_stakeholder(
+        workspace_id=record.workspace_id,
+        organization_id=str(created_org.get("organization_id")),
+        role=OrganizationRole.OWNER_CLIENT,
+        is_primary=True,
+    )
+
+    stakeholders = service.list_project_stakeholders(record.workspace_id)
+    assert linked["organization_id"] == created_org["organization_id"]
+    assert len(stakeholders) == 1
+    assert stakeholders[0]["organization_display_name"] == "Acme Owner"
+
+
+def test_workspace_service_preview_bid_id_returns_expected_format(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    preview = service.preview_next_bid_id()
+
+    assert re.fullmatch(r"BID-\d{4}-\d{4}", preview) is not None
+
+
+def test_workspace_service_preview_bid_id_does_not_consume_ids(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    preview = service.preview_next_bid_id()
+
+    created = service.create_manual_record(
+        name="Preview Non-Consuming",
+        client="Client",
+    )
+
+    assert created.project.project_id == preview
+
+
+def test_workspace_service_multiple_preview_calls_return_identical_value(
+    tmp_path: Path,
+) -> None:
     service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
 
     first_preview = service.preview_next_bid_id()
     second_preview = service.preview_next_bid_id()
 
-    record = service.create_manual_record(
-        name="Preview Project",
+    assert first_preview == second_preview
+
+
+def test_workspace_service_preview_then_create_allocates_previewed_id(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+
+    preview = service.preview_next_bid_id()
+
+    created = service.create_manual_record(
+        name="Preview Then Create",
         client="Client",
     )
 
-    assert first_preview == second_preview
+    assert created.project.project_id == preview
+
+
+def test_workspace_service_create_then_preview_advances_to_next_id(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+
+    first_preview = service.preview_next_bid_id()
+
+    record = service.create_manual_record(
+        name="Create Then Preview",
+        client="Client",
+    )
+
+    next_preview = service.preview_next_bid_id()
+
     assert record.project.project_id == first_preview
-    assert service.preview_next_bid_id() != first_preview
+    assert next_preview != first_preview
+
+
+def test_workspace_service_preview_does_not_reuse_deleted_or_archived_ids(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+
+    first = service.create_manual_record(
+        name="First",
+        client="Client",
+    )
+    service.save_record(first)
+    first_id = first.workspace_id
+
+    second_preview = service.preview_next_bid_id()
+    second = service.create_manual_record(
+        name="Second",
+        client="Client",
+    )
+    service.save_record(second)
+    second_id = second.workspace_id
+
+    service.archive_project(second_id, archived=True)
+    service.delete_project(first_id)
+
+    next_preview = service.preview_next_bid_id()
+
+    assert second_id == second_preview
+    assert next_preview not in {first_id, second_id}
 
 
 def test_workspace_service_create_project_without_documents(tmp_path: Path) -> None:

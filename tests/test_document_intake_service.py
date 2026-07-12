@@ -183,6 +183,27 @@ def test_zip_upload_is_unpacked_recursively(tmp_path: Path) -> None:
     assert result.snapshot.raw_pages
 
 
+def test_malformed_pdf_upload_is_reported_without_crashing(tmp_path: Path) -> None:
+    service = DocumentIntakeService()
+    uploads = [UploadedIntakeFile(name="malformed.pdf", data=b"%PDF-invalid")]
+
+    result = service.build_session_package_from_uploads(
+        uploaded_files=uploads,
+        uploads_root=tmp_path / "uploads",
+        session_id="malformed-pdf",
+    )
+
+    assert any("PDF extraction failed" in warning for warning in result.warnings)
+    file_diagnostics = list(result.import_summary.get("file_diagnostics", []))
+    malformed_rows = [
+        item
+        for item in file_diagnostics
+        if str(item.get("file_name", "")).endswith("malformed.pdf")
+    ]
+    assert malformed_rows
+    assert malformed_rows[0].get("status") == "failed"
+
+
 def test_inspect_uploaded_files_detects_duplicates_empty_and_unsupported() -> None:
     service = DocumentIntakeService()
     uploads = [

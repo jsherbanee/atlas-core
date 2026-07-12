@@ -13,7 +13,7 @@ import subprocess
 from typing import Any
 
 from atlas_core import __version__
-from atlas_core.domain import Project, ProjectStatus
+from atlas_core.domain import OrganizationRole, Project, ProjectStatus
 from atlas_core.services.phase2_review_context_service import (
     DEFAULT_MAW_REFERENCE_PACKAGE,
     build_intake_review_context,
@@ -55,10 +55,6 @@ from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
 from atlas_core.services.runtime_workspace import ensure_runtime_workspace_root
-from atlas_core.services.document_intake_service import (
-    DocumentIntakeService,
-    UploadedIntakeFile,
-)
 
 PROJECT_MANAGER_PAGES = [
     "Mission Control",
@@ -335,6 +331,7 @@ SUPPORTED_UPLOAD_TYPES = [
 
 CREATE_PROJECT_UPLOAD_TYPES = [
     "pdf",
+    "csv",
     "xls",
     "xlsx",
     "doc",
@@ -1034,12 +1031,13 @@ def _bytes_label(value: int) -> str:
     return f"{round(value / (1024 * 1024), 2)} MB"
 
 
-def _create_project_upload_inspection(uploaded_files: list[Any]) -> dict[str, Any]:
-    intake_files = [
-        UploadedIntakeFile(name=str(file.name), data=bytes(file.getvalue()))
-        for file in uploaded_files
-    ]
-    inspection = DocumentIntakeService().inspect_uploaded_files(intake_files)
+def _create_project_upload_inspection(
+    workspace_service: ProjectWorkspaceService,
+    uploaded_files: list[Any],
+) -> dict[str, Any]:
+    inspection = workspace_service.inspect_uploaded_documents(
+        [(str(file.name), bytes(file.getvalue())) for file in uploaded_files]
+    )
 
     total_selected_size = sum(
         int(getattr(file, "size", len(file.getvalue()))) for file in uploaded_files
@@ -1103,6 +1101,17 @@ def _create_project_upload_inspection(uploaded_files: list[Any]) -> dict[str, An
     }
 
 
+def _preview_next_bid_id(workspace_service: Any) -> str | None:
+    preview_method = getattr(workspace_service, "preview_next_bid_id", None)
+    if not callable(preview_method):
+        return None
+
+    try:
+        return str(preview_method())
+    except Exception:
+        return None
+
+
 def _create_project_effective_uploads(
     uploaded_files: list[Any],
     remove_labels: list[str],
@@ -1120,11 +1129,8 @@ def _create_project_effective_uploads(
 
 
 def _create_project_primary_action_label(has_selected_files: bool) -> str:
-    return (
-        "Create Bid Workspace & Upload"
-        if has_selected_files
-        else "Create Bid Workspace"
-    )
+    _ = has_selected_files
+    return "Create Bid Workspace"
 
 
 def _create_project_missing_required_fields(name: str, client: str) -> list[str]:
@@ -1137,12 +1143,100 @@ def _create_project_missing_required_fields(name: str, client: str) -> list[str]
 
 
 def _create_project_post_create_page(has_selected_files: bool) -> str:
-    return "Documents" if has_selected_files else "Overview"
+    _ = has_selected_files
+    return "Documents"
 
 
 def _reset_create_project_upload_state(st: Any) -> None:
-    st.session_state["atlas_create_project_uploads"] = []
-    st.session_state["atlas_create_project_remove_selection"] = []
+    current_token = int(st.session_state.get("atlas_create_project_uploads_token", 0))
+    st.session_state["atlas_create_project_uploads_token"] = current_token + 1
+    st.session_state.pop("atlas_create_project_remove_selection", None)
+
+
+def _create_project_upload_widget_key(st: Any) -> str:
+    token = int(st.session_state.get("atlas_create_project_uploads_token", 0) or 0)
+    return f"atlas_create_project_uploads_{token}"
+
+
+def _pending_upload_identity(name: str, data: bytes) -> str:
+    normalized_name = _safe_text(name, "").strip().lower()
+    source_hash = hashlib.sha1(data).hexdigest()
+    return f"{normalized_name}|{len(data)}|{source_hash}"
+
+
+def _pending_upload_state(st: Any, workspace_id: str) -> list[dict[str, Any]]:
+    state = dict(st.session_state.get("atlas_documents_pending_uploads") or {})
+    rows = list(state.get(workspace_id) or [])
+    return [dict(item) for item in rows if isinstance(item, dict)]
+
+
+def _write_pending_upload_state(
+    st: Any,
+    workspace_id: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    state = dict(st.session_state.get("atlas_documents_pending_uploads") or {})
+    state[workspace_id] = [dict(item) for item in rows]
+    st.session_state["atlas_documents_pending_uploads"] = state
+
+
+def _append_pending_upload_selection(
+    st: Any,
+    workspace_id: str,
+    uploaded_files: list[Any],
+) -> tuple[int, int]:
+    if not uploaded_files:
+        return (0, 0)
+
+    signature = _uploaded_file_signature(uploaded_files)
+    signature_state = dict(
+        st.session_state.get("atlas_documents_pending_selection_signature") or {}
+    )
+    if _safe_text(signature_state.get(workspace_id), "") == signature:
+        return (0, 0)
+
+    existing = _pending_upload_state(st, workspace_id)
+    by_identity = {str(item.get("identity_key")): dict(item) for item in existing}
+    added = 0
+    duplicates = 0
+    for file in list(uploaded_files):
+        name = str(getattr(file, "name", ""))
+        data = bytes(file.getvalue())
+        identity_key = _pending_upload_identity(name, data)
+        if identity_key in by_identity:
+            duplicates += 1
+            continue
+        by_identity[identity_key] = {
+            "identity_key": identity_key,
+            "name": name,
+            "data": data,
+            "size": int(getattr(file, "size", len(data))),
+        }
+        added += 1
+
+    _write_pending_upload_state(st, workspace_id, list(by_identity.values()))
+    signature_state[workspace_id] = signature
+    st.session_state["atlas_documents_pending_selection_signature"] = signature_state
+    return (added, duplicates)
+
+
+def _remove_pending_uploads(
+    st: Any,
+    workspace_id: str,
+    identity_keys: list[str],
+) -> int:
+    keep = [
+        item
+        for item in _pending_upload_state(st, workspace_id)
+        if str(item.get("identity_key")) not in set(identity_keys)
+    ]
+    removed = len(_pending_upload_state(st, workspace_id)) - len(keep)
+    _write_pending_upload_state(st, workspace_id, keep)
+    return removed
+
+
+def _clear_pending_uploads(st: Any, workspace_id: str) -> None:
+    _write_pending_upload_state(st, workspace_id, [])
 
 
 def _to_rows(items: list[Any]) -> list[dict[str, Any]]:
@@ -3109,6 +3203,8 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_quick_add_products", {})
     st.session_state.setdefault("atlas_global_search_open", False)
     st.session_state.setdefault("atlas_active_project_name", "")
+    st.session_state.setdefault("atlas_documents_pending_uploads", {})
+    st.session_state.setdefault("atlas_documents_pending_selection_signature", {})
     st.session_state.setdefault(
         "atlas_os",
         "macos" if platform.system().lower() == "darwin" else "other",
@@ -3132,14 +3228,14 @@ def _atlas_bid_id(record: ProjectWorkspaceRecord) -> str:
 def _client_project_number(record: ProjectWorkspaceRecord) -> str:
     return _safe_text(
         record.metadata.get("client_project_number"),
-        record.project.client_project_number or "",
+        _safe_text(getattr(record.project, "client_project_number", ""), ""),
     )
 
 
 def _internal_project_number(record: ProjectWorkspaceRecord) -> str:
     return _safe_text(
         record.metadata.get("internal_project_number"),
-        record.project.internal_project_number or "",
+        _safe_text(getattr(record.project, "internal_project_number", ""), ""),
     )
 
 
@@ -3209,7 +3305,18 @@ def _build_record_from_context(
         project_id=project_id,
         name=name,
         client=client,
+        atlas_bid_id=_first_text(metadata.get("atlas_bid_id"), project_id),
+        client_project_number=_first_text(metadata.get("client_project_number")),
+        internal_project_number=_first_text(metadata.get("internal_project_number")),
+        consultant=_first_text(metadata.get("consultant")),
+        architect=_first_text(metadata.get("architect")),
+        engineers=[
+            _safe_text(item, "")
+            for item in list(metadata.get("engineers") or [])
+            if _safe_text(item, "")
+        ],
         location=_first_text(metadata.get("location")),
+        issue_date=_first_text(metadata.get("issue_date")),
         bid_date=_first_text(metadata.get("bid_date"), metadata.get("issue_date")),
         status=metadata.get("status") or ProjectStatus.INTAKE,
     )
@@ -3562,6 +3669,13 @@ def _project_library_rows(
         include_archived=include_archived,
         limit=limit,
     ):
+        stakeholder_rows: list[dict[str, Any]] = []
+        try:
+            stakeholder_rows = list(
+                workspace_service.list_project_stakeholders(record.workspace_id)
+            )
+        except Exception:
+            stakeholder_rows = []
         manifest = workspace_service.read_manifest(record.workspace_id)
         document_count = sum(
             int(value) for value in dict(manifest.get("document_counts") or {}).values()
@@ -3574,6 +3688,42 @@ def _project_library_rows(
                 "project_name": record.project.name,
                 "customer": _safe_text(
                     record.metadata.get("owner"), record.project.client
+                ),
+                "stakeholder_names": " | ".join(
+                    [
+                        _safe_text(record.metadata.get("owner"), record.project.client),
+                        _safe_text(record.metadata.get("consultant"), ""),
+                        _safe_text(record.metadata.get("architect"), ""),
+                        " | ".join(
+                            [
+                                _safe_text(
+                                    item.get("organization_display_name"),
+                                    "",
+                                )
+                                for item in stakeholder_rows
+                            ]
+                        ),
+                        " | ".join(
+                            [
+                                " ".join(
+                                    [
+                                        _safe_text(alias, "")
+                                        for alias in list(
+                                            item.get("organization_aliases") or []
+                                        )
+                                    ]
+                                )
+                                for item in stakeholder_rows
+                            ]
+                        ),
+                        ", ".join(
+                            [
+                                _safe_text(item, "")
+                                for item in list(record.metadata.get("engineers") or [])
+                                if _safe_text(item, "")
+                            ]
+                        ),
+                    ]
                 ),
                 "client_project_number": _client_project_number(record),
                 "internal_project_number": _internal_project_number(record),
@@ -3975,6 +4125,7 @@ def _object_type_label(kind: str) -> str:
         "manufacturer": "Manufacturer",
         "vendor": "Vendor",
         "customer": "Customer",
+        "organization": "Organization",
         "price_list": "Price List",
         "project_record": "Project",
         "notebook_entry": "Notebook Entry",
@@ -4007,6 +4158,10 @@ def _object_id_for_selection(kind: str, data: dict[str, Any]) -> str:
         return _safe_text(data.get("vendor"), _safe_text(data.get("name"), ""))
     if kind == "customer":
         return _safe_text(data.get("customer"), "")
+    if kind == "organization":
+        return _safe_text(
+            data.get("organization_id"), _safe_text(data.get("organization"), "")
+        )
     if kind == "price_list":
         return _safe_text(data.get("source_file"), "Price List")
     if kind == "project_record":
@@ -4051,6 +4206,8 @@ def _object_display_name(kind: str, data: dict[str, Any]) -> str:
         return _safe_text(data.get("vendor"), _safe_text(data.get("name"), "Vendor"))
     if kind == "customer":
         return _safe_text(data.get("customer"), "Customer")
+    if kind == "organization":
+        return _safe_text(data.get("organization"), "Organization")
     if kind == "price_list":
         return _safe_text(data.get("source_file"), "Price List")
     if kind == "project_record":
@@ -4110,6 +4267,17 @@ def _object_secondary_label(kind: str, data: dict[str, Any]) -> str:
         return _safe_text(data.get("vendor_type"), _safe_text(data.get("status"), ""))
     if kind == "customer":
         return _safe_text(data.get("portfolio"), "")
+    if kind == "organization":
+        return " | ".join(
+            [
+                item
+                for item in [
+                    _safe_text(data.get("roles"), ""),
+                    _safe_text(data.get("status"), ""),
+                ]
+                if item
+            ]
+        )
     if kind == "price_list":
         return _safe_text(data.get("vendor"), _safe_text(data.get("manufacturer"), ""))
     if kind == "project_record":
@@ -4149,6 +4317,7 @@ def _selection_route(kind: str) -> str:
         "manufacturer": "Master Library Explorer",
         "vendor": "Knowledge",
         "customer": "Knowledge",
+        "organization": "Project Settings",
         "price_list": "Knowledge",
         "project_record": "Overview",
         "notebook_entry": "Notebook",
@@ -5048,6 +5217,14 @@ def _render_home_page(
     last_cost_result = dict(st.session_state.get("atlas_last_cost_result") or {})
     recommendation_rows: list[dict[str, Any]] = []
     if record is not None:
+        stakeholder_rows: list[dict[str, Any]] = []
+        try:
+            stakeholder_rows = list(
+                workspace_service.list_project_stakeholders(record.workspace_id)
+            )
+        except Exception:
+            stakeholder_rows = []
+
         recommendation_rows.append(
             {
                 "Priority": "Medium",
@@ -5068,6 +5245,74 @@ def _render_home_page(
                     "Count": 1,
                     "Destination": "Project Settings",
                     "Source": "Project Metadata",
+                }
+            )
+
+        legacy_stakeholder_text = [
+            _safe_text(record.metadata.get("owner"), ""),
+            _safe_text(record.metadata.get("general_contractor"), ""),
+            _safe_text(record.metadata.get("electrical_contractor"), ""),
+            _safe_text(record.metadata.get("consultant"), ""),
+            _safe_text(record.metadata.get("architect"), ""),
+            ", ".join(
+                [
+                    _safe_text(item, "")
+                    for item in list(record.metadata.get("engineers") or [])
+                    if _safe_text(item, "")
+                ]
+            ),
+        ]
+        has_owner_link = any(
+            _safe_text(item.get("role"), "") == OrganizationRole.OWNER_CLIENT.value
+            for item in stakeholder_rows
+        )
+        if not has_owner_link:
+            recommendation_rows.append(
+                {
+                    "Priority": "High",
+                    "Recommendation": "Project has no Owner / Client relationship link in shared Organizations.",
+                    "Count": 1,
+                    "Destination": "Project Settings",
+                    "Source": "Stakeholder Directory",
+                }
+            )
+        if any(legacy_stakeholder_text) and not stakeholder_rows:
+            recommendation_rows.append(
+                {
+                    "Priority": "Medium",
+                    "Recommendation": "Project has legacy free-text stakeholders. Link them to shared Organizations.",
+                    "Count": 1,
+                    "Destination": "Project Settings",
+                    "Source": "Stakeholder Migration",
+                }
+            )
+
+        try:
+            manifest = workspace_service.read_manifest(record.workspace_id)
+        except Exception:
+            manifest = {}
+        document_count = sum(
+            int(value) for value in dict(manifest.get("document_counts") or {}).values()
+        )
+        if document_count == 0:
+            recommendation_rows.append(
+                {
+                    "Priority": "High",
+                    "Recommendation": "Project was created but has no bid documents uploaded.",
+                    "Count": 1,
+                    "Destination": "Documents",
+                    "Source": "Document Intake",
+                }
+            )
+        rejected_count = int(record.import_summary.get("rejected_file_count", 0) or 0)
+        if rejected_count > 0:
+            recommendation_rows.append(
+                {
+                    "Priority": "High",
+                    "Recommendation": "Uploaded documents include failed intake files. Review and retry rejected files.",
+                    "Count": rejected_count,
+                    "Destination": "Documents",
+                    "Source": "Document Intake",
                 }
             )
     recommendation_rows.extend(
@@ -8207,13 +8452,61 @@ def _render_create_project_page(
         "Create New Project",
         "Quick Start a bid workspace with deterministic identity.",
     )
-    bid_id_preview = workspace_service.preview_next_bid_id()
-    st.caption(f"Atlas Bid ID will be assigned automatically: {bid_id_preview}")
+    bid_id_preview = _preview_next_bid_id(workspace_service)
+    if bid_id_preview:
+        st.caption(f"Atlas Bid ID will be assigned automatically: {bid_id_preview}")
+    else:
+        st.info("Atlas Bid ID will be assigned when the workspace is created.")
+
+    st.caption(
+        "Step 1 of 2: create bid workspace from project details. Documents are added in Step 2 on the Documents workspace."
+    )
+
+    st.markdown("### Quick Start")
+    owner_lookup_query = st.text_input(
+        "Owner / Client stakeholder lookup",
+        key="atlas_new_project_owner_lookup",
+        placeholder="Search organizations by canonical name or alias",
+    )
+    owner_matches: list[dict[str, Any]] = []
+    if owner_lookup_query.strip():
+        try:
+            owner_matches = list(
+                workspace_service.search_stakeholder_organizations(
+                    owner_lookup_query,
+                    role=OrganizationRole.OWNER_CLIENT,
+                    include_inactive=False,
+                    limit=12,
+                )
+            )
+        except Exception:
+            owner_matches = []
+    owner_match_labels = [
+        f"{_safe_text(item.get('display_name'), '')} · {_safe_text(item.get('organization_id'), '')}"
+        for item in owner_matches
+    ]
+    owner_selected_label = st.selectbox(
+        "Select existing Owner / Client",
+        options=["None"] + owner_match_labels,
+        key="atlas_new_project_owner_selected",
+    )
+    selected_owner_name = ""
+    if owner_selected_label != "None":
+        selected_owner_index = ["None", *owner_match_labels].index(
+            owner_selected_label
+        ) - 1
+        selected_owner_name = _safe_text(
+            owner_matches[selected_owner_index].get("display_name"),
+            "",
+        )
 
     with st.form("atlas_create_project_form", clear_on_submit=False):
-        st.markdown("### Quick Start")
         name = st.text_input("Project Name", key="atlas_new_project_name")
-        client = st.text_input("Owner / Client", key="atlas_new_project_client")
+        client = st.text_input(
+            "Owner / Client",
+            value=selected_owner_name,
+            key="atlas_new_project_client",
+        )
         bid_date = st.text_input(
             "Bid Due Date (optional)", key="atlas_new_project_bid_date"
         )
@@ -8222,68 +8515,22 @@ def _render_create_project_page(
             options=[status.value for status in ProjectStatus],
             index=1,
         )
-
-        st.markdown("### Bid Documents")
-        st.caption(
-            "Drop bid documents here or browse files. Supported: PDF, XLS, XLSX, DOC, DOCX, ZIP, JPG, JPEG."
-        )
-        uploaded_files = st.file_uploader(
-            "Drop bid documents here or browse files",
-            type=CREATE_PROJECT_UPLOAD_TYPES,
-            accept_multiple_files=True,
-            key="atlas_create_project_uploads",
-            label_visibility="collapsed",
-        )
-        uploaded_files_list = list(uploaded_files or [])
-        remove_options = [
-            f"{index + 1}. {str(file.name)}"
-            for index, file in enumerate(uploaded_files_list)
-        ]
-        remove_labels = st.multiselect(
-            "Remove selected files before create/upload",
-            options=remove_options,
-            key="atlas_create_project_remove_selection",
-        )
-        effective_uploaded_files = _create_project_effective_uploads(
-            uploaded_files_list,
-            remove_labels,
-        )
-
-        inspection = _create_project_upload_inspection(effective_uploaded_files)
-        if inspection["has_selected_files"]:
-            summary_cols = st.columns(2)
-            summary_cols[0].metric(
-                "Total Selected Files",
-                str(inspection["total_selected_count"]),
-            )
-            summary_cols[1].metric(
-                "Total Selected Upload Size",
-                _bytes_label(int(inspection["total_selected_size"])),
-            )
-            st.dataframe(
-                list(inspection["rows"]),
-                use_container_width=True,
-                hide_index=True,
-            )
-            if remove_labels:
-                st.caption(f"Marked for removal: {len(remove_labels)}")
-            if st.form_submit_button("Clear File Selection", type="secondary"):
-                st.session_state["atlas_create_project_uploads"] = []
-                st.session_state["atlas_create_project_remove_selection"] = []
-                st.rerun()
-
         with st.expander("Optional Project Details", expanded=False):
             client_project_number = st.text_input("Client Project Number")
+            internal_project_number = st.text_input("Internal Project Number")
+            general_contractor = st.text_input("General Contractor")
+            electrical_contractor = st.text_input("Electrical Contractor")
             consultant = st.text_input("Consultant")
             architect = st.text_input("Architect")
             engineers_text = st.text_input("Engineers (comma-separated)")
             issue_date = st.text_input("Issue Date")
             location = st.text_input("Location", key="atlas_new_project_location")
 
-        primary_action_label = _create_project_primary_action_label(
-            bool(inspection["has_selected_files"])
+        primary_action_label = _create_project_primary_action_label(False)
+        submitted = st.form_submit_button(
+            primary_action_label,
+            disabled=False,
         )
-        submitted = st.form_submit_button(primary_action_label)
 
     if not submitted:
         return
@@ -8293,17 +8540,13 @@ def _render_create_project_page(
         st.error("Project Name and Owner / Client are required.")
         return
 
-    has_selected_files = bool(inspection["has_selected_files"])
-    if has_selected_files and bool(inspection["all_selected_invalid"]):
-        st.error(
-            "All selected files are invalid for upload. Fix file issues or clear selection to create workspace only."
-        )
-        return
-
     record = workspace_service.create_manual_record(
         name=name.strip(),
         client=client.strip(),
         client_project_number=client_project_number.strip() or None,
+        internal_project_number=internal_project_number.strip() or None,
+        general_contractor=general_contractor.strip() or None,
+        electrical_contractor=electrical_contractor.strip() or None,
         consultant=consultant.strip() or None,
         architect=architect.strip() or None,
         engineers=[
@@ -8319,76 +8562,41 @@ def _render_create_project_page(
     )
     workspace_service.save_record(record)
 
-    uploaded_record = record
-    accepted_count = 0
-    rejected_count = 0
-    import_summary: dict[str, Any] = {}
-    if has_selected_files:
-        accepted_payload = list(inspection["accepted_payload"])
-        accepted_count = len(accepted_payload)
-        rejected_count = int(inspection["rejected_count"])
-        if accepted_payload:
-            try:
-                uploaded_record = workspace_service.import_uploaded_documents(
-                    record.workspace_id,
-                    accepted_payload,
-                )
-                import_summary = dict(uploaded_record.import_summary or {})
-            except Exception as exc:
-                workspace_service.log_event(
-                    record.workspace_id,
-                    "documents_import_failed",
-                    {
-                        "error": str(exc),
-                        "attempted_file_count": accepted_count,
-                    },
-                )
-                st.warning(
-                    f"Project created, but document upload encountered an error: {exc}"
-                )
-        if rejected_count > 0 or bool(inspection["warnings"]):
-            workspace_service.log_event(
-                record.workspace_id,
-                "documents_upload_rejected",
-                {
-                    "rejected_count": rejected_count,
-                    "archive_warnings": list(inspection["warnings"]),
-                },
+    if owner_selected_label != "None":
+        owner_selected_index = ["None", *owner_match_labels].index(
+            owner_selected_label
+        ) - 1
+        owner_org_id = _safe_text(
+            owner_matches[owner_selected_index].get("organization_id"),
+            "",
+        )
+        if owner_org_id:
+            workspace_service.link_project_stakeholder(
+                workspace_id=record.workspace_id,
+                organization_id=owner_org_id,
+                role=OrganizationRole.OWNER_CLIENT,
+                is_primary=True,
             )
 
     st.session_state["atlas_active_workspace_id"] = record.workspace_id
-    st.session_state["atlas_active_page"] = _create_project_post_create_page(
-        has_selected_files
-    )
-    _reset_create_project_upload_state(st)
+    st.session_state["atlas_active_page"] = _create_project_post_create_page(False)
     st.success(
         f"Created bid workspace {record.project.name} with Atlas Bid ID {_atlas_bid_id(record)}."
     )
-    if has_selected_files:
-        pending_intake = int(import_summary.get("uploaded_file_count", accepted_count))
-        requires_review = int(import_summary.get("unsupported_file_count", 0))
-        st.dataframe(
-            [
-                {
-                    "Project": uploaded_record.project.name,
-                    "Atlas Bid ID": _atlas_bid_id(uploaded_record),
-                    "Files Accepted": accepted_count,
-                    "Files Rejected": rejected_count,
-                    "Files Pending Intake": pending_intake,
-                    "Files Parsing": max(pending_intake - requires_review, 0),
-                    "Files Requiring Review": requires_review,
-                    "Next Recommended Action": "Open Documents and review intake status/extracted metadata.",
-                }
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-        if inspection["warnings"]:
-            st.info("Archive diagnostics: " + " | ".join(list(inspection["warnings"])))
-    else:
-        st.caption(
-            "Next action: Add bid documents in Documents to start deterministic intake and parsing workflows."
-        )
+    st.dataframe(
+        [
+            {
+                "Atlas Bid ID": _atlas_bid_id(record),
+                "Project Name": record.project.name,
+                "Owner / Client": _safe_text(
+                    record.metadata.get("owner"), record.project.client
+                ),
+                "Next Action": "Upload Bid Documents",
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
     st.rerun()
 
 
@@ -8445,6 +8653,7 @@ def _render_open_existing_page(
                     or _contains_any(
                         " ".join(
                             [
+                                _safe_text(item.get("stakeholder_names"), ""),
                                 _safe_text(item.get("project_name"), ""),
                                 _safe_text(item.get("atlas_bid_id"), ""),
                                 _safe_text(item.get("workspace_id"), ""),
@@ -8473,19 +8682,14 @@ def _render_open_existing_page(
         st.dataframe(
             [
                 {
-                    "Project": item["project_name"],
                     "Atlas Bid ID": item["atlas_bid_id"],
-                    "Customer": item["customer"],
-                    "Client Project Number": item["client_project_number"] or "",
-                    "Internal Project Number": item["internal_project_number"] or "",
-                    "Lifecycle": item["lifecycle_stage"],
-                    "Status": item["current_status"],
-                    "Last Opened": item["last_opened"],
-                    "Last Modified": item["last_modified"],
-                    "Documents": item["document_count"],
-                    "Review Status": item["review_status"],
-                    "Reference": "Reference" if item["reference"] else "",
-                    "Archived": "Archived" if item["archived"] else "",
+                    "Internal Project Number": item["internal_project_number"] or "-",
+                    "Client Project Number": item["client_project_number"] or "-",
+                    "Project Name": item["project_name"],
+                    "Owner / Client": item["customer"] or "-",
+                    "Lifecycle Stage": item["lifecycle_stage"],
+                    "Bid Due Date": _safe_text(item["record"].project.bid_date, "-"),
+                    "Last Updated": item["last_modified"],
                 }
                 for item in filtered
             ],
@@ -11239,18 +11443,6 @@ def _render_overview_page(
             ):
                 _toggle_pin_reference(st, selected, should_pin=False)
                 st.rerun()
-            if up_col.button(
-                "Move Up",
-                key="atlas_overview_working_set_up",
-                use_container_width=True,
-            ):
-                _move_working_set_item(
-                    st,
-                    object_id=_safe_text(selected.get("object_id"), ""),
-                    object_type=_safe_text(selected.get("object_type"), ""),
-                    direction=-1,
-                )
-                st.rerun()
             if down_col.button(
                 "Move Down",
                 key="atlas_overview_working_set_down",
@@ -12471,6 +12663,50 @@ def _application_search_entries(
     workspace_service: ProjectWorkspaceService,
 ) -> list[dict[str, Any]]:
     references: list[dict[str, Any]] = []
+
+    try:
+        organizations = list(
+            workspace_service.search_stakeholder_organizations(
+                "",
+                include_inactive=True,
+                limit=5000,
+            )
+        )
+    except Exception:
+        organizations = []
+    for item in organizations:
+        data = {
+            "organization": _safe_text(item.get("display_name"), "Organization"),
+            "organization_id": _safe_text(item.get("organization_id"), ""),
+            "roles": ", ".join(list(item.get("supported_roles") or [])),
+            "status": "active" if bool(item.get("active", True)) else "inactive",
+        }
+        reference = _build_object_reference(
+            kind="organization",
+            data=data,
+            project_id="application",
+            route="Projects",
+            relationship_count=0,
+            warning_count=0,
+        )
+        reference["project_name"] = "Projects"
+        reference["scope"] = "application"
+        reference["match_fields"] = [
+            _safe_text(item.get("display_name"), ""),
+            _safe_text(item.get("canonical_name"), ""),
+            _safe_text(item.get("normalized_name"), ""),
+            " ".join(
+                [_safe_text(alias, "") for alias in list(item.get("aliases") or [])]
+            ),
+            " ".join(
+                [
+                    _safe_text(role, "")
+                    for role in list(item.get("supported_roles") or [])
+                ]
+            ),
+        ]
+        references.append(reference)
+
     project_rows = _project_library_rows(
         workspace_service,
         include_archived=True,
@@ -17068,27 +17304,126 @@ def _render_upload_panel(
     workspace_service: ProjectWorkspaceService,
     record: ProjectWorkspaceRecord,
 ) -> None:
+    st.markdown("#### Add Bid Documents")
+    st.caption(
+        "Upload drawings, specifications, schedules, spreadsheets, photographs, and bid packages. Supported: PDF, CSV, XLS, XLSX, DOC, DOCX, ZIP, JPG, JPEG."
+    )
+
     uploaded_files = st.file_uploader(
         "Upload package files",
         type=SUPPORTED_UPLOAD_TYPES,
         accept_multiple_files=True,
-        help="Upload one or more files or a ZIP package to run Atlas Intake.",
+        key=f"atlas_documents_upload_picker_{record.workspace_id}",
+        help="Select one or more files. New selections append to the pending upload list.",
+    )
+    appended_count, duplicate_count = _append_pending_upload_selection(
+        st,
+        record.workspace_id,
+        list(uploaded_files or []),
+    )
+    if appended_count > 0:
+        st.caption(f"Added {appended_count} file(s) to pending upload list.")
+    if duplicate_count > 0:
+        st.info(
+            f"Skipped {duplicate_count} duplicate file(s) based on filename, size, and source hash."
+        )
+
+    pending = _pending_upload_state(st, record.workspace_id)
+    pending_payload = [
+        (str(item.get("name") or ""), bytes(item.get("data") or b""))
+        for item in pending
+    ]
+    inspection = (
+        workspace_service.inspect_uploaded_documents(pending_payload)
+        if pending_payload
+        else None
     )
 
-    if uploaded_files:
-        signature = _uploaded_file_signature(uploaded_files)
-        if st.session_state.get("atlas_upload_signature") != signature:
-            st.session_state["atlas_upload_signature"] = signature
-            st.session_state.pop("atlas_uploaded_context", None)
+    if pending:
+        remove_options = [
+            f"{index + 1}. {_safe_text(item.get('name'), '')}"
+            for index, item in enumerate(pending)
+        ]
+        selected_remove = st.multiselect(
+            "Remove pending files",
+            options=remove_options,
+            key=f"atlas_documents_remove_pending_{record.workspace_id}",
+        )
+        remove_cols = st.columns(2)
+        if remove_cols[0].button(
+            "Remove Selected Pending Files",
+            use_container_width=True,
+            disabled=not bool(selected_remove),
+            key=f"atlas_documents_remove_pending_button_{record.workspace_id}",
+        ):
+            selected_indexes = {
+                int(item.split(".", 1)[0]) - 1
+                for item in selected_remove
+                if "." in item
+            }
+            identity_keys = [
+                str(item.get("identity_key"))
+                for idx, item in enumerate(pending)
+                if idx in selected_indexes
+            ]
+            _remove_pending_uploads(st, record.workspace_id, identity_keys)
+            st.rerun()
+        if remove_cols[1].button(
+            "Clear Pending Files",
+            use_container_width=True,
+            key=f"atlas_documents_clear_pending_button_{record.workspace_id}",
+        ):
+            _clear_pending_uploads(st, record.workspace_id)
+            st.rerun()
 
-    if st.button("Run Project Analysis", type="primary", disabled=not uploaded_files):
-        with st.spinner("Running project analysis..."):
+        st.dataframe(
+            [
+                {
+                    "Name": _safe_text(item.get("name"), ""),
+                    "File Size": _bytes_label(int(item.get("size") or 0)),
+                }
+                for item in pending
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    if inspection is not None:
+        diagnostics_rows = [
+            {
+                "Name": _safe_text(item.get("name"), ""),
+                "Source Type": _safe_text(item.get("source_type"), "file"),
+                "File Size": _bytes_label(int(item.get("size_bytes") or 0)),
+                "Validation": (
+                    "accepted" if bool(item.get("accepted", False)) else "rejected"
+                ),
+                "Messages": ", ".join(list(item.get("messages") or [])),
+            }
+            for item in list(inspection.diagnostics)
+        ]
+        if diagnostics_rows:
+            st.dataframe(diagnostics_rows, use_container_width=True, hide_index=True)
+        if inspection.warnings:
+            st.info("Archive diagnostics: " + " | ".join(list(inspection.warnings)))
+
+    can_upload = bool(pending_payload)
+    accepted_payload: list[tuple[str, bytes]] = []
+    if inspection is not None:
+        accepted_payload = [
+            (item.name, item.data) for item in list(inspection.accepted_files or [])
+        ]
+        can_upload = can_upload and bool(accepted_payload)
+
+    if st.button(
+        "Upload Pending Files",
+        type="primary",
+        disabled=not can_upload,
+        key=f"atlas_documents_upload_pending_{record.workspace_id}",
+    ):
+        with st.spinner("Uploading files and running project analysis..."):
             updated_record = workspace_service.import_uploaded_documents(
                 workspace_id=record.workspace_id,
-                uploaded_files=[
-                    (str(file.name), bytes(file.getvalue()))
-                    for file in uploaded_files or []
-                ],
+                uploaded_files=accepted_payload,
             )
             st.session_state["atlas_uploaded_context"] = (
                 build_reference_project_context(
@@ -17115,7 +17450,8 @@ def _render_upload_panel(
             st.session_state["atlas_active_workspace_id"] = (
                 refreshed_record.workspace_id
             )
-            st.success("Project analysis completed and workspace updated.")
+            _clear_pending_uploads(st, record.workspace_id)
+            st.success("File upload completed. Project analysis artifacts refreshed.")
             st.rerun()
 
 
@@ -20414,6 +20750,16 @@ def _render_settings_page(
                 value=_safe_text(record.metadata.get("consultant"), ""),
                 key=f"atlas_settings_consultant_{record.workspace_id}",
             )
+            general_contractor_input = st.text_input(
+                "General Contractor",
+                value=_safe_text(record.metadata.get("general_contractor"), ""),
+                key=f"atlas_settings_general_contractor_{record.workspace_id}",
+            )
+            electrical_contractor_input = st.text_input(
+                "Electrical Contractor",
+                value=_safe_text(record.metadata.get("electrical_contractor"), ""),
+                key=f"atlas_settings_electrical_contractor_{record.workspace_id}",
+            )
             architect_input = st.text_input(
                 "Architect",
                 value=_safe_text(record.metadata.get("architect"), ""),
@@ -20462,6 +20808,8 @@ def _render_settings_page(
                         else _internal_project_number(record)
                     ),
                     consultant=consultant_input,
+                    general_contractor=general_contractor_input,
+                    electrical_contractor=electrical_contractor_input,
                     architect=architect_input,
                     engineers=[
                         item.strip()
@@ -20475,6 +20823,121 @@ def _render_settings_page(
                 st.session_state["atlas_active_workspace_id"] = updated.workspace_id
                 st.success("Project metadata updated.")
                 st.rerun()
+
+        st.markdown("### Stakeholder Directory")
+        stakeholder_rows: list[dict[str, Any]] = []
+        try:
+            stakeholder_rows = list(
+                workspace_service.list_project_stakeholders(record.workspace_id)
+            )
+        except Exception:
+            stakeholder_rows = []
+
+        if stakeholder_rows:
+            st.dataframe(
+                [
+                    {
+                        "Role": _safe_text(item.get("role"), "")
+                        .replace("_", " ")
+                        .title(),
+                        "Organization": _safe_text(
+                            item.get("organization_display_name"), ""
+                        ),
+                        "Primary": "Yes" if bool(item.get("is_primary")) else "No",
+                    }
+                    for item in stakeholder_rows
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No stakeholder relationships linked yet.")
+
+        role_options = [item.value for item in OrganizationRole]
+        selected_role_value = st.selectbox(
+            "Stakeholder Role",
+            options=role_options,
+            key=f"atlas_settings_stakeholder_role_{record.workspace_id}",
+        )
+        selected_role = OrganizationRole(selected_role_value)
+        lookup_query = st.text_input(
+            "Search existing organizations",
+            key=f"atlas_settings_stakeholder_lookup_{record.workspace_id}",
+            placeholder="Type organization name or alias",
+        )
+        matches: list[dict[str, Any]] = []
+        if lookup_query.strip():
+            try:
+                matches = list(
+                    workspace_service.search_stakeholder_organizations(
+                        lookup_query,
+                        role=selected_role,
+                        include_inactive=False,
+                        limit=12,
+                    )
+                )
+            except Exception:
+                matches = []
+
+        match_labels = [
+            f"{_safe_text(item.get('display_name'), '')} · {_safe_text(item.get('organization_id'), '')}"
+            for item in matches
+        ]
+        selected_match = st.selectbox(
+            "Select existing Organization",
+            options=["None"] + match_labels,
+            key=f"atlas_settings_stakeholder_match_{record.workspace_id}",
+        )
+
+        create_new_name = st.text_input(
+            "Create new Organization (if no suitable match)",
+            key=f"atlas_settings_stakeholder_create_{record.workspace_id}",
+            placeholder="Organization Name",
+        )
+        duplicate_confirm = st.checkbox(
+            "I confirm this is not an accidental duplicate.",
+            key=f"atlas_settings_stakeholder_duplicate_confirm_{record.workspace_id}",
+        )
+
+        if st.button(
+            "Link Stakeholder",
+            key=f"atlas_settings_stakeholder_link_{record.workspace_id}",
+            use_container_width=True,
+        ):
+            organization_id = ""
+            if selected_match != "None":
+                selected_index = ["None", *match_labels].index(selected_match) - 1
+                organization_id = _safe_text(
+                    matches[selected_index].get("organization_id"),
+                    "",
+                )
+            elif create_new_name.strip():
+                duplicates = workspace_service.find_likely_organization_duplicates(
+                    create_new_name
+                )
+                if duplicates and not duplicate_confirm:
+                    st.warning(
+                        "Likely duplicate organizations exist. Confirm duplicate check before creating a new organization."
+                    )
+                    return
+                created = workspace_service.create_stakeholder_organization(
+                    name=create_new_name.strip(),
+                    role=selected_role,
+                )
+                organization_id = _safe_text(created.get("organization_id"), "")
+
+            if not organization_id:
+                st.warning("Select an existing organization or provide a new one.")
+                return
+
+            workspace_service.link_project_stakeholder(
+                workspace_id=record.workspace_id,
+                organization_id=organization_id,
+                role=selected_role,
+                is_primary=selected_role == OrganizationRole.OWNER_CLIENT,
+            )
+            st.success("Stakeholder linked to project.")
+            st.rerun()
 
         st.markdown("### Project Repository / Storage")
         st.dataframe(

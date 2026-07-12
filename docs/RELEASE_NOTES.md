@@ -23,7 +23,26 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic A Sprint A-04 Engineering Workstation UX Consolidation)
 
-## Unreleased (Epic X Sprint X-02 Project Creation and Bid Identity Refinement)
+## Unreleased (Epic X Sprint X-03 Onboarding and Stakeholder Workflow Hardening)
+
+### Improved
+
+- Create New Project now enforces strict two-step onboarding: metadata-first create, then Documents upload.
+- Create workflow now routes directly to Documents after successful project creation.
+- Documents uploader now accumulates pending files across multiple chooser interactions instead of replacing prior selections.
+- Pending upload queue now supports deterministic dedupe identity and explicit remove/clear behaviors.
+- Upload execution is explicit through Upload Pending Files; no automatic upload on file selection.
+- Create and Project Settings now support lookup-first stakeholder organization selection backed by shared organization records.
+- Stakeholder workflow now supports inline organization creation with duplicate-warning confirmation.
+- Malformed PDF uploads are handled safely by deterministic intake warnings (no UI traceback crash path).
+
+### Scope Notes
+
+- workflow hardening only for existing create/settings/documents flows
+- no Epic E start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
+## Unreleased (Epic X Sprint X-02 Project Creation and Bid Identity Refinement) (Closed)
 
 ### Improved
 
