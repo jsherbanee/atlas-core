@@ -228,13 +228,35 @@ class ProjectWorkspaceService:
 
     def save_record(self, record: ProjectWorkspaceRecord) -> Path:
         record.touch()
-        metadata_payload = self._metadata_payload(record)
-        workspace_payload = record.to_dict()
-        workspace_payload["workspace_state"] = dict(record.workspace_state)
-
         project_root = Path(
             self.manager.project_repository.project_location(record.workspace_id)
         )
+        if (project_root / "project.json").exists():
+            existing_project_payload, existing_metadata_payload, _, _ = (
+                self.manager.project_repository.load(record.workspace_id)
+            )
+            existing_atlas_bid_id = str(
+                existing_metadata_payload.get("atlas_bid_id")
+                or existing_project_payload.get("atlas_bid_id")
+                or existing_project_payload.get("project_id")
+                or record.workspace_id
+            )
+            requested_atlas_bid_id = str(
+                record.metadata.get("atlas_bid_id")
+                or record.project.atlas_bid_id
+                or record.project.project_id
+            )
+            if requested_atlas_bid_id != existing_atlas_bid_id:
+                raise ValueError(
+                    "Atlas Bid ID is immutable once a project has been created"
+                )
+            record.project.atlas_bid_id = existing_atlas_bid_id
+            record.metadata["atlas_bid_id"] = existing_atlas_bid_id
+            record.metadata["project_number"] = existing_atlas_bid_id
+
+        metadata_payload = self._metadata_payload(record)
+        workspace_payload = record.to_dict()
+        workspace_payload["workspace_state"] = dict(record.workspace_state)
         if (project_root / "project.json").exists():
             self.manager.project_repository.save(
                 record.workspace_id,
@@ -301,6 +323,7 @@ class ProjectWorkspaceService:
             metadata={
                 "project_name": name,
                 "owner": client,
+                "owner_client": client,
                 "consultant": consultant,
                 "general_contractor": general_contractor,
                 "electrical_contractor": electrical_contractor,
@@ -573,11 +596,32 @@ class ProjectWorkspaceService:
         workspace_id: str,
         uploaded_files: list[tuple[str, bytes]],
     ) -> ProjectWorkspaceRecord:
+        baseline_record = self.load_record(workspace_id)
         result = self.manager.document_repository.import_uploads(
             workspace_id,
             uploaded_files,
         )
         record = self.load_record(workspace_id)
+        record.project.name = baseline_record.project.name
+        record.project.client = baseline_record.project.client
+        record.project.atlas_bid_id = baseline_record.project.atlas_bid_id
+        record.project.client_project_number = (
+            baseline_record.project.client_project_number
+        )
+        record.project.internal_project_number = (
+            baseline_record.project.internal_project_number
+        )
+        record.metadata["project_name"] = baseline_record.project.name
+        record.metadata["owner"] = baseline_record.project.client
+        record.metadata["owner_client"] = baseline_record.project.client
+        record.metadata["atlas_bid_id"] = baseline_record.project.atlas_bid_id
+        record.metadata["project_number"] = baseline_record.project.atlas_bid_id
+        record.metadata["client_project_number"] = (
+            baseline_record.project.client_project_number
+        )
+        record.metadata["internal_project_number"] = (
+            baseline_record.project.internal_project_number
+        )
         record.source_mode = "project_documents"
         record.source_label = "Project Repository"
         record.package_location = str(result.get("package_location") or "") or None
@@ -667,6 +711,7 @@ class ProjectWorkspaceService:
         return {
             "project_name": str(meta.get("project_name") or record.project.name),
             "owner": str(meta.get("owner") or record.project.client),
+            "owner_client": str(meta.get("owner") or record.project.client),
             "consultant": meta.get("consultant"),
             "general_contractor": meta.get("general_contractor"),
             "electrical_contractor": meta.get("electrical_contractor"),
@@ -768,7 +813,13 @@ class ProjectWorkspaceService:
                 str(project_payload.get("internal_project_number") or "") or None
             )
         if "owner" not in normalized:
-            normalized["owner"] = str(project_payload.get("client") or "") or None
+            normalized["owner"] = (
+                str(normalized.get("owner_client") or "")
+                or str(project_payload.get("client") or "")
+                or None
+            )
+        if "owner_client" not in normalized:
+            normalized["owner_client"] = normalized.get("owner")
         for field_name in [
             "consultant",
             "general_contractor",

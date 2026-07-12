@@ -1170,6 +1170,67 @@ def _pending_upload_state(st: Any, workspace_id: str) -> list[dict[str, Any]]:
     return [dict(item) for item in rows if isinstance(item, dict)]
 
 
+def _documents_upload_picker_key(st: Any, workspace_id: str) -> str:
+    tokens = dict(st.session_state.get("atlas_documents_upload_picker_tokens") or {})
+    token = int(tokens.get(workspace_id, 0) or 0)
+    return f"atlas_documents_upload_picker_{workspace_id}_{token}"
+
+
+def _reset_documents_upload_picker(st: Any, workspace_id: str) -> None:
+    tokens = dict(st.session_state.get("atlas_documents_upload_picker_tokens") or {})
+    tokens[workspace_id] = int(tokens.get(workspace_id, 0) or 0) + 1
+    st.session_state["atlas_documents_upload_picker_tokens"] = tokens
+
+    signatures = dict(
+        st.session_state.get("atlas_documents_pending_selection_signature") or {}
+    )
+    signatures.pop(workspace_id, None)
+    st.session_state["atlas_documents_pending_selection_signature"] = signatures
+
+
+def _pending_identity_keys_to_remove_after_upload(
+    pending: list[dict[str, Any]],
+    inspection: Any,
+) -> set[str]:
+    removable: set[str] = set()
+    accepted_identities: set[str] = set()
+    for item in list(getattr(inspection, "accepted_files", []) or []):
+        accepted_identities.add(
+            _pending_upload_identity(
+                str(getattr(item, "name", "")),
+                bytes(getattr(item, "data", b"")),
+            )
+        )
+
+    accepted_zip_sources: set[str] = set()
+    rejected_zip_sources: set[str] = set()
+    for item in list(getattr(inspection, "diagnostics", []) or []):
+        if not bool(item.get("zip_source", False)):
+            continue
+        source_name = str(item.get("name") or "")
+        source_root = source_name.split("/", 1)[0]
+        if not source_root.lower().endswith(".zip"):
+            continue
+        if bool(item.get("accepted", False)):
+            accepted_zip_sources.add(source_root)
+        else:
+            rejected_zip_sources.add(source_root)
+
+    for pending_item in pending:
+        identity_key = str(pending_item.get("identity_key") or "")
+        pending_name = str(pending_item.get("name") or "")
+        if identity_key in accepted_identities:
+            removable.add(identity_key)
+            continue
+        if (
+            pending_name in accepted_zip_sources
+            and pending_name not in rejected_zip_sources
+        ):
+            removable.add(identity_key)
+
+    return removable
+
+
 def _write_pending_upload_state(
     st: Any,
     workspace_id: str,
@@ -3205,6 +3266,7 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_active_project_name", "")
     st.session_state.setdefault("atlas_documents_pending_uploads", {})
     st.session_state.setdefault("atlas_documents_pending_selection_signature", {})
+    st.session_state.setdefault("atlas_documents_upload_picker_tokens", {})
     st.session_state.setdefault(
         "atlas_os",
         "macos" if platform.system().lower() == "darwin" else "other",
@@ -3281,15 +3343,20 @@ def _build_record_from_context(
     )
     review = context.get("review")
 
-    project_id = _first_text(
-        metadata.get("project_id"),
-        getattr(review, "project_id", None),
-        context.get("sample_project_id"),
-    ) or (
-        existing_record.project_id if existing_record is not None else "atlas-project"
+    project_id = (
+        existing_record.project_id
+        if existing_record is not None
+        else (
+            _first_text(
+                metadata.get("project_id"),
+                getattr(review, "project_id", None),
+                context.get("sample_project_id"),
+            )
+            or "atlas-project"
+        )
     )
 
-    name = (
+    context_name = (
         _first_text(
             metadata.get("project_name"),
             metadata.get("name"),
@@ -3298,16 +3365,40 @@ def _build_record_from_context(
         )
         or project_id
     )
+    context_client = (
+        _first_text(metadata.get("client"), metadata.get("owner"), context_name)
+        or context_name
+    )
 
-    client = _first_text(metadata.get("client"), metadata.get("owner"), name) or name
+    name = existing_record.project.name if existing_record is not None else context_name
+    client = (
+        existing_record.project.client
+        if existing_record is not None
+        else context_client
+    )
+    atlas_bid_id = (
+        existing_record.project.atlas_bid_id
+        if existing_record is not None
+        else _first_text(metadata.get("atlas_bid_id"), project_id)
+    ) or project_id
+    client_project_number = (
+        existing_record.project.client_project_number
+        if existing_record is not None
+        else _first_text(metadata.get("client_project_number"))
+    )
+    internal_project_number = (
+        existing_record.project.internal_project_number
+        if existing_record is not None
+        else _first_text(metadata.get("internal_project_number"))
+    )
 
     project = Project(
         project_id=project_id,
         name=name,
         client=client,
-        atlas_bid_id=_first_text(metadata.get("atlas_bid_id"), project_id),
-        client_project_number=_first_text(metadata.get("client_project_number")),
-        internal_project_number=_first_text(metadata.get("internal_project_number")),
+        atlas_bid_id=atlas_bid_id,
+        client_project_number=client_project_number,
+        internal_project_number=internal_project_number,
         consultant=_first_text(metadata.get("consultant")),
         architect=_first_text(metadata.get("architect")),
         engineers=[
@@ -3320,6 +3411,15 @@ def _build_record_from_context(
         bid_date=_first_text(metadata.get("bid_date"), metadata.get("issue_date")),
         status=metadata.get("status") or ProjectStatus.INTAKE,
     )
+
+    if existing_record is not None:
+        metadata["project_name"] = existing_record.project.name
+        metadata["owner"] = existing_record.project.client
+        metadata["owner_client"] = existing_record.project.client
+        metadata["atlas_bid_id"] = atlas_bid_id
+        metadata["project_number"] = atlas_bid_id
+        metadata["client_project_number"] = client_project_number
+        metadata["internal_project_number"] = internal_project_number
 
     package_location = context.get("package_location")
     snapshot_path = None
@@ -3637,8 +3737,32 @@ def _render_project_context_header(st: Any, header: ProjectContextHeader) -> Non
 
 
 def _open_project_record(st: Any, record: ProjectWorkspaceRecord) -> None:
+    _navigate_to_project_page(st, record=record, page="Overview")
+
+
+def _clear_create_project_widget_state(st: Any) -> None:
+    for key in [
+        "atlas_new_project_owner_lookup",
+        "atlas_new_project_owner_selected",
+        "atlas_new_project_name",
+        "atlas_new_project_client",
+        "atlas_new_project_bid_date",
+        "atlas_new_project_location",
+    ]:
+        st.session_state.pop(key, None)
+    _reset_create_project_upload_state(st)
+
+
+def _navigate_to_project_page(
+    st: Any,
+    *,
+    record: ProjectWorkspaceRecord,
+    page: str,
+) -> None:
     st.session_state["atlas_active_workspace_id"] = record.workspace_id
-    st.session_state["atlas_active_page"] = "Overview"
+    st.session_state["atlas_active_page"] = page
+    if page == "Documents":
+        _clear_create_project_widget_state(st)
     st.rerun()
 
 
@@ -8490,14 +8614,16 @@ def _render_create_project_page(
         options=["None"] + owner_match_labels,
         key="atlas_new_project_owner_selected",
     )
+    selected_owner_match: dict[str, Any] | None = None
     selected_owner_name = ""
     if owner_selected_label != "None":
         selected_owner_index = ["None", *owner_match_labels].index(
             owner_selected_label
         ) - 1
+        selected_owner_match = owner_matches[selected_owner_index]
         selected_owner_name = _safe_text(
-            owner_matches[selected_owner_index].get("display_name"),
-            "",
+            selected_owner_match.get("canonical_name"),
+            _safe_text(selected_owner_match.get("display_name"), ""),
         )
 
     with st.form("atlas_create_project_form", clear_on_submit=False):
@@ -8535,14 +8661,18 @@ def _render_create_project_page(
     if not submitted:
         return
 
-    missing_required_fields = _create_project_missing_required_fields(name, client)
+    owner_for_create = selected_owner_name or client.strip()
+    missing_required_fields = _create_project_missing_required_fields(
+        name,
+        owner_for_create,
+    )
     if missing_required_fields:
         st.error("Project Name and Owner / Client are required.")
         return
 
     record = workspace_service.create_manual_record(
         name=name.strip(),
-        client=client.strip(),
+        client=owner_for_create,
         client_project_number=client_project_number.strip() or None,
         internal_project_number=internal_project_number.strip() or None,
         general_contractor=general_contractor.strip() or None,
@@ -8562,12 +8692,9 @@ def _render_create_project_page(
     )
     workspace_service.save_record(record)
 
-    if owner_selected_label != "None":
-        owner_selected_index = ["None", *owner_match_labels].index(
-            owner_selected_label
-        ) - 1
+    if selected_owner_match is not None:
         owner_org_id = _safe_text(
-            owner_matches[owner_selected_index].get("organization_id"),
+            selected_owner_match.get("organization_id"),
             "",
         )
         if owner_org_id:
@@ -8578,8 +8705,6 @@ def _render_create_project_page(
                 is_primary=True,
             )
 
-    st.session_state["atlas_active_workspace_id"] = record.workspace_id
-    st.session_state["atlas_active_page"] = _create_project_post_create_page(False)
     st.success(
         f"Created bid workspace {record.project.name} with Atlas Bid ID {_atlas_bid_id(record)}."
     )
@@ -8597,7 +8722,11 @@ def _render_create_project_page(
         use_container_width=True,
         hide_index=True,
     )
-    st.rerun()
+    _navigate_to_project_page(
+        st,
+        record=record,
+        page=_create_project_post_create_page(False),
+    )
 
 
 def _render_open_existing_page(
@@ -17309,11 +17438,12 @@ def _render_upload_panel(
         "Upload drawings, specifications, schedules, spreadsheets, photographs, and bid packages. Supported: PDF, CSV, XLS, XLSX, DOC, DOCX, ZIP, JPG, JPEG."
     )
 
+    picker_key = _documents_upload_picker_key(st, record.workspace_id)
     uploaded_files = st.file_uploader(
         "Upload package files",
         type=SUPPORTED_UPLOAD_TYPES,
         accept_multiple_files=True,
-        key=f"atlas_documents_upload_picker_{record.workspace_id}",
+        key=picker_key,
         help="Select one or more files. New selections append to the pending upload list.",
     )
     appended_count, duplicate_count = _append_pending_upload_selection(
@@ -17340,40 +17470,45 @@ def _render_upload_panel(
     )
 
     if pending:
-        remove_options = [
-            f"{index + 1}. {_safe_text(item.get('name'), '')}"
-            for index, item in enumerate(pending)
-        ]
+        remove_options: dict[str, str] = {}
+        for index, item in enumerate(pending):
+            identity_key = str(item.get("identity_key") or "")
+            preview = identity_key.split("|", 2)[-1][:8]
+            label = (
+                f"{index + 1}. {_safe_text(item.get('name'), '')}"
+                f" ({_bytes_label(int(item.get('size') or 0))})"
+                f" [{preview}]"
+            )
+            remove_options[label] = identity_key
         selected_remove = st.multiselect(
             "Remove pending files",
-            options=remove_options,
-            key=f"atlas_documents_remove_pending_{record.workspace_id}",
+            options=list(remove_options.keys()),
+            key=f"atlas_documents_remove_pending_{record.workspace_id}_{picker_key}",
         )
         remove_cols = st.columns(2)
         if remove_cols[0].button(
             "Remove Selected Pending Files",
             use_container_width=True,
             disabled=not bool(selected_remove),
-            key=f"atlas_documents_remove_pending_button_{record.workspace_id}",
+            key=(
+                f"atlas_documents_remove_pending_button_{record.workspace_id}_{picker_key}"
+            ),
         ):
-            selected_indexes = {
-                int(item.split(".", 1)[0]) - 1
-                for item in selected_remove
-                if "." in item
-            }
             identity_keys = [
-                str(item.get("identity_key"))
-                for idx, item in enumerate(pending)
-                if idx in selected_indexes
+                remove_options[label]
+                for label in selected_remove
+                if label in remove_options
             ]
             _remove_pending_uploads(st, record.workspace_id, identity_keys)
+            _reset_documents_upload_picker(st, record.workspace_id)
             st.rerun()
         if remove_cols[1].button(
             "Clear Pending Files",
             use_container_width=True,
-            key=f"atlas_documents_clear_pending_button_{record.workspace_id}",
+            key=f"atlas_documents_clear_pending_button_{record.workspace_id}_{picker_key}",
         ):
             _clear_pending_uploads(st, record.workspace_id)
+            _reset_documents_upload_picker(st, record.workspace_id)
             st.rerun()
 
         st.dataframe(
@@ -17418,41 +17553,36 @@ def _render_upload_panel(
         "Upload Pending Files",
         type="primary",
         disabled=not can_upload,
-        key=f"atlas_documents_upload_pending_{record.workspace_id}",
+        key=f"atlas_documents_upload_pending_{record.workspace_id}_{picker_key}",
     ):
+        removable_identity_keys = (
+            _pending_identity_keys_to_remove_after_upload(pending, inspection)
+            if inspection is not None
+            else set()
+        )
         with st.spinner("Uploading files and running project analysis..."):
             updated_record = workspace_service.import_uploaded_documents(
                 workspace_id=record.workspace_id,
                 uploaded_files=accepted_payload,
             )
-            st.session_state["atlas_uploaded_context"] = (
-                build_reference_project_context(
-                    updated_record.package_location
-                    if updated_record.package_location is not None
-                    else Path(
-                        workspace_service.project_location(updated_record.workspace_id)
-                    )
-                    / "documents"
-                )
-            )
+            st.session_state["atlas_active_workspace_id"] = updated_record.workspace_id
+            st.session_state["atlas_active_page"] = "Documents"
 
-        context = st.session_state.get("atlas_uploaded_context")
-        if context is not None:
-            refreshed_record = _build_record_from_context(
-                context,
-                existing_record=updated_record,
+        _remove_pending_uploads(
+            st,
+            record.workspace_id,
+            sorted(removable_identity_keys),
+        )
+        _reset_documents_upload_picker(st, record.workspace_id)
+        remaining = _pending_upload_state(st, record.workspace_id)
+        if remaining:
+            st.warning(
+                "Partial upload completed. Accepted files were imported and "
+                f"{len(remaining)} file(s) remain pending due to validation diagnostics."
             )
-            refreshed_record.workspace_state = dict(updated_record.workspace_state)
-            refreshed_record.pinned = updated_record.pinned
-            refreshed_record.is_reference = updated_record.is_reference
-            refreshed_record.archived = updated_record.archived
-            workspace_service.save_record(refreshed_record)
-            st.session_state["atlas_active_workspace_id"] = (
-                refreshed_record.workspace_id
-            )
-            _clear_pending_uploads(st, record.workspace_id)
+        else:
             st.success("File upload completed. Project analysis artifacts refreshed.")
-            st.rerun()
+        st.rerun()
 
 
 def _render_project_files_page(

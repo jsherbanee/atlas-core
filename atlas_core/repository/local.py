@@ -730,10 +730,6 @@ class LocalDocumentRepository(DocumentRepository):
 
         self._copy_group(source_root / "unsupported", documents_root / "other")
 
-        metadata_source = source_root / "metadata.json"
-        if metadata_source.exists():
-            shutil.copy2(metadata_source, project_dir / "metadata.json")
-
         self.project_repository.refresh_manifest(project_id)
 
         return {

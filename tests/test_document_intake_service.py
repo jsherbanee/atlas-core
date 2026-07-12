@@ -243,6 +243,31 @@ def test_inspect_uploaded_files_detects_duplicates_empty_and_unsupported() -> No
     assert any(item["name"].endswith(".xlsx") for item in accepted)
 
 
+def test_build_session_package_from_uploads_supports_partial_success(
+    tmp_path: Path,
+) -> None:
+    service = DocumentIntakeService()
+    uploads = [
+        UploadedIntakeFile(
+            name="accepted.csv", data=b"tag,description\nSPK-1,Speaker\n"
+        ),
+        UploadedIntakeFile(name="rejected.exe", data=b"not-supported"),
+    ]
+
+    result = service.build_session_package_from_uploads(
+        uploaded_files=uploads,
+        uploads_root=tmp_path / "uploads",
+        session_id="partial-success",
+    )
+
+    assert result.import_summary["uploaded_file_count"] >= 1
+    assert result.import_summary["rejected_file_count"] >= 1
+    diagnostics = list(result.import_summary.get("rejected_file_diagnostics") or [])
+    assert any(
+        str(item.get("name", "")).endswith("rejected.exe") for item in diagnostics
+    )
+
+
 def test_zip_upload_rejects_traversal_unsupported_and_system_artifacts(
     tmp_path: Path,
 ) -> None:

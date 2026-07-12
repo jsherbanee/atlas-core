@@ -9,6 +9,7 @@ from atlas_core.services.project_workspace_service import (
     ProjectWorkspaceService,
 )
 from pypdf import PdfWriter
+import pytest
 
 
 def _blank_pdf_bytes() -> bytes:
@@ -388,6 +389,10 @@ def test_workspace_service_mixed_valid_invalid_uploads_partial_success(
     assert uploaded.workspace_id == record.workspace_id
     assert int(uploaded.import_summary.get("uploaded_file_count", 0) or 0) >= 1
     assert int(uploaded.import_summary.get("rejected_file_count", 0) or 0) >= 1
+    rejected = list(uploaded.import_summary.get("rejected_file_diagnostics") or [])
+    assert any(
+        str(item.get("name", "")).endswith("not-supported.exe") for item in rejected
+    )
 
 
 def test_workspace_service_project_id_stable_after_import_failure(
@@ -423,3 +428,119 @@ def test_workspace_service_project_id_stable_after_import_failure(
 
     loaded = service.load_record(created_id)
     assert loaded.workspace_id == created_id
+
+
+def test_workspace_service_upload_flow_preserves_identity_and_owner_across_batches(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    organization = service.create_stakeholder_organization(
+        name="Northstar Owner Group",
+        role=OrganizationRole.OWNER_CLIENT,
+    )
+    record = service.create_manual_record(
+        name="X03 Validation Main",
+        client="Northstar Owner Group",
+    )
+    service.save_record(record)
+    service.link_project_stakeholder(
+        workspace_id=record.workspace_id,
+        organization_id=str(organization.get("organization_id")),
+        role=OrganizationRole.OWNER_CLIENT,
+        is_primary=True,
+    )
+
+    project_path_before = service.project_location(record.workspace_id)
+    atlas_bid_id_before = record.project.atlas_bid_id
+
+    service.import_uploaded_documents(
+        record.workspace_id,
+        [("batch-one.pdf", _blank_pdf_bytes())],
+    )
+    service.import_uploaded_documents(
+        record.workspace_id,
+        [("batch-two.csv", b"col1,col2\n1,2\n")],
+    )
+
+    reloaded = service.load_record(record.workspace_id)
+    stakeholders = service.list_project_stakeholders(record.workspace_id)
+    metadata_path = Path(project_path_before) / "metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+
+    assert reloaded.project.name == "X03 Validation Main"
+    assert reloaded.project.atlas_bid_id == atlas_bid_id_before
+    assert reloaded.project.client == "Northstar Owner Group"
+    assert service.project_location(record.workspace_id) == project_path_before
+    assert (Path(project_path_before) / "documents" / "drawings").exists()
+    assert (Path(project_path_before) / "documents" / "schedules").exists()
+    assert metadata.get("project_name") == "X03 Validation Main"
+    assert metadata.get("atlas_bid_id") == atlas_bid_id_before
+    assert metadata.get("owner") == "Northstar Owner Group"
+    assert metadata.get("owner_client") == "Northstar Owner Group"
+    assert "current_route" not in metadata
+    assert stakeholders
+    assert stakeholders[0]["organization_display_name"] == "Northstar Owner Group"
+
+
+def test_workspace_service_reuses_one_organization_across_projects_and_roles(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    organization = service.create_stakeholder_organization(
+        name="Shared Engineering Group",
+        role=OrganizationRole.OWNER_CLIENT,
+    )
+    org_id = str(organization.get("organization_id"))
+
+    first = service.create_manual_record(name="Project One", client="Client One")
+    second = service.create_manual_record(name="Project Two", client="Client Two")
+    service.save_record(first)
+    service.save_record(second)
+
+    service.link_project_stakeholder(
+        workspace_id=first.workspace_id,
+        organization_id=org_id,
+        role=OrganizationRole.OWNER_CLIENT,
+        is_primary=True,
+    )
+    service.link_project_stakeholder(
+        workspace_id=first.workspace_id,
+        organization_id=org_id,
+        role=OrganizationRole.CONSULTANT,
+        is_primary=False,
+    )
+    service.link_project_stakeholder(
+        workspace_id=second.workspace_id,
+        organization_id=org_id,
+        role=OrganizationRole.OWNER_CLIENT,
+        is_primary=True,
+    )
+
+    first_stakeholders = service.list_project_stakeholders(first.workspace_id)
+    second_stakeholders = service.list_project_stakeholders(second.workspace_id)
+    organizations = service.organization_directory.list_organizations(
+        include_inactive=True
+    )
+
+    assert len([item for item in organizations if item.organization_id == org_id]) == 1
+    assert len(first_stakeholders) == 2
+    assert len(second_stakeholders) == 1
+    assert {item["role"] for item in first_stakeholders} == {
+        OrganizationRole.OWNER_CLIENT.value,
+        OrganizationRole.CONSULTANT.value,
+    }
+
+
+def test_workspace_service_rejects_atlas_bid_id_mutation_after_create(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(name="Immutable Bid", client="Client")
+    service.save_record(record)
+
+    loaded = service.load_record(record.workspace_id)
+    loaded.project.atlas_bid_id = "BID-2099-9999"
+    loaded.metadata["atlas_bid_id"] = "BID-2099-9999"
+
+    with pytest.raises(ValueError, match="Atlas Bid ID is immutable"):
+        service.save_record(loaded)

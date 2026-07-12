@@ -66,12 +66,14 @@ class _CreatePageStreamlit:
         client_name: str = "",
         uploaded_files: list[Any] | None = None,
         button_presses: dict[str, bool] | None = None,
+        select_values: dict[str, str] | None = None,
     ) -> None:
         self.submit = submit
         self.project_name = project_name
         self.client_name = client_name
         self.uploaded_files = list(uploaded_files or [])
         self.button_presses = dict(button_presses or {})
+        self.select_values = dict(select_values or {})
         self.session_state: dict[str, Any] = {}
         self.select_options: dict[str, list[str]] = {}
         self.infos: list[str] = []
@@ -134,6 +136,9 @@ class _CreatePageStreamlit:
     ) -> str:
         _ = kwargs
         self.select_options[_label] = list(options)
+        selected_value = self.select_values.get(_label)
+        if selected_value in options:
+            return str(selected_value)
         return str(options[index])
 
     def file_uploader(self, *args: Any, **kwargs: Any) -> list[Any]:
@@ -180,6 +185,7 @@ class _CreatePageWorkspaceServiceWithoutPreview:
         self.import_calls: list[tuple[str, list[tuple[str, bytes]]]] = []
         self.inspect_calls = 0
         self.search_queries: list[str] = []
+        self.link_calls: list[dict[str, Any]] = []
 
     def inspect_uploaded_documents(
         self,
@@ -278,9 +284,27 @@ class _CreatePageWorkspaceServiceWithoutPreview:
         return [
             {
                 "organization_id": "org-lookup-owner",
+                "canonical_name": "Lookup Owner LLC",
                 "display_name": "Lookup Owner LLC",
             }
         ]
+
+    def link_project_stakeholder(
+        self,
+        *,
+        workspace_id: str,
+        organization_id: str,
+        role: Any,
+        is_primary: bool = False,
+    ) -> dict[str, Any]:
+        payload = {
+            "workspace_id": workspace_id,
+            "organization_id": organization_id,
+            "role": role,
+            "is_primary": is_primary,
+        }
+        self.link_calls.append(payload)
+        return payload
 
 
 class _CreatePageWorkspaceServiceWithPreview(_CreatePageWorkspaceServiceWithoutPreview):
@@ -872,8 +896,80 @@ def test_create_project_page_creation_still_works_without_preview() -> None:
 
     assert service.created
     assert st.session_state["atlas_active_workspace_id"] == "BID-2099-0001"
+    assert "atlas_header_project_selector" not in st.session_state
     assert st.session_state["atlas_active_page"] == "Documents"
     assert st.rerun_called is True
+
+
+def test_create_project_page_existing_owner_selection_uses_canonical_owner_and_links() -> (
+    None
+):
+    st = _CreatePageStreamlit(
+        submit=True,
+        project_name="Create With Existing Owner",
+        client_name="Lookup Owner",
+        select_values={
+            "Select existing Owner / Client": "Lookup Owner LLC · org-lookup-owner"
+        },
+    )
+    service = _CreatePageWorkspaceServiceWithoutPreview()
+
+    app._render_create_project_page(st, service)  # type: ignore[arg-type]
+
+    assert service.created
+    created = service.created[-1]
+    assert created.project.client == "Lookup Owner LLC"
+    assert service.link_calls
+    assert service.link_calls[-1]["organization_id"] == "org-lookup-owner"
+    assert st.session_state["atlas_active_page"] == "Documents"
+    assert st.rerun_called is True
+
+
+def test_build_record_from_context_preserves_existing_identity_fields() -> None:
+    existing = ProjectWorkspaceRecord(
+        workspace_id="BID-2026-0005",
+        project=Project(
+            project_id="BID-2026-0005",
+            name="X03 Validation Main",
+            client="Northstar Owner Group",
+            atlas_bid_id="BID-2026-0005",
+            client_project_number="CLIENT-123",
+            internal_project_number="INT-789",
+            status=ProjectStatus.INTAKE,
+        ),
+        metadata={
+            "project_name": "X03 Validation Main",
+            "owner": "Northstar Owner Group",
+            "atlas_bid_id": "BID-2026-0005",
+            "client_project_number": "CLIENT-123",
+            "internal_project_number": "INT-789",
+        },
+    )
+    context = {
+        "sample_project_id": "documents",
+        "sample_project_name": "documents",
+        "intake_snapshot": SimpleNamespace(
+            metadata={
+                "project_name": "documents",
+                "atlas_bid_id": "documents",
+                "owner": "documents",
+                "client_project_number": "documents",
+                "internal_project_number": "documents",
+            }
+        ),
+    }
+
+    rebuilt = app._build_record_from_context(context, existing_record=existing)
+
+    assert rebuilt.project.project_id == "BID-2026-0005"
+    assert rebuilt.project.name == "X03 Validation Main"
+    assert rebuilt.project.atlas_bid_id == "BID-2026-0005"
+    assert rebuilt.project.client_project_number == "CLIENT-123"
+    assert rebuilt.project.internal_project_number == "INT-789"
+    assert rebuilt.metadata["project_name"] == "X03 Validation Main"
+    assert rebuilt.metadata["owner"] == "Northstar Owner Group"
+    assert rebuilt.metadata["owner_client"] == "Northstar Owner Group"
+    assert rebuilt.metadata["atlas_bid_id"] == "BID-2026-0005"
 
 
 def test_create_project_upload_inspection_helper_uses_service_public_api() -> None:
@@ -1012,3 +1108,112 @@ def test_documents_pending_uploads_remove_and_clear() -> None:
 
     app._clear_pending_uploads(st, "BID-1")
     assert app._pending_upload_state(st, "BID-1") == []
+
+
+def test_pending_identity_keys_to_remove_after_upload_keeps_rejected_pending() -> None:
+    pending = [
+        {
+            "identity_key": app._pending_upload_identity("good.pdf", b"good"),
+            "name": "good.pdf",
+            "data": b"good",
+            "size": 4,
+        },
+        {
+            "identity_key": app._pending_upload_identity("bad.exe", b"bad"),
+            "name": "bad.exe",
+            "data": b"bad",
+            "size": 3,
+        },
+    ]
+    inspection = SimpleNamespace(
+        accepted_files=[SimpleNamespace(name="good.pdf", data=b"good")],
+        diagnostics=[
+            {"name": "good.pdf", "accepted": True, "zip_source": False},
+            {
+                "name": "bad.exe",
+                "accepted": False,
+                "zip_source": False,
+                "messages": ["unsupported extension"],
+            },
+        ],
+    )
+
+    removable = app._pending_identity_keys_to_remove_after_upload(pending, inspection)
+
+    assert removable == {pending[0]["identity_key"]}
+
+
+def test_pending_identity_keys_to_remove_after_upload_handles_zip_partitions() -> None:
+    zip_pending = {
+        "identity_key": app._pending_upload_identity("bundle.zip", b"zip-data"),
+        "name": "bundle.zip",
+        "data": b"zip-data",
+        "size": 8,
+    }
+
+    all_accepted = SimpleNamespace(
+        accepted_files=[],
+        diagnostics=[
+            {
+                "name": "bundle.zip/nested/one.pdf",
+                "accepted": True,
+                "zip_source": True,
+            },
+            {
+                "name": "bundle.zip/nested/two.csv",
+                "accepted": True,
+                "zip_source": True,
+            },
+        ],
+    )
+    mixed = SimpleNamespace(
+        accepted_files=[],
+        diagnostics=[
+            {
+                "name": "bundle.zip/nested/one.pdf",
+                "accepted": True,
+                "zip_source": True,
+            },
+            {
+                "name": "bundle.zip/nested/two.exe",
+                "accepted": False,
+                "zip_source": True,
+            },
+        ],
+    )
+
+    removable_all = app._pending_identity_keys_to_remove_after_upload(
+        [zip_pending],
+        all_accepted,
+    )
+    removable_mixed = app._pending_identity_keys_to_remove_after_upload(
+        [zip_pending],
+        mixed,
+    )
+
+    assert removable_all == {zip_pending["identity_key"]}
+    assert removable_mixed == set()
+
+
+def test_documents_upload_picker_reset_increments_token_and_clears_signature() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_documents_upload_picker_tokens": {"BID-1": 2, "BID-2": 1},
+            "atlas_documents_pending_selection_signature": {
+                "BID-1": "abc",
+                "BID-2": "xyz",
+            },
+        }
+    )
+
+    app._reset_documents_upload_picker(st, "BID-1")
+
+    assert st.session_state["atlas_documents_upload_picker_tokens"]["BID-1"] == 3
+    assert st.session_state["atlas_documents_upload_picker_tokens"]["BID-2"] == 1
+    assert (
+        "BID-1" not in st.session_state["atlas_documents_pending_selection_signature"]
+    )
+    assert (
+        st.session_state["atlas_documents_pending_selection_signature"]["BID-2"]
+        == "xyz"
+    )
