@@ -38,7 +38,7 @@ D-02 explicit non-goals:
 - freight, escalation, currency conversion calculations
 - procurement, POs, accounting, ERP
 
-D-03A is documentation-only architecture in progress for assemblies, accessories, and labor rollups. D-03 implementation remains deferred.
+D-03 implementation is complete for assemblies, accessories, and labor rollups. D-03 composes deterministic generated lines and labor snapshots through D-02 revision APIs while preserving D-01 cost-selection authority.
 
 ## 3. D-01 Dependency Contract
 D-02 consumes D-01 outputs and contracts:

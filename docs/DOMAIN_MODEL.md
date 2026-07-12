@@ -208,17 +208,17 @@ Status legend:
 - Relationships: belongs to Estimate Revision and Estimate Line Item; references Vendor Offering, Price Sheet Version, Price Record.
 - Lifecycle Role: Guarantees deterministic historical replay independent of mutable current commercial views.
 
-### Assembly Definition (D-03A Planned)
+### Assembly Definition (D-03 Implemented)
 - Purpose: Deterministic reusable template describing component and accessory composition.
 - Relationships: linked to Product, System context, and versioned Assembly Revision records.
 - Lifecycle Role: Enables repeatable line-item composition without hidden inference.
 
-### Assembly Revision (D-03A Planned)
+### Assembly Revision (D-03 Implemented)
 - Purpose: Immutable version of an Assembly Definition used for deterministic replay.
 - Relationships: referenced by Estimate Revision expansion runs and generated Estimate Line Items.
 - Lifecycle Role: Preserves historical composition logic over time.
 
-### Labor Rollup (D-03A Planned)
+### Labor Rollup (D-03 Implemented)
 - Purpose: Revision-scoped deterministic labor output derived from estimate composition and labor rulesets.
 - Relationships: belongs to Estimate Revision; references Labor RuleSet versions and generated labor categories.
 - Lifecycle Role: Produces replayable labor planning outputs while preserving D-02 immutability boundaries.

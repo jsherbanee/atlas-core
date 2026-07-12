@@ -29,14 +29,14 @@ Sprint 9.5 Commercial Knowledge Completion (C-02) adds deterministic draft/valid
 Sprint 10 implements the Deterministic Pricing Engine: immutable price record selection, explainable candidate/rule traces, deterministic pricing snapshot IDs, manual pricing override audit model, advisory price-update impacts, export payloads, and Estimate/BOM pricing workspace integration.
 Sprint D-01 Core Cost Selection Engine now establishes acquisition-cost-first deterministic selection, vendor-type-aware hierarchy, complete cost traceability, explicit selection APIs, quick-add product project isolation, optional promotion to immutable commercial knowledge, and cost-focused Estimate/BOM workspace views.
 Sprint D-02 Estimate Engine and Cost Snapshot implementation is complete, including immutable revision lifecycle, line-item snapshots, replay/reselection workflows, and deterministic totals/validation.
-Sprint D-03A Assemblies, Accessories, and Labor Rollups is now active as a documentation-only architecture sprint.
+Sprint D-03 Assemblies, Accessories, and Labor Rollups implementation is complete and formally closed.
 Sprint A-04 consolidates Engineering Workstation UX consistency with shared workspace section headers, recommendation dedupe/grouping in Mission Control, terminology normalization for Products (Master Library), resettable dense-table filters, and source-object linking from estimate snapshot views.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1046 tests)
+- pytest: full suite passing (1055 tests)
 
 ## Tooling Status
 - GitHub Actions configured
@@ -45,13 +45,13 @@ Sprint A-04 consolidates Engineering Workstation UX consistency with shared work
   - .pre-commit-config.yaml
 
 ## Active Focus
-Finalize and review Sprint D-03A architecture documentation before D-03 implementation begins.
+Sprint D-03 is closed with full quality gates passing.
 
 Secondary active focus:
-- apply Sprint A-04 workstation UX consistency updates without introducing D-03 capabilities.
+- apply Sprint A-04 workstation UX consistency updates while preserving D-03 boundaries.
 
-Deferred implementation in current sprint scope:
-- D-03 Scope and Risk Diagnostics (implementation)
+Current implementation scope note:
+- no post-D-03 epic implementation has started in this closeout pass
 
 
 Lifecycle object definitions and cross-phase module boundaries are documented in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).

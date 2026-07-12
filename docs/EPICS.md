@@ -113,8 +113,8 @@ Status: Active
 
 - D-01 Core Cost Selection Engine (Closed)
 - D-02 Estimate Engine and Cost Snapshot Architecture (Implemented)
-- D-03A Assemblies, Accessories, and Labor Rollups Architecture (Documentation-Only, Current Sprint)
-- D-03 Scope and Risk Diagnostics (Implementation Deferred Pending D-03A Sign-Off)
+- D-03 Assemblies, Accessories, and Labor Rollups (Implemented, Closed)
+- D-03 Scope and Risk Diagnostics (Implemented through D-03 validation/readiness diagnostics)
 - D-04 Bid Completeness and Readiness Scoring
 - D-05 Estimator Brief and Final Estimator Review
 - D-06 Estimate Workflow Integration and Exports

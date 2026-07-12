@@ -48,6 +48,7 @@ from atlas_core.services.sales_design_review_service import SalesDesignReviewSer
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 from atlas_core.services.estimate_service import DeterministicEstimateService
 from atlas_core.services.estimate_engine_service import EstimateEngineService
+from atlas_core.services.assembly_expansion_service import AssemblyExpansionService
 from atlas_core.services.commercial_knowledge_service import CommercialKnowledgeService
 from atlas_core.services.cost_engine_service import DeterministicCostEngine
 from atlas_core.registry import ManufacturerRegistry
@@ -4812,6 +4813,36 @@ def _render_home_page(
             }
         )
 
+    engine_state = st.session_state.get("atlas_estimate_engine_state")
+    if isinstance(engine_state, dict):
+        try:
+            estimate_engine = EstimateEngineService(state=engine_state)
+            estimate_rows = list(estimate_engine.state.get("estimates", {}).values())
+            for estimate_row in estimate_rows:
+                estimate_id = _safe_text(estimate_row.get("estimate_id"), "")
+                if not estimate_id:
+                    continue
+                readiness = estimate_engine.mission_control_readiness(
+                    estimate_id=estimate_id
+                )
+                for text in list(readiness.get("recommendations") or []):
+                    recommendation_rows.append(
+                        {
+                            "Priority": (
+                                "High"
+                                if "blocking" in text.lower()
+                                or "missing" in text.lower()
+                                else "Medium"
+                            ),
+                            "Recommendation": text,
+                            "Count": 1,
+                            "Destination": "Estimate",
+                            "Source": "Estimate Engine D-03",
+                        }
+                    )
+        except Exception:
+            pass
+
     st.markdown("### Workspace Recommendations")
     deduped_recommendations = _dedupe_recommendation_rows(recommendation_rows)
     if deduped_recommendations:
@@ -4954,6 +4985,7 @@ def _render_application_knowledge_page(
             "Price Lists",
             "Imports",
             "Import History",
+            "Assemblies",
         ]
     )
 
@@ -5593,6 +5625,272 @@ def _render_application_knowledge_page(
                 hide_index=True,
             )
 
+    with tabs[9]:
+        st.markdown("### Assembly Library")
+        engine = _estimate_engine_service(st)
+        assembly_service = AssemblyExpansionService(
+            state=dict(engine.state.get("assembly_state") or {})
+        )
+
+        create_cols = st.columns(4)
+        new_assembly_id = create_cols[0].text_input(
+            "Assembly ID",
+            key="atlas_assembly_library_id",
+            value="",
+        )
+        new_canonical_name = create_cols[1].text_input(
+            "Canonical Name",
+            key="atlas_assembly_library_canonical_name",
+            value="",
+        )
+        new_display_name = create_cols[2].text_input(
+            "Display Name",
+            key="atlas_assembly_library_display_name",
+            value="",
+        )
+        new_category = create_cols[3].text_input(
+            "Category",
+            key="atlas_assembly_library_category",
+            value="general",
+        )
+        if st.button(
+            "Create Assembly",
+            key="atlas_assembly_library_create",
+            use_container_width=True,
+        ):
+            try:
+                assembly_service.create_assembly(
+                    canonical_name=_safe_text(new_canonical_name, "assembly"),
+                    display_name=_safe_text(new_display_name, "Assembly"),
+                    created_by="atlas-ui",
+                    assembly_id=_safe_text(new_assembly_id, ""),
+                    category=_safe_text(new_category, "general"),
+                )
+                engine.state["assembly_state"] = assembly_service.to_dict()
+                _save_estimate_engine_service(st, engine)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to create assembly: {exc}")
+
+        assemblies = [
+            dict(item)
+            for item in list(assembly_service.state.get("assemblies", {}).values())
+        ]
+        assemblies.sort(
+            key=lambda item: (
+                _safe_text(item.get("category"), ""),
+                _safe_text(item.get("display_name"), ""),
+            )
+        )
+
+        if not assemblies:
+            st.caption("No assemblies are currently defined.")
+        else:
+            st.dataframe(
+                [
+                    {
+                        "Assembly": _safe_text(item.get("display_name"), ""),
+                        "Assembly ID": _safe_text(item.get("assembly_id"), ""),
+                        "Category": _safe_text(item.get("category"), ""),
+                        "Active Version": _safe_text(
+                            item.get("current_active_version_id"),
+                            "",
+                        ),
+                        "Status": (
+                            "Active" if bool(item.get("active", True)) else "Inactive"
+                        ),
+                    }
+                    for item in assemblies
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            assembly_id = st.selectbox(
+                "Assembly Detail",
+                options=[
+                    _safe_text(item.get("assembly_id"), "") for item in assemblies
+                ],
+                key="atlas_assembly_library_selected",
+            )
+            version_rows = [
+                dict(item)
+                for item in list(assembly_service.state.get("versions", {}).values())
+                if _safe_text(item.get("assembly_id"), "") == assembly_id
+            ]
+            version_rows.sort(
+                key=lambda item: _safe_text(item.get("version_label"), "")
+            )
+            st.dataframe(version_rows, use_container_width=True, hide_index=True)
+            selected_version = st.selectbox(
+                "Assembly Version",
+                options=[
+                    _safe_text(item.get("assembly_version_id"), "")
+                    for item in version_rows
+                ],
+                key="atlas_assembly_library_version",
+            )
+
+            component_rows = list(
+                assembly_service.state.get("components", {}).get(selected_version) or []
+            )
+            st.markdown("#### Component Editor")
+            st.dataframe(component_rows, use_container_width=True, hide_index=True)
+            add_component_cols = st.columns(4)
+            component_type = add_component_cols[0].selectbox(
+                "Component Type",
+                options=[
+                    "product",
+                    "nested_assembly",
+                    "labor_activity",
+                    "consumable",
+                    "infrastructure_material",
+                    "allowance",
+                    "informational",
+                ],
+                key="atlas_assembly_library_component_type",
+            )
+            component_ref = add_component_cols[1].text_input(
+                "Product / Labor / Nested Version",
+                key="atlas_assembly_library_component_ref",
+            )
+            component_qty = add_component_cols[2].number_input(
+                "Quantity Rule Value",
+                min_value=0.0,
+                value=1.0,
+                step=1.0,
+                key="atlas_assembly_library_component_qty",
+            )
+            accessory_kind = add_component_cols[3].selectbox(
+                "Accessory Rule",
+                options=["none", "required", "optional", "mutex_group"],
+                key="atlas_assembly_library_component_accessory",
+            )
+
+            if st.button(
+                "Add Component",
+                key="atlas_assembly_library_add_component",
+                use_container_width=True,
+            ):
+                try:
+                    payload = {
+                        "component_type": component_type,
+                        "quantity_rule": {
+                            "rule_type": "per_parent",
+                            "value": component_qty,
+                        },
+                        "accessory_rule": {"kind": accessory_kind},
+                    }
+                    if component_type in {
+                        "product",
+                        "consumable",
+                        "infrastructure_material",
+                    }:
+                        payload["product_id"] = component_ref
+                    elif component_type == "nested_assembly":
+                        payload["nested_assembly_version_id"] = component_ref
+                    elif component_type == "labor_activity":
+                        payload["labor_activity_id"] = component_ref
+                        payload["provenance_metadata"] = {
+                            "labor_category": "installation"
+                        }
+
+                    assembly_service.add_component(
+                        assembly_version_id=selected_version,
+                        component=payload,
+                    )
+                    engine.state["assembly_state"] = assembly_service.to_dict()
+                    _save_estimate_engine_service(st, engine)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to add component: {exc}")
+
+            lifecycle_cols = st.columns(4)
+            if lifecycle_cols[0].button(
+                "Validate Version",
+                key="atlas_assembly_library_validate",
+                use_container_width=True,
+            ):
+                result = assembly_service.validate_assembly(
+                    assembly_version_id=selected_version,
+                )
+                st.session_state["atlas_assembly_library_validation"] = result
+                engine.state["assembly_state"] = assembly_service.to_dict()
+                _save_estimate_engine_service(st, engine)
+                st.rerun()
+            if lifecycle_cols[1].button(
+                "Activate",
+                key="atlas_assembly_library_activate",
+                use_container_width=True,
+            ):
+                try:
+                    assembly_service.activate_assembly_version(
+                        assembly_version_id=selected_version,
+                    )
+                    engine.state["assembly_state"] = assembly_service.to_dict()
+                    _save_estimate_engine_service(st, engine)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to activate assembly version: {exc}")
+            if lifecycle_cols[2].button(
+                "Supersede",
+                key="atlas_assembly_library_supersede",
+                use_container_width=True,
+            ):
+                try:
+                    assembly_service.supersede_assembly_version(
+                        assembly_version_id=selected_version,
+                    )
+                    engine.state["assembly_state"] = assembly_service.to_dict()
+                    _save_estimate_engine_service(st, engine)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to supersede assembly version: {exc}")
+            if lifecycle_cols[3].button(
+                "Archive",
+                key="atlas_assembly_library_archive",
+                use_container_width=True,
+            ):
+                try:
+                    assembly_service.archive_assembly_version(
+                        assembly_version_id=selected_version,
+                    )
+                    engine.state["assembly_state"] = assembly_service.to_dict()
+                    _save_estimate_engine_service(st, engine)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to archive assembly version: {exc}")
+
+            with st.expander("Expansion Preview", expanded=False):
+                try:
+                    preview = assembly_service.expand_assembly(
+                        request={
+                            "estimate_id": "preview",
+                            "revision_id": "preview",
+                            "assembly_version_id": selected_version,
+                            "parent_quantity": 1,
+                        },
+                        labor_rate_set_id="",
+                    )
+                    st.dataframe(
+                        list(preview.get("contributions") or []),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    st.dataframe(
+                        [dict(preview.get("labor_rollup") or {})],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    if list(preview.get("diagnostics") or []):
+                        st.dataframe(
+                            list(preview.get("diagnostics") or []),
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+                except Exception as exc:
+                    st.warning(f"Preview unavailable: {exc}")
+
 
 def _render_application_reports_page(
     st: Any, workspace_service: ProjectWorkspaceService
@@ -6138,6 +6436,227 @@ def _render_estimate_revision_engine(
         )
         _save_estimate_engine_service(st, service)
         st.rerun()
+
+    with st.expander("D-03 Assemblies and Labor", expanded=False):
+        assembly_service = AssemblyExpansionService(
+            state=dict(service.state.get("assembly_state") or {})
+        )
+        active_versions = [
+            dict(item)
+            for item in list(assembly_service.state.get("versions", {}).values())
+            if _safe_text(item.get("lifecycle_state"), "")
+            in {"active", "validated", "draft"}
+        ]
+        active_versions.sort(
+            key=lambda item: (
+                _safe_text(item.get("assembly_id"), ""),
+                _safe_text(item.get("version_label"), ""),
+            )
+        )
+        version_options = [
+            _safe_text(item.get("assembly_version_id"), "") for item in active_versions
+        ]
+        if not version_options:
+            st.caption(
+                "No assembly versions are available. Use Knowledge > Assemblies to create one."
+            )
+        else:
+            d03_cols = st.columns(3)
+            selected_version = d03_cols[0].selectbox(
+                "Assembly Version",
+                options=version_options,
+                key="atlas_estimate_d03_assembly_version",
+            )
+            parent_quantity = d03_cols[1].number_input(
+                "Parent Quantity",
+                min_value=0.0,
+                value=1.0,
+                step=1.0,
+                key="atlas_estimate_d03_parent_quantity",
+            )
+            labor_rate_set_id = d03_cols[2].text_input(
+                "Labor Rate Set",
+                value="labor_rates:v1",
+                key="atlas_estimate_d03_labor_rate_set",
+            )
+
+            preview_cols = st.columns(2)
+            if preview_cols[0].button(
+                "Preview Assembly Insertion",
+                key="atlas_estimate_d03_preview_assembly",
+                use_container_width=True,
+            ):
+                preview = service.preview_assembly_insertion(
+                    revision_id=selected_revision_id,
+                    assembly_version_id=selected_version,
+                    parent_quantity=float(parent_quantity),
+                    labor_rate_set_id=_safe_text(labor_rate_set_id, ""),
+                    actor="atlas-ui",
+                )
+                st.session_state["atlas_estimate_d03_preview"] = preview
+
+            if preview_cols[1].button(
+                "Accept Assembly Insertion",
+                key="atlas_estimate_d03_add_assembly",
+                use_container_width=True,
+            ):
+                try:
+                    result = service.add_assembly_to_revision(
+                        revision_id=selected_revision_id,
+                        assembly_version_id=selected_version,
+                        parent_quantity=float(parent_quantity),
+                        labor_rate_set_id=_safe_text(labor_rate_set_id, ""),
+                        commercial_state=_commercial_knowledge_state(st),
+                        actor="atlas-ui",
+                        parent_description="Assembly",
+                    )
+                    st.session_state["atlas_estimate_d03_last_insert"] = result
+                    _save_estimate_engine_service(st, service)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Assembly insertion failed: {exc}")
+
+            preview = dict(st.session_state.get("atlas_estimate_d03_preview") or {})
+            if preview:
+                st.markdown("##### Expansion Preview")
+                st.dataframe(
+                    list(preview.get("contributions") or []),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                st.dataframe(
+                    [dict(preview.get("labor_rollup") or {})],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                if list(preview.get("diagnostics") or []):
+                    st.dataframe(
+                        list(preview.get("diagnostics") or []),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+        expansion_rows = [
+            dict(item)
+            for item in list(service.state.get("assembly_expansions", {}).values())
+            if _safe_text(item.get("revision_id"), "") == selected_revision_id
+        ]
+        if expansion_rows:
+            st.markdown("##### Assembly Expansions")
+            st.dataframe(
+                [
+                    {
+                        "Expansion Run": _safe_text(item.get("expansion_run_id"), ""),
+                        "Assembly Version": _safe_text(
+                            item.get("assembly_version_id"), ""
+                        ),
+                        "Parent Line": _safe_text(item.get("parent_line_item_id"), ""),
+                        "Labor Rate Set": _safe_text(item.get("labor_rate_set_id"), ""),
+                        "Created At": _safe_text(item.get("created_at"), ""),
+                    }
+                    for item in expansion_rows
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+            expansion_ids = [
+                _safe_text(item.get("expansion_run_id"), "")
+                for item in expansion_rows
+                if _safe_text(item.get("expansion_run_id"), "")
+            ]
+            selected_run = st.selectbox(
+                "Expansion Run",
+                options=expansion_ids,
+                key="atlas_estimate_d03_expansion_run",
+            )
+            inspect_cols = st.columns(3)
+            if inspect_cols[0].button(
+                "Preview Labor Rate Refresh",
+                key="atlas_estimate_d03_refresh_labor_preview",
+                use_container_width=True,
+            ):
+                preview = service.refresh_assembly_labor_rates(
+                    revision_id=selected_revision_id,
+                    expansion_run_id=selected_run,
+                    labor_rate_set_id=_safe_text(
+                        st.session_state.get("atlas_estimate_d03_labor_rate_set"),
+                        "",
+                    ),
+                    actor="atlas-ui",
+                )
+                st.session_state["atlas_estimate_d03_refresh_preview"] = preview
+            if inspect_cols[1].button(
+                "Preview Product Cost Refresh",
+                key="atlas_estimate_d03_refresh_product_preview",
+                use_container_width=True,
+            ):
+                preview = service.refresh_assembly_product_costs(
+                    revision_id=selected_revision_id,
+                    expansion_run_id=selected_run,
+                    commercial_state=_commercial_knowledge_state(st),
+                    actor="atlas-ui",
+                )
+                st.session_state["atlas_estimate_d03_refresh_preview"] = preview
+            if inspect_cols[2].button(
+                "Inspect Provenance",
+                key="atlas_estimate_d03_inspect_provenance",
+                use_container_width=True,
+            ):
+                expansion = dict(
+                    service.state.get("assembly_expansions", {}).get(selected_run) or {}
+                )
+                provenance = service.inspect_assembly_provenance(
+                    revision_id=selected_revision_id,
+                    parent_line_item_id=_safe_text(
+                        expansion.get("parent_line_item_id"),
+                        "",
+                    ),
+                )
+                st.session_state["atlas_estimate_d03_provenance"] = provenance
+
+            refresh_preview = dict(
+                st.session_state.get("atlas_estimate_d03_refresh_preview") or {}
+            )
+            if refresh_preview:
+                st.markdown("##### Refresh Comparison")
+                st.dataframe(
+                    [refresh_preview], use_container_width=True, hide_index=True
+                )
+                if st.button(
+                    "Apply Refresh",
+                    key="atlas_estimate_d03_apply_refresh",
+                    use_container_width=True,
+                ):
+                    try:
+                        service.apply_assembly_refresh(
+                            refresh_id=_safe_text(
+                                refresh_preview.get("refresh_id"), ""
+                            ),
+                            actor="atlas-ui",
+                            accept=True,
+                            commercial_state=_commercial_knowledge_state(st),
+                        )
+                        _save_estimate_engine_service(st, service)
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to apply refresh: {exc}")
+
+            provenance = dict(
+                st.session_state.get("atlas_estimate_d03_provenance") or {}
+            )
+            if provenance:
+                st.markdown("##### Provenance")
+                st.dataframe(
+                    list(provenance.get("lines") or []),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                if list(provenance.get("labor_snapshots") or []):
+                    st.dataframe(
+                        list(provenance.get("labor_snapshots") or []),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
 
     line_items = list(selected_revision.get("line_items") or [])
     st.markdown("#### Line-Item Table")

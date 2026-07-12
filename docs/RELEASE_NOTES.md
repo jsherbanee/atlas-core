@@ -23,6 +23,22 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic A Sprint A-04 Engineering Workstation UX Consolidation)
 
+## Unreleased (Sprint D-03 Assemblies, Accessories, and Labor Rollups)
+
+### Added
+
+- D-03 assembly/labor domain contracts and deterministic expansion service.
+- Estimate engine D-03 integration APIs for assembly insertion, refresh, recalculation, version upgrade comparison, and provenance inspection.
+- Immutable labor snapshot persistence and generated-line provenance fields.
+- Knowledge workspace Assembly Library tab and Estimate workspace D-03 controls.
+- Mission Control recommendation ingestion from estimate engine D-03 readiness diagnostics.
+
+### Scope Notes
+
+- D-01 remains deterministic product cost selection authority.
+- D-02 remains revision, lock, and cost snapshot authority.
+- D-03 implementation is complete and closed with full quality gates and full-suite regressions passing.
+
 ### Improved
 
 - Added shared workspace section-header orientation pattern across key workstation pages.
@@ -60,7 +76,7 @@ This document tracks product-facing changes for Atlas Preview releases.
 ### Scope Notes
 
 - Current sprint scope is D-01 only.
-- D-02 and D-03 are explicitly deferred.
+- D-02 is implemented; D-03 is implemented and closed.
 
 ## Preview 0.5 (2026-07-07)
 

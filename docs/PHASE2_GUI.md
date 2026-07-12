@@ -71,6 +71,7 @@ Knowledge landing sections:
 - Products
 - Price Lists
 - Imports
+- Assemblies
 
 Knowledge page excludes project-specific BOM/drawing/risk views.
 
@@ -205,6 +206,21 @@ Estimate Workspace behavior:
 - unknown products are flagged and remain no-pricing in deterministic mode
 - line navigation supports Equipment, Specification, Drawing, Relationships, and Evidence routes
 - object detail headers include Open Estimate Workspace for source-to-estimate return
+
+D-03 Estimate Workspace additions:
+- Assembly insertion workflow with explicit preview and accept actions
+- generated assembly parent/product/labor line rendering
+- provenance inspection and labor snapshot inspection
+- assembly refresh preview and apply controls for product costs and labor rates
+
+D-03 Knowledge workspace additions:
+- Assembly Library tab with list/search/detail workflows
+- version lifecycle actions (validate/activate/supersede/archive)
+- component editor with product/nested/labor component types
+- expansion/material/labor preview panels
+
+D-03 Mission Control additions:
+- recommendation rows now include estimate-engine D-03 readiness recommendations
 
 Price List Library (C-02) now includes PDF import review controls for:
 - PDF source inspection

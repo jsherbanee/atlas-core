@@ -1,4 +1,4 @@
-# Assemblies, Accessories, and Labor Rollups (D-03A Architecture)
+# Assemblies, Accessories, and Labor Rollups (D-03 Implementation)
 
 ## Related Documents
 - [ESTIMATING.md](ESTIMATING.md)
@@ -9,14 +9,19 @@
 - [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)
 
 ## 1. Purpose
-D-03A defines architecture only for deterministic assemblies, accessory composition, and labor rollups.
+D-03 defines deterministic assemblies, accessory composition, and labor rollups for production estimate workflows.
 
-This sprint is documentation-only. It does not implement production code, UI behavior changes, test changes, or migrations.
+Current implementation status:
+- implemented domain contracts in `atlas_core/domain/assembly_labor.py`
+- implemented assembly authority service in `atlas_core/services/assembly_expansion_service.py`
+- integrated estimate revision insertion, refresh, and override APIs in `atlas_core/services/estimate_engine_service.py`
+- implemented Assembly Library and Estimate D-03 workflows in `apps/phase2_review_app.py`
+- full repository quality gates and regression coverage passed during closeout
 
-D-03A must preserve D-01 and D-02 contracts:
+D-03 must preserve D-01 and D-02 contracts:
 - D-01 remains the sole source for deterministic cost selection.
 - D-02 remains the sole source for immutable estimate revisions and cost snapshots.
-- D-03A composes line structure and labor semantics on top of D-02 without mutating historical facts.
+- D-03 composes line structure and labor semantics on top of D-02 without mutating historical facts.
 
 ## 2. Scope and Non-Goals
 In scope:
@@ -37,11 +42,11 @@ Non-goals:
 - Deterministic first: same inputs and ruleset versions yield same outputs.
 - Immutable history: locked revisions never mutate.
 - Explicit provenance: every generated line and labor value references rule and source context.
-- Separation of concerns: D-03A composes lines and labor; D-01 selects costs; D-02 snapshots revisions.
+- Separation of concerns: D-03 composes lines and labor; D-01 selects costs; D-02 snapshots revisions.
 - No hidden side effects: expansion and rollups must be explicit user-triggered operations in draft revisions.
 
 ## 4. Object Model
-### 4.1 New D-03 Domain Concepts (Planned)
+### 4.1 D-03 Domain Concepts (Implemented)
 - AssemblyDefinition
   - Canonical assembly template owned by Master Library.
 - AssemblyRevision
@@ -168,7 +173,7 @@ Labor rates are externalized and versioned:
 - labor_rate_set_version
 - effective_date window
 
-D-03A architecture stores rate-set references for replayability but does not define sell-price calculations.
+D-03 stores rate-set references for replayability and does not define sell-price calculations.
 
 ## 10. Provenance and Traceability
 Each generated material or labor artifact must capture:
@@ -204,7 +209,7 @@ Three explicit operations:
 No operation silently triggers another unless explicitly requested.
 
 ## 13. Overrides and Governance
-Supported override categories (planned):
+Supported override categories:
 - Accessory inclusion override
 - Accessory quantity override
 - Labor category hour override
@@ -237,8 +242,8 @@ Each transaction must either:
 - fully persist all related line/rollup/provenance records, or
 - persist nothing and return deterministic diagnostics.
 
-## 16. API Surface (Design Only)
-Planned service operations:
+## 16. API Surface
+Implemented service operations:
 - create_assembly_definition
 - create_assembly_revision
 - expand_assembly
@@ -255,13 +260,13 @@ Contract conventions:
 - deterministic ordering of returned rows
 - no hidden writes from read/preview APIs
 
-## 17. UI Architecture Notes (No Behavioral Changes in D-03A)
-D-03A defines architecture targets only:
+## 17. UI Architecture Notes
+Current D-03 UI implementation adds explicit workflows in existing pages:
 - BOM Review continues to own pre-estimate composition context.
 - Estimate Workspace continues to own revision-level estimating operations.
 - Mission Control continues to consume recommendation and readiness signals.
 
-Future UI implementation should preserve existing navigation model and add D-03 workflows as explicit actions in relevant pages.
+No separate application is introduced.
 
 ## 18. Performance and Determinism
 Performance requirements:
@@ -274,16 +279,20 @@ Guardrails:
 - configurable max generated lines per operation
 - deterministic timeout diagnostics for excessive graph expansion
 
+Known non-blocking limits:
+- no speculative caching is used in D-03 closeout; repeated refresh/recalc requests recompute deterministic expansion and labor outputs
+- very large nested-assembly graphs may have noticeable latency due to full deterministic traversal on each explicit request
+
 ## 19. Migration and Backward Compatibility
 Compatibility requirements:
 - Existing D-02 revisions without D-03 artifacts remain valid.
 - D-03 artifacts are additive and versioned.
 - Replay of pre-D-03 revisions remains unchanged.
 
-No database migration plan is defined in D-03A because this sprint is architecture documentation only.
+No database migration is required for the current in-memory workspace implementation.
 
 ## 20. Testing Strategy (Implementation Planning)
-When D-03 implementation starts, add deterministic tests for:
+Active deterministic test focus for D-03 includes:
 - nested expansion and cycle detection
 - accessory quantity formulas and rounding behavior
 - consolidation rules and provenance

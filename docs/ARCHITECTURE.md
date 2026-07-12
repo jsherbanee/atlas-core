@@ -136,7 +136,7 @@ Delivered architecture:
 
 Authoritative detail is maintained in [ESTIMATING.md](ESTIMATING.md), with D-01 dependencies in [COST_ENGINE.md](COST_ENGINE.md).
 
-## D-03A Assemblies, Accessories, and Labor Rollups (Documentation-Only)
-D-03A is an architecture sprint that defines deterministic composition and labor rollup design without implementation changes.
+## D-03 Assemblies, Accessories, and Labor Rollups (Implemented)
+D-03 implementation is complete and composes deterministic assembly expansion and labor rollups on top of D-02 revision ownership while preserving D-01 cost-selection authority.
 
 Authoritative detail is maintained in [ASSEMBLIES_AND_LABOR.md](ASSEMBLIES_AND_LABOR.md).

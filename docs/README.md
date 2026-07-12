@@ -2,11 +2,11 @@
 
 Atlas documentation defines the platform vision, architecture, engineering-intelligence surfaces, and implementation status for Atlas Core.
 
-Current implementation sprint focus: D-03A Assemblies, Accessories, and Labor Rollups architecture documentation.
-Deferred in current sprint scope: D-03 implementation.
+Current implementation sprint focus: Sprint D-03 closeout completion (implemented and closed).
+Deferred in current sprint scope: post-D-03 epic work (not started).
 
 Current UX stream: Epic A Sprint A-04 Engineering Workstation UX Consolidation.
-Scope: interaction and terminology consistency only, with no new D-03 capability introduction.
+Scope: interaction and terminology consistency while preserving D-03 production boundaries.
 
 These documents are intended to be used as a cohesive reference library, not isolated notes.
 
@@ -145,7 +145,7 @@ Future releases should follow this structure.
 - When to reference: During milestone planning and sequencing decisions.
 
 ### [ASSEMBLIES_AND_LABOR.md](ASSEMBLIES_AND_LABOR.md)
-- Purpose: Defines D-03A architecture for deterministic assemblies, accessories, and labor rollups.
+- Purpose: Defines D-03 architecture and implementation boundaries for deterministic assemblies, accessories, and labor rollups.
 - Audience: Estimating architecture, service, and workspace contributors.
 - When to reference: Before implementing D-03 composition, rollup, and revision-integration behavior.
 

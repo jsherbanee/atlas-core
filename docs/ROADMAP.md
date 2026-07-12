@@ -60,13 +60,13 @@ Completed outcomes:
 
 ## Phase 2: Bid Intelligence (Active)
 Current objective:
-Complete Sprint D-03A Assemblies, Accessories, and Labor Rollups architecture documentation.
+Sprint D-03 Assemblies, Accessories, and Labor Rollups is implemented and closed.
 
 Current UX hardening stream:
 
 - Epic A Sprint A-04 Engineering Workstation UX Consolidation
 - focused on interaction consistency and deterministic navigation continuity
-- does not start D-03
+- preserves D-03 scope boundaries while workstation consistency updates continue
 
 Implemented in current baseline candidate:
 - Bid package review orchestration
@@ -91,8 +91,8 @@ Implemented in current baseline candidate:
 - Deterministic cost engine for acquisition cost selection, cost traceability, commercial coverage, and project-only quick-add product support
 
 Remaining Phase 2 refinements:
-- D-03A Assemblies, Accessories, and Labor Rollups architecture (documentation-only)
-- D-03 Scope and Risk Diagnostics (implementation deferred pending D-03A sign-off)
+- D-03 closeout verified: full quality-gate validation and architecture review complete
+- post-D-03 epic implementation has not started in this pass
 - PDF ingestion and indexing robustness
 - Drawing/spec intelligence quality refinements
 - Device schedule extraction quality refinements

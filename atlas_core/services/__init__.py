@@ -121,6 +121,7 @@ from atlas_core.services.estimate_service import (
     EstimateExtensionPoints,
 )
 from atlas_core.services.estimate_engine_service import EstimateEngineService
+from atlas_core.services.assembly_expansion_service import AssemblyExpansionService
 from atlas_core.services.product_resolution_service import ProductResolutionService
 from atlas_core.services.commercial_knowledge_service import (
     CommercialKnowledgeService,
@@ -362,6 +363,7 @@ __all__ = [
     "DeterministicEstimateService",
     "EstimateExtensionPoints",
     "EstimateEngineService",
+    "AssemblyExpansionService",
     "ProductResolutionService",
     "CommercialKnowledgeService",
     "DeterministicCostEngine",

@@ -197,6 +197,20 @@ class EstimateLineItem:
     source_selection_status: str = "no_eligible_cost"
     selected_cost_snapshot_id: str = ""
     manual_selection_metadata: ManualSelectionMetadata | None = None
+    line_role: str = "standard_product"
+    parent_line_item_id: str = ""
+    assembly_id: str = ""
+    assembly_version_id: str = ""
+    assembly_component_id: str = ""
+    source_contribution_chain: list[str] = field(default_factory=list)
+    generated_quantity: Decimal = Decimal("0")
+    quantity_rule: dict[str, Any] = field(default_factory=dict)
+    optional_accessory_decision: str = "not_applicable"
+    manual_adjustment_metadata: list[dict[str, Any]] = field(default_factory=list)
+    expansion_run_id: str = ""
+    assembly_ruleset_version: str = ""
+    labor_snapshot_id: str = ""
+    excluded: bool = False
     diagnostics: list[dict[str, Any]] = field(default_factory=list)
     notes: str = ""
     created_at: str = field(
@@ -228,6 +242,25 @@ class EstimateLineItem:
             self.manual_selection_metadata = ManualSelectionMetadata(
                 **self.manual_selection_metadata
             )
+        self.line_role = _safe(self.line_role, "standard_product")
+        self.parent_line_item_id = _safe(self.parent_line_item_id)
+        self.assembly_id = _safe(self.assembly_id)
+        self.assembly_version_id = _safe(self.assembly_version_id)
+        self.assembly_component_id = _safe(self.assembly_component_id)
+        self.source_contribution_chain = [
+            _safe(item) for item in list(self.source_contribution_chain) if _safe(item)
+        ]
+        self.generated_quantity = _decimal(self.generated_quantity)
+        self.quantity_rule = dict(self.quantity_rule)
+        self.optional_accessory_decision = _safe(
+            self.optional_accessory_decision, "not_applicable"
+        )
+        self.manual_adjustment_metadata = [
+            dict(item) for item in list(self.manual_adjustment_metadata)
+        ]
+        self.expansion_run_id = _safe(self.expansion_run_id)
+        self.assembly_ruleset_version = _safe(self.assembly_ruleset_version)
+        self.labor_snapshot_id = _safe(self.labor_snapshot_id)
         self.notes = _safe(self.notes)
 
     def to_dict(self) -> dict[str, Any]:
@@ -252,6 +285,20 @@ class EstimateLineItem:
                 if self.manual_selection_metadata is not None
                 else None
             ),
+            "line_role": self.line_role,
+            "parent_line_item_id": self.parent_line_item_id,
+            "assembly_id": self.assembly_id,
+            "assembly_version_id": self.assembly_version_id,
+            "assembly_component_id": self.assembly_component_id,
+            "source_contribution_chain": list(self.source_contribution_chain),
+            "generated_quantity": _to_number(self.generated_quantity),
+            "quantity_rule": dict(self.quantity_rule),
+            "optional_accessory_decision": self.optional_accessory_decision,
+            "manual_adjustment_metadata": list(self.manual_adjustment_metadata),
+            "expansion_run_id": self.expansion_run_id,
+            "assembly_ruleset_version": self.assembly_ruleset_version,
+            "labor_snapshot_id": self.labor_snapshot_id,
+            "excluded": self.excluded,
             "diagnostics": list(self.diagnostics),
             "notes": self.notes,
             "created_at": self.created_at,
@@ -289,9 +336,21 @@ class EstimateDiagnostic:
 
 @dataclass
 class EstimateTotals:
-    acquisition_cost_total: Decimal
-    unresolved_cost_total: Decimal
-    excluded_line_total: Decimal
+    acquisition_cost_total: Decimal = Decimal("0")
+    generated_material_acquisition_cost: Decimal = Decimal("0")
+    generated_labor_cost: Decimal = Decimal("0")
+    allowance_cost_total: Decimal = Decimal("0")
+    unresolved_cost_total: Decimal = Decimal("0")
+    unresolved_material_total: Decimal = Decimal("0")
+    unresolved_labor_total: Decimal = Decimal("0")
+    material_subtotal: Decimal = Decimal("0")
+    labor_subtotal: Decimal = Decimal("0")
+    excluded_line_total: Decimal = Decimal("0")
+    assembly_count: int = 0
+    generated_product_line_count: int = 0
+    generated_labor_line_count: int = 0
+    diagnostic_counts: dict[str, int] = field(default_factory=dict)
+    readiness_summary: dict[str, Any] = field(default_factory=dict)
     section_subtotals: dict[str, Decimal] = field(default_factory=dict)
     system_subtotals: dict[str, Decimal] = field(default_factory=dict)
     room_subtotals: dict[str, Decimal] = field(default_factory=dict)
@@ -300,8 +359,24 @@ class EstimateTotals:
 
     def __post_init__(self) -> None:
         self.acquisition_cost_total = _decimal(self.acquisition_cost_total)
+        self.generated_material_acquisition_cost = _decimal(
+            self.generated_material_acquisition_cost
+        )
+        self.generated_labor_cost = _decimal(self.generated_labor_cost)
+        self.allowance_cost_total = _decimal(self.allowance_cost_total)
         self.unresolved_cost_total = _decimal(self.unresolved_cost_total)
+        self.unresolved_material_total = _decimal(self.unresolved_material_total)
+        self.unresolved_labor_total = _decimal(self.unresolved_labor_total)
+        self.material_subtotal = _decimal(self.material_subtotal)
+        self.labor_subtotal = _decimal(self.labor_subtotal)
         self.excluded_line_total = _decimal(self.excluded_line_total)
+        self.assembly_count = int(self.assembly_count)
+        self.generated_product_line_count = int(self.generated_product_line_count)
+        self.generated_labor_line_count = int(self.generated_labor_line_count)
+        self.diagnostic_counts = {
+            str(key): int(value) for key, value in dict(self.diagnostic_counts).items()
+        }
+        self.readiness_summary = dict(self.readiness_summary)
         self.section_subtotals = {
             _safe(key, "unassigned"): _decimal(value)
             for key, value in dict(self.section_subtotals).items()
@@ -321,8 +396,22 @@ class EstimateTotals:
     def to_dict(self) -> dict[str, Any]:
         return {
             "acquisition_cost_total": _to_number(self.acquisition_cost_total),
+            "generated_material_acquisition_cost": _to_number(
+                self.generated_material_acquisition_cost
+            ),
+            "generated_labor_cost": _to_number(self.generated_labor_cost),
+            "allowance_cost_total": _to_number(self.allowance_cost_total),
             "unresolved_cost_total": _to_number(self.unresolved_cost_total),
+            "unresolved_material_total": _to_number(self.unresolved_material_total),
+            "unresolved_labor_total": _to_number(self.unresolved_labor_total),
+            "material_subtotal": _to_number(self.material_subtotal),
+            "labor_subtotal": _to_number(self.labor_subtotal),
             "excluded_line_total": _to_number(self.excluded_line_total),
+            "assembly_count": self.assembly_count,
+            "generated_product_line_count": self.generated_product_line_count,
+            "generated_labor_line_count": self.generated_labor_line_count,
+            "diagnostic_counts": dict(self.diagnostic_counts),
+            "readiness_summary": dict(self.readiness_summary),
             "section_subtotals": {
                 key: _to_number(value) for key, value in self.section_subtotals.items()
             },
