@@ -22,12 +22,13 @@ Sprint 5 introduces an Equipment Object Workspace that treats equipment as first
 Sprint 6 implements the Atlas object navigation layer, adding shared object navigation patterns across Drawings, Specifications, Equipment, global object search, and Relationship Explorer.
 Sprint 7 delivers persistent Global Object Search and Working Set workflows, including deterministic ranking, grouped result presentation, local search history, and object-context breadcrumbs.
 Sprint 7.5 completes UI repair and runtime-state isolation with shared project context header rendering, configuration-driven navigation cleanup, shared object detail section scaffolding, and mutable runtime workspace storage outside immutable source fixtures.
+Sprint 8 introduces the Deterministic Estimating Foundation: Estimate Workspace architecture, traceable estimate line entities, resolution/pricing status modeling, confidence scoring, and extension-point interfaces for future pricing engines.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: 934 passed
+- pytest: 964 passed
 
 ## Tooling Status
 - GitHub Actions configured
@@ -49,7 +50,7 @@ Current workspace behavior:
 - Atlas uses an Application Workspace for Mission Control, project management, knowledge, reports, and administration.
 - Opening a project switches Atlas into a dedicated Project Workspace with project-specific navigation.
 - Local project records are stored under AtlasProjects/.
-- Project Workspace emphasizes Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate (advisory), Notebook, Reports, and project details/settings pages.
+- Project Workspace emphasizes Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate (deterministic foundation), Notebook, Reports, and project details/settings pages.
 - Equipment Workspace now provides object-first equipment investigation from canonical BOM lines with summary, list/detail workflow, relationship navigation, evidence/warnings, and deterministic recommended actions.
 - Drawings, Specifications, and Equipment now use shared object headers plus deterministic References/Referenced By relationship groups for connected-object traversal.
 - Relationship Explorer now supports relationship-type filtering, connected-object-type filtering, connected object cards, and richer edge context (originating document and warnings).
@@ -60,6 +61,13 @@ Current workspace behavior:
 - Runtime interactive workspace storage now defaults to a mutable local runtime path (`~/.atlas_core/runtime/AtlasProjects` unless overridden), preventing normal app execution from mutating tracked fixture data.
 - Project navigation now includes explicit disabled future lifecycle sections and shared configuration-driven rendering.
 - Shared object metadata/reference section helpers are reused across Equipment, Drawings, and Specifications detail views.
+- Estimate Workspace now renders deterministic sections (Overview, Equipment Cost, Labor, Accessories, Freight, General Conditions, Engineering Allowances, Project Summary, Estimate Confidence).
+- Deterministic estimate lines now include required source traceability fields (source object, object type, manufacturer, model, description, quantity, pricing status, labor status, confidence, and source references).
+- Estimate line navigation now supports Equipment, Specification, Drawing, Relationships, and Evidence traversal.
+- Product resolution state now surfaces exact product, approved substitute, preferred alternate, generic allowance, and unknown product.
+- Cost status now surfaces no pricing, estimated, quoted, verified, expired, and unavailable.
+- Unknown products now remain no-pricing in deterministic mode.
+- Estimate confidence now reports known pricing coverage, product resolution coverage, labor/pricing gaps, quantity uncertainty, and generic allowance exposure.
 - BOM Review now includes an Open Equipment Detail action for selected BOM rows while preserving BOM table reconciliation behavior.
 - Drawing and Specification workspaces now expose referenced equipment as human-readable objects that can open Equipment Workspace.
 - Project Workspace now includes a non-blocking guided review sequence with statuses (not started/ready/needs review/blocked/complete).

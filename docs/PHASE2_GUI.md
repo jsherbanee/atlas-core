@@ -184,6 +184,26 @@ Project:
 - Notebook
 - Reports
 
+Estimate Workspace (Sprint 8 deterministic foundation):
+- Overview
+- Equipment Cost
+- Labor
+- Accessories
+- Freight
+- General Conditions
+- Engineering Allowances
+- Project Summary
+- Estimate Confidence
+
+Estimate Workspace behavior:
+- deterministic estimate lines are generated from reviewed engineering objects
+- each estimate line preserves source object traceability and source references
+- product resolution state is visible on every line (exact/approved substitute/preferred alternate/generic allowance/unknown)
+- pricing status and labor status are visible on every line
+- unknown products are flagged and remain no-pricing in deterministic mode
+- line navigation supports Equipment, Specification, Drawing, Relationships, and Evidence routes
+- object detail headers include Open Estimate Workspace for source-to-estimate return
+
 Project Details:
 - Drawings
 - Specifications

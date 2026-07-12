@@ -42,7 +42,7 @@ Opportunity [Implemented]
 Bid Package [Implemented]
 	|
 	v
-Estimate [Implemented - advisory]
+Estimate [Implemented - deterministic foundation]
 	|
 	v
 Proposal [In Progress - estimator brief support]

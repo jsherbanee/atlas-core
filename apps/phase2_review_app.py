@@ -38,6 +38,7 @@ from atlas_core.services.bom_review_service import BomReviewService
 from atlas_core.services.pricing_service import PricingService
 from atlas_core.services.sales_design_review_service import SalesDesignReviewService
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
+from atlas_core.services.estimate_service import DeterministicEstimateService
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
 from atlas_core.services.runtime_workspace import ensure_runtime_workspace_root
@@ -484,6 +485,68 @@ def _status_chip(value: str) -> str:
     if normalized in {"not started"}:
         return "⚪ " + value
     return "⚪ " + value
+
+
+def _estimate_resolution_chip(value: str) -> str:
+    normalized = _safe_text(value, "").replace("_", " ").lower()
+    if normalized == "exact product":
+        return "🟢 Exact Product"
+    if normalized == "approved substitute":
+        return "🟢 Approved Substitute"
+    if normalized == "preferred alternate":
+        return "🟠 Preferred Alternate"
+    if normalized == "generic allowance":
+        return "🟠 Generic Allowance"
+    if normalized == "unknown product":
+        return "🔴 Unknown Product"
+    return "⚪ " + _safe_text(value, "Unknown")
+
+
+def _estimate_cost_status_chip(value: str) -> str:
+    normalized = _safe_text(value, "").replace("_", " ").lower()
+    if normalized == "verified":
+        return "🟢 Verified"
+    if normalized == "quoted":
+        return "🟢 Quoted"
+    if normalized == "estimated":
+        return "🟠 Estimated"
+    if normalized == "no pricing":
+        return "⚪ No Pricing"
+    if normalized == "expired":
+        return "🔴 Expired"
+    if normalized == "unavailable":
+        return "🔴 Unavailable"
+    return "⚪ " + _safe_text(value, "Unknown")
+
+
+def _open_estimate_navigation_target(
+    st: Any,
+    *,
+    target_kind: str,
+    target_value: str,
+) -> None:
+    value = _safe_text(target_value, "")
+    if not value:
+        return
+
+    if target_kind == "equipment":
+        st.session_state["atlas_active_page"] = "Equipment"
+        _set_context_selection(st, "equipment", {"equipment_id": value})
+    elif target_kind == "specification":
+        st.session_state["atlas_active_page"] = "Specifications"
+        _set_context_selection(st, "specification", {"section": value})
+    elif target_kind == "drawing":
+        st.session_state["atlas_active_page"] = "Drawings"
+        _set_context_selection(st, "drawing", {"drawing_number": value})
+    elif target_kind == "relationships":
+        st.session_state["atlas_active_page"] = "Relationships"
+        _set_context_selection(st, "equipment", {"equipment_id": value})
+    elif target_kind == "evidence":
+        st.session_state["atlas_active_page"] = "Evidence"
+        _set_context_selection(st, "evidence", {"source_file": value, "page": "n/a"})
+    else:
+        return
+    st.rerun()
 
 
 def _safe_text(value: Any, default: str = "Unknown") -> str:
@@ -3436,10 +3499,17 @@ def _render_object_header(
         f"Project {_safe_text(record.project.name, 'Project')}",
     ]
     st.markdown(" ".join([f"`{badge}`" for badge in badges]))
-    header_cols = st.columns([7.5, 2.5])
+    header_cols = st.columns([5.5, 2.25, 2.25])
     header_cols[0].caption(f"Recommended action: {recommended_action}")
-    pinned = _is_reference_pinned(st, reference)
     if header_cols[1].button(
+        "Open Estimate Workspace",
+        key=f"atlas_object_header_open_estimate_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
+        use_container_width=True,
+    ):
+        st.session_state["atlas_active_page"] = "Estimate"
+        st.rerun()
+    pinned = _is_reference_pinned(st, reference)
+    if header_cols[2].button(
         "Remove from Working Set" if pinned else "Add to Working Set",
         key=f"atlas_object_header_pin_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
         use_container_width=True,
@@ -4660,43 +4730,252 @@ def _render_estimate_page(
     _render_page_header(
         st,
         "Estimate",
-        "Advisory labor and preliminary cost coverage only. No proposal generation or financial records.",
+        "Deterministic estimate workspace with explicit traceability from engineering objects to estimate lines.",
     )
     review = context.get("review") if context else None
     labor_estimate = getattr(review, "labor_estimate", None) if review else None
     bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
-    known_cost_lines = sum(1 for row in bom_rows if row.get("known_cost") is not None)
-    total_lines = len(bom_rows)
+    service = DeterministicEstimateService()
+    estimate = service.build(
+        project_id=record.project.project_id,
+        project_name=record.project.name,
+        bom_rows=bom_rows,
+        labor_estimate=labor_estimate,
+    )
+    dashboard = service.build_dashboard(estimate)
+    confidence_model = estimate.confidence_model
+    line_rows = estimate.all_lines()
 
-    st.dataframe(
+    tabs = st.tabs(
         [
-            {
-                "Project": record.project.name,
-                "Total BOM Lines": total_lines,
-                "Lines With Known Cost": known_cost_lines,
-                "Preliminary Cost Coverage": (
-                    f"{int((known_cost_lines / total_lines) * 100)}%"
-                    if total_lines
-                    else "0%"
-                ),
-                "Labor Confidence": _safe_text(
-                    getattr(labor_estimate, "confidence", None),
-                    "n/a",
-                ),
-                "Estimate Mode": "Advisory",
-            }
-        ],
-        use_container_width=True,
-        hide_index=True,
+            "Overview",
+            "Equipment Cost",
+            "Labor",
+            "Accessories",
+            "Freight",
+            "General Conditions",
+            "Engineering Allowances",
+            "Project Summary",
+            "Estimate Confidence",
+        ]
     )
 
-    if labor_estimate is not None and hasattr(labor_estimate, "to_dict"):
-        st.markdown("### Labor Detail")
+    with tabs[0]:
         st.dataframe(
-            [labor_estimate.to_dict()], use_container_width=True, hide_index=True
+            [
+                {
+                    "Project": record.project.name,
+                    "Estimate Lines": dashboard["line_count"],
+                    "Material Cost": dashboard["material_cost"],
+                    "Labor Cost": dashboard["labor_cost"],
+                    "Allowance Cost": dashboard["allowance_cost"],
+                    "Freight": dashboard["freight"],
+                    "Known Cost %": f"{dashboard['known_cost_percent']}%",
+                    "Unknown Cost %": f"{dashboard['unknown_cost_percent']}%",
+                    "Resolved Products": dashboard["resolved_products"],
+                    "Unresolved Products": dashboard["unresolved_products"],
+                    "Pricing Confidence": f"{dashboard['pricing_confidence']}%",
+                    "Overall Estimate Confidence": f"{dashboard['overall_estimate_confidence']}%",
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
         )
-    else:
-        st.info("No labor estimate output is available yet.")
+        st.caption(
+            "Every estimate line is traceable to source engineering objects. Proposal, RFQ, and purchasing output is intentionally out of scope."
+        )
+
+    with tabs[1]:
+        if not line_rows:
+            _render_guided_empty_state(
+                st,
+                why_empty="No estimate lines are available yet.",
+                action_to_populate="Run project analysis to produce reviewed BOM/equipment objects.",
+                next_location="Open Documents and execute Project Analysis.",
+            )
+        else:
+            display_rows = []
+            for line in line_rows:
+                display_rows.append(
+                    {
+                        "Line": line.line_id,
+                        "Source Object": line.source_object,
+                        "Object Type": line.object_type.title(),
+                        "Manufacturer": line.manufacturer,
+                        "Model": line.model,
+                        "Description": line.description,
+                        "Quantity": line.quantity,
+                        "Product Resolution": _estimate_resolution_chip(
+                            line.product_resolution_status.value
+                        ),
+                        "Pricing Status": _estimate_cost_status_chip(
+                            line.pricing_status.value
+                        ),
+                        "Labor Status": _estimate_cost_status_chip(
+                            line.labor_status.value
+                        ),
+                        "Confidence": f"{int(line.confidence * 100)}%",
+                        "Material": line.material_cost.amount,
+                        "Labor": line.labor_cost.amount,
+                        "Accessories": line.accessory_cost.amount,
+                        "Line Total": line.line_total(),
+                    }
+                )
+            st.dataframe(display_rows, use_container_width=True, hide_index=True)
+
+            selected_line_id = st.selectbox(
+                "Select estimate line",
+                options=[line.line_id for line in line_rows],
+                key="atlas_estimate_selected_line",
+            )
+            selected_line = next(
+                line for line in line_rows if line.line_id == selected_line_id
+            )
+
+            st.markdown("#### Estimate Line Traceability")
+            trace_rows = [
+                {
+                    "Source Object": selected_line.source_object,
+                    "Object Type": selected_line.object_type,
+                    "Manufacturer": selected_line.manufacturer,
+                    "Model": selected_line.model,
+                    "Description": selected_line.description,
+                    "Quantity": selected_line.quantity,
+                    "Pricing Status": selected_line.pricing_status.value,
+                    "Labor Status": selected_line.labor_status.value,
+                    "Confidence": f"{int(selected_line.confidence * 100)}%",
+                    "Source References": ", ".join(
+                        f"{ref.source_type}:{ref.source_id}"
+                        for ref in selected_line.source_references
+                    )
+                    or "n/a",
+                }
+            ]
+            st.dataframe(trace_rows, use_container_width=True, hide_index=True)
+
+            nav_cols = st.columns(5)
+            target_map = {
+                item.get("kind"): item.get("value")
+                for item in selected_line.navigation_refs
+            }
+            button_targets = [
+                ("equipment", "Open Equipment"),
+                ("specification", "Open Specification"),
+                ("drawing", "Open Drawing"),
+                ("relationships", "Open Relationship"),
+                ("evidence", "Open Evidence"),
+            ]
+            for index, (kind, label) in enumerate(button_targets):
+                value = _safe_text(target_map.get(kind), "")
+                if nav_cols[index].button(
+                    label,
+                    key=f"atlas_estimate_nav_{selected_line.line_id}_{kind}",
+                    disabled=not value,
+                    use_container_width=True,
+                ):
+                    _open_estimate_navigation_target(
+                        st,
+                        target_kind=kind,
+                        target_value=value,
+                    )
+
+    with tabs[2]:
+        st.dataframe(
+            service.labor_architecture_rows(estimate),
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.caption(
+            "Labor categories are architected for deterministic expansion. Labor hours and rates can remain empty during foundation stage."
+        )
+
+    with tabs[3]:
+        st.dataframe(
+            [
+                {
+                    "Category": category,
+                    "Generation Status": "Placeholder",
+                    "Estimated Cost": 0.0,
+                }
+                for category in service.ACCESSORY_PLACEHOLDER_CATEGORIES
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[4]:
+        st.dataframe(
+            [
+                {
+                    "Freight Cost": estimate.freight_cost.amount,
+                    "Freight Status": _estimate_cost_status_chip(
+                        estimate.freight_cost.status.value
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[5]:
+        st.dataframe(
+            [
+                {
+                    "Subtotal": estimate.subtotal().amount,
+                    "Markup %": round(estimate.markup.percent * 100, 2),
+                    "Markup Amount": estimate.markup_amount(),
+                    "Contingency %": round(estimate.contingency.percent * 100, 2),
+                    "Contingency Amount": estimate.contingency_amount(),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[6]:
+        allowance_rows = [item.to_dict() for item in estimate.allowances]
+        if allowance_rows:
+            st.dataframe(allowance_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info(
+                "No engineering allowances were created from current reviewed objects."
+            )
+
+    with tabs[7]:
+        st.dataframe(
+            [
+                {
+                    "Subtotal": estimate.subtotal().amount,
+                    "Markup": estimate.markup_amount(),
+                    "Contingency": estimate.contingency_amount(),
+                    "Grand Total": estimate.grand_total().amount,
+                    "Resolved Products": dashboard["resolved_products"],
+                    "Unresolved Products": dashboard["unresolved_products"],
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[8]:
+        confidence = confidence_model.to_dict() if confidence_model is not None else {}
+        st.dataframe(
+            [
+                {
+                    "Overall Confidence": f"{int(float(confidence.get('score', 0.0)) * 100)}%",
+                    "Known Pricing": f"{int(float(confidence.get('known_pricing_ratio', 0.0)) * 100)}%",
+                    "Resolved Products": f"{int(float(confidence.get('resolved_product_ratio', 0.0)) * 100)}%",
+                    "Unpriced Labor": f"{int(float(confidence.get('unpriced_labor_ratio', 0.0)) * 100)}%",
+                    "Unknown Quantity": f"{int(float(confidence.get('unknown_quantity_ratio', 0.0)) * 100)}%",
+                    "Generic Allowance": f"{int(float(confidence.get('generic_allowance_ratio', 0.0)) * 100)}%",
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.markdown("#### Confidence Explanations")
+        for message in list(confidence.get("messages") or []):
+            st.markdown(f"- {message}")
 
     _render_review_transition(
         st,

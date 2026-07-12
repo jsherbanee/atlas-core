@@ -116,6 +116,10 @@ from atlas_core.services.pricing_service import (
     PriceListImportSummary,
     VendorProductOffer,
 )
+from atlas_core.services.estimate_service import (
+    DeterministicEstimateService,
+    EstimateExtensionPoints,
+)
 from atlas_core.services.sales_design_review_service import (
     SalesDesignEngineerReview,
     SalesDesignReviewService,
@@ -346,6 +350,8 @@ __all__ = [
     "SpecificationIndexerService",
     "SystemDetectionService",
     "ManufacturerProduct",
+    "DeterministicEstimateService",
+    "EstimateExtensionPoints",
     "PricingService",
     "PriceListImportSummary",
     "SalesDesignEngineerReview",

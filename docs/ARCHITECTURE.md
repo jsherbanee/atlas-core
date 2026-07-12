@@ -47,3 +47,23 @@ Atlas is moving to a registry-driven rule model where:
 - New discipline coverage is added through modular rule files, not ad hoc service conditionals.
 
 This keeps behavior deterministic, testable, and easy to extend as Phase 2 Bid Intelligence expands.
+
+## Deterministic Estimating Foundation
+Sprint 8 introduces deterministic estimating architecture as an engine-layer extension.
+
+Design posture:
+- Estimating remains object-driven and traceable to reviewed engineering entities.
+- No hidden calculations and no black-box pricing.
+- Unknown product resolution states do not receive deterministic pricing.
+- Proposal/procurement/financial workflows remain out of scope.
+
+Implementation structure:
+- domain: deterministic estimate entities and status enums
+- services: deterministic estimate build, totals, dashboard, and confidence modeling
+- UI shell: Estimate Workspace sections that surface deterministic model outputs
+
+Extension boundaries are interface-only for future adapters:
+- vendor/manufacturer/price/quote integrations
+- labor rules and regional multipliers
+- tax/currency
+- proposal/RFQ generators
