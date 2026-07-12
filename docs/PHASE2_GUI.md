@@ -11,6 +11,8 @@ Atlas Workspace v1 (Sprint 8) launches into a persistent interactive engineering
 
 Atlas Workspace UI Sprint 4 adds repository-first project access, a scoped application-wide Knowledge workspace, a compact active-project identity header, and a strict two-column Project Workspace layout.
 
+Atlas Workspace UI Sprint 6 adds an object navigation layer that connects equipment, drawings, specifications, systems, rooms, risks, RFIs, and evidence through shared object headers, references/referenced-by groups, relationship explorer filters, and quick cross-object navigation actions.
+
 - Status bar
 
 The shell remains visible while page content changes.
@@ -177,6 +179,14 @@ Project Details:
 - Evidence
 - Timeline
 - Relationships
+
+Object navigation behavior in Project Workspace:
+- object pages expose shared object headers with identity, project, status, relationship counts, and quick actions
+- object pages expose deterministic `References` and `Referenced By` sections for cross-object movement
+- breadcrumbs include selected object context when an object is active
+- global search groups object results by type and supports open and pin/unpin actions
+- overview surfaces Recently Viewed and Pinned object lists for fast context return
+- Relationship Explorer provides relationship-type and connected-object-type filters with connected object cards
 
 Project Settings:
 - Project Metadata

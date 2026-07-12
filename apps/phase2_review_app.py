@@ -2202,6 +2202,8 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_price_list_signature", "")
     st.session_state.setdefault("atlas_review_flags", {})
     st.session_state.setdefault("atlas_equipment_origin", {})
+    st.session_state.setdefault("atlas_recently_viewed_objects", [])
+    st.session_state.setdefault("atlas_pinned_objects", [])
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -2487,6 +2489,29 @@ def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
         return f"Atlas / Projects / {page}"
     if page in {"Mission Control", "Knowledge", "Reports", "Administration"}:
         return f"Atlas / {page}"
+
+    try:
+        import streamlit as _st
+    except Exception:
+        _st = None
+
+    selection = (
+        dict(_st.session_state.get("atlas_context_selection") or {})
+        if _st is not None
+        else {}
+    )
+    kind = _safe_text(selection.get("kind"), "")
+    data = dict(selection.get("data") or {})
+    object_pages = {
+        "Equipment": "equipment",
+        "Drawings": "drawing",
+        "Specifications": "specification",
+    }
+    expected_kind = object_pages.get(page)
+    if expected_kind is not None and kind == expected_kind:
+        name = _object_display_name(kind, data)
+        return f"Atlas / Projects / {record.project.name} / {page} / {name}"
+
     return f"Atlas / Projects / {record.project.name} / {page}"
 
 
@@ -2732,8 +2757,306 @@ def _nav_buttons(
                     st.rerun()
 
 
+def _object_type_label(kind: str) -> str:
+    mapping = {
+        "equipment": "Equipment",
+        "drawing": "Drawing",
+        "specification": "Specification",
+        "system": "System",
+        "room": "Room",
+        "risk": "Risk / Finding",
+        "rfi": "RFI Candidate",
+        "evidence": "Evidence",
+        "manufacturer": "Manufacturer",
+        "master_product": "Product",
+        "model": "Product",
+    }
+    return mapping.get(kind, kind.replace("_", " ").title())
+
+
+def _object_id_for_selection(kind: str, data: dict[str, Any]) -> str:
+    if kind == "equipment":
+        return _safe_text(data.get("equipment_id"), "")
+    if kind == "drawing":
+        return _safe_text(data.get("drawing_number"), "")
+    if kind == "specification":
+        return _safe_text(data.get("section"), "")
+    if kind == "system":
+        return _safe_text(data.get("system"), "")
+    if kind == "room":
+        return _safe_text(data.get("room"), _safe_text(data.get("room_or_area"), ""))
+    if kind == "rfi":
+        return _safe_text(data.get("rfi_id"), _safe_text(data.get("title"), ""))
+    if kind == "evidence":
+        source_file = _safe_text(data.get("source_file"), "file")
+        page = _safe_text(data.get("page"), "n/a")
+        return f"{source_file}:{page}"
+    if kind == "manufacturer":
+        return _safe_text(data.get("manufacturer"), "")
+    if kind == "master_product":
+        return _safe_text(data.get("product_id"), _safe_text(data.get("model"), ""))
+    return _safe_text(data.get("object_id"), "")
+
+
+def _object_display_name(kind: str, data: dict[str, Any]) -> str:
+    if kind == "equipment":
+        manufacturer = _safe_text(data.get("manufacturer"), "")
+        model = _safe_text(data.get("model"), "")
+        equipment_id = _safe_text(data.get("equipment_id"), "Equipment")
+        merged = " ".join([part for part in [manufacturer, model] if part]).strip()
+        return merged or equipment_id
+    if kind == "drawing":
+        return _safe_text(data.get("drawing_number"), "Drawing")
+    if kind == "specification":
+        return _safe_text(data.get("section"), "Specification")
+    if kind == "system":
+        return _safe_text(data.get("system"), "System")
+    if kind == "room":
+        return _safe_text(
+            data.get("room"), _safe_text(data.get("room_or_area"), "Room")
+        )
+    if kind == "rfi":
+        return _safe_text(data.get("title"), _safe_text(data.get("rfi_id"), "RFI"))
+    if kind == "evidence":
+        return _safe_text(data.get("source_file"), "Evidence")
+    if kind == "manufacturer":
+        return _safe_text(data.get("manufacturer"), "Manufacturer")
+    if kind == "master_product":
+        return _safe_text(data.get("model"), "Product")
+    return _safe_text(data.get("title"), _safe_text(data.get("object_id"), "Object"))
+
+
+def _object_secondary_label(kind: str, data: dict[str, Any]) -> str:
+    if kind == "equipment":
+        return _safe_text(data.get("description"), "")
+    if kind == "drawing":
+        return _safe_text(data.get("title"), "")
+    if kind == "specification":
+        return _safe_text(data.get("title"), "")
+    if kind == "system":
+        return f"equipment {_safe_text(data.get('equipment_count'), 'n/a')}"
+    if kind == "room":
+        return _safe_text(data.get("system"), "")
+    if kind == "rfi":
+        return _safe_text(data.get("category"), "")
+    if kind == "evidence":
+        return f"page {_safe_text(data.get('page'), 'n/a')}"
+    if kind == "master_product":
+        return _safe_text(data.get("manufacturer"), "")
+    return ""
+
+
+def _selection_route(kind: str) -> str:
+    mapping = {
+        "equipment": "Equipment",
+        "drawing": "Drawings",
+        "specification": "Specifications",
+        "system": "Systems",
+        "room": "Equipment",
+        "rfi": "RFI Candidates",
+        "evidence": "Evidence",
+        "manufacturer": "Master Library Explorer",
+        "master_product": "Master Library Explorer",
+    }
+    return mapping.get(kind, "Overview")
+
+
+def _build_object_reference(
+    *,
+    kind: str,
+    data: dict[str, Any],
+    project_id: str,
+    route: str,
+    relationship_count: int = 0,
+    warning_count: int = 0,
+) -> dict[str, Any]:
+    status = _safe_text(
+        data.get("completeness_status"),
+        _safe_text(data.get("status"), _safe_text(data.get("current_status"), "n/a")),
+    )
+    confidence_value = data.get("confidence")
+    confidence_text = (
+        str(round(float(confidence_value), 2))
+        if isinstance(confidence_value, (int, float))
+        else _safe_text(confidence_value, "n/a")
+    )
+    source_refs = list(data.get("source_documents") or [])
+    if not source_refs and kind == "evidence":
+        source_refs = [_safe_text(data.get("source_file"), "")]
+    return {
+        "object_id": _object_id_for_selection(kind, data),
+        "object_type": _object_type_label(kind),
+        "display_name": _object_display_name(kind, data),
+        "secondary_label": _object_secondary_label(kind, data),
+        "status": status,
+        "confidence": confidence_text,
+        "project_id": project_id,
+        "route": route,
+        "source_refs": [item for item in source_refs if _safe_text(item, "")],
+        "relationship_count": int(relationship_count),
+        "warning_count": int(warning_count),
+        "selection_kind": kind,
+        "selection_data": dict(data),
+    }
+
+
+def _track_recently_viewed(st: Any, reference: dict[str, Any]) -> None:
+    object_id = _safe_text(reference.get("object_id"), "")
+    object_type = _safe_text(reference.get("object_type"), "")
+    if not object_id or not object_type:
+        return
+    existing = list(st.session_state.get("atlas_recently_viewed_objects") or [])
+    filtered = [
+        item
+        for item in existing
+        if not (
+            _safe_text(item.get("object_id"), "") == object_id
+            and _safe_text(item.get("object_type"), "") == object_type
+        )
+    ]
+    entry = dict(reference)
+    entry["last_viewed_at"] = _now_iso()
+    filtered.insert(0, entry)
+    st.session_state["atlas_recently_viewed_objects"] = filtered[:30]
+
+
+def _toggle_pin_reference(st: Any, reference: dict[str, Any], should_pin: bool) -> None:
+    object_id = _safe_text(reference.get("object_id"), "")
+    object_type = _safe_text(reference.get("object_type"), "")
+    if not object_id or not object_type:
+        return
+    existing = list(st.session_state.get("atlas_pinned_objects") or [])
+    filtered = [
+        item
+        for item in existing
+        if not (
+            _safe_text(item.get("object_id"), "") == object_id
+            and _safe_text(item.get("object_type"), "") == object_type
+        )
+    ]
+    if should_pin:
+        filtered.insert(0, dict(reference))
+    st.session_state["atlas_pinned_objects"] = filtered[:40]
+
+
+def _is_reference_pinned(st: Any, reference: dict[str, Any]) -> bool:
+    object_id = _safe_text(reference.get("object_id"), "")
+    object_type = _safe_text(reference.get("object_type"), "")
+    for item in list(st.session_state.get("atlas_pinned_objects") or []):
+        if (
+            _safe_text(item.get("object_id"), "") == object_id
+            and _safe_text(item.get("object_type"), "") == object_type
+        ):
+            return True
+    return False
+
+
 def _set_context_selection(st: Any, kind: str, data: dict[str, Any]) -> None:
     st.session_state["atlas_context_selection"] = {"kind": kind, "data": data}
+    if kind not in {
+        "equipment",
+        "drawing",
+        "specification",
+        "system",
+        "room",
+        "rfi",
+        "evidence",
+        "manufacturer",
+        "master_product",
+        "resolver_conflict",
+        "resolved",
+    }:
+        return
+
+    route = _selection_route(kind)
+    project_id = _safe_text(st.session_state.get("atlas_active_workspace_id"), "")
+    warnings = list(data.get("warnings") or [])
+    reference = _build_object_reference(
+        kind=kind,
+        data=data,
+        project_id=project_id,
+        route=route,
+        relationship_count=0,
+        warning_count=len(warnings),
+    )
+    _track_recently_viewed(st, reference)
+
+
+def _render_object_card(
+    st: Any,
+    reference: dict[str, Any],
+    *,
+    key_prefix: str,
+) -> None:
+    status = _safe_text(reference.get("status"), "n/a")
+    confidence = _safe_text(reference.get("confidence"), "n/a")
+    relations = int(reference.get("relationship_count", 0) or 0)
+    warnings = int(reference.get("warning_count", 0) or 0)
+    secondary = _safe_text(reference.get("secondary_label"), "")
+    st.markdown(
+        "<div class='atlas-object-card'>"
+        f"<div class='atlas-object-header'>{_safe_text(reference.get('object_type'), 'Object')}</div>"
+        f"{_safe_text(reference.get('display_name'), 'Object')}"
+        f"<br/><span class='atlas-muted'>{secondary}</span>"
+        f"<br/><span class='atlas-muted'>Status: {status} · Confidence: {confidence} · Links: {relations} · Warnings: {warnings}</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    cols = st.columns(2)
+    if cols[0].button(
+        f"Open {_safe_text(reference.get('display_name'), 'Object')}",
+        key=f"{key_prefix}_open_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
+        use_container_width=True,
+    ):
+        st.session_state["atlas_active_page"] = _safe_text(
+            reference.get("route"), "Overview"
+        )
+        _set_context_selection(
+            st,
+            _safe_text(reference.get("selection_kind"), "project")
+            .lower()
+            .replace(" / ", "_"),
+            dict(reference.get("selection_data") or {}),
+        )
+        st.rerun()
+
+    pinned = _is_reference_pinned(st, reference)
+    if cols[1].button(
+        "Unpin" if pinned else "Pin",
+        key=f"{key_prefix}_pin_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
+        use_container_width=True,
+    ):
+        _toggle_pin_reference(st, reference, should_pin=not pinned)
+        st.rerun()
+
+
+def _render_object_header(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    reference: dict[str, Any],
+    *,
+    description: str,
+    recommended_action: str,
+) -> None:
+    st.markdown(f"#### {_safe_text(reference.get('display_name'), 'Object')}")
+    st.caption(description)
+    badges = [
+        _safe_text(reference.get("object_type"), "Object"),
+        _safe_text(reference.get("status"), "n/a").replace("_", " ").title(),
+        f"Confidence {_safe_text(reference.get('confidence'), 'n/a')}",
+        f"Project {_safe_text(record.project.name, 'Project')}",
+    ]
+    st.markdown(" ".join([f"`{badge}`" for badge in badges]))
+    header_cols = st.columns([7.5, 2.5])
+    header_cols[0].caption(f"Recommended action: {recommended_action}")
+    pinned = _is_reference_pinned(st, reference)
+    if header_cols[1].button(
+        "Unpin Object" if pinned else "Pin Object",
+        key=f"atlas_object_header_pin_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
+        use_container_width=True,
+    ):
+        _toggle_pin_reference(st, reference, should_pin=not pinned)
+        st.rerun()
 
 
 def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
@@ -2782,6 +3105,10 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
             st.session_state.get("atlas_notebook_entries") or []
         ),
         "review_flags": dict(st.session_state.get("atlas_review_flags") or {}),
+        "recently_viewed_objects": list(
+            st.session_state.get("atlas_recently_viewed_objects") or []
+        ),
+        "pinned_objects": list(st.session_state.get("atlas_pinned_objects") or []),
     }
 
 
@@ -2843,6 +3170,14 @@ def _restore_workspace_state(
     review_flags = state.get("review_flags")
     if isinstance(review_flags, dict):
         st.session_state["atlas_review_flags"] = dict(review_flags)
+
+    recently_viewed = state.get("recently_viewed_objects")
+    if isinstance(recently_viewed, list):
+        st.session_state["atlas_recently_viewed_objects"] = list(recently_viewed)
+
+    pinned_objects = state.get("pinned_objects")
+    if isinstance(pinned_objects, list):
+        st.session_state["atlas_pinned_objects"] = list(pinned_objects)
 
     st.session_state["atlas_loaded_workspace_state_for"] = record.workspace_id
 
@@ -5782,6 +6117,124 @@ def _render_overview_page(
     if primary_actions[3].button("Open Engineering Review", use_container_width=True):
         st.session_state["atlas_active_page"] = "Engineering Review"
         st.rerun()
+
+    st.markdown("### Object Navigation")
+    nav_cols = st.columns(2)
+    recent = list(st.session_state.get("atlas_recently_viewed_objects") or [])
+    pinned = list(st.session_state.get("atlas_pinned_objects") or [])
+
+    with nav_cols[0]:
+        st.markdown("#### Recently Viewed Objects")
+        if recent:
+            st.dataframe(
+                [
+                    {
+                        "Object": _safe_text(item.get("display_name"), "Object"),
+                        "Type": _safe_text(item.get("object_type"), "n/a"),
+                        "Route": _safe_text(item.get("route"), "Overview"),
+                        "Last Viewed": _safe_text(item.get("last_viewed_at"), "n/a"),
+                    }
+                    for item in recent[:10]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+            target = st.selectbox(
+                "Open recently viewed",
+                options=[
+                    f"{_safe_text(item.get('object_type'), '')}: {_safe_text(item.get('display_name'), '')}"
+                    for item in recent[:10]
+                ],
+                key="atlas_overview_recent_open",
+            )
+            selected = recent[:10][
+                [
+                    f"{_safe_text(item.get('object_type'), '')}: {_safe_text(item.get('display_name'), '')}"
+                    for item in recent[:10]
+                ].index(target)
+            ]
+            if st.button(
+                "Open Recently Viewed",
+                key="atlas_overview_open_recent",
+                use_container_width=True,
+            ):
+                st.session_state["atlas_active_page"] = _safe_text(
+                    selected.get("route"),
+                    "Overview",
+                )
+                _set_context_selection(
+                    st,
+                    _safe_text(selected.get("selection_kind"), "project"),
+                    dict(selected.get("selection_data") or {}),
+                )
+                st.rerun()
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No recently viewed objects yet.",
+                action_to_populate="Open an equipment, drawing, specification, or related object detail.",
+                next_location="Navigate through object pages to build recent history.",
+            )
+
+    with nav_cols[1]:
+        st.markdown("#### Pinned Objects")
+        if pinned:
+            st.dataframe(
+                [
+                    {
+                        "Object": _safe_text(item.get("display_name"), "Object"),
+                        "Type": _safe_text(item.get("object_type"), "n/a"),
+                        "Route": _safe_text(item.get("route"), "Overview"),
+                    }
+                    for item in pinned[:10]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+            target = st.selectbox(
+                "Open pinned",
+                options=[
+                    f"{_safe_text(item.get('object_type'), '')}: {_safe_text(item.get('display_name'), '')}"
+                    for item in pinned[:10]
+                ],
+                key="atlas_overview_pinned_open",
+            )
+            selected = pinned[:10][
+                [
+                    f"{_safe_text(item.get('object_type'), '')}: {_safe_text(item.get('display_name'), '')}"
+                    for item in pinned[:10]
+                ].index(target)
+            ]
+            open_col, unpin_col = st.columns(2)
+            if open_col.button(
+                "Open Pinned",
+                key="atlas_overview_open_pinned",
+                use_container_width=True,
+            ):
+                st.session_state["atlas_active_page"] = _safe_text(
+                    selected.get("route"),
+                    "Overview",
+                )
+                _set_context_selection(
+                    st,
+                    _safe_text(selected.get("selection_kind"), "project"),
+                    dict(selected.get("selection_data") or {}),
+                )
+                st.rerun()
+            if unpin_col.button(
+                "Unpin",
+                key="atlas_overview_unpin_selected",
+                use_container_width=True,
+            ):
+                _toggle_pin_reference(st, selected, should_pin=False)
+                st.rerun()
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No pinned objects yet.",
+                action_to_populate="Pin important objects from equipment, drawing, or specification detail headers.",
+                next_location="Open object detail pages and use Pin Object.",
+            )
 
     st.markdown("### Project Review Checklist")
     st.dataframe(
@@ -8836,6 +9289,92 @@ def _selection_node_id(kind: str, data: dict[str, Any]) -> str | None:
     return None
 
 
+def _selection_kind_from_node(node: dict[str, Any]) -> str:
+    node_kind = _safe_text(node.get("selection_kind"), "")
+    if node_kind:
+        return node_kind
+    node_type = _safe_text(node.get("type"), "").lower()
+    mapping = {
+        "drawing": "drawing",
+        "specification": "specification",
+        "equipment": "equipment",
+        "system": "system",
+        "room": "room",
+        "rfi candidate": "rfi",
+        "evidence": "evidence",
+        "manufacturer": "manufacturer",
+        "product": "master_product",
+    }
+    return mapping.get(node_type, "project")
+
+
+def _object_reference_from_node(
+    node: dict[str, Any],
+    *,
+    record: ProjectWorkspaceRecord,
+) -> dict[str, Any]:
+    data = dict(node.get("data") or {})
+    kind = _selection_kind_from_node(node)
+    route = _safe_text(node.get("page"), _selection_route(kind))
+    metadata = dict(node.get("metadata") or {})
+    return _build_object_reference(
+        kind=kind,
+        data=data,
+        project_id=record.project.project_id,
+        route=route,
+        relationship_count=int(metadata.get("relationship_count", 0) or 0),
+        warning_count=int(
+            metadata.get("warning_count", len(list(data.get("warnings") or [])) or 0)
+        ),
+    )
+
+
+def _reference_groups_for_selection(
+    record: ProjectWorkspaceRecord,
+    graph: dict[str, Any],
+    kind: str,
+    data: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    node_id = _selection_node_id(kind, data)
+    if not node_id:
+        return [], []
+    relationships = _node_relationships(graph, node_id)
+    outgoing = []
+    for edge in list(relationships.get("outgoing") or []):
+        target = _node_by_id(graph, _safe_text(edge.get("target"), ""))
+        if target is None:
+            continue
+        outgoing.append(_object_reference_from_node(target, record=record))
+    incoming = []
+    for edge in list(relationships.get("incoming") or []):
+        source = _node_by_id(graph, _safe_text(edge.get("source"), ""))
+        if source is None:
+            continue
+        incoming.append(_object_reference_from_node(source, record=record))
+    return outgoing, incoming
+
+
+def _render_reference_group(
+    st: Any,
+    *,
+    title: str,
+    references: list[dict[str, Any]],
+    empty_message: str,
+    key_prefix: str,
+) -> None:
+    st.markdown(f"#### {title}")
+    if not references:
+        _render_guided_empty_state(
+            st,
+            why_empty=empty_message,
+            action_to_populate="Import or analyze source documents that establish object links.",
+            next_location="Review Documents, Drawings, Specifications, and Equipment mappings.",
+        )
+        return
+    for index, reference in enumerate(references[:12]):
+        _render_object_card(st, reference, key_prefix=f"{key_prefix}_{index}")
+
+
 def _notebook_object_reference_options(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
@@ -11007,39 +11546,119 @@ def _render_global_search_panel(
 
     filtered.sort(key=_score)
 
-    with st.expander(f"Global Search Results ({len(filtered)})", expanded=True):
+    references: list[dict[str, Any]] = []
+    for item in filtered:
+        data = dict(item.get("data") or {})
+        kind = _safe_text(item.get("selection_kind"), "project")
+        warnings = list(data.get("warnings") or [])
+        references.append(
+            _build_object_reference(
+                kind=kind,
+                data=data,
+                project_id=record.project.project_id,
+                route=_safe_text(item.get("page"), _selection_route(kind)),
+                relationship_count=0,
+                warning_count=len(warnings),
+            )
+        )
+
+    grouped_refs: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for reference in references:
+        grouped_refs[_safe_text(reference.get("object_type"), "Object")].append(
+            reference
+        )
+
+    with st.expander(f"Global Search Results ({len(references)})", expanded=True):
         st.caption(
             "Use arrow keys in the result selector for keyboard navigation, then press Enter."
         )
-        if not filtered:
-            st.info("No objects match the current project search.")
+        if not references:
+            _render_guided_empty_state(
+                st,
+                why_empty="No search results match the current query.",
+                action_to_populate="Try a broader term or disable restrictive type filters.",
+                next_location="Use project object search across equipment, drawings, specifications, systems, risks, RFIs, and evidence.",
+            )
             return
 
+        for object_type in sorted(grouped_refs.keys()):
+            st.markdown(f"#### {object_type}")
+            st.dataframe(
+                [
+                    {
+                        "Display Name": _safe_text(item.get("display_name"), "Object"),
+                        "Type": _safe_text(item.get("object_type"), "Object"),
+                        "Status": _safe_text(item.get("status"), "n/a"),
+                        "Project": _safe_text(item.get("project_id"), "n/a"),
+                        "Confidence": _safe_text(item.get("confidence"), "n/a"),
+                    }
+                    for item in grouped_refs[object_type][:20]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
         labels = [
-            f"{item['kind']}: {item['name']}  |  {item['subtitle']}"
-            for item in filtered
+            f"{_safe_text(item.get('object_type'), 'Object')}: {_safe_text(item.get('display_name'), 'Object')} | {_safe_text(item.get('secondary_label'), '')}"
+            for item in references
         ]
         selected_label = st.selectbox(
             "Results", options=labels, key="atlas_search_result"
         )
-        selected = filtered[labels.index(selected_label)]
+        selected = references[labels.index(selected_label)]
 
         st.markdown(
             "<div class='atlas-object-card'>"
-            f"<div class='atlas-object-header'>Selected Result: {selected['kind']}</div>"
-            f"{selected['name']}<br/><span class='atlas-muted'>{selected['subtitle']}</span>"
+            f"<div class='atlas-object-header'>Selected Result: {_safe_text(selected.get('object_type'), 'Object')}</div>"
+            f"{_safe_text(selected.get('display_name'), 'Object')}<br/><span class='atlas-muted'>{_safe_text(selected.get('secondary_label'), '')}</span>"
             "</div>",
             unsafe_allow_html=True,
         )
 
-        if st.button("Open Result", key="atlas_open_search_result", type="primary"):
-            st.session_state["atlas_active_page"] = selected["page"]
+        action_cols = st.columns(2)
+        if action_cols[0].button(
+            "Open Result",
+            key="atlas_open_search_result",
+            type="primary",
+            use_container_width=True,
+        ):
+            st.session_state["atlas_active_page"] = _safe_text(
+                selected.get("route"),
+                "Overview",
+            )
             _set_context_selection(
                 st,
-                str(selected.get("selection_kind") or "project"),
-                dict(selected.get("data") or {}),
+                _safe_text(selected.get("selection_kind"), "project"),
+                dict(selected.get("selection_data") or {}),
             )
             st.rerun()
+
+        pinned = _is_reference_pinned(st, selected)
+        if action_cols[1].button(
+            "Unpin" if pinned else "Pin",
+            key="atlas_search_pin_result",
+            use_container_width=True,
+        ):
+            _toggle_pin_reference(st, selected, should_pin=not pinned)
+            st.rerun()
+
+        st.markdown("#### Recently Viewed")
+        recent = list(st.session_state.get("atlas_recently_viewed_objects") or [])
+        if recent:
+            st.dataframe(
+                [
+                    {
+                        "Object": _safe_text(item.get("display_name"), "Object"),
+                        "Type": _safe_text(item.get("object_type"), "n/a"),
+                        "Route": _safe_text(item.get("route"), "Overview"),
+                    }
+                    for item in recent[:8]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No recently viewed objects.")
 
 
 def _render_upload_panel(
@@ -11197,7 +11816,11 @@ def _render_project_files_page(
     )
 
 
-def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
+def _render_drawings_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
     _render_page_header(
         st,
         "Drawing Workspace",
@@ -11293,9 +11916,25 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
     selected = filtered[labels.index(selected_label)]
     _set_context_selection(st, "drawing", selected)
 
-    st.markdown(
-        f"### Selected Drawing Detail\n\n**{selected['drawing_number']} - {selected['title']}**"
+    graph = _build_knowledge_graph(record, context)
+    drawing_reference = _build_object_reference(
+        kind="drawing",
+        data=selected,
+        project_id=record.project.project_id,
+        route="Drawings",
+        relationship_count=0,
+        warning_count=len(list(selected.get("warnings") or [])),
     )
+
+    st.markdown("### Selected Drawing Detail")
+    _render_object_header(
+        st,
+        record,
+        drawing_reference,
+        description=_safe_text(selected.get("title"), "Drawing object"),
+        recommended_action="Review related equipment, specifications, and evidence.",
+    )
+
     st.dataframe(
         [
             {"Property": "Drawing Number", "Value": selected["drawing_number"]},
@@ -11321,6 +11960,31 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
         use_container_width=True,
         hide_index=True,
     )
+
+    st.markdown("### References and Referenced By")
+    references, referenced_by = _reference_groups_for_selection(
+        record,
+        graph,
+        "drawing",
+        selected,
+    )
+    reference_cols = st.columns(2)
+    with reference_cols[0]:
+        _render_reference_group(
+            st,
+            title="References",
+            references=references,
+            empty_message="This drawing has no outgoing references yet.",
+            key_prefix=f"atlas_drawing_refs_{_safe_text(selected.get('drawing_number'), 'drawing')}",
+        )
+    with reference_cols[1]:
+        _render_reference_group(
+            st,
+            title="Referenced By",
+            references=referenced_by,
+            empty_message="No objects currently reference this drawing.",
+            key_prefix=f"atlas_drawing_refby_{_safe_text(selected.get('drawing_number'), 'drawing')}",
+        )
 
     st.markdown("### Related Objects")
     related_tabs = st.tabs(
@@ -11650,7 +12314,11 @@ def _render_drawing_explorer_page(st: Any, context: dict[str, Any] | None) -> No
             st.info("No hierarchy groups available yet.")
 
 
-def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None:
+def _render_specifications_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
     _render_page_header(
         st,
         "Specification Workspace",
@@ -11763,9 +12431,25 @@ def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None
     selected = filtered[labels.index(selected_label)]
     _set_context_selection(st, "specification", selected)
 
-    st.markdown(
-        f"### Selected Specification Detail\n\n**{selected['section']} - {selected['title']}**"
+    graph = _build_knowledge_graph(record, context)
+    specification_reference = _build_object_reference(
+        kind="specification",
+        data=selected,
+        project_id=record.project.project_id,
+        route="Specifications",
+        relationship_count=0,
+        warning_count=0,
     )
+
+    st.markdown("### Selected Specification Detail")
+    _render_object_header(
+        st,
+        record,
+        specification_reference,
+        description=_safe_text(selected.get("title"), "Specification object"),
+        recommended_action="Review references, requirements, and evidence consistency.",
+    )
+
     st.dataframe(
         [
             {"property": "Division", "value": selected["division"]},
@@ -11799,6 +12483,31 @@ def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None
         use_container_width=True,
         hide_index=True,
     )
+
+    st.markdown("### References and Referenced By")
+    references, referenced_by = _reference_groups_for_selection(
+        record,
+        graph,
+        "specification",
+        selected,
+    )
+    reference_cols = st.columns(2)
+    with reference_cols[0]:
+        _render_reference_group(
+            st,
+            title="References",
+            references=references,
+            empty_message="This specification has no outgoing references yet.",
+            key_prefix=f"atlas_spec_refs_{_safe_text(selected.get('section'), 'spec')}",
+        )
+    with reference_cols[1]:
+        _render_reference_group(
+            st,
+            title="Referenced By",
+            references=referenced_by,
+            empty_message="No objects currently reference this specification.",
+            key_prefix=f"atlas_spec_refby_{_safe_text(selected.get('section'), 'spec')}",
+        )
 
     relationship_tabs = st.tabs(
         [
@@ -12294,7 +13003,11 @@ def _render_specification_explorer_page(
     )
 
 
-def _render_equipment_page(st: Any, context: dict[str, Any] | None) -> None:
+def _render_equipment_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
     _render_page_header(
         st,
         "Equipment Workspace",
@@ -12531,22 +13244,29 @@ def _render_equipment_page(st: Any, context: dict[str, Any] | None) -> None:
             st.rerun()
 
     st.markdown("### Selected Equipment Detail")
-    title_text = (
-        f"{_safe_text(selected.get('manufacturer'), 'Unknown')} "
-        f"{_safe_text(selected.get('model'), 'Unknown')}"
-    ).strip()
-    subtitle_text = _safe_text(selected.get("description"), "Equipment item")
-    status_badges = [
-        _safe_text(selected.get("completeness_status"), "Needs Review")
-        .replace("_", " ")
-        .title(),
-        f"Confidence {int(float(selected.get('confidence', 0.0) or 0.0) * 100)}%",
-        _safe_text(selected.get("lifecycle_status"), "Active"),
-        _safe_text(selected.get("responsibility"), "Needs Review"),
-    ]
-    st.markdown(f"#### {title_text}")
-    st.caption(subtitle_text)
-    st.markdown(" ".join([f"`{badge}`" for badge in status_badges]))
+    graph = _build_knowledge_graph(record, context)
+    equipment_ref = _build_object_reference(
+        kind="equipment",
+        data=selected,
+        project_id=record.project.project_id,
+        route="Equipment",
+        relationship_count=0,
+        warning_count=len(list(selected.get("warnings") or [])),
+    )
+    _render_object_header(
+        st,
+        record,
+        equipment_ref,
+        description=_safe_text(selected.get("description"), "Equipment item"),
+        recommended_action=_safe_text(
+            (
+                _equipment_recommended_actions(selected)[0]
+                if _equipment_recommended_actions(selected)
+                else {}
+            ).get("action"),
+            "Review equipment object",
+        ),
+    )
 
     detail_tabs = st.tabs(
         [
@@ -12698,6 +13418,32 @@ def _render_equipment_page(st: Any, context: dict[str, Any] | None) -> None:
                 next_location="Review Documents and BOM evidence drill-down.",
             )
 
+    st.markdown("### References and Referenced By")
+    references, referenced_by = _reference_groups_for_selection(
+        record,
+        graph,
+        "equipment",
+        selected,
+    )
+    related_cols = st.columns(2)
+    with related_cols[0]:
+        _render_reference_group(
+            st,
+            title="References",
+            references=references,
+            empty_message="This equipment object has no outgoing references yet.",
+            key_prefix=f"atlas_equipment_refs_{_safe_text(selected.get('equipment_id'), 'eq')}",
+        )
+
+    with related_cols[1]:
+        _render_reference_group(
+            st,
+            title="Referenced By",
+            references=referenced_by,
+            empty_message="No objects currently reference this equipment object.",
+            key_prefix=f"atlas_equipment_refby_{_safe_text(selected.get('equipment_id'), 'eq')}",
+        )
+
     st.markdown("### Related Objects")
     related_cols = st.columns(2)
     with related_cols[0]:
@@ -12796,6 +13542,13 @@ def _render_equipment_page(st: Any, context: dict[str, Any] | None) -> None:
     st.markdown("### Recommended Actions")
     actions = _equipment_recommended_actions(selected)
     st.dataframe(actions, use_container_width=True, hide_index=True)
+    if st.button(
+        "Open Relationship Explorer",
+        key=f"atlas_equipment_open_relationships_{_safe_text(selected.get('equipment_id'), 'eq')}",
+        use_container_width=True,
+    ):
+        st.session_state["atlas_active_page"] = "Relationships"
+        st.rerun()
     action_destinations = sorted(
         {
             _safe_text(item.get("destination"), "")
@@ -13180,7 +13933,7 @@ def _render_relationship_explorer_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
-    st.subheader("Relationship Inspector")
+    st.subheader("Relationship Explorer")
     graph = _build_knowledge_graph(record, context)
     nodes = list(graph.get("nodes", []))
     if not nodes:
@@ -13195,9 +13948,52 @@ def _render_relationship_explorer_page(
     selected_node = nodes[labels.index(selected_label)]
     depth = st.slider("Recursive expansion depth", min_value=1, max_value=4, value=2)
 
+    outgoing_type_options = sorted(
+        {
+            _safe_text(edge.get("relationship"), "")
+            for edge in list(graph.get("edges") or [])
+            if _safe_text(edge.get("relationship"), "")
+        }
+    )
+    object_type_options = sorted({_safe_text(node.get("type"), "") for node in nodes})
+    filter_cols = st.columns(2)
+    relationship_filter = filter_cols[0].multiselect(
+        "Relationship Type",
+        options=outgoing_type_options,
+        default=[],
+        key="atlas_relationship_type_filter",
+    )
+    object_type_filter = filter_cols[1].multiselect(
+        "Connected Object Type",
+        options=object_type_options,
+        default=[],
+        key="atlas_relationship_object_type_filter",
+    )
+
     relationships = _node_relationships(graph, _safe_text(selected_node.get("id"), ""))
-    incoming = relationships.get("incoming", [])
-    outgoing = relationships.get("outgoing", [])
+    incoming = list(relationships.get("incoming", []))
+    outgoing = list(relationships.get("outgoing", []))
+
+    def _allowed(edge: dict[str, Any], connected_node: dict[str, Any] | None) -> bool:
+        if (
+            relationship_filter
+            and _safe_text(edge.get("relationship"), "") not in relationship_filter
+        ):
+            return False
+        if object_type_filter and connected_node is not None:
+            return _safe_text(connected_node.get("type"), "") in object_type_filter
+        return True
+
+    incoming = [
+        edge
+        for edge in incoming
+        if _allowed(edge, _node_by_id(graph, _safe_text(edge.get("source"), "")))
+    ]
+    outgoing = [
+        edge
+        for edge in outgoing
+        if _allowed(edge, _node_by_id(graph, _safe_text(edge.get("target"), "")))
+    ]
 
     st.markdown("#### Incoming Relationships")
     if incoming:
@@ -13234,6 +14030,44 @@ def _render_relationship_explorer_page(
         )
     else:
         st.info("No outgoing relationships.")
+
+    st.markdown("#### Connected Objects")
+    connected_refs: list[dict[str, Any]] = []
+    for edge in outgoing:
+        target = _node_by_id(graph, _safe_text(edge.get("target"), ""))
+        if target is None:
+            continue
+        connected_refs.append(_object_reference_from_node(target, record=record))
+    for edge in incoming:
+        source = _node_by_id(graph, _safe_text(edge.get("source"), ""))
+        if source is None:
+            continue
+        connected_refs.append(_object_reference_from_node(source, record=record))
+
+    deduped_connected: list[dict[str, Any]] = []
+    seen_connected: set[tuple[str, str]] = set()
+    for item in connected_refs:
+        key = (
+            _safe_text(item.get("object_type"), ""),
+            _safe_text(item.get("object_id"), ""),
+        )
+        if key in seen_connected:
+            continue
+        seen_connected.add(key)
+        deduped_connected.append(item)
+
+    if deduped_connected:
+        for index, reference in enumerate(deduped_connected[:12]):
+            _render_object_card(
+                st, reference, key_prefix=f"atlas_rel_connected_{index}"
+            )
+    else:
+        _render_guided_empty_state(
+            st,
+            why_empty="No connected objects match current relationship filters.",
+            action_to_populate="Adjust relationship type/object type filters.",
+            next_location="Use filters above to widen the connected object set.",
+        )
 
     all_relationships = incoming + outgoing
     st.markdown("#### Relationship Details")
@@ -13289,6 +14123,14 @@ def _render_relationship_explorer_page(
                     "supporting evidence": _safe_text(
                         selected_edge.get("source_evidence"), "n/a"
                     ),
+                    "originating document": _safe_text(
+                        (
+                            dict(source_node.get("metadata") or {}).get("source_file")
+                            if source_node is not None
+                            else None
+                        ),
+                        "n/a",
+                    ),
                 }
             ],
             use_container_width=True,
@@ -13317,6 +14159,26 @@ def _render_relationship_explorer_page(
             use_container_width=True,
             hide_index=True,
         )
+        st.markdown("Warnings")
+        source_data = dict(source_node.get("data") or {}) if source_node else {}
+        target_data = dict(target_node.get("data") or {}) if target_node else {}
+        warning_rows = [
+            {
+                "object": _safe_text(
+                    source_node.get("label") if source_node else None, "n/a"
+                ),
+                "warnings": ", ".join(list(source_data.get("warnings") or []))
+                or "None",
+            },
+            {
+                "object": _safe_text(
+                    target_node.get("label") if target_node else None, "n/a"
+                ),
+                "warnings": ", ".join(list(target_data.get("warnings") or []))
+                or "None",
+            },
+        ]
+        st.dataframe(warning_rows, use_container_width=True, hide_index=True)
         st.markdown("Related Engineering Insights")
         if related_insight_rows:
             st.dataframe(
@@ -14628,11 +15490,11 @@ def _render_main_content(
     elif page == "Overview":
         _render_overview_page(st, record, context)
     elif page == "Drawings":
-        _render_drawings_page(st, context)
+        _render_drawings_page(st, record, context)
     elif page == "Specifications":
-        _render_specifications_page(st, context)
+        _render_specifications_page(st, record, context)
     elif page == "Equipment":
-        _render_equipment_page(st, context)
+        _render_equipment_page(st, record, context)
     elif page == "Schedules":
         _render_project_folder_page(st, context, "Schedules", "Schedules")
     elif page == "Addenda":

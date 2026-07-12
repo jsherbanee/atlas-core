@@ -136,6 +136,9 @@ Navigation should always help answer four questions:
 - What object am I viewing?
 - What should I do next?
 
+Object navigation should feel model-first rather than page-first.
+Core object types (equipment, drawings, specifications, systems, rooms, risks, RFIs, and evidence) should expose a consistent object identity pattern and deterministic cross-object movement from any workspace where they appear.
+
 Navigation should be persistent, require minimal clicks, and maintain a predictable hierarchy. The interface should feel like a workspace, not a maze.
 
 Project Workspace pages should follow an action-first hierarchy:
@@ -144,6 +147,12 @@ Project Workspace pages should follow an action-first hierarchy:
 - Critical issues and blockers
 - Summary metrics
 - Drill-down evidence
+
+Object detail hierarchy should follow:
+- object identity and confidence context
+- references and referenced-by relationships
+- evidence and warnings
+- recommended next navigation or review action
 
 Project Workspace review should also provide a visible, non-blocking guided sequence (Documents, BOM, Scope and Risk, Engineering Findings, Estimate Coverage, Summary Report) so users always know progress without being forced through a wizard.
 
@@ -200,6 +209,7 @@ Atlas components should be optimized for engineering clarity.
 - Status indicators should be explicit and color-independent where possible.
 - Navigation should remain persistent and predictable.
 - Search should help users move from object discovery to decision context.
+- Search should support object-type grouping, recent context recall, and fast object handoff into related workspaces.
 - Contextual object detail should expose canonical values, supporting evidence, and uncertainty through inline or on-demand detail surfaces.
 - Object workspaces should use one primary object detail view and avoid repeating the same properties across multiple simultaneous tables/panels.
 - Empty states should explain why data is empty, how to populate it, and what the next step is.
