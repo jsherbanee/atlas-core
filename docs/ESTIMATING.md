@@ -4,243 +4,588 @@
 - [PRODUCT_VISION.md](PRODUCT_VISION.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)
 - [ARCHITECTURE.md](ARCHITECTURE.md)
-- [PHASE2_GUI.md](PHASE2_GUI.md)
 - [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)
-- [PRICING_ENGINE.md](PRICING_ENGINE.md)
+- [COMMERCIAL_KNOWLEDGE.md](COMMERCIAL_KNOWLEDGE.md)
+- [PRICE_VERSIONING.md](PRICE_VERSIONING.md)
 - [COST_ENGINE.md](COST_ENGINE.md)
+- [PRICING_ENGINE.md](PRICING_ENGINE.md)
 
-## Purpose
-This document defines Atlas deterministic estimating architecture.
+## 1. Purpose
+Sprint D-02 implements deterministic estimate identity, revision history, immutable cost snapshots, reproducible replay, and controlled cost refresh workflows.
 
-The goal is to convert reviewed engineering objects into estimate-ready line items where every dollar is traceable and reproducible.
+D-02 builds on the closed D-01 Core Cost Selection Engine and does not replace or weaken D-01 selection behavior.
 
-Out of scope for this foundation:
-- proposal generation
-- purchasing/procurement workflows
-- RFQ generation
-- financial posting
+## 2. Scope and Non-Goals
+D-02 scope:
+- Estimate identity
+- Estimate revision identity
+- Estimate line items
+- requested, engineering, and procurement quantities
+- selected cost-source references
+- immutable cost snapshots
+- deterministic line extensions and totals
+- cost refresh comparison
+- revision history and replayability
+- estimate validation and readiness gating
 
-## Deterministic Principles
-- Every estimate line must reference a source engineering object.
-- Every cost status must be explicit.
-- Every product resolution state must be explicit.
-- Confidence must explain why certainty is high or low.
-- No hidden calculations or black-box pricing behavior.
+D-02 explicit non-goals:
+- Product Resolution
+- fuzzy matching
+- assemblies and inferred accessories
+- labor rollups
+- sell pricing, margin, proposal generation
+- freight, escalation, currency conversion calculations
+- procurement, POs, accounting, ERP
 
-## Estimate Architecture
-Sprint 8 introduces a deterministic estimate model and service layer.
-Sprint 10 adds deterministic acquisition cost selection over immutable commercial knowledge:
-- domain entities in atlas_core/domain/deterministic_estimate.py
-- deterministic estimate orchestration in atlas_core/services/estimate_service.py
-- deterministic pricing entities in atlas_core/domain/pricing_engine.py
-- deterministic cost entities in atlas_core/domain/cost_engine.py
-- deterministic pricing orchestration in atlas_core/services/pricing_engine_service.py
-- deterministic cost orchestration in atlas_core/services/cost_engine_service.py
-- UI workspace integration in apps/phase2_review_app.py (Estimate page)
+D-03 remains deferred and is responsible for assemblies, accessories, and labor rollups.
 
-Core flow:
-1. reviewed BOM/equipment objects are read from project context
-2. deterministic estimate lines are generated
-3. deterministic product resolution gates pricing eligibility
-4. deterministic cost selection selects immutable price records and retains alternatives
-5. each line records source traceability and resolution/pricing state
-6. totals and confidence are calculated from explicit model state
+## 3. D-01 Dependency Contract
+D-02 consumes D-01 outputs and contracts:
+- CostSelectionRequest
+- CostSelectionResult
+- CostProvenance
+- CostSelectionDiagnostic
+- CostSelectionResultStatus
+- DeterministicCostEngine APIs documented in [COST_ENGINE.md](COST_ENGINE.md)
 
-## Estimate Object Model
-Primary objects:
+D-02 stores immutable snapshots of D-01 decisions and never re-derives historical locked revisions from mutable current lookups.
+
+## 4. Estimate Object Model (Architecture)
+The following are architecture objects for D-02 implementation planning. They are not implementation classes in this sprint.
+
+### 4.1 Aggregate Objects
 - Estimate
-- EstimatePackage
-- EstimateLine
-- MaterialCost
-- LaborCost
-- AccessoryCost
-- FreightCost
-- Allowance
-- Subtotal
-- Markup
-- Contingency
-- GrandTotal
+  - Stable project-scoped identity for an estimating container.
+  - Owns revision history and default active draft pointer.
+- EstimateRevision
+  - Immutable-or-draft revision record under one Estimate.
+  - Owns line items, diagnostics, and totals for one revision state.
+- EstimateLineItem
+  - Revision-scoped line record with quantity intent, product reference, and selected cost snapshot reference.
+- CostSnapshot
+  - Immutable snapshot of a D-01 cost selection decision at line scope.
+- CostRefreshResult
+  - Non-mutating comparison result between an existing snapshot and a reselection attempt.
 
-EstimateLine traceability fields:
-- source_object
-- object_type
-- manufacturer
-- model
-- description
-- quantity
-- pricing_status
-- labor_status
-- confidence
-- source_references
+### 4.2 Supporting Value Objects
+- EstimateDiagnostic
+  - code, severity, message, scope (estimate, revision, line), blocking flag, source refs.
+- EstimateTotals
+  - deterministic revision totals and confidence summary using Decimal-safe arithmetic.
+- SnapshotReference
+  - normalized reference set for vendor/offering/sheet/version/record identifiers.
+- RevisionComparison
+  - structured diff between revisions (added/removed/changed lines, cost/provenance deltas).
+- ManualSelectionMetadata
+  - reason, actor, timestamp, prior automatic result reference.
 
-## Product Resolution States
-Atlas currently models product resolution as:
-- exact_product
-- approved_substitute
-- preferred_alternate
-- generic_allowance
-- unknown_product
+### 4.3 Required Identities
+- estimate_id: stable, never reused, project-owned.
+- revision_id: immutable identity per revision.
+- revision_number: monotonic per estimate, no reuse.
+- line_item_id: immutable identity within revision lineage.
+- cost_snapshot_id: immutable identity tied to snapshot content hash and schema version.
 
-Unknown products are not eligible for deterministic pricing.
+### 4.4 Ownership and Relationships
+- Project 1 -> N Estimate
+- Estimate 1 -> N EstimateRevision
+- EstimateRevision 1 -> N EstimateLineItem
+- EstimateLineItem 0..1 -> 1 CostSnapshot
+- EstimateRevision 1 -> N EstimateDiagnostic
+- EstimateRevision 1 -> 1 EstimateTotals
+- EstimateRevision 0..N -> 0..N CostRefreshResult (history)
 
-## Cost Status Model
-Line-level cost status:
-- no_pricing
-- estimated
-- quoted
-- verified
-- expired
-- unavailable
+### 4.5 Mutability Rules
+- Estimate: mutable metadata, immutable identity.
+- Draft EstimateRevision: mutable line composition and snapshot references.
+- Locked/Superseded/Archived EstimateRevision: immutable.
+- CostSnapshot: immutable immediately after creation; never edited in place.
+- Diagnostics and totals are recomputed for draft, frozen at lock.
 
-Labor status uses the same deterministic status model.
+### 4.6 Audit Fields
+All mutable operations must capture:
+- created_at, created_by
+- updated_at, updated_by
+- locked_at, locked_by
+- superseded_at, superseded_by
+- reason fields for lock/supersede/manual selection/allowance use
 
-## Deterministic Pricing Engine (Sprint 10)
-Pricing engine outputs are separate from baseline estimate-line material snapshots.
+## 5. Relationship Diagram
+```mermaid
+flowchart LR
+  A[Project] --> B[Estimate]
+  B --> C[Estimate Revision]
+  C --> D[Estimate Line Item]
+  D --> E[Cost Snapshot]
+  C --> F[Estimate Totals]
+  C --> G[Estimate Diagnostics]
+  C --> H[Revision Comparison]
+  E --> I[Price Record]
+  E --> J[Price Sheet Version]
+  E --> K[Vendor Offering]
+```
 
-Pricing engine objects:
-- PricingResult
-- PricedEstimateLine
-- PriceSelection
-- PriceSelectionCandidate
-- PricingRule
-- PricingWarning
-- PricingSummary
-- CommercialCoverageSummary
+## 6. Estimate Lifecycle
+Lifecycle states:
+- draft
+- validating
+- ready
+- locked
+- superseded
+- archived
 
-Deterministic pricing statuses:
-- verified_current
-- quoted
-- current_price_sheet
-- historical_price
-- estimated_allowance
-- stale_price
-- expired_price
-- missing_from_latest_price_sheet
-- unavailable
-- no_pricing
-- manual_override
+Allowed transitions:
+- draft -> validating
+- validating -> draft
+- validating -> ready
+- ready -> draft
+- ready -> locked
+- locked -> superseded
+- superseded -> archived
 
-Deterministic pricing run metadata:
-- pricing_run_id
-- run_timestamp
-- pricing_policy_version
+No transition from locked/superseded/archived back to mutable states.
 
-Deterministic pricing exports:
-- Pricing Summary JSON
-- Priced BOM CSV
-- Commercial Coverage JSON
-- Pricing Exceptions CSV
+Finalized revisions may not be deleted. Archival is status-based retention.
 
-Pricing update impacts are advisory only (no silent repricing).
+### 6.1 Editability by State
+- draft:
+  - add/update/remove lines
+  - refresh snapshots
+  - manual source selection with reason
+  - recalculate totals
+- validating:
+  - no structural edits; validation execution only
+- ready:
+  - no implicit edits; explicit return to draft required
+- locked/superseded/archived:
+  - immutable data payload
 
-## Deterministic Cost Engine (Sprint 10)
-Cost engine outputs provide acquisition-cost-first deterministic selection with traceable vendor hierarchy.
+## 7. Revision Model
+Every material change must occur in a revision.
 
-Cost engine objects:
-- CostResult
-- CostLine
-- CostSelection
-- CostCandidate
-- CostSummary
-- CostConfidence
+Required revision fields:
+- revision_id
+- revision_number
+- estimate_id
+- parent_revision_id (nullable for first revision)
+- revision_reason
+- created_by, created_at
+- locked_by, locked_at
+- superseded_by_revision_id, superseded_at
+- ruleset versions (cost, estimate, snapshot schema)
 
-Cost statuses:
-- verified
-- quoted
-- current
-- historical
-- allowance
-- stale
-- expired
-- unavailable
-- missing
+Revision behavior:
+- create_revision may clone prior revision lines by value.
+- copied line snapshots remain referenced immutably until refreshed in draft.
+- recalculated data is explicit and traceable to operation type.
+- superseded revisions remain fully replayable.
 
-Out of scope remains explicit:
-- markup
-- sell pricing
-- margin strategy
-- proposal generation
+A revision never mutates historical commercial facts. It only records references to immutable commercial artifacts through CostSnapshot.
 
-## Labor Architecture
-Labor architecture categories are defined even when line-level labor values are empty:
-- receiving
-- staging
-- rack_build
-- installation
-- termination
-- programming
-- commissioning
-- testing
-- training
-- punch
+## 8. Estimate Line Item Architecture
+Each EstimateLineItem includes:
+- stable line_item_id
+- product reference (canonical product id)
+- descriptive snapshot fields (manufacturer, model, description)
+- requested_quantity
+- engineering_quantity
+- procurement_quantity
+- unit_of_measure
+- grouping references (section/system/room/origin object)
+- selected vendor, vendor offering, price record references
+- selected cost_snapshot_id
+- extended acquisition cost
+- source-selection status
+- diagnostics
+- user notes
+- manual source selection metadata
 
-## Accessory Architecture
-Accessory generation is architecture-only in Sprint 8.
+Descriptive snapshot fields are copied into the line to preserve readability even if shared Product metadata changes later.
 
-Placeholder categories:
-- Mounts
-- Cables
-- Connectors
-- Rack Hardware
-- Faceplates
-- Adapters
-- Power Supplies
-- Network Modules
+## 9. Cost Snapshot Schema
+CostSnapshot is immutable and created from CostSelectionResult plus line context.
 
-No automatic accessory generation is executed in this sprint.
+Required fields:
+- cost_snapshot_id
+- estimate_id, revision_id, line_item_id
+- product_id
+- vendor_id
+- vendor_offering_id
+- price_sheet_id
+- price_sheet_version_id
+- price_record_id
+- source_filename
+- source_file_hash
+- source_reference (row/page/region)
+- import_timestamp
+- purchasing_channel
+- source_currency
+- source_unit_cost
+- effective_unit_cost
+- requested_quantity
+- purchasable_quantity
+- package_count
+- excess_quantity
+- extended_acquisition_cost
+- effective_date
+- expiration_date
+- selection_rule
+- tie_break_sequence
+- confidence_score
+- confidence_breakdown
+- diagnostics
+- selection_timestamp
+- snapshot_created_at
+- cost_engine_ruleset_version
+- estimate_ruleset_version
+- snapshot_schema_version
 
-## Estimate Dashboard Model
-Estimate dashboard fields:
-- Material Cost
-- Labor Cost
-- Allowance Cost
-- Freight
-- Contingency
-- Known Cost %
-- Unknown Cost %
-- Resolved Products
-- Unresolved Products
-- Pricing Confidence
-- Overall Estimate Confidence
+Derived quantity rule:
+- excess_quantity = max(0, purchasable_quantity - requested_quantity)
 
-## Confidence Model
-Estimate confidence combines:
-- known pricing ratio
-- resolved product ratio
-- unpriced labor ratio
-- unknown quantity ratio
-- generic allowance ratio
+## 10. Snapshot Immutability Rules
+Creation events:
+- line cost selection in draft
+- explicit refresh acceptance in draft
+- revision clone (references existing snapshot by id unless refresh is executed)
 
-Confidence output includes explanatory messages describing observed gaps.
+Replacement rules:
+- draft line snapshot may be replaced only by explicit user acceptance.
+- locked revision snapshots are never replaced.
 
-## Navigation Model
-Estimate line navigation actions target:
-- Equipment
-- Specification
-- Drawing
-- Relationships
-- Evidence
+Correction handling:
+- corrected commercial pricing creates new commercial version and new snapshot in new draft revision.
+- prior snapshots remain queryable and replayable forever.
 
-Object detail headers include an explicit Open Estimate Workspace action to support source-to-estimate return navigation.
+Locking model:
+- locking occurs at revision scope.
+- line-level snapshots become effectively immutable as part of locked revision immutability.
 
-## Future Extension Points
-The deterministic estimate service defines extension interfaces for future, non-implemented integrations:
-- vendor registry
-- manufacturer registry
-- price lists
-- quote imports
-- labor rules
-- regional multipliers
-- sales tax
-- currency conversion
-- proposal generator
-- RFQ generator
-- accessory generation
+## 11. Cost Refresh Workflow
+Refresh is controlled and explicit.
 
-These are interface-only placeholders in Sprint 8.
+```mermaid
+flowchart TD
+  A[User requests refresh] --> B[Run D-01 select_cost with current commercial state]
+  B --> C[Build candidate new snapshot preview]
+  C --> D[Compare old vs new snapshot]
+  D --> E{User accepts?}
+  E -- No --> F[Keep existing snapshot]
+  E -- Yes, draft revision --> G[Persist new snapshot and update line]
+  E -- Yes, locked revision --> H[Create new draft revision then persist new snapshot]
+```
 
-Pricing extension points are implemented for Sprint 10 inputs:
-- preferred vendor policy hierarchy
-- project quote candidate inputs
-- explicit generic allowance map
-- manual override audit model
+Refresh output must show:
+- unit and extended cost deltas
+- vendor/vendor offering changes
+- purchasing channel changes
+- provenance field changes
+- confidence and diagnostic changes
+
+No silent refresh for historical revisions.
+
+## 12. Historical Replay and Reselection
+Historical replay:
+- reproduces exact locked revision payload from stored snapshots and frozen totals.
+- does not invoke live selection.
+
+Historical reselection:
+- reruns D-01 with specified as_of_date and selected commercial dataset/ruleset inputs.
+- produces comparison output only unless explicitly accepted into new draft revision.
+
+Atlas must distinguish:
+- selected_then: stored snapshot decision
+- selected_now: current rules/current commercial state reselection
+- selected_for_historical_date_current_rules
+- selected_for_historical_date_original_rules
+
+## 13. Ruleset Versioning
+Lightweight deterministic version identifiers:
+- cost_engine_ruleset_version (from D-01 policy/version)
+- estimate_calculation_ruleset_version
+- snapshot_schema_version
+
+Replay contract:
+- locked revision records these versions.
+- replay reads stored values and does not depend on current implicit defaults.
+
+## 14. Deterministic Totals
+Use Decimal-safe arithmetic for all totals.
+
+Required totals:
+- line extended acquisition cost
+- subtotal by section
+- subtotal by system
+- subtotal by room
+- estimate acquisition-cost total
+- unresolved-cost total
+- excluded-line total
+- warning counts by severity
+- confidence summary
+
+Excluded in D-02 totals:
+- sell price
+- margin
+- freight and escalation calculations
+- tax
+- labor rollup inference
+- assembly/accessory inference
+
+If labor/accessories appear as explicit imported line items, they may be totaled as explicit acquisition lines without inference.
+
+## 15. Manual Cost-Source Selection
+Manual selection behavior:
+- estimator may choose a persisted PriceRecord reference.
+- system validates with D-01 restriction and diagnostic model.
+- snapshot retains full provenance and warnings.
+- snapshot records automatic ranking bypass metadata.
+- prior automatic result reference is stored for comparison where available.
+
+D-02 does not allow arbitrary typed money overrides unless a separate controlled allowance object is introduced and approved.
+
+## 16. Allowances and Missing Costs
+Handled states:
+- no_eligible_cost
+- expired_cost_only
+- future_cost_only
+- unresolved_product
+- unsupported_currency
+- invalid_commercial_metadata
+- explicit_allowance
+
+Allowance lines:
+- separate source-selection status from sourced product lines.
+- require reason, actor, timestamp, approval state.
+- cannot fabricate PriceRecord identifiers.
+- use allowance provenance object with explicit allowance_source_class.
+
+## 17. Validation and Readiness
+Validation categories:
+- errors (lock-blocking)
+- warnings (review-required)
+- informational
+
+Representative lock-blocking rules:
+- missing product reference where required
+- missing snapshot on priced-required lines
+- unresolved product references
+- unsupported currency
+- invalid quantities
+- missing required provenance fields
+- mutable reference detected for finalized revision
+- blocked diagnostics present
+- manual selection missing reason
+
+Validation flow:
+```mermaid
+flowchart TD
+  A[Validate Revision] --> B[Line-level checks]
+  B --> C[Snapshot integrity checks]
+  C --> D[Totals recomputation checks]
+  D --> E[Diagnostic classification]
+  E --> F{Blocking errors?}
+  F -- Yes --> G[State remains draft]
+  F -- No --> H[State ready]
+```
+
+## 18. Service API Contracts (Design Only)
+Proposed repository-consistent API surface:
+- create_estimate
+- create_revision
+- add_line_item
+- update_draft_line_item
+- remove_draft_line_item
+- select_line_cost
+- create_cost_snapshot
+- refresh_line_cost
+- refresh_revision_costs
+- compare_cost_snapshots
+- validate_revision
+- calculate_revision_totals
+- lock_revision
+- clone_revision
+- replay_revision
+- list_revision_history
+
+Contract rules:
+- explicit request/response objects
+- deterministic errors and diagnostics
+- no implicit mutating side effects outside declared operation
+
+## 19. Transaction Boundaries
+Atomic operations required:
+- create revision
+- add/update/remove line item
+- create snapshot
+- refresh one line
+- refresh all lines in revision
+- lock revision
+- clone revision
+
+Rollback requirement:
+- failed operation leaves prior state intact.
+- no partially locked revision.
+- no partially refreshed revision accepted as complete.
+
+## 20. UI Architecture (Design Only)
+Estimate workspace panels using existing Atlas patterns:
+- estimate list
+- revision selector
+- line-item table
+- cost-source inspector
+- provenance drawer
+- diagnostics panel
+- totals panel
+- refresh comparison panel
+- revision comparison panel
+- lock workflow
+- Mission Control recommendations
+
+Primary user questions answered:
+- which estimate and revision are active
+- what is missing or invalid
+- what changed vs prior revision
+- what actions are required to become lock-ready
+- confidence and diagnostic posture
+
+## 21. Mission Control Recommendations
+Deterministic recommendations include:
+- estimate has missing costs
+- expired source pricing detected
+- unresolved products present
+- unsupported currency detected
+- stale draft revision age threshold exceeded
+- cost refresh available
+- revision ready to lock
+- locked revision superseded by newer pricing imports
+- allowance lines requiring review
+
+## 22. Backward Compatibility Strategy
+Compatibility targets:
+- current project BOM data
+- existing estimate objects and services
+- D-01 cost APIs
+- Epic C commercial history model
+- serialized project files
+- existing reports and routes
+
+Adapter posture:
+- preserve existing Estimate service outputs.
+- add revision-aware wrappers and persistence adapters.
+- maintain old read paths during transition, then stage deprecation by versioned persistence flags.
+
+Likely staged deprecations:
+- single-estimate-per-project assumptions
+- non-revisioned cost fields on transient BOM rows once revision snapshots become authoritative
+
+## 23. Persistence Architecture (Design)
+Persisted objects:
+- estimates
+- estimate_revisions
+- estimate_line_items
+- cost_snapshots
+- revision_diagnostics
+- revision_totals
+- revision_comparisons
+- refresh_results
+
+Immutability:
+- locked revisions immutable
+- cost_snapshots immutable
+
+Indexes and uniqueness:
+- unique (estimate_id)
+- unique (estimate_id, revision_number)
+- unique (revision_id, line_item_id)
+- unique (cost_snapshot_id)
+- index by project_id, estimate_id, revision_state, updated_at
+- index by snapshot provenance keys (price_record_id, price_sheet_version_id)
+
+Foreign-key behavior:
+- revision references estimate (restrict delete)
+- line references revision (cascade on draft-only purge operations if allowed)
+- snapshot references revision and line (restrict delete)
+
+Deletion restrictions:
+- locked/superseded/archived revisions not physically deleted.
+- archive flags preferred over hard delete.
+
+Migration strategy (planned, not implemented here):
+- additive schema first
+- dual-write optional transition window
+- backfill snapshots for latest draft where feasible
+- enable revision lock once validation parity confirmed
+
+Source-reference retention:
+- preserve source row/page metadata from snapshot provenance without relying on mutable external files.
+
+## 24. Test Strategy for D-02 Implementation
+Required test groups:
+- object lifecycle and transitions
+- revision creation/clone/supersede behavior
+- snapshot immutability
+- historical replay fidelity
+- refresh comparison and acceptance flows
+- Decimal totals
+- transaction rollback integrity
+- allowance handling
+- validation and lock blocking
+- backward compatibility adapters
+- UI critical paths
+- Mission Control recommendation determinism
+
+Recommended test phases:
+1. domain and service contract tests
+2. persistence and transaction tests
+3. replay and refresh regression snapshots
+4. UI workflow tests
+5. backward compatibility and migration dry-run tests
+
+## 25. Implementation Order (Recommended)
+1. Revision and snapshot domain contracts
+2. Persistence schema and repositories (additive)
+3. create_estimate/create_revision/clone_revision/list_revision_history
+4. line item CRUD in draft
+5. select_line_cost + create_cost_snapshot integration with D-01
+6. totals + validation
+7. lock workflow and immutability enforcement
+8. refresh_line_cost and refresh_revision_costs
+9. replay and comparison services
+10. Mission Control recommendation integration
+11. compatibility adapters and staged deprecations
+
+## 26. Migration Considerations
+Planned migration sequence:
+1. create estimate/revision tables and snapshot storage
+2. backfill current active estimate views into revision 1 drafts
+3. derive snapshots for lines with existing D-01 trace references where lossless
+4. mark unbackfillable lines with diagnostics requiring refresh
+5. enable lock operation only after validation completeness gates are green
+
+## 27. Risks
+Highest-risk areas:
+- preserving replay fidelity across ruleset evolution
+- dual-state behavior during compatibility transition
+- enforcing immutability without blocking practical refresh workflows
+- snapshot schema drift and partial provenance
+- transaction safety for bulk refresh and lock operations
+
+## 28. Open Design Questions
+1. Should draft snapshot replacement keep a full replacement chain per line or only prior pointer plus audit log?
+2. Are lock approvals single-step or role-gated dual approval for high-value revisions?
+3. What threshold defines stale draft revision for Mission Control recommendations?
+4. Should refresh-all support partial acceptance batches or require full revision acceptance?
+5. How should archived revisions participate in default revision comparison UX?
+
+## 29. Go/No-Go Recommendation
+Go for D-02 implementation planning and phased execution.
+
+Rationale:
+- D-01 dependency contracts are explicit and stable.
+- D-02 object model, lifecycle, immutability, replay, refresh, validation, transaction boundaries, and compatibility posture are defined.
+- Major design risks are identified with test and migration phases.
+
+Gate before coding:
+- finalize unresolved design questions above
+- approve migration cutover policy
+- approve lock governance policy

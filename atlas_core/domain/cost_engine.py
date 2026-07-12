@@ -38,6 +38,21 @@ class CostFreshness(str, Enum):
     UNKNOWN = "unknown"
 
 
+class CostSelectionResultStatus(str, Enum):
+    SELECTED = "selected"
+    SELECTED_WITH_WARNINGS = "selected_with_warnings"
+    NO_ELIGIBLE_COST = "no_eligible_cost"
+    EXPIRED_COST_ONLY = "expired_cost_only"
+    FUTURE_COST_ONLY = "future_cost_only"
+    CONFLICTING_COSTS = "conflicting_costs"
+    UNSUPPORTED_CURRENCY = "unsupported_currency"
+    INVALID_QUANTITY = "invalid_quantity"
+    UNRESOLVED_PRODUCT = "unresolved_product"
+    INACTIVE_PRODUCT = "inactive_product"
+    MANUAL_SELECTION_INVALID = "manual_selection_invalid"
+    INVALID_COMMERCIAL_METADATA = "invalid_commercial_metadata"
+
+
 @dataclass
 class CostCandidate:
     candidate_id: str
@@ -60,6 +75,16 @@ class CostCandidate:
     reason: str
     availability: str
     confidence: float
+    source_class: str = "commercial_record"
+    candidate_fingerprint: str = ""
+    unit_of_measure: str = "ea"
+    pack_quantity: int | None = None
+    minimum_order_quantity: int | None = None
+    purchase_multiple: int | None = None
+    normalized_unit_cost: float | None = None
+    purchasing_quantity: float | None = None
+    selected: bool = False
+    rejected_reason: str = ""
 
     def __post_init__(self) -> None:
         self.candidate_id = _required("candidate_id", self.candidate_id)
@@ -92,6 +117,31 @@ class CostCandidate:
         self.reason = _required("reason", self.reason)
         self.availability = _safe(self.availability)
         self.confidence = _rate("confidence", self.confidence)
+        self.source_class = _safe(self.source_class) or "commercial_record"
+        self.candidate_fingerprint = _safe(self.candidate_fingerprint)
+        self.unit_of_measure = _safe(self.unit_of_measure) or "ea"
+        if self.pack_quantity is not None:
+            self.pack_quantity = _non_negative_int("pack_quantity", self.pack_quantity)
+        if self.minimum_order_quantity is not None:
+            self.minimum_order_quantity = _non_negative_int(
+                "minimum_order_quantity", self.minimum_order_quantity
+            )
+        if self.purchase_multiple is not None:
+            self.purchase_multiple = _non_negative_int(
+                "purchase_multiple", self.purchase_multiple
+            )
+        self.normalized_unit_cost = (
+            None
+            if self.normalized_unit_cost is None
+            else _non_negative_float("normalized_unit_cost", self.normalized_unit_cost)
+        )
+        self.purchasing_quantity = (
+            None
+            if self.purchasing_quantity is None
+            else _non_negative_float("purchasing_quantity", self.purchasing_quantity)
+        )
+        self.selected = bool(self.selected)
+        self.rejected_reason = _safe(self.rejected_reason)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -115,6 +165,16 @@ class CostCandidate:
             "reason": self.reason,
             "availability": self.availability,
             "confidence": self.confidence,
+            "source_class": self.source_class,
+            "candidate_fingerprint": self.candidate_fingerprint,
+            "unit_of_measure": self.unit_of_measure,
+            "pack_quantity": self.pack_quantity,
+            "minimum_order_quantity": self.minimum_order_quantity,
+            "purchase_multiple": self.purchase_multiple,
+            "normalized_unit_cost": self.normalized_unit_cost,
+            "purchasing_quantity": self.purchasing_quantity,
+            "selected": self.selected,
+            "rejected_reason": self.rejected_reason,
         }
 
 
@@ -184,6 +244,17 @@ class CostLine:
     days_since_import: int | None
     source_file: str
     source_row: int | None
+    price_sheet_id: str | None = None
+    source_filename: str = ""
+    selection_rule_id: str = ""
+    selection_timestamp: str = ""
+    as_of_date: str = ""
+    policy_version: str = ""
+    candidate_fingerprint: str = ""
+    vendor_id: str | None = None
+    vendor_name: str | None = None
+    purchasing_quantity: float | None = None
+    quantity_uom: str = "ea"
     warnings: list[str] = field(default_factory=list)
     confidence: CostConfidence | None = None
     selection: CostSelection | None = None
@@ -226,6 +297,21 @@ class CostLine:
         self.source_file = _safe(self.source_file)
         if self.source_row is not None:
             self.source_row = _non_negative_int("source_row", self.source_row)
+        self.price_sheet_id = _safe(self.price_sheet_id) or None
+        self.source_filename = _safe(self.source_filename) or self.source_file
+        self.selection_rule_id = _safe(self.selection_rule_id)
+        self.selection_timestamp = _safe(self.selection_timestamp)
+        self.as_of_date = _safe(self.as_of_date)
+        self.policy_version = _safe(self.policy_version)
+        self.candidate_fingerprint = _safe(self.candidate_fingerprint)
+        self.vendor_id = _safe(self.vendor_id) or None
+        self.vendor_name = _safe(self.vendor_name) or self.vendor
+        self.purchasing_quantity = (
+            None
+            if self.purchasing_quantity is None
+            else _non_negative_float("purchasing_quantity", self.purchasing_quantity)
+        )
+        self.quantity_uom = _safe(self.quantity_uom) or "ea"
         self.warnings = [_required("warning", item) for item in self.warnings]
         if self.confidence is not None and not isinstance(
             self.confidence, CostConfidence
@@ -262,6 +348,17 @@ class CostLine:
             "days_since_import": self.days_since_import,
             "source_file": self.source_file,
             "source_row": self.source_row,
+            "price_sheet_id": self.price_sheet_id,
+            "source_filename": self.source_filename,
+            "selection_rule_id": self.selection_rule_id,
+            "selection_timestamp": self.selection_timestamp,
+            "as_of_date": self.as_of_date,
+            "policy_version": self.policy_version,
+            "candidate_fingerprint": self.candidate_fingerprint,
+            "vendor_id": self.vendor_id,
+            "vendor_name": self.vendor_name,
+            "purchasing_quantity": self.purchasing_quantity,
+            "quantity_uom": self.quantity_uom,
             "warnings": list(self.warnings),
             "confidence": (
                 self.confidence.to_dict() if self.confidence is not None else None
@@ -444,6 +541,268 @@ class CostResult:
                 if self.commercial_coverage is not None
                 else None
             ),
+        }
+
+
+@dataclass
+class CostEvaluationRequest:
+    estimate: Any
+    product_resolutions: list[dict[str, Any]]
+    commercial_state: dict[str, Any]
+    project_id: str
+    preferred_vendor_policy: dict[str, Any] = field(default_factory=dict)
+    project_quotes: list[dict[str, Any]] = field(default_factory=list)
+    allowances: dict[str, float] = field(default_factory=dict)
+    vendor_type_overrides: dict[str, str] = field(default_factory=dict)
+    quick_add_products: list[dict[str, Any]] = field(default_factory=list)
+    manual_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
+    eligibility_state: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.project_id = _required("project_id", self.project_id)
+        self.product_resolutions = [
+            dict(item) for item in list(self.product_resolutions)
+        ]
+        self.project_quotes = [dict(item) for item in list(self.project_quotes)]
+        self.quick_add_products = [dict(item) for item in list(self.quick_add_products)]
+
+
+@dataclass
+class CostEvaluationResult:
+    result: CostResult
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.result, CostResult):
+            self.result = CostResult(**self.result)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"result": self.result.to_dict()}
+
+
+@dataclass
+class CostSelectionDiagnostic:
+    code: str
+    severity: str
+    message: str
+
+    def __post_init__(self) -> None:
+        self.code = _required("code", self.code)
+        self.severity = _required("severity", self.severity)
+        self.message = _required("message", self.message)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "code": self.code,
+            "severity": self.severity,
+            "message": self.message,
+        }
+
+
+@dataclass
+class CostProvenance:
+    product_id: str
+    vendor: str
+    vendor_offering_id: str
+    price_sheet_id: str
+    price_sheet_version_id: str
+    price_record_id: str
+    source_filename: str
+    source_file_hash: str
+    import_timestamp: str
+    effective_date: str
+    expiration_date: str
+    source_reference: str
+    selection_rule: str
+    selection_timestamp: str
+
+    def __post_init__(self) -> None:
+        self.product_id = _safe(self.product_id)
+        self.vendor = _safe(self.vendor)
+        self.vendor_offering_id = _safe(self.vendor_offering_id)
+        self.price_sheet_id = _safe(self.price_sheet_id)
+        self.price_sheet_version_id = _safe(self.price_sheet_version_id)
+        self.price_record_id = _safe(self.price_record_id)
+        self.source_filename = _safe(self.source_filename)
+        self.source_file_hash = _safe(self.source_file_hash)
+        self.import_timestamp = _safe(self.import_timestamp)
+        self.effective_date = _safe(self.effective_date)
+        self.expiration_date = _safe(self.expiration_date)
+        self.source_reference = _safe(self.source_reference)
+        self.selection_rule = _safe(self.selection_rule)
+        self.selection_timestamp = _safe(self.selection_timestamp)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "product_id": self.product_id,
+            "vendor": self.vendor,
+            "vendor_offering_id": self.vendor_offering_id,
+            "price_sheet_id": self.price_sheet_id,
+            "price_sheet_version_id": self.price_sheet_version_id,
+            "price_record_id": self.price_record_id,
+            "source_filename": self.source_filename,
+            "source_file_hash": self.source_file_hash,
+            "import_timestamp": self.import_timestamp,
+            "effective_date": self.effective_date,
+            "expiration_date": self.expiration_date,
+            "source_reference": self.source_reference,
+            "selection_rule": self.selection_rule,
+            "selection_timestamp": self.selection_timestamp,
+        }
+
+
+@dataclass
+class CostSelectionRequest:
+    product_id: str
+    requested_quantity: float
+    as_of_date: str
+    preferred_vendor: str = ""
+    preferred_vendor_offering_id: str = ""
+    preferred_purchasing_channel: str = ""
+    permitted_purchasing_channels: list[str] = field(default_factory=list)
+    price_sheet_id: str = ""
+    currency: str = "USD"
+    manual_price_record_id: str = ""
+    context_metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.product_id = _required("product_id", self.product_id)
+        self.requested_quantity = _non_negative_float(
+            "requested_quantity", self.requested_quantity
+        )
+        self.as_of_date = _required("as_of_date", self.as_of_date)
+        self.preferred_vendor = _safe(self.preferred_vendor)
+        self.preferred_vendor_offering_id = _safe(self.preferred_vendor_offering_id)
+        self.preferred_purchasing_channel = _safe(self.preferred_purchasing_channel)
+        self.permitted_purchasing_channels = [
+            _safe(item)
+            for item in list(self.permitted_purchasing_channels)
+            if _safe(item)
+        ]
+        self.price_sheet_id = _safe(self.price_sheet_id)
+        self.currency = _safe(self.currency) or "USD"
+        self.manual_price_record_id = _safe(self.manual_price_record_id)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "product_id": self.product_id,
+            "requested_quantity": self.requested_quantity,
+            "as_of_date": self.as_of_date,
+            "preferred_vendor": self.preferred_vendor,
+            "preferred_vendor_offering_id": self.preferred_vendor_offering_id,
+            "preferred_purchasing_channel": self.preferred_purchasing_channel,
+            "permitted_purchasing_channels": list(self.permitted_purchasing_channels),
+            "price_sheet_id": self.price_sheet_id,
+            "currency": self.currency,
+            "manual_price_record_id": self.manual_price_record_id,
+            "context_metadata": dict(self.context_metadata),
+        }
+
+
+@dataclass
+class CostSelectionResult:
+    request: CostSelectionRequest
+    status: CostSelectionResultStatus
+    selected_candidate: CostCandidate | None
+    rejected_candidates: list[CostCandidate] = field(default_factory=list)
+    normalized_requested_quantity: float = 0.0
+    purchasable_quantity: float = 0.0
+    package_count: int = 0
+    selected_source_unit_cost: float | None = None
+    effective_per_unit_cost: float | None = None
+    extended_acquisition_cost: float = 0.0
+    selection_rule: str = ""
+    tie_break_sequence: list[str] = field(default_factory=list)
+    deterministic_confidence: float = 0.0
+    confidence_breakdown: dict[str, Any] = field(default_factory=dict)
+    diagnostics: list[CostSelectionDiagnostic] = field(default_factory=list)
+    provenance: CostProvenance | None = None
+    selection_timestamp: str = ""
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.request, CostSelectionRequest):
+            self.request = CostSelectionRequest(**self.request)
+        if not isinstance(self.status, CostSelectionResultStatus):
+            self.status = CostSelectionResultStatus(self.status)
+        if self.selected_candidate is not None and not isinstance(
+            self.selected_candidate, CostCandidate
+        ):
+            self.selected_candidate = CostCandidate(**self.selected_candidate)
+        self.rejected_candidates = [
+            item if isinstance(item, CostCandidate) else CostCandidate(**item)
+            for item in list(self.rejected_candidates)
+        ]
+        self.normalized_requested_quantity = _non_negative_float(
+            "normalized_requested_quantity", self.normalized_requested_quantity
+        )
+        self.purchasable_quantity = _non_negative_float(
+            "purchasable_quantity", self.purchasable_quantity
+        )
+        self.package_count = _non_negative_int("package_count", self.package_count)
+        self.selected_source_unit_cost = (
+            None
+            if self.selected_source_unit_cost is None
+            else _non_negative_float(
+                "selected_source_unit_cost", self.selected_source_unit_cost
+            )
+        )
+        self.effective_per_unit_cost = (
+            None
+            if self.effective_per_unit_cost is None
+            else _non_negative_float(
+                "effective_per_unit_cost", self.effective_per_unit_cost
+            )
+        )
+        self.extended_acquisition_cost = _non_negative_float(
+            "extended_acquisition_cost", self.extended_acquisition_cost
+        )
+        self.selection_rule = _safe(self.selection_rule)
+        self.tie_break_sequence = [
+            _safe(item) for item in list(self.tie_break_sequence) if _safe(item)
+        ]
+        self.deterministic_confidence = _rate(
+            "deterministic_confidence", self.deterministic_confidence
+        )
+        self.diagnostics = [
+            (
+                item
+                if isinstance(item, CostSelectionDiagnostic)
+                else CostSelectionDiagnostic(**item)
+            )
+            for item in list(self.diagnostics)
+        ]
+        if self.provenance is not None and not isinstance(
+            self.provenance, CostProvenance
+        ):
+            self.provenance = CostProvenance(**self.provenance)
+        self.selection_timestamp = _safe(self.selection_timestamp)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "request": self.request.to_dict(),
+            "status": self.status.value,
+            "selected_candidate": (
+                self.selected_candidate.to_dict()
+                if self.selected_candidate is not None
+                else None
+            ),
+            "rejected_candidates": [
+                item.to_dict() for item in self.rejected_candidates
+            ],
+            "normalized_requested_quantity": self.normalized_requested_quantity,
+            "purchasable_quantity": self.purchasable_quantity,
+            "package_count": self.package_count,
+            "selected_source_unit_cost": self.selected_source_unit_cost,
+            "effective_per_unit_cost": self.effective_per_unit_cost,
+            "extended_acquisition_cost": self.extended_acquisition_cost,
+            "selection_rule": self.selection_rule,
+            "tie_break_sequence": list(self.tie_break_sequence),
+            "deterministic_confidence": self.deterministic_confidence,
+            "confidence_breakdown": dict(self.confidence_breakdown),
+            "diagnostics": [item.to_dict() for item in self.diagnostics],
+            "provenance": (
+                self.provenance.to_dict() if self.provenance is not None else None
+            ),
+            "selection_timestamp": self.selection_timestamp,
         }
 
 

@@ -17,7 +17,7 @@ Atlas is a complete project lifecycle platform for commercial AV, theatrical, th
 Atlas scope spans:
 - Lead
 - Opportunity
-- Bid Intelligence
+- Bid Package
 - Estimating
 - Proposal
 - Award
@@ -193,10 +193,25 @@ Status legend:
 - Relationships: contains Estimate Line and Labor Estimate; informs Proposal.
 - Lifecycle Role: Primary commercial model before award.
 
-### Estimate Line
-- Purpose: Atomic estimate scope/cost entry.
-- Relationships: belongs to Estimate; references Equipment, Product, System, Room, Area.
-- Lifecycle Role: Unit of continuity for downstream order and financial mapping.
+### Estimate Revision (D-02 Implemented)
+- Purpose: Immutable-or-draft revision container for material estimate changes.
+- Relationships: belongs to Estimate; owns Estimate Line Item, Cost Snapshot, Estimate Totals, Estimate Diagnostic.
+- Lifecycle Role: Deterministic history and replay boundary for estimating decisions.
+
+### Estimate Line Item (D-02 Implemented)
+- Purpose: Revision-scoped atomic estimating entry with quantity intent and selected cost snapshot reference.
+- Relationships: belongs to Estimate Revision; references Equipment, Product, System, Room, Area, Cost Snapshot.
+- Lifecycle Role: Stable unit for revision comparison and lock readiness.
+
+### Cost Snapshot (D-02 Implemented)
+- Purpose: Immutable record of D-01 cost selection and provenance at line scope.
+- Relationships: belongs to Estimate Revision and Estimate Line Item; references Vendor Offering, Price Sheet Version, Price Record.
+- Lifecycle Role: Guarantees deterministic historical replay independent of mutable current commercial views.
+
+### Estimate Diagnostic (D-02 Implemented)
+- Purpose: Deterministic readiness and validation signal at estimate/revision/line scope.
+- Relationships: belongs to Estimate Revision; references line and snapshot context when applicable.
+- Lifecycle Role: Lock-blocking and advisory quality governance for revision transitions.
 
 ### Product Resolution
 - Purpose: Deterministic canonical-product mapping record between scoped Equipment and estimate preparation.
@@ -207,6 +222,12 @@ Status legend:
 - Purpose: Immutable commercial history layer for product availability and versioned pricing records.
 - Relationships: links Manufacturer, Product, Vendor, Vendor Offering, Price Sheet, Price Sheet Version, and Price Record.
 - Lifecycle Role: preserves historical commercial context for deterministic estimate readiness and historical bid recreation without mutating prior imports.
+
+### Cost Selection (D-01)
+- Purpose: Deterministic acquisition cost selection contract layer for estimate lines and inspector workflows.
+- Relationships: consumes Commercial Knowledge history and Product Resolution outputs; emits selected and rejected cost candidates plus provenance/diagnostics.
+- Core objects: CostSelectionRequest, CostSelectionResult, CostProvenance, CostSelectionDiagnostic, CostSelectionResultStatus.
+- Lifecycle Role: D-01 implementation object set and dependency contract for D-02 snapshots.
 
 ### Labor Estimate
 - Purpose: Labor hours and confidence model.
@@ -312,300 +333,3 @@ Status legend:
 - Purpose: Turnover bundle of final project artifacts.
 - Relationships: linked to Project, Commissioning Record, Asset, Warranty.
 - Lifecycle Role: Completion and handover record.
-
-### Warranty
-- Purpose: Coverage terms and obligations.
-- Relationships: linked to Contract, Product, Manufacturer, Asset, Service Ticket.
-- Lifecycle Role: Post-closeout entitlement and risk transfer.
-
-### Asset
-- Purpose: Installed and maintainable operational instance.
-- Relationships: derived from Equipment and Product; linked to Commissioning Record, Warranty, Service Ticket.
-- Lifecycle Role: Long-lived field object through service lifecycle.
-
-### Service Ticket
-- Purpose: Post-install service work record.
-- Relationships: linked to Asset, Warranty, Contact, Issue, Knowledge Record.
-- Lifecycle Role: Service execution and customer support flow.
-
-### Knowledge Record
-- Purpose: Reusable knowledge from project and service outcomes.
-- Relationships: linked to Project, Evidence, Issue, Service Ticket, Asset.
-- Lifecycle Role: Knowledge archive and continuous improvement engine.
-
-## 5. Object Relationships
-```text
-Organization
-	|
-	+-- Contact
-	|
-	+-- Opportunity
-			 |
-			 +-- Bid Package
-			 |    +-- Document
-			 |    |    +-- Drawing
-			 |    |    +-- Specification
-			 |    |    +-- Addendum
-			 |    |    +-- Schedule
-			 |    +-- Evidence
-			 |    +-- Engineering Assumption
-			 |    +-- RFI Candidate
-			 |
-			 +-- Estimate
-						+-- Estimate Line
-						+-- Labor Estimate
-						+-- Proposal
-
-Award
-	|
-	v
-Project
-	+-- Project Phase
-	+-- Project Workspace
-	+-- Systems
-	+-- Equipment
-	+-- Financials
-	|    +-- Contract
-	|    +-- Sales Order
-	|    +-- Invoice
-	|    +-- Vendor Bill
-	|    +-- Payment
-	|    +-- Receipt
-	|    +-- Budget
-	|    +-- Forecast
-	+-- Procurement
-	|    +-- Purchase Order
-	|    +-- Vendor
-	|    +-- Manufacturer
-	|    +-- Product
-	|    +-- Shipment
-	|    +-- Receiving Record
-	+-- Construction
-	|    +-- Room
-	|    +-- Area
-	|    +-- Issue
-	|    +-- Punch Item
-	+-- Commissioning Record
-	+-- Closeout Package
-	+-- Warranty
-	+-- Asset
-	+-- Service Ticket
-	+-- Knowledge Record
-```
-
-## 6. Object Continuity
-Objects should evolve through lifecycle stages rather than being recreated as disconnected data.
-
-Continuity example:
-```text
-Equipment
-	|
-	v
-Estimate Line
-	|
-	v
-Purchase Order
-	|
-	v
-Receiving
-	|
-	v
-Installed Asset
-	|
-	v
-Commissioning
-	|
-	v
-Warranty
-	|
-	v
-Service
-```
-
-Same object. Different lifecycle stage.
-
-## 7. Services vs Business Objects
-
-### Business Objects
-Business objects are persistent records that survive lifecycle transitions.
-
-Examples:
-- Project
-- Equipment
-- Estimate
-- Purchase Order
-- Asset
-- Service Ticket
-- Knowledge Record
-
-### Services
-Services execute workflows on top of business objects and should not replace durable object identity.
-
-Service examples:
-- Atlas Intake
-- Bid Intelligence
-- Estimator Review
-- Revision Comparison
-- Knowledge Graph
-- Reporting
-- Search
-
-Services operate on business objects and emit derived outputs, but authoritative records remain in business object stores.
-
-## 8. Atlas Modules
-
-### Atlas Intake
-- Purpose: Deterministic file intake and classification.
-- Primary objects: Bid Package, Document, Drawing, Specification, Addendum, Schedule, Evidence.
-- Implementation status: Implemented.
-
-### Atlas Projects
-- Purpose: Project-level workspace, lifecycle state, and continuity orchestration.
-- Primary objects: Project, Project Phase, Project Workspace.
-- Implementation status: Partial.
-
-### Atlas Bid Intelligence
-- Purpose: Risk, readiness, and advisory analysis during bidding.
-- Primary objects: Bid Package, Engineering Assumption, RFI Candidate, Evidence.
-- Implementation status: Implemented.
-
-### Atlas Estimating
-- Purpose: Scope-cost modeling and labor estimation.
-- Primary objects: Estimate, Estimate Line, Labor Estimate, Equipment, System.
-- Implementation status: Partial.
-
-### Atlas Engineering
-- Purpose: Technical development and approvals after award.
-- Primary objects: Project Phase, System, Submittal, Issue.
-- Implementation status: Planned.
-
-### Atlas Procurement
-- Purpose: Buy-side execution and supply coordination.
-- Primary objects: Purchase Order, Vendor, Manufacturer, Product, Shipment, Receiving Record.
-- Implementation status: Planned.
-
-### Atlas Financials
-- Purpose: Commercial and accounting records.
-- Primary objects: Contract, Sales Order, Invoice, Vendor Bill, Payment, Receipt, Budget, Forecast.
-- Implementation status: Planned.
-
-### Atlas Construction
-- Purpose: Field execution and installation controls.
-- Primary objects: Project, Room, Area, Equipment, Issue, Punch Item.
-- Implementation status: Planned.
-
-### Atlas Closeout
-- Purpose: Turnover and completion package management.
-- Primary objects: Closeout Package, Commissioning Record, Asset, Warranty.
-- Implementation status: Planned.
-
-### Atlas Service
-- Purpose: Post-closeout support operations.
-- Primary objects: Service Ticket, Asset, Warranty, Knowledge Record.
-- Implementation status: Planned.
-
-### Atlas Knowledge Graph
-- Purpose: Cross-project knowledge reuse and linkage.
-- Primary objects: Knowledge Record, Evidence, Asset, Issue.
-- Implementation status: Planned.
-
-### Atlas Reporting
-- Purpose: Cross-module analytics, dashboards, and exports.
-- Primary objects: Estimate, Forecast, Issue, Service Ticket, Knowledge Record.
-- Implementation status: Partial.
-
-### Atlas Administration
-- Purpose: Tenant configuration, policies, and access management.
-- Primary objects: Organization, Contact, workspace policy objects.
-- Implementation status: Deferred.
-
-## 9. Phase Boundaries
-Current implementation remains Phase 2 Bid Intelligence.
-
-Implemented (Phase 2):
-- Document Intake
-- Project Snapshot
-- Bid Package Review
-- Engineering Assumptions
-- Readiness
-- Estimator Brief
-- RFI Candidates
-- Labor Estimate
-- Revision Comparison
-- Evidence
-- Workspace Prototype
-
-Deferred:
-- Procurement
-- Financials
-- Project Execution
-- Scheduling
-- Receiving
-- Commissioning
-- Closeout
-- Warranty
-- Service
-
-## 10. Source of Truth
-Ownership expectations:
-- Documents: canonical document and metadata records.
-- Evidence: immutable trace links between outputs and sources.
-- Project Metadata: authoritative project master profile.
-- Estimate: authoritative pre-award estimating record with revisions.
-- Financials: authoritative only after award conversion and financial execution.
-- Assets: authoritative installed and maintained device records.
-- Knowledge: reusable outcome and service intelligence records.
-
-Clarifications:
-- Phase 2 intelligence is advisory only.
-- Financial records become authoritative only after project award and downstream execution workflows.
-
-## 11. Cloud Architecture Considerations
-Future architecture should support:
-- Local Workspace
-- Shared Workspace
-- S3 Storage
-- Project History
-- Audit Trail
-- Role-Based Access
-- Organization Workspaces
-- Remote Collaboration
-
-These are architecture targets only and are not implemented in this phase.
-
-## 12. UX Implications
-Atlas Workspace should be project-centric rather than document-centric.
-
-Long-term navigation should support:
-1. Home
-2. Projects
-3. Documents
-4. Estimating
-5. Engineering
-6. Procurement
-7. Financials
-8. Construction
-9. Closeout
-10. Service
-11. Reports
-12. Administration
-
-Phase 2 interfaces may expose only implemented sections and omit or disable future sections.
-
-## 13. Architecture Rules
-- Business objects must survive lifecycle transitions.
-- Services should remain stateless where practical.
-- Source traceability must always be preserved.
-- Do not duplicate durable objects.
-- Do not hardcode reference projects.
-- Cloud infrastructure should remain behind adapters.
-- Maintain deterministic behavior whenever possible.
-
-## Related Documents
-- [PRODUCT_VISION.md](PRODUCT_VISION.md)
-- [ROADMAP.md](ROADMAP.md)
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-- [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)
-- [PHASE2_BASELINE.md](PHASE2_BASELINE.md)
-- [PHASE2_GUI.md](PHASE2_GUI.md)
-- [CODEX_WORKFLOW.md](CODEX_WORKFLOW.md)

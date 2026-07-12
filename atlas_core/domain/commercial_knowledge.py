@@ -182,6 +182,11 @@ class PriceRecord:
     expiration_date: str
     confidence: float
     source_row: int
+    unit_of_measure: str = "ea"
+    pack_quantity: int | None = None
+    minimum_order_quantity: int | None = None
+    purchase_multiple: int | None = None
+    active: bool = True
     notes: str = ""
 
     def __post_init__(self) -> None:
@@ -198,6 +203,18 @@ class PriceRecord:
         self.expiration_date = _safe(self.expiration_date)
         self.confidence = _rate("confidence", self.confidence)
         self.source_row = _non_negative_int("source_row", self.source_row)
+        self.unit_of_measure = _safe(self.unit_of_measure, "ea")
+        if self.pack_quantity is not None:
+            self.pack_quantity = _non_negative_int("pack_quantity", self.pack_quantity)
+        if self.minimum_order_quantity is not None:
+            self.minimum_order_quantity = _non_negative_int(
+                "minimum_order_quantity", self.minimum_order_quantity
+            )
+        if self.purchase_multiple is not None:
+            self.purchase_multiple = _non_negative_int(
+                "purchase_multiple", self.purchase_multiple
+            )
+        self.active = bool(self.active)
         self.notes = _safe(self.notes)
 
     def to_dict(self) -> dict[str, Any]:
@@ -217,6 +234,11 @@ class PriceRecord:
             "expiration_date": self.expiration_date,
             "confidence": self.confidence,
             "source_row": self.source_row,
+            "unit_of_measure": self.unit_of_measure,
+            "pack_quantity": self.pack_quantity,
+            "minimum_order_quantity": self.minimum_order_quantity,
+            "purchase_multiple": self.purchase_multiple,
+            "active": self.active,
             "notes": self.notes,
         }
 

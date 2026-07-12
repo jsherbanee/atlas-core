@@ -141,6 +141,13 @@ class CommercialKnowledgeService:
                 ),
                 confidence=self._bounded_confidence(row.get("confidence", 0.9)),
                 source_row=int(row.get("source_row", 0) or 0),
+                unit_of_measure=self._safe(row.get("unit_of_measure"), "ea"),
+                pack_quantity=self._int_or_none(row.get("pack_quantity")),
+                minimum_order_quantity=self._int_or_none(
+                    row.get("minimum_order_quantity")
+                ),
+                purchase_multiple=self._int_or_none(row.get("purchase_multiple")),
+                active=bool(row.get("active", True)),
                 notes=self._safe(row.get("notes"), ""),
             ).to_dict()
             self.state["price_records"][record_id] = record
@@ -781,6 +788,13 @@ class CommercialKnowledgeService:
             "expiration_date": self._safe(row.get("expiration_date"), ""),
             "confidence": self._bounded_confidence(row.get("confidence", 0.9)),
             "source_row": source_row,
+            "unit_of_measure": self._safe(row.get("unit_of_measure"), "ea"),
+            "pack_quantity": self._int_or_none(row.get("pack_quantity")),
+            "minimum_order_quantity": self._int_or_none(
+                row.get("minimum_order_quantity")
+            ),
+            "purchase_multiple": self._int_or_none(row.get("purchase_multiple")),
+            "active": bool(row.get("active", True)),
             "notes": self._safe(row.get("notes"), ""),
         }
 
@@ -803,6 +817,24 @@ class CommercialKnowledgeService:
             return None
         try:
             return round(float(text), 4)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _int_or_none(value: Any) -> int | None:
+        if value is None:
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            if value.is_integer():
+                return int(value)
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return int(text)
         except ValueError:
             return None
 
