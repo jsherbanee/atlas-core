@@ -158,7 +158,7 @@ def test_build_session_package_from_uploads_classifies_and_runs_intake(
     assert result.import_summary["specification_count"] == 1
     assert result.import_summary["schedule_count"] == 1
     assert result.import_summary["image_count"] == 1
-    assert result.import_summary["unsupported_file_count"] == 1
+    assert result.import_summary["unsupported_file_count"] == 0
     assert any("OCR support is required" in warning for warning in result.warnings)
 
 
@@ -181,6 +181,136 @@ def test_zip_upload_is_unpacked_recursively(tmp_path: Path) -> None:
     assert result.import_summary["drawing_count"] == 1
     assert result.import_summary["schedule_count"] == 1
     assert result.snapshot.raw_pages
+
+
+def test_inspect_uploaded_files_detects_duplicates_empty_and_unsupported() -> None:
+    service = DocumentIntakeService()
+    uploads = [
+        UploadedIntakeFile(name="bid-sheet.pdf", data=b"pdf-content"),
+        UploadedIntakeFile(name="bid-sheet.pdf", data=b"pdf-content-2"),
+        UploadedIntakeFile(name="duplicate-hash.docx", data=b"same"),
+        UploadedIntakeFile(name="duplicate-hash-2.docx", data=b"same"),
+        UploadedIntakeFile(name="empty.pdf", data=b""),
+        UploadedIntakeFile(name="unsupported.exe", data=b"x"),
+        UploadedIntakeFile(name="photo.jpg", data=b"jpg-bytes"),
+        UploadedIntakeFile(name="photo.jpeg", data=b"jpeg-bytes"),
+        UploadedIntakeFile(name="schedule.xls", data=b"xls-bytes"),
+        UploadedIntakeFile(name="schedule.xlsx", data=b"xlsx-bytes"),
+        UploadedIntakeFile(name="legacy.doc", data=b"doc-bytes"),
+        UploadedIntakeFile(name="modern.docx", data=_docx_bytes("DOCX TEXT")),
+    ]
+
+    inspected = service.inspect_uploaded_files(uploads)
+    diagnostics = list(inspected.diagnostics)
+
+    rejected = [item for item in diagnostics if not bool(item.get("accepted"))]
+    accepted = [item for item in diagnostics if bool(item.get("accepted"))]
+
+    assert any("duplicate filename" in ",".join(item["messages"]) for item in rejected)
+    assert any(
+        "duplicate source hash" in ",".join(item["messages"]) for item in rejected
+    )
+    assert any("empty file" in ",".join(item["messages"]) for item in rejected)
+    assert any(
+        "unsupported extension" in ",".join(item["messages"]) for item in rejected
+    )
+    assert any(item["name"].endswith(".jpg") for item in accepted)
+    assert any(item["name"].endswith(".jpeg") for item in accepted)
+    assert any(item["name"].endswith(".doc") for item in accepted)
+    assert any(item["name"].endswith(".docx") for item in accepted)
+    assert any(item["name"].endswith(".xls") for item in accepted)
+    assert any(item["name"].endswith(".xlsx") for item in accepted)
+
+
+def test_zip_upload_rejects_traversal_unsupported_and_system_artifacts(
+    tmp_path: Path,
+) -> None:
+    service = DocumentIntakeService()
+    zip_payload = _zip_bytes(
+        {
+            "nested/AV-300 Audio Plan.txt": b"AV-300",
+            "nested/notes.exe": b"bad",
+            "../escape.txt": b"escape",
+            "__MACOSX/._ignored": b"ignored",
+            ".DS_Store": b"ignored",
+        }
+    )
+
+    inspected = service.inspect_uploaded_files(
+        [UploadedIntakeFile(name="source.zip", data=zip_payload)]
+    )
+
+    accepted_names = [item.name for item in inspected.accepted_files]
+    rejected = [item for item in inspected.diagnostics if not item.get("accepted")]
+
+    assert any(name.endswith("AV-300 Audio Plan.txt") for name in accepted_names)
+    assert any(name.endswith("notes.exe") for name in [d["name"] for d in rejected])
+    assert any("unsafe archive path" in warning for warning in inspected.warnings)
+    assert not any("__MACOSX" in name for name in accepted_names)
+    assert not any(name.endswith(".DS_Store") for name in accepted_names)
+
+    result = service.build_session_package_from_uploads(
+        uploaded_files=[UploadedIntakeFile(name="source.zip", data=zip_payload)],
+        uploads_root=tmp_path / "uploads",
+        session_id="zip-safety",
+    )
+    assert result.import_summary["unsupported_file_count"] == 0
+    assert result.import_summary["drawing_count"] >= 1
+
+
+def test_zip_upload_handles_malformed_archive_deterministically() -> None:
+    service = DocumentIntakeService()
+    inspected = service.inspect_uploaded_files(
+        [UploadedIntakeFile(name="broken.zip", data=b"not-a-real-zip")]
+    )
+
+    assert inspected.accepted_files == []
+    assert any(
+        "could not unpack ZIP archive" in warning for warning in inspected.warnings
+    )
+
+
+def test_zip_upload_entry_and_expansion_limits_are_enforced() -> None:
+    service = DocumentIntakeService()
+    service._MAX_ARCHIVE_ENTRY_COUNT = 2
+    service._MAX_ARCHIVE_UNCOMPRESSED_BYTES = 10
+
+    payload = _zip_bytes(
+        {
+            "a/one.pdf": b"12345",
+            "a/two.pdf": b"67890",
+            "a/three.pdf": b"overflow",
+        }
+    )
+    inspected = service.inspect_uploaded_files(
+        [UploadedIntakeFile(name="limited.zip", data=payload)]
+    )
+
+    assert len(inspected.accepted_files) <= 2
+    assert any(
+        "archive entry limit exceeded" in warning
+        or "archive expansion size limit exceeded" in warning
+        for warning in inspected.warnings
+    )
+
+
+def test_zip_nested_paths_preserved_as_source_metadata(tmp_path: Path) -> None:
+    service = DocumentIntakeService()
+    payload = _zip_bytes(
+        {
+            "nested/floor1/AV-401 Drawing.txt": b"AV-401",
+        }
+    )
+    result = service.build_session_package_from_uploads(
+        uploaded_files=[UploadedIntakeFile(name="bundle.zip", data=payload)],
+        uploads_root=tmp_path / "uploads",
+        session_id="zip-nested",
+    )
+
+    assert any(
+        "bundle.zip/nested/floor1/AV-401 Drawing.txt" in str(page.get("source_path"))
+        for page in result.snapshot.raw_pages
+    )
 
 
 def test_pdf_embedded_text_status_reports_extracted(tmp_path: Path) -> None:

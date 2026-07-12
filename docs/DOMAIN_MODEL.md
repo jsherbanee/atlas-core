@@ -118,6 +118,13 @@ Status legend:
 - Relationships: linked to Project, Bid Package, Document, Evidence, Estimate.
 - Lifecycle Role: Operational lens for project-centric work, independent of single-document workflows.
 
+### Sprint X-02 Identity Refinement
+- Atlas now separates workspace identity into explicit fields used together in project workflows:
+	- Atlas Bid ID: deterministic bid/workspace identifier for repository and cross-workspace lookup.
+	- Client Project Number: optional external/customer identifier.
+	- Internal Project Number: optional internal execution identifier, typically assigned after award/execution transition.
+- These fields refine identity clarity inside existing project/bid lifecycle surfaces and do not introduce new post-award execution workflows.
+
 ### Bid Package
 - Purpose: Intake bundle of bid source artifacts.
 - Relationships: contains Document, Drawing, Specification, Addendum, Schedule.

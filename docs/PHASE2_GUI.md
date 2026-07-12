@@ -18,6 +18,8 @@ Atlas Workspace UI Sprint 7 adds persistent Global Object Search and a project-s
 Atlas Workspace Sprint 7.5 performs UI repair and runtime-state isolation: shared project context header rendering, configuration-driven navigation (including disabled future lifecycle sections), shared object detail section scaffolding, breadcrumb normalization, meaningful empty-state messaging, and mutable runtime project storage outside immutable repository fixtures.
 
 Atlas Workspace Sprint A-04 consolidates workstation UX: shared workspace section headers, recommendation deduplication/grouping, filter reset consistency in dense tables, object-link continuity from estimate snapshot context, and terminology normalization for Products (Master Library).
+Atlas Workspace Sprint X-02 refines project creation and identity workflows with deterministic Atlas Bid ID preview/allocation and explicit project identifier surfaces.
+X-02 amendment adds bid-document upload directly in Create New Project with explicit create/upload actions and deterministic intake diagnostics.
 
 - Status bar
 
@@ -59,6 +61,50 @@ Primary actions:
 - Delete Project with explicit confirmation
 
 Project persistence remains repository-backed through ProjectWorkspaceService.
+
+Project identity display (X-02):
+- Atlas Bid ID is shown as the primary repository identifier in project selectors and list tables.
+- Client Project Number and Internal Project Number are shown as explicit secondary identifiers.
+- Search across project libraries includes Atlas Bid ID, client project number, and internal project number.
+
+## Create New Project (X-02)
+
+Create New Project behavior is optimized for bid workspace startup:
+- Atlas Bid ID is generated deterministically and shown as non-consuming preview.
+- Manual Project ID entry is removed from primary workflow.
+- Required inputs: Project Name and Owner/Client.
+- Optional identity/detail inputs remain available through expandable details.
+- Primary action label: Create Bid Workspace.
+
+Create workflow amendment:
+- Bid document panel is embedded in Create New Project (drag/drop and browse).
+- Supported onboarding formats: PDF, XLS, XLSX, DOC, DOCX, ZIP, JPG, JPEG.
+- Selected files are reviewed before submission with validation and duplicate diagnostics.
+- Primary action changes to Create Bid Workspace & Upload when files are selected.
+- Files are not uploaded automatically on drop/browse; explicit action is required.
+
+Partial-success behavior:
+- Project creation is independent from per-file intake outcomes.
+- If some files are valid and some invalid, project is created and valid files import while rejected files surface diagnostics.
+- If all selected files are invalid, combined create/upload action is blocked until files are corrected or cleared.
+- Retry for rejected/failed files continues in the Documents workspace.
+
+ZIP handling behavior:
+- Archive inspection occurs before extraction.
+- Unsafe paths, encrypted entries, duplicate entries, and system artifacts are rejected.
+- Entry count and expansion-size limits are enforced.
+- Nested archive depth is bounded.
+- Contained relative paths are preserved in intake-source metadata.
+
+## Project Settings Identity Workflow (X-02)
+
+Project Settings now includes controlled metadata editing for identity fields:
+- Atlas Bid ID (read-only)
+- Client Project Number (editable)
+- Internal Project Number (lifecycle-stage-aware editable behavior)
+- Lifecycle stage updates persisted through project identity metadata service path
+
+If lifecycle stage is awarded/execution and internal project number is missing, deterministic advisory messaging is shown.
 
 ## Knowledge Workspace Scope
 Knowledge is application-wide and cross-project.

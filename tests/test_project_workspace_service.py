@@ -5,6 +5,17 @@ from atlas_core.services.project_workspace_service import (
     ProjectWorkspaceRecord,
     ProjectWorkspaceService,
 )
+from pypdf import PdfWriter
+
+
+def _blank_pdf_bytes() -> bytes:
+    from io import BytesIO
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    buffer = BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
 
 
 def test_project_round_trip_preserves_lifecycle_events() -> None:
@@ -131,3 +142,110 @@ def test_workspace_service_manifest_health_and_bundle(tmp_path: Path) -> None:
     imported = service.import_project_bundle(bundle_path)
     assert imported.workspace_id == "project-bundle"
     assert Path(service.project_location("project-bundle")).exists()
+
+
+def test_workspace_service_preview_bid_id_is_non_consuming(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+
+    first_preview = service.preview_next_bid_id()
+    second_preview = service.preview_next_bid_id()
+
+    record = service.create_manual_record(
+        name="Preview Project",
+        client="Client",
+    )
+
+    assert first_preview == second_preview
+    assert record.project.project_id == first_preview
+    assert service.preview_next_bid_id() != first_preview
+
+
+def test_workspace_service_create_project_without_documents(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        name="No Docs Yet",
+        client="Client",
+    )
+    service.save_record(record)
+
+    loaded = service.load_record(record.workspace_id)
+    assert loaded.workspace_id == record.workspace_id
+    assert loaded.project.name == "No Docs Yet"
+    assert loaded.import_summary == {}
+
+
+def test_workspace_service_create_project_with_single_pdf_upload(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        name="Single PDF",
+        client="Client",
+    )
+    service.save_record(record)
+
+    uploaded = service.import_uploaded_documents(
+        record.workspace_id,
+        [("bid-package.pdf", _blank_pdf_bytes())],
+    )
+
+    assert uploaded.workspace_id == record.workspace_id
+    assert int(uploaded.import_summary.get("uploaded_file_count", 0) or 0) >= 1
+
+
+def test_workspace_service_mixed_valid_invalid_uploads_partial_success(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        name="Mixed Upload",
+        client="Client",
+    )
+    service.save_record(record)
+
+    uploaded = service.import_uploaded_documents(
+        record.workspace_id,
+        [
+            ("bid-package.pdf", _blank_pdf_bytes()),
+            ("not-supported.exe", b"bad"),
+        ],
+    )
+
+    assert uploaded.workspace_id == record.workspace_id
+    assert int(uploaded.import_summary.get("uploaded_file_count", 0) or 0) >= 1
+    assert int(uploaded.import_summary.get("rejected_file_count", 0) or 0) >= 1
+
+
+def test_workspace_service_project_id_stable_after_import_failure(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        name="Stable ID",
+        client="Client",
+    )
+    service.save_record(record)
+    created_id = record.workspace_id
+
+    original_import = service.manager.document_repository.import_uploads
+
+    def _raise_failure(
+        project_id: str, uploaded_files: list[tuple[str, bytes]]
+    ) -> dict:
+        _ = (project_id, uploaded_files)
+        raise RuntimeError("simulated import failure")
+
+    service.manager.document_repository.import_uploads = _raise_failure  # type: ignore[assignment]
+    try:
+        try:
+            service.import_uploaded_documents(
+                created_id,
+                [("bid-package.pdf", b"fake-pdf")],
+            )
+        except RuntimeError:
+            pass
+    finally:
+        service.manager.document_repository.import_uploads = original_import  # type: ignore[assignment]
+
+    loaded = service.load_record(created_id)
+    assert loaded.workspace_id == created_id

@@ -95,6 +95,14 @@ class ProjectRepository(ABC):
     def health_check(self, project_id: str) -> JsonDict:
         raise NotImplementedError
 
+    @abstractmethod
+    def allocate_bid_id(self, year: int | None = None) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def peek_next_bid_id(self, year: int | None = None) -> str:
+        raise NotImplementedError
+
 
 class WorkspaceRepository(ABC):
     """Persistence contract for workspace-view and UI state."""

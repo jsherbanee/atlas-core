@@ -30,6 +30,8 @@ class Project:
     project_id: str
     name: str
     client: str
+    client_project_number: str | None = None
+    internal_project_number: str | None = None
     location: str | None = None
     bid_date: str | None = None
     status: ProjectStatus = ProjectStatus.INTAKE
@@ -148,6 +150,8 @@ class Project:
             "project_id": self.project_id,
             "name": self.name,
             "client": self.client,
+            "client_project_number": self.client_project_number,
+            "internal_project_number": self.internal_project_number,
             "location": self.location,
             "bid_date": self.bid_date,
             "status": self.status.value,
@@ -167,6 +171,12 @@ class Project:
             project_id=str(payload.get("project_id") or ""),
             name=str(payload.get("name") or ""),
             client=str(payload.get("client") or ""),
+            client_project_number=(
+                str(payload.get("client_project_number") or "") or None
+            ),
+            internal_project_number=(
+                str(payload.get("internal_project_number") or "") or None
+            ),
             location=payload.get("location"),
             bid_date=payload.get("bid_date"),
             status=payload.get("status") or ProjectStatus.INTAKE,

@@ -60,6 +60,8 @@ def test_to_dict_output():
         "project_id": "p-001",
         "name": "City Hall Refresh",
         "client": "Acme",
+        "client_project_number": None,
+        "internal_project_number": None,
         "location": "Oakland, CA",
         "bid_date": "2026-07-15",
         "status": "estimating",

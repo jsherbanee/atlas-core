@@ -134,9 +134,10 @@ Status: Implemented and Closed for current roadmap baseline
 
 ## Epic X: Product Hardening
 
-Status: Implemented (X-01 Closed)
+Status: Active (X-01 Closed, X-02 In Progress)
 
 - X-01 Pilot Readiness and Application Walkthrough (Implemented, Closed)
+- X-02 Project Creation and Bid Identity Refinement (In Progress)
 
 ## Epic E: Knowledge and Shared Objects
 

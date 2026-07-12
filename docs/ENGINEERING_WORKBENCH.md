@@ -109,6 +109,12 @@ Deferred non-blocking UX debt:
 - selected-object detail density can still feel heavy on smaller laptop viewports
 - additional progressive disclosure opportunities remain for long evidence tables
 
+## Sprint X-02 Scope Boundary Note
+
+X-02 introduces project identity and creation hardening in shared workspace flows and does not add new engineering intelligence behaviors in Engineering Workbench.
+
+Workbench impact in X-02 is limited to consistent project identity context continuity from shared header/search/navigation surfaces.
+
 ## Resolver Conflict Center
 
 Resolver Conflict Center provides a dedicated conflict workspace.

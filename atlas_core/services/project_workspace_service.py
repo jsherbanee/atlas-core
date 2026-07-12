@@ -249,7 +249,7 @@ class ProjectWorkspaceService:
     def create_manual_record(
         self,
         *,
-        project_id: str,
+        project_id: str | None = None,
         name: str,
         client: str,
         location: str | None = None,
@@ -258,15 +258,23 @@ class ProjectWorkspaceService:
         consultant: str | None = None,
         architect: str | None = None,
         engineers: list[str] | None = None,
-        project_number: str | None = None,
+        client_project_number: str | None = None,
+        internal_project_number: str | None = None,
         issue_date: str | None = None,
         lifecycle_stage: str | None = None,
     ) -> ProjectWorkspaceRecord:
+        atlas_bid_id = (
+            self.manager.project_repository.allocate_bid_id()
+            if project_id is None
+            else project_id
+        )
         lifecycle = status or ProjectStatus.INTAKE
         project = Project(
-            project_id=project_id,
+            project_id=atlas_bid_id,
             name=name,
             client=client,
+            client_project_number=client_project_number,
+            internal_project_number=internal_project_number,
             location=location,
             bid_date=bid_date,
             status=lifecycle,
@@ -282,7 +290,10 @@ class ProjectWorkspaceService:
                 "consultant": consultant,
                 "architect": architect,
                 "engineers": list(engineers or []),
-                "project_number": project_number or project_id,
+                "atlas_bid_id": atlas_bid_id,
+                "client_project_number": client_project_number,
+                "internal_project_number": internal_project_number,
+                "project_number": atlas_bid_id,
                 "issue_date": issue_date,
                 "bid_date": bid_date,
                 "status": lifecycle.value,
@@ -290,6 +301,76 @@ class ProjectWorkspaceService:
                 "atlas_version": __version__,
             },
         )
+
+    def preview_next_bid_id(self) -> str:
+        return self.manager.project_repository.peek_next_bid_id()
+
+    def update_project_identity_metadata(
+        self,
+        workspace_id: str,
+        *,
+        owner: str | None = None,
+        lifecycle_stage: str | None = None,
+        client_project_number: str | None = None,
+        internal_project_number: str | None = None,
+        consultant: str | None = None,
+        architect: str | None = None,
+        engineers: list[str] | None = None,
+        issue_date: str | None = None,
+        location: str | None = None,
+        bid_date: str | None = None,
+    ) -> ProjectWorkspaceRecord:
+        record = self.load_record(workspace_id)
+
+        if owner is not None:
+            record.metadata["owner"] = owner
+            record.project.client = owner
+        if lifecycle_stage is not None:
+            normalized_stage = lifecycle_stage.strip()
+            if normalized_stage:
+                record.metadata["lifecycle_stage"] = normalized_stage
+                record.metadata["status"] = normalized_stage
+                record.project.status = ProjectStatus(normalized_stage)
+        if client_project_number is not None:
+            normalized_client_number = client_project_number.strip() or None
+            record.metadata["client_project_number"] = normalized_client_number
+            record.project.client_project_number = normalized_client_number
+        if internal_project_number is not None:
+            normalized_internal_number = internal_project_number.strip() or None
+            record.metadata["internal_project_number"] = normalized_internal_number
+            record.project.internal_project_number = normalized_internal_number
+        if consultant is not None:
+            record.metadata["consultant"] = consultant.strip() or None
+        if architect is not None:
+            record.metadata["architect"] = architect.strip() or None
+        if engineers is not None:
+            record.metadata["engineers"] = [
+                item.strip()
+                for item in engineers
+                if isinstance(item, str) and item.strip()
+            ]
+        if issue_date is not None:
+            record.metadata["issue_date"] = issue_date.strip() or None
+        if location is not None:
+            normalized_location = location.strip() or None
+            record.project.location = normalized_location
+        if bid_date is not None:
+            normalized_bid_date = bid_date.strip() or None
+            record.project.bid_date = normalized_bid_date
+            record.metadata["bid_date"] = normalized_bid_date
+
+        self.save_record(record)
+        self.manager.log(
+            workspace_id,
+            "project_identity_updated",
+            {
+                "atlas_bid_id": record.project.project_id,
+                "client_project_number": record.project.client_project_number,
+                "internal_project_number": record.project.internal_project_number,
+                "lifecycle_stage": record.metadata.get("lifecycle_stage"),
+            },
+        )
+        return self.load_record(workspace_id)
 
     def rename_project(
         self, workspace_id: str, new_name: str
@@ -443,6 +524,15 @@ class ProjectWorkspaceService:
     @staticmethod
     def _metadata_payload(record: ProjectWorkspaceRecord) -> dict[str, Any]:
         meta = dict(record.metadata)
+        atlas_bid_id = str(meta.get("atlas_bid_id") or record.project.project_id)
+        client_project_number = (
+            str(meta.get("client_project_number") or "")
+            or record.project.client_project_number
+        )
+        internal_project_number = (
+            str(meta.get("internal_project_number") or "")
+            or record.project.internal_project_number
+        )
         now = datetime.now(UTC).isoformat()
         return {
             "project_name": str(meta.get("project_name") or record.project.name),
@@ -450,9 +540,10 @@ class ProjectWorkspaceService:
             "consultant": meta.get("consultant"),
             "architect": meta.get("architect"),
             "engineers": list(meta.get("engineers") or []),
-            "project_number": str(
-                meta.get("project_number") or record.project.project_id
-            ),
+            "atlas_bid_id": atlas_bid_id,
+            "client_project_number": client_project_number,
+            "internal_project_number": internal_project_number,
+            "project_number": atlas_bid_id,
             "issue_date": meta.get("issue_date"),
             "bid_date": meta.get("bid_date") or record.project.bid_date,
             "status": str(meta.get("status") or record.project.status.value),
@@ -484,9 +575,20 @@ class ProjectWorkspaceService:
             or project_payload.get("project_id")
             or project_dir.name
         )
+        normalized_meta = cls._normalized_identity_metadata(
+            metadata_payload,
+            project_payload,
+            payload["workspace_id"],
+        )
+        project_payload["client_project_number"] = normalized_meta.get(
+            "client_project_number"
+        )
+        project_payload["internal_project_number"] = normalized_meta.get(
+            "internal_project_number"
+        )
         payload["metadata"] = {
             **dict(payload.get("metadata") or {}),
-            **dict(metadata_payload),
+            **normalized_meta,
         }
         payload["workspace_state"] = dict(payload.get("workspace_state") or {})
         payload["pinned"] = bool(
@@ -508,6 +610,32 @@ class ProjectWorkspaceService:
             or None
         )
         return ProjectWorkspaceRecord.from_dict(payload)
+
+    @staticmethod
+    def _normalized_identity_metadata(
+        metadata_payload: dict[str, Any],
+        project_payload: dict[str, Any],
+        workspace_id: str,
+    ) -> dict[str, Any]:
+        normalized = dict(metadata_payload)
+        atlas_bid_id = str(
+            normalized.get("atlas_bid_id")
+            or normalized.get("project_number")
+            or project_payload.get("project_id")
+            or workspace_id
+        )
+        normalized["atlas_bid_id"] = atlas_bid_id
+        normalized["project_number"] = atlas_bid_id
+
+        if "client_project_number" not in normalized:
+            normalized["client_project_number"] = (
+                str(project_payload.get("client_project_number") or "") or None
+            )
+        if "internal_project_number" not in normalized:
+            normalized["internal_project_number"] = (
+                str(project_payload.get("internal_project_number") or "") or None
+            )
+        return normalized
 
     @staticmethod
     def _sort_key(record: ProjectWorkspaceRecord) -> str:

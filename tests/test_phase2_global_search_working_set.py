@@ -42,6 +42,19 @@ class _FakeWorkspaceService:
         return list(self._records)[:limit]
 
 
+@dataclass
+class _FakeUploadedFile:
+    name: str
+    data: bytes
+
+    @property
+    def size(self) -> int:
+        return len(self.data)
+
+    def getvalue(self) -> bytes:
+        return self.data
+
+
 def _reference(
     *,
     object_id: str,
@@ -263,6 +276,64 @@ def test_workspace_snapshot_persists_working_set_and_search_history() -> None:
     assert snapshot["recent_opened_results"][0]["object_id"] == "EQ-1"
 
 
+def test_project_record_identifier_and_secondary_labels() -> None:
+    reference = app._build_object_reference(
+        kind="project_record",
+        data={
+            "workspace_id": "legacy-workspace-id",
+            "atlas_bid_id": "BID-2026-0012",
+            "project_name": "Campus AV Refresh",
+            "customer": "City Schools",
+            "client_project_number": "CS-4421",
+            "internal_project_number": "INT-0902",
+            "status": "In Progress",
+        },
+        project_id="legacy-workspace-id",
+        route="Overview",
+    )
+
+    assert reference["object_id"] == "BID-2026-0012"
+    assert reference["secondary_label"] == (
+        "City Schools | Client #CS-4421 | Internal #INT-0902"
+    )
+
+
+def test_project_identifier_match_fields_rank_for_client_and_internal_numbers() -> None:
+    reference = {
+        "object_id": "BID-2026-0012",
+        "display_name": "Campus AV Refresh",
+        "object_type": "Project",
+        "secondary_label": "City Schools | Client #CS-4421 | Internal #INT-0902",
+        "scope": "application",
+        "match_fields": [
+            "BID-2026-0012",
+            "legacy-workspace-id",
+            "Campus AV Refresh",
+            "City Schools",
+            "CS-4421",
+            "INT-0902",
+        ],
+        "selection_kind": "project_record",
+        "selection_data": {},
+    }
+
+    client_filtered = app._filter_search_results(
+        [reference],
+        query="CS-4421",
+        selected_types=[],
+        project_open=False,
+    )
+    internal_filtered = app._filter_search_results(
+        [reference],
+        query="INT-0902",
+        selected_types=[],
+        project_open=False,
+    )
+
+    assert len(client_filtered) == 1
+    assert len(internal_filtered) == 1
+
+
 def test_breadcrumb_generates_object_specific_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -343,3 +414,133 @@ def test_project_navigation_contains_disabled_future_lifecycle_group() -> None:
     assert set(app.DISABLED_LIFECYCLE_PAGES) <= {
         page for _, entries in app.PROJECT_NAV_GROUPS for _, page in entries
     }
+
+
+def test_create_project_primary_action_label_changes_with_selection() -> None:
+    assert app._create_project_primary_action_label(False) == "Create Bid Workspace"
+    assert (
+        app._create_project_primary_action_label(True)
+        == "Create Bid Workspace & Upload"
+    )
+
+
+def test_create_project_required_fields_only_name_and_client() -> None:
+    assert app._create_project_missing_required_fields("", "") == [
+        "Project Name",
+        "Owner / Client",
+    ]
+    assert app._create_project_missing_required_fields("Project", "") == [
+        "Owner / Client"
+    ]
+    assert app._create_project_missing_required_fields("Project", "Client") == []
+
+
+def test_create_project_post_create_route_depends_on_upload_selection() -> None:
+    assert app._create_project_post_create_page(False) == "Overview"
+    assert app._create_project_post_create_page(True) == "Documents"
+
+
+def test_create_project_effective_uploads_supports_individual_removal() -> None:
+    uploads = [
+        _FakeUploadedFile(name="a.pdf", data=b"a"),
+        _FakeUploadedFile(name="b.pdf", data=b"b"),
+        _FakeUploadedFile(name="c.pdf", data=b"c"),
+    ]
+
+    kept = app._create_project_effective_uploads(uploads, ["2. b.pdf"])
+    kept_names = [item.name for item in kept]
+    assert kept_names == ["a.pdf", "c.pdf"]
+
+
+def test_create_project_clear_upload_state_resets_session_keys() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_create_project_uploads": ["x"],
+            "atlas_create_project_remove_selection": ["1. x"],
+        }
+    )
+
+    app._reset_create_project_upload_state(st)
+
+    assert st.session_state["atlas_create_project_uploads"] == []
+    assert st.session_state["atlas_create_project_remove_selection"] == []
+
+
+def test_create_project_upload_inspection_rows_include_required_columns() -> None:
+    uploads = [
+        _FakeUploadedFile(name="bid.pdf", data=b"pdf-bytes"),
+        _FakeUploadedFile(name="bad.exe", data=b"x"),
+    ]
+
+    inspected = app._create_project_upload_inspection(uploads)
+
+    assert inspected["total_selected_count"] == 2
+    assert inspected["total_selected_size"] > 0
+    assert inspected["accepted_count"] >= 1
+    assert inspected["rejected_count"] >= 1
+    assert inspected["has_any_selected_invalid"] is True
+    assert inspected["all_selected_invalid"] is False
+    assert inspected["accepted_payload"]
+    assert inspected["rows"]
+
+    row = inspected["rows"][0]
+    assert set(
+        [
+            "Name",
+            "Source Type",
+            "File Size",
+            "ZIP Source",
+            "Duplicate",
+            "Validation",
+            "Messages",
+        ]
+    ) <= set(row.keys())
+
+
+def test_create_project_upload_inspection_keeps_invalid_diagnostics_visible() -> None:
+    uploads = [
+        _FakeUploadedFile(name="empty.pdf", data=b""),
+        _FakeUploadedFile(name="ok.jpg", data=b"img"),
+    ]
+
+    inspected = app._create_project_upload_inspection(uploads)
+
+    rejected_rows = [
+        row for row in inspected["rows"] if row.get("Validation") == "rejected"
+    ]
+    accepted_rows = [
+        row for row in inspected["rows"] if row.get("Validation") == "accepted"
+    ]
+    assert rejected_rows
+    assert accepted_rows
+    assert any("empty file" in str(row.get("Messages", "")) for row in rejected_rows)
+
+
+def test_create_project_upload_inspection_all_invalid_selection_is_blockable() -> None:
+    uploads = [_FakeUploadedFile(name="bad.exe", data=b"x")]
+    inspected = app._create_project_upload_inspection(uploads)
+
+    assert inspected["has_selected_files"] is True
+    assert inspected["all_selected_invalid"] is True
+    assert inspected["accepted_count"] == 0
+
+
+def test_create_project_upload_inspection_zip_warnings_have_zip_indicator() -> None:
+    uploads = [_FakeUploadedFile(name="bad.zip", data=b"not-a-real-zip")]
+    inspected = app._create_project_upload_inspection(uploads)
+
+    warning_rows = [
+        row for row in inspected["rows"] if row.get("Validation") == "warning"
+    ]
+    assert warning_rows
+    assert all(row.get("ZIP Source") == "Yes" for row in warning_rows)
+
+
+def test_create_project_upload_inspection_marks_duplicate_state() -> None:
+    uploads = [
+        _FakeUploadedFile(name="dup.pdf", data=b"same"),
+        _FakeUploadedFile(name="dup.pdf", data=b"same2"),
+    ]
+    inspected = app._create_project_upload_inspection(uploads)
+
+    assert any(row.get("Duplicate") == "Yes" for row in inspected["rows"])

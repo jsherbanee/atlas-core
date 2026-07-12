@@ -33,12 +33,14 @@ Sprint D-03 Assemblies, Accessories, and Labor Rollups implementation is complet
 Sprint A-04 consolidates Engineering Workstation UX consistency with shared workspace section headers, recommendation dedupe/grouping in Mission Control, terminology normalization for Products (Master Library), resettable dense-table filters, and source-object linking from estimate snapshot views.
 Sprint A-05 performs end-to-end GUI validation and workflow refinement across Mission Control, Project Workspace, Knowledge, Estimate, and D-03 integration flows.
 Sprint X-01 performs pilot-readiness walkthrough validation and usability hardening for existing workflows.
+Sprint X-02 implements project creation and bid identity refinement with Atlas Bid ID allocation, explicit client/internal project identifiers, and metadata update workflows.
+Sprint X-02 amendment adds Create New Project bid-document upload with explicit create/upload action, safe ZIP inspection controls, structured intake diagnostics, and partial-success recovery behavior.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1063 tests)
+- pytest: full suite passing (1077 tests)
 
 ## Tooling Status
 - GitHub Actions configured
@@ -47,13 +49,15 @@ Sprint X-01 performs pilot-readiness walkthrough validation and usability harden
   - .pre-commit-config.yaml
 
 ## Active Focus
-Sprint X-01 pilot-readiness walkthrough and product-hardening refinements.
+Sprint X-02 project creation and bid identity refinement.
 
 Secondary active focus:
 - low-risk UI helper refinement and consistency hardening in existing workspaces.
+- explicit identifier discoverability across project creation, listing, open flows, global search, and project settings.
 
 Current implementation scope note:
-- no post-D-03 epic implementation has started in this refinement pass
+- no Epic E implementation has started in this refinement pass
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation features were introduced in X-02
 
 
 Lifecycle object definitions and cross-phase module boundaries are documented in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).

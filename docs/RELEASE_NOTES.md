@@ -23,6 +23,26 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic A Sprint A-04 Engineering Workstation UX Consolidation)
 
+## Unreleased (Epic X Sprint X-02 Project Creation and Bid Identity Refinement)
+
+### Improved
+
+- Create New Project now uses Atlas Bid ID allocation with deterministic non-consuming preview behavior.
+- Project metadata now distinguishes Atlas Bid ID, Client Project Number, and Internal Project Number.
+- Projects and Open Existing views now surface/search identifier fields for faster retrieval.
+- Global search project records now include Atlas Bid ID and client/internal project-number match fields.
+- Project Settings now supports controlled identity metadata updates, including lifecycle-stage-aware internal project number editing.
+- Mission Control recommendations now include a deterministic prompt when awarded/execution lifecycle stages are missing an internal project number.
+- Create New Project now includes an embedded bid-document upload panel with drag/drop, browse, review-before-submit, and explicit create/upload action controls.
+- Create workflow now supports partial-success import behavior (accepted files import, rejected files are reported with diagnostics).
+- ZIP onboarding now enforces deterministic safety checks (unsafe path rejection, encrypted-entry rejection, system-artifact filtering, depth/entry/expansion limits).
+
+### Scope Notes
+
+- product-hardening and project identity refinement only for existing capabilities
+- no Epic E start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
 ## Unreleased (Epic X Sprint X-01 Pilot Readiness and Application Walkthrough)
 
 ### Improved

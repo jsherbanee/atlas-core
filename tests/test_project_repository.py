@@ -109,3 +109,24 @@ def test_project_domain_roundtrip_still_works() -> None:
     project = Project(project_id="id-1", name="Name", client="Client")
     restored = Project.from_dict(project.to_dict())
     assert restored.project_id == "id-1"
+
+
+def test_bid_id_preview_does_not_consume_sequence(tmp_path: Path) -> None:
+    repo = LocalProjectRepository(tmp_path / "AtlasProjects")
+
+    first_preview = repo.peek_next_bid_id(year=2032)
+    second_preview = repo.peek_next_bid_id(year=2032)
+    allocated = repo.allocate_bid_id(year=2032)
+    next_preview = repo.peek_next_bid_id(year=2032)
+
+    assert first_preview == "BID-2032-0001"
+    assert second_preview == "BID-2032-0001"
+    assert allocated == "BID-2032-0001"
+    assert next_preview == "BID-2032-0002"
+
+
+def test_bid_id_sequence_observes_existing_bid_projects(tmp_path: Path) -> None:
+    repo = LocalProjectRepository(tmp_path / "AtlasProjects")
+    _seed_project(repo, "BID-2033-0010")
+
+    assert repo.peek_next_bid_id(year=2033) == "BID-2033-0011"

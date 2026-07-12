@@ -55,6 +55,10 @@ from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
 from atlas_core.services.runtime_workspace import ensure_runtime_workspace_root
+from atlas_core.services.document_intake_service import (
+    DocumentIntakeService,
+    UploadedIntakeFile,
+)
 
 PROJECT_MANAGER_PAGES = [
     "Mission Control",
@@ -327,6 +331,17 @@ SUPPORTED_UPLOAD_TYPES = [
     "rtf",
     "json",
     "zip",
+]
+
+CREATE_PROJECT_UPLOAD_TYPES = [
+    "pdf",
+    "xls",
+    "xlsx",
+    "doc",
+    "docx",
+    "zip",
+    "jpg",
+    "jpeg",
 ]
 
 
@@ -1009,6 +1024,125 @@ def _uploaded_file_signature(uploaded_files: list[Any]) -> str:
         digest.update(str(getattr(file, "size", 0)).encode("utf-8"))
 
     return digest.hexdigest()
+
+
+def _bytes_label(value: int) -> str:
+    if value < 1024:
+        return f"{value} B"
+    if value < 1024 * 1024:
+        return f"{round(value / 1024, 1)} KB"
+    return f"{round(value / (1024 * 1024), 2)} MB"
+
+
+def _create_project_upload_inspection(uploaded_files: list[Any]) -> dict[str, Any]:
+    intake_files = [
+        UploadedIntakeFile(name=str(file.name), data=bytes(file.getvalue()))
+        for file in uploaded_files
+    ]
+    inspection = DocumentIntakeService().inspect_uploaded_files(intake_files)
+
+    total_selected_size = sum(
+        int(getattr(file, "size", len(file.getvalue()))) for file in uploaded_files
+    )
+    accepted_files = list(inspection.accepted_files)
+    accepted_payload = [(item.name, item.data) for item in accepted_files]
+
+    selected_names = {
+        _safe_text(item.get("name"), "") for item in list(inspection.diagnostics)
+    }
+    rejected_files = [
+        item
+        for item in list(inspection.diagnostics)
+        if not bool(item.get("accepted", False))
+    ]
+    warnings_rows = [
+        {
+            "Name": "archive",
+            "Source Type": "zip",
+            "File Size": "n/a",
+            "ZIP Source": "Yes",
+            "Duplicate": "No",
+            "Validation": "warning",
+            "Messages": warning,
+        }
+        for warning in list(inspection.warnings)
+    ]
+
+    rows = [
+        {
+            "Name": _safe_text(item.get("name"), ""),
+            "Source Type": _safe_text(item.get("source_type"), "file"),
+            "File Size": _bytes_label(int(item.get("size_bytes") or 0)),
+            "ZIP Source": "Yes" if bool(item.get("zip_source")) else "No",
+            "Duplicate": (
+                "Yes"
+                if bool(item.get("duplicate_name"))
+                or bool(item.get("duplicate_source_hash"))
+                else "No"
+            ),
+            "Validation": (
+                "accepted" if bool(item.get("accepted", False)) else "rejected"
+            ),
+            "Messages": ", ".join(list(item.get("messages") or [])),
+        }
+        for item in list(inspection.diagnostics)
+    ]
+
+    return {
+        "accepted_payload": accepted_payload,
+        "accepted_count": len(accepted_payload),
+        "rejected_count": len(rejected_files),
+        "total_selected_count": len(uploaded_files),
+        "total_selected_size": total_selected_size,
+        "rows": [*rows, *warnings_rows],
+        "warnings": list(inspection.warnings),
+        "has_selected_files": bool(uploaded_files),
+        "has_any_selected_invalid": bool(rejected_files) or bool(inspection.warnings),
+        "all_selected_invalid": bool(uploaded_files) and not bool(accepted_payload),
+        "selected_names": selected_names,
+    }
+
+
+def _create_project_effective_uploads(
+    uploaded_files: list[Any],
+    remove_labels: list[str],
+) -> list[Any]:
+    remove_indexes = {
+        int(option.split(".", 1)[0]) - 1
+        for option in list(remove_labels)
+        if "." in option
+    }
+    return [
+        file
+        for index, file in enumerate(list(uploaded_files))
+        if index not in remove_indexes
+    ]
+
+
+def _create_project_primary_action_label(has_selected_files: bool) -> str:
+    return (
+        "Create Bid Workspace & Upload"
+        if has_selected_files
+        else "Create Bid Workspace"
+    )
+
+
+def _create_project_missing_required_fields(name: str, client: str) -> list[str]:
+    missing: list[str] = []
+    if not _safe_text(name, ""):
+        missing.append("Project Name")
+    if not _safe_text(client, ""):
+        missing.append("Owner / Client")
+    return missing
+
+
+def _create_project_post_create_page(has_selected_files: bool) -> str:
+    return "Documents" if has_selected_files else "Overview"
+
+
+def _reset_create_project_upload_state(st: Any) -> None:
+    st.session_state["atlas_create_project_uploads"] = []
+    st.session_state["atlas_create_project_remove_selection"] = []
 
 
 def _to_rows(items: list[Any]) -> list[dict[str, Any]]:
@@ -2988,6 +3122,49 @@ def _project_stage(record: ProjectWorkspaceRecord) -> str:
     return str(status).replace("_", " ").title()
 
 
+def _atlas_bid_id(record: ProjectWorkspaceRecord) -> str:
+    return _safe_text(
+        record.metadata.get("atlas_bid_id"),
+        record.project.project_id,
+    )
+
+
+def _client_project_number(record: ProjectWorkspaceRecord) -> str:
+    return _safe_text(
+        record.metadata.get("client_project_number"),
+        record.project.client_project_number or "",
+    )
+
+
+def _internal_project_number(record: ProjectWorkspaceRecord) -> str:
+    return _safe_text(
+        record.metadata.get("internal_project_number"),
+        record.project.internal_project_number or "",
+    )
+
+
+def _is_awarded_or_execution_stage(value: Any) -> bool:
+    normalized = _safe_text(value, "").strip().lower().replace("_", " ")
+    return normalized in {
+        "awarded",
+        "engineering",
+        "procurement",
+        "active",
+        "closeout",
+        "archived",
+    }
+
+
+def _needs_internal_project_number(record: ProjectWorkspaceRecord) -> bool:
+    lifecycle_stage = _safe_text(
+        record.metadata.get("lifecycle_stage"),
+        record.project.status.value,
+    )
+    return _is_awarded_or_execution_stage(
+        lifecycle_stage
+    ) and not _internal_project_number(record)
+
+
 def _project_status(context: dict[str, Any] | None) -> str:
     if context is None:
         return "Unknown"
@@ -3393,10 +3570,13 @@ def _project_library_rows(
             {
                 "record": record,
                 "workspace_id": record.workspace_id,
+                "atlas_bid_id": _atlas_bid_id(record),
                 "project_name": record.project.name,
                 "customer": _safe_text(
                     record.metadata.get("owner"), record.project.client
                 ),
+                "client_project_number": _client_project_number(record),
+                "internal_project_number": _internal_project_number(record),
                 "lifecycle_stage": _safe_text(
                     record.metadata.get("lifecycle_stage"),
                     _project_stage(record),
@@ -3830,7 +4010,10 @@ def _object_id_for_selection(kind: str, data: dict[str, Any]) -> str:
     if kind == "price_list":
         return _safe_text(data.get("source_file"), "Price List")
     if kind == "project_record":
-        return _safe_text(data.get("workspace_id"), "")
+        return _safe_text(
+            data.get("atlas_bid_id"),
+            _safe_text(data.get("workspace_id"), ""),
+        )
     if kind == "notebook_entry":
         return _safe_text(data.get("entry_id"), _safe_text(data.get("title"), ""))
     if kind == "master_product":
@@ -3930,7 +4113,25 @@ def _object_secondary_label(kind: str, data: dict[str, Any]) -> str:
     if kind == "price_list":
         return _safe_text(data.get("vendor"), _safe_text(data.get("manufacturer"), ""))
     if kind == "project_record":
-        return _safe_text(data.get("customer"), "")
+        return " | ".join(
+            [
+                item
+                for item in [
+                    _safe_text(data.get("customer"), ""),
+                    (
+                        f"Client #{_safe_text(data.get('client_project_number'), '')}"
+                        if _safe_text(data.get("client_project_number"), "")
+                        else ""
+                    ),
+                    (
+                        f"Internal #{_safe_text(data.get('internal_project_number'), '')}"
+                        if _safe_text(data.get("internal_project_number"), "")
+                        else ""
+                    ),
+                ]
+                if item
+            ]
+        )
     if kind == "notebook_entry":
         return _safe_text(data.get("entry_type"), "")
     return ""
@@ -4859,6 +5060,16 @@ def _render_home_page(
                 "Source": "Project Workspace",
             }
         )
+        if _needs_internal_project_number(record):
+            recommendation_rows.append(
+                {
+                    "Priority": "Medium",
+                    "Recommendation": "Assign Internal Project Number now that lifecycle stage is awarded/execution.",
+                    "Count": 1,
+                    "Destination": "Project Settings",
+                    "Source": "Project Metadata",
+                }
+            )
     recommendation_rows.extend(
         [
             {**item, "Source": "Commercial Knowledge"}
@@ -6193,8 +6404,11 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
                     " ".join(
                         [
                             _safe_text(item.get("project_name"), ""),
+                            _safe_text(item.get("atlas_bid_id"), ""),
                             _safe_text(item.get("workspace_id"), ""),
                             _safe_text(item.get("customer"), ""),
+                            _safe_text(item.get("client_project_number"), ""),
+                            _safe_text(item.get("internal_project_number"), ""),
                         ]
                     ),
                     [search.strip().lower()],
@@ -6226,7 +6440,10 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         [
             {
                 "Project": item["project_name"],
+                "Atlas Bid ID": item["atlas_bid_id"],
                 "Customer": item["customer"],
+                "Client Project Number": item["client_project_number"] or "",
+                "Internal Project Number": item["internal_project_number"] or "",
                 "Lifecycle": item["lifecycle_stage"],
                 "Status": item["current_status"],
                 "Last Opened": item["last_opened"],
@@ -6243,7 +6460,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         hide_index=True,
     )
 
-    labels = [f"{item['project_name']} · {item['workspace_id']}" for item in filtered]
+    labels = [f"{item['project_name']} · {item['atlas_bid_id']}" for item in filtered]
     if labels:
         selected_label = st.selectbox("Open Project", options=labels)
         selected_item = filtered[labels.index(selected_label)]
@@ -7988,37 +8205,105 @@ def _render_create_project_page(
     _render_page_header(
         st,
         "Create New Project",
-        "Initialize a local project workspace for deterministic intake and review.",
+        "Quick Start a bid workspace with deterministic identity.",
     )
+    bid_id_preview = workspace_service.preview_next_bid_id()
+    st.caption(f"Atlas Bid ID will be assigned automatically: {bid_id_preview}")
+
     with st.form("atlas_create_project_form", clear_on_submit=False):
-        project_id = st.text_input("Project ID", key="atlas_new_project_id")
+        st.markdown("### Quick Start")
         name = st.text_input("Project Name", key="atlas_new_project_name")
         client = st.text_input("Owner / Client", key="atlas_new_project_client")
-        consultant = st.text_input("Consultant")
-        architect = st.text_input("Architect")
-        engineers_text = st.text_input("Engineers (comma-separated)")
-        project_number = st.text_input("Project Number")
-        issue_date = st.text_input("Issue Date")
-        location = st.text_input("Location", key="atlas_new_project_location")
-        bid_date = st.text_input("Bid Date", key="atlas_new_project_bid_date")
+        bid_date = st.text_input(
+            "Bid Due Date (optional)", key="atlas_new_project_bid_date"
+        )
         lifecycle_stage = st.selectbox(
             "Lifecycle Stage",
             options=[status.value for status in ProjectStatus],
             index=1,
         )
-        submitted = st.form_submit_button("Create Project")
+
+        st.markdown("### Bid Documents")
+        st.caption(
+            "Drop bid documents here or browse files. Supported: PDF, XLS, XLSX, DOC, DOCX, ZIP, JPG, JPEG."
+        )
+        uploaded_files = st.file_uploader(
+            "Drop bid documents here or browse files",
+            type=CREATE_PROJECT_UPLOAD_TYPES,
+            accept_multiple_files=True,
+            key="atlas_create_project_uploads",
+            label_visibility="collapsed",
+        )
+        uploaded_files_list = list(uploaded_files or [])
+        remove_options = [
+            f"{index + 1}. {str(file.name)}"
+            for index, file in enumerate(uploaded_files_list)
+        ]
+        remove_labels = st.multiselect(
+            "Remove selected files before create/upload",
+            options=remove_options,
+            key="atlas_create_project_remove_selection",
+        )
+        effective_uploaded_files = _create_project_effective_uploads(
+            uploaded_files_list,
+            remove_labels,
+        )
+
+        inspection = _create_project_upload_inspection(effective_uploaded_files)
+        if inspection["has_selected_files"]:
+            summary_cols = st.columns(2)
+            summary_cols[0].metric(
+                "Total Selected Files",
+                str(inspection["total_selected_count"]),
+            )
+            summary_cols[1].metric(
+                "Total Selected Upload Size",
+                _bytes_label(int(inspection["total_selected_size"])),
+            )
+            st.dataframe(
+                list(inspection["rows"]),
+                use_container_width=True,
+                hide_index=True,
+            )
+            if remove_labels:
+                st.caption(f"Marked for removal: {len(remove_labels)}")
+            if st.form_submit_button("Clear File Selection", type="secondary"):
+                st.session_state["atlas_create_project_uploads"] = []
+                st.session_state["atlas_create_project_remove_selection"] = []
+                st.rerun()
+
+        with st.expander("Optional Project Details", expanded=False):
+            client_project_number = st.text_input("Client Project Number")
+            consultant = st.text_input("Consultant")
+            architect = st.text_input("Architect")
+            engineers_text = st.text_input("Engineers (comma-separated)")
+            issue_date = st.text_input("Issue Date")
+            location = st.text_input("Location", key="atlas_new_project_location")
+
+        primary_action_label = _create_project_primary_action_label(
+            bool(inspection["has_selected_files"])
+        )
+        submitted = st.form_submit_button(primary_action_label)
 
     if not submitted:
         return
 
-    if not project_id.strip() or not name.strip() or not client.strip():
-        st.error("Project ID, Project Name, and Owner / Client are required.")
+    missing_required_fields = _create_project_missing_required_fields(name, client)
+    if missing_required_fields:
+        st.error("Project Name and Owner / Client are required.")
+        return
+
+    has_selected_files = bool(inspection["has_selected_files"])
+    if has_selected_files and bool(inspection["all_selected_invalid"]):
+        st.error(
+            "All selected files are invalid for upload. Fix file issues or clear selection to create workspace only."
+        )
         return
 
     record = workspace_service.create_manual_record(
-        project_id=project_id.strip(),
         name=name.strip(),
         client=client.strip(),
+        client_project_number=client_project_number.strip() or None,
         consultant=consultant.strip() or None,
         architect=architect.strip() or None,
         engineers=[
@@ -8026,7 +8311,6 @@ def _render_create_project_page(
             for item in engineers_text.split(",")
             if isinstance(item, str) and item.strip()
         ],
-        project_number=project_number.strip() or None,
         issue_date=issue_date.strip() or None,
         location=location.strip() or None,
         bid_date=bid_date.strip() or None,
@@ -8034,9 +8318,77 @@ def _render_create_project_page(
         lifecycle_stage=lifecycle_stage,
     )
     workspace_service.save_record(record)
+
+    uploaded_record = record
+    accepted_count = 0
+    rejected_count = 0
+    import_summary: dict[str, Any] = {}
+    if has_selected_files:
+        accepted_payload = list(inspection["accepted_payload"])
+        accepted_count = len(accepted_payload)
+        rejected_count = int(inspection["rejected_count"])
+        if accepted_payload:
+            try:
+                uploaded_record = workspace_service.import_uploaded_documents(
+                    record.workspace_id,
+                    accepted_payload,
+                )
+                import_summary = dict(uploaded_record.import_summary or {})
+            except Exception as exc:
+                workspace_service.log_event(
+                    record.workspace_id,
+                    "documents_import_failed",
+                    {
+                        "error": str(exc),
+                        "attempted_file_count": accepted_count,
+                    },
+                )
+                st.warning(
+                    f"Project created, but document upload encountered an error: {exc}"
+                )
+        if rejected_count > 0 or bool(inspection["warnings"]):
+            workspace_service.log_event(
+                record.workspace_id,
+                "documents_upload_rejected",
+                {
+                    "rejected_count": rejected_count,
+                    "archive_warnings": list(inspection["warnings"]),
+                },
+            )
+
     st.session_state["atlas_active_workspace_id"] = record.workspace_id
-    st.session_state["atlas_active_page"] = "Overview"
-    st.success(f"Created project {record.project.name}.")
+    st.session_state["atlas_active_page"] = _create_project_post_create_page(
+        has_selected_files
+    )
+    _reset_create_project_upload_state(st)
+    st.success(
+        f"Created bid workspace {record.project.name} with Atlas Bid ID {_atlas_bid_id(record)}."
+    )
+    if has_selected_files:
+        pending_intake = int(import_summary.get("uploaded_file_count", accepted_count))
+        requires_review = int(import_summary.get("unsupported_file_count", 0))
+        st.dataframe(
+            [
+                {
+                    "Project": uploaded_record.project.name,
+                    "Atlas Bid ID": _atlas_bid_id(uploaded_record),
+                    "Files Accepted": accepted_count,
+                    "Files Rejected": rejected_count,
+                    "Files Pending Intake": pending_intake,
+                    "Files Parsing": max(pending_intake - requires_review, 0),
+                    "Files Requiring Review": requires_review,
+                    "Next Recommended Action": "Open Documents and review intake status/extracted metadata.",
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        if inspection["warnings"]:
+            st.info("Archive diagnostics: " + " | ".join(list(inspection["warnings"])))
+    else:
+        st.caption(
+            "Next action: Add bid documents in Documents to start deterministic intake and parsing workflows."
+        )
     st.rerun()
 
 
@@ -8094,8 +8446,11 @@ def _render_open_existing_page(
                         " ".join(
                             [
                                 _safe_text(item.get("project_name"), ""),
+                                _safe_text(item.get("atlas_bid_id"), ""),
                                 _safe_text(item.get("workspace_id"), ""),
                                 _safe_text(item.get("customer"), ""),
+                                _safe_text(item.get("client_project_number"), ""),
+                                _safe_text(item.get("internal_project_number"), ""),
                             ]
                         ),
                         [search.strip().lower()],
@@ -8119,7 +8474,10 @@ def _render_open_existing_page(
             [
                 {
                     "Project": item["project_name"],
+                    "Atlas Bid ID": item["atlas_bid_id"],
                     "Customer": item["customer"],
+                    "Client Project Number": item["client_project_number"] or "",
+                    "Internal Project Number": item["internal_project_number"] or "",
                     "Lifecycle": item["lifecycle_stage"],
                     "Status": item["current_status"],
                     "Last Opened": item["last_opened"],
@@ -8136,7 +8494,7 @@ def _render_open_existing_page(
         )
 
         labels = [
-            f"{item['project_name']} · {item['workspace_id']}" for item in filtered
+            f"{item['project_name']} · {item['atlas_bid_id']}" for item in filtered
         ]
         if labels:
             selected_label = st.selectbox("Select Project", options=labels)
@@ -12122,8 +12480,13 @@ def _application_search_entries(
         record = item["record"]
         data = {
             "workspace_id": record.workspace_id,
+            "atlas_bid_id": _safe_text(item.get("atlas_bid_id"), record.workspace_id),
             "project_name": record.project.name,
             "customer": _safe_text(item.get("customer"), "n/a"),
+            "client_project_number": _safe_text(item.get("client_project_number"), ""),
+            "internal_project_number": _safe_text(
+                item.get("internal_project_number"), ""
+            ),
             "status": _safe_text(item.get("review_status"), "Needs Review"),
         }
         reference = _build_object_reference(
@@ -12137,9 +12500,12 @@ def _application_search_entries(
         reference["project_name"] = record.project.name
         reference["scope"] = "application"
         reference["match_fields"] = [
+            _safe_text(item.get("atlas_bid_id"), record.workspace_id),
             record.workspace_id,
             record.project.name,
             _safe_text(item.get("customer"), ""),
+            _safe_text(item.get("client_project_number"), ""),
+            _safe_text(item.get("internal_project_number"), ""),
         ]
         references.append(reference)
 
@@ -19981,6 +20347,134 @@ def _render_settings_page(
     if page == "Project Settings":
         manifest = workspace_service.read_manifest(record.workspace_id)
         health = workspace_service.project_health(record.workspace_id)
+        atlas_bid_id = _atlas_bid_id(record)
+        lifecycle_stage = _safe_text(
+            record.metadata.get("lifecycle_stage"),
+            record.project.status.value,
+        )
+        internal_required = _is_awarded_or_execution_stage(lifecycle_stage)
+        internal_missing = internal_required and not _internal_project_number(record)
+
+        st.markdown("### Project Identity")
+        st.dataframe(
+            [
+                {
+                    "Atlas Bid ID": atlas_bid_id,
+                    "Client Project Number": _client_project_number(record) or "",
+                    "Internal Project Number": _internal_project_number(record) or "",
+                    "Lifecycle Stage": lifecycle_stage,
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        if internal_missing:
+            st.info(
+                "Lifecycle stage is awarded/execution and Internal Project Number is not set. Assign it below when available."
+            )
+
+        stage_options = [status.value for status in ProjectStatus]
+        with st.expander("Edit Project Metadata", expanded=False):
+            owner_input = st.text_input(
+                "Owner / Client",
+                value=_safe_text(record.metadata.get("owner"), record.project.client),
+                key=f"atlas_settings_owner_{record.workspace_id}",
+            )
+            lifecycle_input = st.selectbox(
+                "Lifecycle Stage",
+                options=stage_options,
+                index=(
+                    stage_options.index(
+                        _safe_text(lifecycle_stage, ProjectStatus.INTAKE.value)
+                    )
+                    if _safe_text(lifecycle_stage, "") in stage_options
+                    else stage_options.index(ProjectStatus.INTAKE.value)
+                ),
+                key=f"atlas_settings_lifecycle_{record.workspace_id}",
+            )
+            client_project_number_input = st.text_input(
+                "Client Project Number",
+                value=_client_project_number(record),
+                key=f"atlas_settings_client_number_{record.workspace_id}",
+            )
+            internal_disabled = not _is_awarded_or_execution_stage(lifecycle_input)
+            internal_project_number_input = st.text_input(
+                "Internal Project Number",
+                value=_internal_project_number(record),
+                key=f"atlas_settings_internal_number_{record.workspace_id}",
+                disabled=internal_disabled,
+                help=(
+                    "Internal Project Number becomes editable when lifecycle reaches awarded/execution stages."
+                    if internal_disabled
+                    else "Optional for awarded/execution stages."
+                ),
+            )
+            consultant_input = st.text_input(
+                "Consultant",
+                value=_safe_text(record.metadata.get("consultant"), ""),
+                key=f"atlas_settings_consultant_{record.workspace_id}",
+            )
+            architect_input = st.text_input(
+                "Architect",
+                value=_safe_text(record.metadata.get("architect"), ""),
+                key=f"atlas_settings_architect_{record.workspace_id}",
+            )
+            engineers_input = st.text_input(
+                "Engineers (comma-separated)",
+                value=", ".join(
+                    [
+                        _safe_text(item, "")
+                        for item in list(record.metadata.get("engineers") or [])
+                        if _safe_text(item, "")
+                    ]
+                ),
+                key=f"atlas_settings_engineers_{record.workspace_id}",
+            )
+            issue_date_input = st.text_input(
+                "Issue Date",
+                value=_safe_text(record.metadata.get("issue_date"), ""),
+                key=f"atlas_settings_issue_date_{record.workspace_id}",
+            )
+            location_input = st.text_input(
+                "Location",
+                value=_safe_text(record.project.location, ""),
+                key=f"atlas_settings_location_{record.workspace_id}",
+            )
+            bid_date_input = st.text_input(
+                "Bid Due Date",
+                value=_safe_text(record.project.bid_date, ""),
+                key=f"atlas_settings_bid_date_{record.workspace_id}",
+            )
+
+            if st.button(
+                "Save Project Metadata",
+                key=f"atlas_settings_save_metadata_{record.workspace_id}",
+                use_container_width=True,
+            ):
+                updated = workspace_service.update_project_identity_metadata(
+                    record.workspace_id,
+                    owner=owner_input,
+                    lifecycle_stage=lifecycle_input,
+                    client_project_number=client_project_number_input,
+                    internal_project_number=(
+                        internal_project_number_input
+                        if not internal_disabled
+                        else _internal_project_number(record)
+                    ),
+                    consultant=consultant_input,
+                    architect=architect_input,
+                    engineers=[
+                        item.strip()
+                        for item in engineers_input.split(",")
+                        if isinstance(item, str) and item.strip()
+                    ],
+                    issue_date=issue_date_input,
+                    location=location_input,
+                    bid_date=bid_date_input,
+                )
+                st.session_state["atlas_active_workspace_id"] = updated.workspace_id
+                st.success("Project metadata updated.")
+                st.rerun()
 
         st.markdown("### Project Repository / Storage")
         st.dataframe(

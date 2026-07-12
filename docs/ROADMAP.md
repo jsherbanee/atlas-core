@@ -60,13 +60,14 @@ Completed outcomes:
 
 ## Phase 2: Bid Intelligence (Active)
 Current objective:
-Sprint X-01 Pilot Readiness and Application Walkthrough is implemented and closed.
+Sprint X-02 Project Creation and Bid Identity Refinement is active.
 
 Current UX hardening stream:
 
-- Epic X Product Hardening closeout (A-05 and X-01 complete)
+- Epic X Product Hardening continuation (A-05 and X-01 complete, X-02 active)
 - focused on estimator/project-engineer/design-engineer workflow usability hardening for existing capabilities
 - preserves D-03 scope boundaries and does not start Epic E or Commercial Intelligence implementation
+- includes identity model hardening for Atlas Bid ID, Client Project Number, and Internal Project Number in existing project-management workflows
 
 Implemented in current baseline candidate:
 - Bid package review orchestration

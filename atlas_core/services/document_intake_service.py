@@ -59,6 +59,13 @@ class UploadSessionResult:
     warnings: list[str]
 
 
+@dataclass
+class UploadInspectionResult:
+    accepted_files: list[UploadedIntakeFile]
+    diagnostics: list[dict[str, Any]]
+    warnings: list[str]
+
+
 class LocalOcrEngine(Protocol):
     def is_available(self) -> bool: ...
 
@@ -131,6 +138,12 @@ class DocumentIntakeService:
         | _DOCUMENT_EXTENSIONS
         | {".json", ".zip"}
     )
+    _MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024
+    _MAX_ARCHIVE_ENTRY_COUNT = 2000
+    _MAX_ARCHIVE_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
+    _MAX_ARCHIVE_DEPTH = 3
+    _SYSTEM_ARTIFACT_NAMES = {".ds_store"}
+    _SYSTEM_ARTIFACT_PREFIXES = {"__macosx/"}
 
     def __init__(
         self,
@@ -170,7 +183,18 @@ class DocumentIntakeService:
         if not uploaded_files:
             raise ValueError("No files were uploaded")
 
-        normalized_files, warnings = self._flatten_uploads(uploaded_files)
+        inspection = self.inspect_uploaded_files(uploaded_files)
+        normalized_files = [
+            (item.name, item.data) for item in list(inspection.accepted_files)
+        ]
+        warnings = list(inspection.warnings)
+        rejected_diagnostics = [
+            item
+            for item in list(inspection.diagnostics)
+            if not bool(item.get("accepted", False))
+        ]
+        if not normalized_files:
+            raise ValueError("No valid files were uploaded")
         active_session_id = session_id or f"session-{uuid.uuid4().hex[:12]}"
         session_root = Path(uploads_root) / active_session_id
         self._ensure_package_folders(session_root)
@@ -224,6 +248,8 @@ class DocumentIntakeService:
             "image_count": image_count,
             "unsupported_file_count": unsupported_file_count,
             "uploaded_file_count": len(normalized_files),
+            "rejected_file_count": len(rejected_diagnostics),
+            "rejected_file_diagnostics": rejected_diagnostics,
             "extraction_warnings": sorted(set(warnings)),
         }
 
@@ -243,6 +269,73 @@ class DocumentIntakeService:
             snapshot=snapshot,
             import_summary=dict(snapshot.import_summary),
             warnings=list(snapshot.warnings),
+        )
+
+    def inspect_uploaded_files(
+        self,
+        uploaded_files: list[UploadedIntakeFile],
+    ) -> UploadInspectionResult:
+        normalized_files, warnings = self._flatten_uploads(uploaded_files)
+        diagnostics: list[dict[str, Any]] = []
+        accepted_files: list[UploadedIntakeFile] = []
+
+        seen_names: set[str] = set()
+        seen_hashes: set[str] = set()
+        for name, data in normalized_files:
+            suffix = Path(name).suffix.lower()
+            source_hash = hashlib.sha1(data).hexdigest()
+            duplicate_name = name.lower() in seen_names
+            duplicate_hash = source_hash in seen_hashes
+            file_size = len(data)
+            unsupported = suffix not in self._SUPPORTED_EXTENSIONS or suffix == ".zip"
+            empty = file_size <= 0
+            too_large = file_size > self._MAX_UPLOAD_FILE_BYTES
+
+            errors: list[str] = []
+            if unsupported:
+                errors.append("unsupported extension")
+            if empty:
+                errors.append("empty file")
+            if too_large:
+                errors.append("file exceeds size limit")
+            if duplicate_name:
+                errors.append("duplicate filename")
+            if duplicate_hash:
+                errors.append("duplicate source hash")
+
+            accepted = not errors
+            if accepted:
+                accepted_files.append(UploadedIntakeFile(name=name, data=data))
+
+            diagnostics.append(
+                {
+                    "name": name,
+                    "extension": suffix,
+                    "size_bytes": file_size,
+                    "source_hash": source_hash,
+                    "source_type": (
+                        "zip_entry" if "/" in name or "\\" in name else "file"
+                    ),
+                    "zip_source": (
+                        Path(name).parts[0].lower().endswith(".zip")
+                        if Path(name).parts
+                        else False
+                    ),
+                    "duplicate_name": duplicate_name,
+                    "duplicate_source_hash": duplicate_hash,
+                    "accepted": accepted,
+                    "severity": "error" if errors else "informational",
+                    "messages": errors or ["accepted"],
+                }
+            )
+
+            seen_names.add(name.lower())
+            seen_hashes.add(source_hash)
+
+        return UploadInspectionResult(
+            accepted_files=accepted_files,
+            diagnostics=diagnostics,
+            warnings=warnings,
         )
 
     def build_snapshot(self, package_path: str | Path) -> DocumentIntakeSnapshot:
@@ -821,7 +914,7 @@ class DocumentIntakeService:
         if not folder_path.exists() or not folder_path.is_dir():
             return []
 
-        return sorted(path for path in folder_path.iterdir() if path.is_file())
+        return sorted(path for path in folder_path.rglob("*") if path.is_file())
 
     def _flatten_uploads(
         self,
@@ -847,7 +940,7 @@ class DocumentIntakeService:
         warnings: list[str],
         depth: int = 0,
     ) -> list[tuple[str, bytes]]:
-        if depth > 3:
+        if depth > self._MAX_ARCHIVE_DEPTH:
             warnings.append(f"{name}: nested archive depth limit reached; skipping.")
             return []
 
@@ -858,12 +951,52 @@ class DocumentIntakeService:
         expanded: list[tuple[str, bytes]] = []
         try:
             with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                entry_count = 0
+                total_uncompressed_size = 0
+                seen_entries: set[str] = set()
                 for info in archive.infolist():
                     if info.is_dir():
                         continue
 
+                    entry_count += 1
+                    if entry_count > self._MAX_ARCHIVE_ENTRY_COUNT:
+                        warnings.append(
+                            f"{name}: archive entry limit exceeded; remaining entries skipped."
+                        )
+                        break
+
+                    entry_name = self._normalized_archive_entry(info.filename)
+                    if entry_name is None:
+                        warnings.append(
+                            f"{name}: rejected unsafe archive path {info.filename}."
+                        )
+                        continue
+
+                    if self._is_system_artifact(entry_name):
+                        continue
+
+                    if info.flag_bits & 0x1:
+                        warnings.append(
+                            f"{name}: encrypted archive entry rejected ({entry_name})."
+                        )
+                        continue
+
+                    if entry_name in seen_entries:
+                        warnings.append(
+                            f"{name}: duplicate archive entry rejected ({entry_name})."
+                        )
+                        continue
+                    seen_entries.add(entry_name)
+
+                    total_uncompressed_size += int(info.file_size or 0)
+                    if total_uncompressed_size > self._MAX_ARCHIVE_UNCOMPRESSED_BYTES:
+                        warnings.append(
+                            f"{name}: archive expansion size limit exceeded; remaining entries skipped."
+                        )
+                        break
+
                     inner_data = archive.read(info.filename)
-                    logical_name = f"{Path(name).stem}/{info.filename}"
+                    logical_name = f"{name}/{entry_name}"
                     expanded.extend(
                         self._expand_upload_file(
                             logical_name,
@@ -876,6 +1009,32 @@ class DocumentIntakeService:
             warnings.append(f"{name}: could not unpack ZIP archive.")
 
         return expanded
+
+    @classmethod
+    def _normalized_archive_entry(cls, value: str) -> str | None:
+        normalized = value.replace("\\", "/").strip()
+        if not normalized or normalized.startswith("/"):
+            return None
+
+        parts: list[str] = []
+        for part in normalized.split("/"):
+            stripped = part.strip()
+            if not stripped or stripped == ".":
+                continue
+            if stripped == "..":
+                return None
+            parts.append(stripped)
+
+        if not parts:
+            return None
+        return "/".join(parts)
+
+    @classmethod
+    def _is_system_artifact(cls, normalized_entry: str) -> bool:
+        lowered = normalized_entry.lower()
+        if any(lowered.startswith(prefix) for prefix in cls._SYSTEM_ARTIFACT_PREFIXES):
+            return True
+        return Path(lowered).name in cls._SYSTEM_ARTIFACT_NAMES
 
     def _ensure_package_folders(self, package_root: Path) -> None:
         for folder_name in (
@@ -935,8 +1094,24 @@ class DocumentIntakeService:
         upload_name: str,
         upload_data: bytes,
     ) -> Path:
-        file_name = Path(upload_name).name
-        destination = package_root / target_group / file_name
+        normalized_name = upload_name.replace("\\", "/")
+        relative_parts = [part for part in normalized_name.split("/") if part]
+        if not relative_parts:
+            relative_parts = [Path(upload_name).name]
+        safe_parts: list[str] = []
+        for part in relative_parts:
+            stripped = part.strip()
+            if not stripped or stripped in {".", ".."}:
+                continue
+            safe_parts.append(stripped)
+        if not safe_parts:
+            safe_parts = [Path(upload_name).name]
+
+        destination = package_root / target_group
+        for part in safe_parts[:-1]:
+            destination = destination / part
+        destination.mkdir(parents=True, exist_ok=True)
+        destination = destination / safe_parts[-1]
         destination = self._resolve_duplicate_path(destination)
         destination.write_bytes(upload_data)
         return destination

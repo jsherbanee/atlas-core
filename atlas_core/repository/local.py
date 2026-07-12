@@ -32,6 +32,7 @@ _METADATA_FILE = "metadata.json"
 _WORKSPACE_FILE = "workspace.json"
 _MANIFEST_FILE = "project_manifest.json"
 _HISTORY_FILE = "history/events.jsonl"
+_BID_SEQUENCE_FILE = ".atlas_bid_id_sequence.json"
 _SCHEMA_VERSION = "1.0"
 _STORAGE_VERSION = "1.0"
 _REQUIRED_TOP_LEVEL_DIRS = [
@@ -90,6 +91,7 @@ class LocalProjectRepository(ProjectRepository):
         self._write_project(project_dir, project_payload)
         self._write_metadata(project_dir, metadata_payload)
         self._write_workspace(project_dir, workspace_payload)
+        self._observe_bid_id(project_id)
         self._write_manifest(project_dir)
         return str(project_dir)
 
@@ -105,6 +107,7 @@ class LocalProjectRepository(ProjectRepository):
         self._write_project(project_dir, project_payload)
         self._write_metadata(project_dir, metadata_payload)
         self._write_workspace(project_dir, workspace_payload)
+        self._observe_bid_id(project_id)
         self._write_manifest(project_dir)
         return str(project_dir)
 
@@ -305,8 +308,35 @@ class LocalProjectRepository(ProjectRepository):
             shutil.move(str(project_dir), str(target_dir))
 
         self._ensure_project_layout(target_dir)
+        self._observe_bid_id(project_id)
         self._write_manifest(target_dir)
         return project_id
+
+    def allocate_bid_id(self, year: int | None = None) -> str:
+        target_year = year or datetime.now(UTC).year
+        state = self._read_bid_sequence_state()
+        years = dict(state.get("years") or {})
+        current = int(years.get(str(target_year), 0) or 0)
+
+        while True:
+            current += 1
+            candidate = f"BID-{target_year:04d}-{current:04d}"
+            if not self._project_dir(candidate).exists():
+                years[str(target_year)] = current
+                self._write_bid_sequence_state({"years": years})
+                return candidate
+
+    def peek_next_bid_id(self, year: int | None = None) -> str:
+        target_year = year or datetime.now(UTC).year
+        state = self._read_bid_sequence_state()
+        years = dict(state.get("years") or {})
+        current = int(years.get(str(target_year), 0) or 0)
+
+        while True:
+            current += 1
+            candidate = f"BID-{target_year:04d}-{current:04d}"
+            if not self._project_dir(candidate).exists():
+                return candidate
 
     def health_check(self, project_id: str) -> JsonDict:
         _, _, _, location = self.load(project_id)
@@ -417,6 +447,43 @@ class LocalProjectRepository(ProjectRepository):
             return ref
 
         return self._project_dir(project_ref)
+
+    def _read_bid_sequence_state(self) -> JsonDict:
+        path = self.root / _BID_SEQUENCE_FILE
+        if not path.exists():
+            return {"years": {}}
+        payload = self._read_json(path)
+        years = payload.get("years")
+        if not isinstance(years, dict):
+            return {"years": {}}
+        normalized: dict[str, int] = {}
+        for raw_year, raw_value in years.items():
+            year_text = str(raw_year).strip()
+            if not year_text.isdigit():
+                continue
+            try:
+                normalized[year_text] = int(raw_value)
+            except Exception:
+                continue
+        return {"years": normalized}
+
+    def _write_bid_sequence_state(self, payload: JsonDict) -> None:
+        path = self.root / _BID_SEQUENCE_FILE
+        self._write_json(path, payload)
+
+    def _observe_bid_id(self, project_id: str) -> None:
+        matched = re.match(r"^BID-(\d{4})-(\d+)$", project_id.strip(), flags=re.I)
+        if matched is None:
+            return
+
+        year = matched.group(1)
+        sequence = int(matched.group(2))
+        state = self._read_bid_sequence_state()
+        years = dict(state.get("years") or {})
+        current = int(years.get(year, 0) or 0)
+        if sequence > current:
+            years[year] = sequence
+            self._write_bid_sequence_state({"years": years})
 
     def _project_dir(self, project_id: str) -> Path:
         return self.root / _slugify(project_id)

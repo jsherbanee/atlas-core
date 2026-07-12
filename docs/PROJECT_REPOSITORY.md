@@ -17,6 +17,8 @@ Goals:
 - Keep storage deterministic and portable.
 - Decouple workspace logic from storage implementation using repository contracts.
 - Enable future cloud adapters without changing workspace code paths.
+- Support deterministic Atlas Bid ID sequencing with non-consuming preview and consuming allocation behavior.
+- Keep create-with-upload onboarding deterministic with explicit diagnostics and recovery-safe partial success.
 
 Out of scope:
 - AWS/S3
@@ -34,6 +36,10 @@ Contracts:
 - ReviewRepository
 - KnowledgeRepository
 - HistoryRepository
+
+Project identity contract notes (X-02):
+- `allocate_bid_id(year=None)` reserves the next available deterministic Atlas Bid ID.
+- `peek_next_bid_id(year=None)` previews the next available deterministic Atlas Bid ID without advancing sequence state.
 
 Storage-agnostic contract behavior:
 - Callers work with project identifiers and storage locations (string references), not filesystem internals.
@@ -63,6 +69,7 @@ Runtime UI sessions use mutable workspace storage outside immutable source fixtu
 Directory structure:
 
 - AtlasProjects/
+  - .atlas_bid_id_sequence.json
   - <project_id>/
     - project.json
     - metadata.json
@@ -125,7 +132,10 @@ metadata.json:
 - consultant
 - architect
 - engineers
-- project number
+- project number (Atlas Bid ID compatibility alias)
+- atlas bid id
+- client project number
+- internal project number
 - issue date
 - bid date
 - status
@@ -163,6 +173,29 @@ Atlas persists the following state to workspace.json:
 - context selection
 
 On load, the workspace restores this state so the user returns to their last working context.
+
+## Create + Upload Recovery Behavior (X-02 Amendment)
+
+Project onboarding uses existing repository/intake paths and does not create a parallel upload subsystem.
+
+Behavior guarantees:
+- project identity creation and Atlas Bid ID assignment are deterministic and durable once the project is created
+- document import failures do not corrupt or delete a successfully created project
+- valid files remain associated with the new project even when other files are rejected
+- rejected files surface structured diagnostics and can be retried from Documents workspace
+- runtime upload artifacts are written only under controlled project intake locations
+
+## ZIP Safety Rules (X-02 Amendment)
+
+ZIP intake applies deterministic safety controls before extracting entries:
+- path traversal rejection
+- encrypted-entry rejection
+- duplicate-entry rejection
+- system artifact filtering (`__MACOSX`, `.DS_Store`)
+- nested archive depth limit
+- archive entry-count limit
+- archive expansion-size limit
+- contained relative-path preservation in source metadata
 
 ## Immutable Fixtures vs Mutable Runtime Storage
 Atlas distinguishes fixture data from runtime state:

@@ -88,6 +88,19 @@ X-01 continues product-hardening posture without adding architecture surface are
 
 X-01 focus is pilot-readiness validation, deterministic workflow clarity, and documentation/status synchronization.
 
+## Sprint X-02 Project Creation and Bid Identity Refinement Constraints (Active)
+
+X-02 continues product-hardening without expanding architecture scope:
+
+- no Epic E implementation start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation capability work
+
+X-02 focus is project-identity clarity and deterministic project-creation behavior in existing architecture layers:
+
+- repository-level deterministic Atlas Bid ID allocation and non-consuming preview contracts
+- service-level metadata normalization for Atlas Bid ID, Client Project Number, and Internal Project Number
+- UI discoverability consistency across create/open/list/search/settings flows
+
 
 Implementation structure:
 - domain: deterministic estimate entities and status enums
