@@ -25,12 +25,14 @@ Sprint 7.5 completes UI repair and runtime-state isolation with shared project c
 Sprint 8 introduces the Deterministic Estimating Foundation: Estimate Workspace architecture, traceable estimate line entities, resolution/pricing status modeling, confidence scoring, and extension-point interfaces for future pricing engines.
 Sprint 9 implements the Deterministic Product Resolution Engine: canonical product resolution domain/service models, dedicated Product Resolution workspace page, manual override audit behavior, engineering summary integration, and deterministic estimate pricing gate enforcement based on resolution completeness.
 Sprint 9 Commercial Knowledge Foundation adds immutable price-sheet versioning, deterministic version comparison, product change reporting, and commercial freshness/lifecycle visibility without introducing procurement or quote-generation workflows.
+Sprint 10 implements the Deterministic Pricing Engine: immutable price record selection, explainable candidate/rule traces, deterministic pricing snapshot IDs, manual pricing override audit model, advisory price-update impacts, export payloads, and Estimate/BOM pricing workspace integration.
+Sprint 10 Deterministic Cost Engine now establishes acquisition-cost-first deterministic selection, vendor-type-aware hierarchy, complete cost traceability, quick-add product project isolation, optional promotion to immutable commercial knowledge, and cost-focused Estimate/BOM workspace views.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: 964 passed
+- pytest: targeted Sprint 10 suite passing (15 tests)
 
 ## Tooling Status
 - GitHub Actions configured
@@ -64,6 +66,7 @@ Current workspace behavior:
 - Project navigation now includes explicit disabled future lifecycle sections and shared configuration-driven rendering.
 - Shared object metadata/reference section helpers are reused across Equipment, Drawings, and Specifications detail views.
 - Estimate Workspace now renders deterministic sections (Overview, Equipment Cost, Labor, Accessories, Freight, General Conditions, Engineering Allowances, Project Summary, Estimate Confidence).
+- Estimate Workspace now includes deterministic pricing sections: Pricing Overview, Commercial Coverage, Priced Equipment, Unpriced Equipment, Stale Pricing, Allowances, Vendor Alternatives, Pricing Warnings, and Pricing History.
 - Deterministic estimate lines now include required source traceability fields (source object, object type, manufacturer, model, description, quantity, pricing status, labor status, confidence, and source references).
 - Estimate line navigation now supports Equipment, Specification, Drawing, Relationships, and Evidence traversal.
 - Product resolution state now surfaces exact product, approved substitute, preferred alternate, generic allowance, and unknown product.
@@ -76,6 +79,12 @@ Current workspace behavior:
 - Price List Library now imports into immutable Price Sheet Versions and Price Records through Commercial Knowledge services.
 - Import History page now exposes deterministic version-level change summaries and historical replay of previous commercial versions.
 - Knowledge workspace now includes Commercial Health metrics for coverage, freshness, missing pricing, stale pricing, and commercial confidence.
+- Deterministic pricing lines now include selected price record/vendor offering/version traceability, freshness/status/warnings, confidence rationale, and manual override provenance.
+- BOM Review now surfaces lightweight deterministic pricing fields and drill-down selection details.
+- Deterministic pricing exports now provide Pricing Summary JSON, Priced BOM CSV, Commercial Coverage JSON, and Pricing Exceptions CSV.
+- Deterministic cost lines now include vendor classification, source file/row traceability, import/effective/expiration dates, and confidence rationale.
+- Estimate workspace now includes deterministic cost dashboard views and quick-add product workflow (project-only or promotion).
+- Commercial coverage now tracks current/historical/allowance/missing/stale cost states with material cost confidence.
 - BOM Review now includes an Open Equipment Detail action for selected BOM rows while preserving BOM table reconciliation behavior.
 - Drawing and Specification workspaces now expose referenced equipment as human-readable objects that can open Equipment Workspace.
 - Project Workspace now includes a non-blocking guided review sequence with statuses (not started/ready/needs review/blocked/complete).
@@ -107,3 +116,5 @@ Current workspace behavior:
 - [MANUFACTURER_REGISTRY.md](MANUFACTURER_REGISTRY.md)
 - [COMMERCIAL_KNOWLEDGE.md](COMMERCIAL_KNOWLEDGE.md)
 - [PRICE_VERSIONING.md](PRICE_VERSIONING.md)
+- [PRICING_ENGINE.md](PRICING_ENGINE.md)
+- [COST_ENGINE.md](COST_ENGINE.md)

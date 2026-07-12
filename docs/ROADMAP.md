@@ -28,6 +28,8 @@ Milestones describe customer-visible product capability.
 - Title block intelligence
 - Future OCR integration points
 - Commercial Knowledge Foundation with immutable price versioning
+- Deterministic Pricing Engine with immutable record selection and explainable pricing traces
+- Deterministic Cost Engine with acquisition-cost traceability and vendor hierarchy
 
 ### Beta 1.0
 - Internal production-ready
@@ -72,12 +74,18 @@ Implemented in current baseline candidate:
 - Commercial knowledge model (vendor offerings, price sheets, immutable versions, and price records)
 - Deterministic price version comparison and product change reporting
 - Commercial freshness and lifecycle tracking for price recency and missing-from-latest detection
+- Deterministic pricing engine for estimate lines with candidate/rule traces, manual override audit, and pricing snapshot reproducibility
+- Advisory pricing impact detection without silent repricing
+- Deterministic pricing exports for summary, priced BOM, coverage, and exceptions
+- Deterministic cost engine for acquisition cost selection, cost traceability, commercial coverage, and project-only quick-add product support
 
 Remaining Phase 2 refinements:
 - PDF ingestion and indexing robustness
 - Drawing/spec intelligence quality refinements
 - Device schedule extraction quality refinements
 - Additional deterministic regression snapshots and export validations
+- Additional pricing policy calibration and broader multi-vendor benchmark coverage
+- Additional cost confidence calibration and larger quick-add promotion regression coverage
 
 ## Phase 3: Project Initialization (Deferred)
 Deferred until Phase 2 completion.

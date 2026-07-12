@@ -6,6 +6,8 @@
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [PHASE2_GUI.md](PHASE2_GUI.md)
 - [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)
+- [PRICING_ENGINE.md](PRICING_ENGINE.md)
+- [COST_ENGINE.md](COST_ENGINE.md)
 
 ## Purpose
 This document defines Atlas deterministic estimating architecture.
@@ -26,16 +28,23 @@ Out of scope for this foundation:
 - No hidden calculations or black-box pricing behavior.
 
 ## Estimate Architecture
-Sprint 8 introduces a deterministic estimate model and service layer:
+Sprint 8 introduces a deterministic estimate model and service layer.
+Sprint 10 adds deterministic acquisition cost selection over immutable commercial knowledge:
 - domain entities in atlas_core/domain/deterministic_estimate.py
 - deterministic estimate orchestration in atlas_core/services/estimate_service.py
+- deterministic pricing entities in atlas_core/domain/pricing_engine.py
+- deterministic cost entities in atlas_core/domain/cost_engine.py
+- deterministic pricing orchestration in atlas_core/services/pricing_engine_service.py
+- deterministic cost orchestration in atlas_core/services/cost_engine_service.py
 - UI workspace integration in apps/phase2_review_app.py (Estimate page)
 
 Core flow:
 1. reviewed BOM/equipment objects are read from project context
 2. deterministic estimate lines are generated
-3. each line records source traceability and resolution/pricing state
-4. totals and confidence are calculated from explicit model state
+3. deterministic product resolution gates pricing eligibility
+4. deterministic cost selection selects immutable price records and retains alternatives
+5. each line records source traceability and resolution/pricing state
+6. totals and confidence are calculated from explicit model state
 
 ## Estimate Object Model
 Primary objects:
@@ -84,6 +93,73 @@ Line-level cost status:
 - unavailable
 
 Labor status uses the same deterministic status model.
+
+## Deterministic Pricing Engine (Sprint 10)
+Pricing engine outputs are separate from baseline estimate-line material snapshots.
+
+Pricing engine objects:
+- PricingResult
+- PricedEstimateLine
+- PriceSelection
+- PriceSelectionCandidate
+- PricingRule
+- PricingWarning
+- PricingSummary
+- CommercialCoverageSummary
+
+Deterministic pricing statuses:
+- verified_current
+- quoted
+- current_price_sheet
+- historical_price
+- estimated_allowance
+- stale_price
+- expired_price
+- missing_from_latest_price_sheet
+- unavailable
+- no_pricing
+- manual_override
+
+Deterministic pricing run metadata:
+- pricing_run_id
+- run_timestamp
+- pricing_policy_version
+
+Deterministic pricing exports:
+- Pricing Summary JSON
+- Priced BOM CSV
+- Commercial Coverage JSON
+- Pricing Exceptions CSV
+
+Pricing update impacts are advisory only (no silent repricing).
+
+## Deterministic Cost Engine (Sprint 10)
+Cost engine outputs provide acquisition-cost-first deterministic selection with traceable vendor hierarchy.
+
+Cost engine objects:
+- CostResult
+- CostLine
+- CostSelection
+- CostCandidate
+- CostSummary
+- CostConfidence
+
+Cost statuses:
+- verified
+- quoted
+- current
+- historical
+- allowance
+- stale
+- expired
+- unavailable
+- missing
+
+Out of scope remains explicit:
+- markup
+- sell pricing
+- margin strategy
+- proposal generation
 
 ## Labor Architecture
 Labor architecture categories are defined even when line-level labor values are empty:
@@ -162,3 +238,9 @@ The deterministic estimate service defines extension interfaces for future, non-
 - accessory generation
 
 These are interface-only placeholders in Sprint 8.
+
+Pricing extension points are implemented for Sprint 10 inputs:
+- preferred vendor policy hierarchy
+- project quote candidate inputs
+- explicit generic allowance map
+- manual override audit model

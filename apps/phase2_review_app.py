@@ -42,6 +42,7 @@ from atlas_core.services.sales_design_review_service import SalesDesignReviewSer
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 from atlas_core.services.estimate_service import DeterministicEstimateService
 from atlas_core.services.commercial_knowledge_service import CommercialKnowledgeService
+from atlas_core.services.cost_engine_service import DeterministicCostEngine
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
@@ -2340,6 +2341,232 @@ def _resolved_product_rows(st: Any, bom_rows: list[dict[str, Any]]) -> list[Any]
     return resolutions
 
 
+def _pricing_manual_overrides(st: Any) -> dict[str, dict[str, Any]]:
+    raw = st.session_state.get("atlas_pricing_manual_overrides")
+    if isinstance(raw, dict):
+        return {str(key): dict(value or {}) for key, value in raw.items()}
+    return {}
+
+
+def _pricing_policy(st: Any) -> dict[str, Any]:
+    raw = st.session_state.get("atlas_preferred_vendor_policy")
+    if isinstance(raw, dict):
+        return dict(raw)
+    return {}
+
+
+def _pricing_quotes(st: Any) -> list[dict[str, Any]]:
+    raw = st.session_state.get("atlas_project_quotes")
+    if isinstance(raw, list):
+        return [dict(item or {}) for item in raw if isinstance(item, dict)]
+    return []
+
+
+def _pricing_allowances(st: Any) -> dict[str, float]:
+    raw = st.session_state.get("atlas_generic_allowances")
+    if not isinstance(raw, dict):
+        return {}
+    allowances: dict[str, float] = {}
+    for key, value in raw.items():
+        if isinstance(value, (int, float)):
+            allowances[str(key)] = float(value)
+    return allowances
+
+
+def _quick_add_products_by_project(st: Any) -> dict[str, list[dict[str, Any]]]:
+    raw = st.session_state.get("atlas_quick_add_products")
+    if not isinstance(raw, dict):
+        return {}
+    result: dict[str, list[dict[str, Any]]] = {}
+    for project_id, rows in raw.items():
+        if isinstance(rows, list):
+            result[str(project_id)] = [
+                dict(item or {}) for item in rows if isinstance(item, dict)
+            ]
+    return result
+
+
+def _quick_add_products_for_project(st: Any, project_id: str) -> list[dict[str, Any]]:
+    return list(_quick_add_products_by_project(st).get(project_id, []))
+
+
+def _apply_deterministic_pricing(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    *,
+    bom_rows: list[dict[str, Any]],
+    product_resolutions: list[Any],
+    estimate: Any,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    preferred_vendor_policy = _pricing_policy(st)
+    project_quotes = _pricing_quotes(st)
+    generic_allowances = _pricing_allowances(st)
+    commercial_state = _commercial_knowledge_state(st)
+    quick_add_products = _quick_add_products_for_project(st, record.project.project_id)
+
+    resolution_rows = [
+        item.to_dict() if hasattr(item, "to_dict") else dict(item or {})
+        for item in list(product_resolutions or [])
+    ]
+    signature_payload = {
+        "project_id": record.project.project_id,
+        "estimate": estimate.to_dict() if hasattr(estimate, "to_dict") else {},
+        "resolutions": resolution_rows,
+        "commercial_state": commercial_state,
+        "preferred_vendor_policy": preferred_vendor_policy,
+        "project_quotes": project_quotes,
+        "generic_allowances": generic_allowances,
+        "quick_add_products": quick_add_products,
+    }
+    signature = hashlib.sha1(
+        json.dumps(signature_payload, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+    cache_key = "atlas_deterministic_pricing_cache"
+    cached = st.session_state.get(cache_key)
+    if isinstance(cached, dict) and cached.get("signature") == signature:
+        cost_result = dict(cached.get("result") or {})
+    else:
+        engine = DeterministicCostEngine()
+        cost_result = engine.run(
+            estimate=estimate,
+            product_resolutions=product_resolutions,
+            commercial_state=commercial_state,
+            project_id=record.project.project_id,
+            preferred_vendor_policy=preferred_vendor_policy,
+            project_quotes=project_quotes,
+            allowances=generic_allowances,
+            quick_add_products=quick_add_products,
+        ).to_dict()
+        st.session_state[cache_key] = {"signature": signature, "result": cost_result}
+
+    st.session_state["atlas_last_cost_result"] = cost_result
+
+    priced_lines = []
+    for item in list(cost_result.get("lines") or []):
+        confidence = dict(item.get("confidence") or {})
+        selection = dict(item.get("selection") or {})
+        status = _safe_text(item.get("status"), "missing")
+        priced_lines.append(
+            {
+                "estimate_line_id": item.get("estimate_line_id"),
+                "source_equipment_id": item.get("equipment_object_id"),
+                "canonical_product_id": item.get("resolved_product_id"),
+                "selected_price_record_id": item.get("price_record_id"),
+                "selected_vendor_offering_id": item.get("vendor_offering_id"),
+                "selected_price_sheet_version_id": item.get("price_sheet_version_id"),
+                "unit_cost": item.get("unit_cost"),
+                "extended_cost": item.get("extended_cost"),
+                "currency": item.get("currency"),
+                "pricing_status": status,
+                "pricing_confidence": confidence.get("score"),
+                "selection_method": selection.get("method"),
+                "selection_reason": selection.get("reason"),
+                "effective_date": item.get("effective_date"),
+                "expiration_date": item.get("expiration_date"),
+                "import_date": item.get("import_date"),
+                "days_since_import": item.get("days_since_import"),
+                "freshness_status": item.get("freshness"),
+                "warnings": [
+                    {"code": "cost_warning", "message": warning, "severity": "warning"}
+                    for warning in list(item.get("warnings") or [])
+                ],
+                "source_refs": [
+                    {
+                        "vendor": item.get("vendor"),
+                        "vendor_type": item.get("vendor_type"),
+                        "price_sheet_version_id": item.get("price_sheet_version_id"),
+                        "price_record_id": item.get("price_record_id"),
+                        "source_file": item.get("source_file"),
+                        "source_row": item.get("source_row"),
+                    }
+                ],
+                "selection": {
+                    "selected_candidate_id": selection.get("selected_candidate_id"),
+                    "selection_method": selection.get("method"),
+                    "selection_reason": selection.get("reason"),
+                    "candidates": list(selection.get("candidates") or []),
+                    "applied_rules": [
+                        {
+                            "rule_id": f"decision:{index + 1}",
+                            "name": "Cost decision trace",
+                            "priority": index + 1,
+                            "matched": True,
+                            "detail": detail,
+                        }
+                        for index, detail in enumerate(
+                            list(selection.get("decision_trace") or [])
+                        )
+                    ],
+                },
+                "confidence_rationale": list(confidence.get("rationale") or []),
+            }
+        )
+
+    pricing_result = {
+        "pricing_run_id": cost_result.get("cost_run_id"),
+        "run_timestamp": cost_result.get("run_timestamp"),
+        "pricing_policy_version": cost_result.get("cost_policy_version"),
+        "priced_lines": priced_lines,
+        "summary": dict(
+            (cost_result.get("summary") or {}).get("project_summary") or {}
+        ),
+        "commercial_coverage": dict(cost_result.get("commercial_coverage") or {}),
+    }
+    st.session_state["atlas_last_pricing_result"] = pricing_result
+
+    by_source_id = {
+        _safe_text(item.get("source_equipment_id"), ""): item
+        for item in list(pricing_result.get("priced_lines") or [])
+    }
+
+    enriched_rows: list[dict[str, Any]] = []
+    for row in bom_rows:
+        source_id = _safe_text(
+            row.get("bom_item_id"),
+            _safe_text(row.get("equipment_id"), ""),
+        )
+        priced = dict(by_source_id.get(source_id) or {})
+        entry = dict(row)
+        entry["det_cost_status"] = priced.get("pricing_status")
+        entry["det_acquisition_cost"] = priced.get("unit_cost")
+        entry["det_cost_extended"] = priced.get("extended_cost")
+        entry["det_cost_confidence"] = priced.get("pricing_confidence")
+        entry["det_vendor_type"] = _safe_text(
+            ((priced.get("source_refs") or [{}])[0]).get("vendor_type"),
+            "",
+        )
+        entry["det_source_file"] = _safe_text(
+            ((priced.get("source_refs") or [{}])[0]).get("source_file"),
+            "",
+        )
+        entry["det_source_row"] = ((priced.get("source_refs") or [{}])[0]).get(
+            "source_row"
+        )
+        entry["det_pricing_status"] = priced.get("pricing_status")
+        entry["det_selected_unit_cost"] = priced.get("unit_cost")
+        entry["det_extended_cost"] = priced.get("extended_cost")
+        entry["det_pricing_confidence"] = priced.get("pricing_confidence")
+        entry["det_freshness_status"] = priced.get("freshness_status")
+        entry["det_selection_reason"] = priced.get("selection_reason")
+        entry["det_selection_method"] = priced.get("selection_method")
+        entry["det_selected_price_record_id"] = priced.get("selected_price_record_id")
+        entry["det_selected_price_sheet_version_id"] = priced.get(
+            "selected_price_sheet_version_id"
+        )
+        entry["det_selected_vendor_offering_id"] = priced.get(
+            "selected_vendor_offering_id"
+        )
+        entry["det_pricing_warnings"] = ", ".join(
+            warning.get("code", "")
+            for warning in list(priced.get("warnings") or [])
+            if isinstance(warning, dict)
+        )
+        enriched_rows.append(entry)
+
+    return enriched_rows, pricing_result
+
+
 def _resolution_summary_rows(resolutions: list[Any]) -> dict[str, int]:
     summary = {
         "resolved_products": 0,
@@ -2432,6 +2659,7 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_recent_opened_results", [])
     st.session_state.setdefault("atlas_product_resolution_overrides", {})
     st.session_state.setdefault("atlas_product_resolution_cache", {})
+    st.session_state.setdefault("atlas_quick_add_products", {})
     st.session_state.setdefault("atlas_global_search_open", False)
     st.session_state.setdefault("atlas_active_project_name", "")
     st.session_state.setdefault(
@@ -4983,6 +5211,20 @@ def _render_estimate_page(
         labor_estimate=labor_estimate,
         product_resolutions=product_resolutions,
     )
+    bom_rows, pricing_result = _apply_deterministic_pricing(
+        st,
+        record,
+        bom_rows=bom_rows,
+        product_resolutions=product_resolutions,
+        estimate=estimate,
+    )
+    priced_lines = list(pricing_result.get("priced_lines") or [])
+    pricing_by_line_id = {
+        _safe_text(item.get("estimate_line_id"), ""): item for item in priced_lines
+    }
+    pricing_summary = dict(pricing_result.get("summary") or {})
+    pricing_coverage = dict(pricing_result.get("commercial_coverage") or {})
+
     dashboard = service.build_dashboard(estimate)
     confidence_model = estimate.confidence_model
     line_rows = estimate.all_lines()
@@ -4998,6 +5240,15 @@ def _render_estimate_page(
             "Engineering Allowances",
             "Project Summary",
             "Estimate Confidence",
+            "Cost Overview",
+            "Commercial Coverage",
+            "Priced Equipment",
+            "Unpriced Equipment",
+            "Stale Cost",
+            "Allowances",
+            "Vendor Alternatives",
+            "Cost Warnings",
+            "Cost History",
         ]
     )
 
@@ -5045,7 +5296,7 @@ def _render_estimate_page(
             hide_index=True,
         )
         st.caption(
-            "Pricing remains deterministic and blocked for unresolved, generic allowance, or low-confidence product resolution lines."
+            "Acquisition cost remains deterministic and blocked for unresolved, generic allowance, or low-confidence product resolution lines."
         )
 
     with tabs[1]:
@@ -5059,6 +5310,7 @@ def _render_estimate_page(
         else:
             display_rows = []
             for line in line_rows:
+                priced = dict(pricing_by_line_id.get(line.line_id) or {})
                 display_rows.append(
                     {
                         "Line": line.line_id,
@@ -5077,6 +5329,15 @@ def _render_estimate_page(
                         "Labor Status": _estimate_cost_status_chip(
                             line.labor_status.value
                         ),
+                        "Deterministic Pricing": _safe_text(
+                            priced.get("pricing_status"), "no_pricing"
+                        ),
+                        "Selected Unit Cost": priced.get("unit_cost"),
+                        "Selected Vendor Offering": priced.get(
+                            "selected_vendor_offering_id"
+                        ),
+                        "Commercial Freshness": priced.get("freshness_status"),
+                        "Cost Confidence": priced.get("pricing_confidence"),
                         "Confidence": f"{int(line.confidence * 100)}%",
                         "Material": line.material_cost.amount,
                         "Labor": line.labor_cost.amount,
@@ -5096,6 +5357,7 @@ def _render_estimate_page(
             )
 
             st.markdown("#### Estimate Line Traceability")
+            selected_priced = dict(pricing_by_line_id.get(selected_line.line_id) or {})
             trace_rows = [
                 {
                     "Source Object": selected_line.source_object,
@@ -5105,6 +5367,20 @@ def _render_estimate_page(
                     "Description": selected_line.description,
                     "Quantity": selected_line.quantity,
                     "Pricing Status": selected_line.pricing_status.value,
+                    "Deterministic Pricing Status": selected_priced.get(
+                        "pricing_status"
+                    ),
+                    "Deterministic Selection": selected_priced.get("selection_reason"),
+                    "Selected Unit Cost": selected_priced.get("unit_cost"),
+                    "Extended Cost": selected_priced.get("extended_cost"),
+                    "Freshness": selected_priced.get("freshness_status"),
+                    "Price Record": selected_priced.get("selected_price_record_id"),
+                    "Sheet Version": selected_priced.get(
+                        "selected_price_sheet_version_id"
+                    ),
+                    "Vendor Offering": selected_priced.get(
+                        "selected_vendor_offering_id"
+                    ),
                     "Labor Status": selected_line.labor_status.value,
                     "Confidence": f"{int(selected_line.confidence * 100)}%",
                     "Source References": ", ".join(
@@ -5239,6 +5515,310 @@ def _render_estimate_page(
         st.markdown("#### Confidence Explanations")
         for message in list(confidence.get("messages") or []):
             st.markdown(f"- {message}")
+
+    with tabs[9]:
+        st.dataframe(
+            [
+                {
+                    "Cost Run ID": pricing_result.get("pricing_run_id"),
+                    "Run Timestamp": pricing_result.get("run_timestamp"),
+                    "Policy Version": pricing_result.get("pricing_policy_version"),
+                    "Equipment Cost": pricing_summary.get("equipment_cost", 0.0),
+                    "Accessory Cost": pricing_summary.get("accessory_cost", 0.0),
+                    "Software Cost": pricing_summary.get("software_cost", 0.0),
+                    "Known Cost": pricing_summary.get("known_cost", 0.0),
+                    "Unknown Cost": pricing_summary.get("unknown_cost", 0.0),
+                    "Known Cost %": pricing_summary.get("known_cost_percent", 0.0),
+                    "Unknown Cost %": pricing_summary.get("unknown_cost_percent", 0.0),
+                    "Allowance Cost": pricing_summary.get("allowance_cost", 0.0),
+                    "Products Without Cost": pricing_summary.get(
+                        "products_without_cost", 0
+                    ),
+                    "Pricing Freshness": pricing_summary.get(
+                        "pricing_freshness", "unknown"
+                    ),
+                    "Commercial Confidence": pricing_summary.get(
+                        "commercial_confidence", 0.0
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        with st.expander("Quick Add Product", expanded=False):
+            qa_mfr = st.text_input("Manufacturer", key="atlas_quick_add_mfr")
+            qa_model = st.text_input("Model", key="atlas_quick_add_model")
+            qa_desc = st.text_input("Description", key="atlas_quick_add_desc")
+            qa_vendor = st.text_input("Vendor", key="atlas_quick_add_vendor")
+            qa_vendor_type = st.selectbox(
+                "Vendor Type",
+                options=[
+                    "manufacturer_direct",
+                    "authorized_distributor",
+                    "regional_distributor",
+                    "buying_group",
+                    "marketplace",
+                    "integrator",
+                    "other",
+                ],
+                key="atlas_quick_add_vendor_type",
+            )
+            qa_cost = st.number_input(
+                "Acquisition Cost",
+                min_value=0.0,
+                value=0.0,
+                step=1.0,
+                key="atlas_quick_add_cost",
+            )
+            qa_source = st.text_input(
+                "Source",
+                value="manual entry",
+                key="atlas_quick_add_source",
+            )
+            qa_mode = st.radio(
+                "After creation",
+                options=["Project Only", "Promote to Master Library"],
+                horizontal=True,
+                key="atlas_quick_add_mode",
+            )
+
+            if st.button(
+                "Create Quick Add Product",
+                key="atlas_quick_add_create",
+                use_container_width=True,
+            ):
+                if not qa_mfr.strip() or not qa_model.strip() or not qa_vendor.strip():
+                    st.warning("Manufacturer, model, and vendor are required.")
+                else:
+                    engine = DeterministicCostEngine()
+                    if qa_mode == "Project Only":
+                        result = engine.quick_add_product(
+                            project_id=record.project.project_id,
+                            manufacturer=qa_mfr,
+                            model=qa_model,
+                            description=qa_desc,
+                            vendor=qa_vendor,
+                            vendor_type=qa_vendor_type,
+                            cost=float(qa_cost),
+                            source=qa_source,
+                            project_only=True,
+                            project_state={
+                                "quick_add_products": _quick_add_products_by_project(st)
+                            },
+                        )
+                        st.session_state["atlas_quick_add_products"] = dict(
+                            result.get("project_state", {}).get("quick_add_products")
+                            or {}
+                        )
+                    else:
+                        result = engine.quick_add_product(
+                            project_id=record.project.project_id,
+                            manufacturer=qa_mfr,
+                            model=qa_model,
+                            description=qa_desc,
+                            vendor=qa_vendor,
+                            vendor_type=qa_vendor_type,
+                            cost=float(qa_cost),
+                            source=qa_source,
+                            project_only=False,
+                            commercial_state=_commercial_knowledge_state(st),
+                        )
+                        library = _price_list_library_state(st)
+                        library["commercial_knowledge"] = dict(
+                            result.get("commercial_state") or {}
+                        )
+                        st.session_state["atlas_price_list_library"] = library
+                    st.rerun()
+
+        engine = DeterministicCostEngine()
+        export_cols = st.columns(2)
+        export_cols[0].download_button(
+            "Download Cost Summary JSON",
+            data=engine.export_cost_summary_json(
+                st.session_state.get("atlas_last_cost_result") or {}
+            ),
+            file_name=f"{record.project.project_id}_cost_summary.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+        export_cols[1].download_button(
+            "Download Cost Lines CSV",
+            data=engine.export_cost_lines_csv(
+                st.session_state.get("atlas_last_cost_result") or {}
+            ),
+            file_name=f"{record.project.project_id}_cost_lines.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+    with tabs[10]:
+        st.dataframe(
+            [
+                {
+                    "Resolved Products": pricing_coverage.get("resolved_products", 0),
+                    "Products With Current Cost": pricing_coverage.get(
+                        "products_with_current_cost", 0
+                    ),
+                    "Products Using Historical Cost": pricing_coverage.get(
+                        "products_using_historical_cost", 0
+                    ),
+                    "Products Using Allowances": pricing_coverage.get(
+                        "products_using_allowances", 0
+                    ),
+                    "Products Missing Cost": pricing_coverage.get(
+                        "products_missing_cost", 0
+                    ),
+                    "Products With Stale Cost": pricing_coverage.get(
+                        "products_with_stale_cost", 0
+                    ),
+                    "Coverage %": pricing_coverage.get("coverage_percent", 0.0),
+                    "Material Cost Confidence": pricing_coverage.get(
+                        "material_cost_confidence", 0.0
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.download_button(
+            "Download Commercial Coverage JSON",
+            data=DeterministicCostEngine().export_commercial_coverage_json(
+                st.session_state.get("atlas_last_cost_result") or {}
+            ),
+            file_name=f"{record.project.project_id}_commercial_coverage.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+
+    with tabs[11]:
+        st.dataframe(
+            [
+                item
+                for item in priced_lines
+                if _safe_text(item.get("pricing_status"), "")
+                not in {"missing", "unavailable"}
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[12]:
+        st.dataframe(
+            [
+                item
+                for item in priced_lines
+                if _safe_text(item.get("pricing_status"), "")
+                in {
+                    "missing",
+                    "unavailable",
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[13]:
+        stale_rows = [
+            item
+            for item in priced_lines
+            if _safe_text(item.get("pricing_status"), "")
+            in {
+                "stale",
+                "expired",
+                "historical",
+            }
+        ]
+        st.dataframe(stale_rows, use_container_width=True, hide_index=True)
+
+    with tabs[14]:
+        st.dataframe(
+            [
+                item
+                for item in priced_lines
+                if _safe_text(item.get("pricing_status"), "") in {"allowance"}
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[15]:
+        line_options = [
+            _safe_text(item.get("estimate_line_id"), "") for item in priced_lines
+        ]
+        if not line_options:
+            st.info("No priced lines are available for vendor alternative review.")
+        else:
+            selected_alt_line = st.selectbox(
+                "Select priced line",
+                options=line_options,
+                key="atlas_pricing_alternative_line",
+            )
+            selected_priced_line = next(
+                (
+                    item
+                    for item in priced_lines
+                    if _safe_text(item.get("estimate_line_id"), "") == selected_alt_line
+                ),
+                None,
+            )
+            selection = (
+                dict(selected_priced_line.get("selection") or {})
+                if isinstance(selected_priced_line, dict)
+                else {}
+            )
+            st.dataframe(
+                list(selection.get("candidates") or []),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    with tabs[16]:
+        warning_rows: list[dict[str, Any]] = []
+        for item in priced_lines:
+            for warning in list(item.get("warnings") or []):
+                warning_rows.append(
+                    {
+                        "Estimate Line": item.get("estimate_line_id"),
+                        "Cost Status": item.get("pricing_status"),
+                        "Warning Code": warning.get("code"),
+                        "Warning": warning.get("message"),
+                        "Severity": warning.get("severity"),
+                    }
+                )
+        st.dataframe(warning_rows, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Download Cost Exceptions CSV",
+            data=DeterministicCostEngine().export_cost_exceptions_csv(
+                st.session_state.get("atlas_last_cost_result") or {}
+            ),
+            file_name=f"{record.project.project_id}_cost_exceptions.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+    with tabs[17]:
+        commercial_service = _commercial_service(st)
+        product_options = sorted(
+            {
+                _safe_text(item.get("canonical_product_id"), "")
+                for item in priced_lines
+                if _safe_text(item.get("canonical_product_id"), "")
+            }
+        )
+        if not product_options:
+            st.info("No canonical product history is available for cost history view.")
+        else:
+            selected_product = st.selectbox(
+                "Select canonical product",
+                options=product_options,
+                key="atlas_pricing_history_product",
+            )
+            st.dataframe(
+                commercial_service.price_history_for_product(selected_product),
+                use_container_width=True,
+                hide_index=True,
+            )
 
     _render_review_transition(
         st,
@@ -5899,6 +6479,21 @@ def _render_bom_review_page(
         return
 
     bom_rows = _enriched_bom_rows(st, bom_rows)
+    product_resolutions = _resolved_product_rows(st, bom_rows)
+    pricing_estimate = DeterministicEstimateService().build(
+        project_id=record.project.project_id,
+        project_name=record.project.name,
+        bom_rows=bom_rows,
+        labor_estimate=None,
+        product_resolutions=product_resolutions,
+    )
+    bom_rows, _ = _apply_deterministic_pricing(
+        st,
+        record,
+        bom_rows=bom_rows,
+        product_resolutions=product_resolutions,
+        estimate=pricing_estimate,
+    )
 
     metrics = _canonical_bom_metrics(bom_rows)
     cards_top = st.columns(4)
@@ -6086,6 +6681,11 @@ def _render_bom_review_page(
                     "Matched Vendor Offer": row.get("matched_vendor_offer"),
                     "List Price": row.get("list_price"),
                     "Known Cost": row.get("known_cost"),
+                    "Deterministic Cost": row.get("det_cost_status"),
+                    "Acquisition Cost": row.get("det_acquisition_cost"),
+                    "Vendor Type": row.get("det_vendor_type"),
+                    "Freshness": row.get("det_freshness_status"),
+                    "Cost Confidence": row.get("det_cost_confidence"),
                     "Pricing Source": row.get("pricing_source"),
                     "Pricing Effective Date": row.get("pricing_effective_date"),
                     "Match Confidence": row.get("match_confidence"),
@@ -6168,6 +6768,31 @@ def _render_bom_review_page(
                         or "None",
                         "List Price": selected_row.get("list_price"),
                         "Known Cost": selected_row.get("known_cost"),
+                        "Deterministic Cost": selected_row.get("det_cost_status")
+                        or "None",
+                        "Acquisition Cost": selected_row.get("det_acquisition_cost"),
+                        "Extended Cost": selected_row.get("det_cost_extended"),
+                        "Vendor Type": selected_row.get("det_vendor_type") or "None",
+                        "Source File": selected_row.get("det_source_file") or "None",
+                        "Source Row": selected_row.get("det_source_row"),
+                        "Freshness": selected_row.get("det_freshness_status") or "None",
+                        "Cost Confidence": selected_row.get("det_cost_confidence"),
+                        "Selection Method": selected_row.get("det_selection_method")
+                        or "None",
+                        "Selection Reason": selected_row.get("det_selection_reason")
+                        or "None",
+                        "Price Record": selected_row.get("det_selected_price_record_id")
+                        or "None",
+                        "Price Sheet Version": selected_row.get(
+                            "det_selected_price_sheet_version_id"
+                        )
+                        or "None",
+                        "Vendor Offering": selected_row.get(
+                            "det_selected_vendor_offering_id"
+                        )
+                        or "None",
+                        "Cost Warnings": selected_row.get("det_pricing_warnings")
+                        or "None",
                         "Pricing Source": selected_row.get("pricing_source") or "None",
                         "Pricing Effective Date": selected_row.get(
                             "pricing_effective_date"

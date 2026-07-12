@@ -33,6 +33,7 @@ class KnowledgeFreshnessStatus(str, Enum):
 class VendorOffering:
     vendor_offering_id: str
     vendor: str
+    vendor_type: str
     product: str
     manufacturer: str
     vendor_sku: str
@@ -44,6 +45,7 @@ class VendorOffering:
             "vendor_offering_id", self.vendor_offering_id
         )
         self.vendor = _required("vendor", self.vendor)
+        self.vendor_type = _safe(self.vendor_type, "other")
         self.product = _required("product", self.product)
         self.manufacturer = _required("manufacturer", self.manufacturer)
         self.vendor_sku = _required("vendor_sku", self.vendor_sku)
@@ -56,6 +58,7 @@ class VendorOffering:
         return {
             "vendor_offering_id": self.vendor_offering_id,
             "vendor": self.vendor,
+            "vendor_type": self.vendor_type,
             "product": self.product,
             "manufacturer": self.manufacturer,
             "vendor_sku": self.vendor_sku,
@@ -167,6 +170,7 @@ class PriceRecord:
     price_record_id: str
     version_id: str
     vendor: str
+    vendor_type: str
     product: str
     vendor_sku: str
     cost: float | None
@@ -184,6 +188,7 @@ class PriceRecord:
         self.price_record_id = _required("price_record_id", self.price_record_id)
         self.version_id = _required("version_id", self.version_id)
         self.vendor = _required("vendor", self.vendor)
+        self.vendor_type = _safe(self.vendor_type, "other")
         self.product = _required("product", self.product)
         self.vendor_sku = _required("vendor_sku", self.vendor_sku)
         self.currency = _required("currency", self.currency)
@@ -200,6 +205,7 @@ class PriceRecord:
             "price_record_id": self.price_record_id,
             "version_id": self.version_id,
             "vendor": self.vendor,
+            "vendor_type": self.vendor_type,
             "product": self.product,
             "vendor_sku": self.vendor_sku,
             "cost": self.cost,
@@ -215,10 +221,11 @@ class PriceRecord:
         }
 
 
-def _safe(value: Any) -> str:
+def _safe(value: Any, default: str = "") -> str:
     if value is None:
-        return ""
-    return str(value).strip()
+        return default
+    text = str(value).strip()
+    return text or default
 
 
 def _required(field_name: str, value: Any) -> str:

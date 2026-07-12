@@ -18,6 +18,12 @@ class VendorType(str, Enum):
     """Vendor type for an Atlas vendor."""
 
     MANUFACTURER_DIRECT = "manufacturer_direct"
+    AUTHORIZED_DISTRIBUTOR = "authorized_distributor"
+    REGIONAL_DISTRIBUTOR = "regional_distributor"
+    BUYING_GROUP = "buying_group"
+    MARKETPLACE = "marketplace"
+    INTEGRATOR = "integrator"
+    OTHER = "other"
     DISTRIBUTOR = "distributor"
     DEALER = "dealer"
     REP = "rep"

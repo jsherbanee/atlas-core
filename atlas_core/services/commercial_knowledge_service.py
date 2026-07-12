@@ -126,6 +126,7 @@ class CommercialKnowledgeService:
                 price_record_id=record_id,
                 version_id=version_id,
                 vendor=vendor_text,
+                vendor_type=self._safe(row.get("vendor_type"), "other"),
                 product=self._safe(row.get("product"), ""),
                 vendor_sku=self._safe(row.get("vendor_sku"), "UNKNOWN-SKU"),
                 cost=self._float_or_none(row.get("cost")),
@@ -155,6 +156,7 @@ class CommercialKnowledgeService:
                 offering = VendorOffering(
                     vendor_offering_id=offering_id,
                     vendor=vendor_text,
+                    vendor_type=self._safe(record.get("vendor_type"), "other"),
                     product=self._safe(record.get("product"), ""),
                     manufacturer=manufacturer_text,
                     vendor_sku=self._safe(record.get("vendor_sku"), "UNKNOWN-SKU"),
@@ -170,6 +172,10 @@ class CommercialKnowledgeService:
                     history.append(version_id)
                 offering["historical_versions"] = history
                 offering["latest_version"] = version_id
+                offering["vendor_type"] = self._safe(
+                    record.get("vendor_type"),
+                    self._safe(offering.get("vendor_type"), "other"),
+                )
             self.state["vendor_offerings"][offering_id] = offering
 
             self._update_product_history(
@@ -757,6 +763,7 @@ class CommercialKnowledgeService:
 
         return {
             "vendor": self._safe(row.get("vendor"), vendor),
+            "vendor_type": self._safe(row.get("vendor_type"), "other"),
             "manufacturer": self._safe(row.get("manufacturer"), manufacturer),
             "product": product,
             "vendor_sku": self._safe(
