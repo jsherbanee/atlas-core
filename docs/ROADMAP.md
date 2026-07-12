@@ -60,7 +60,7 @@ Completed outcomes:
 
 ## Phase 2: Bid Intelligence (Active)
 Current objective:
-Complete Sprint D-02A Estimate Engine and Cost Snapshot Architecture as implementation-ready documentation.
+Complete Sprint D-03A Assemblies, Accessories, and Labor Rollups architecture documentation.
 
 Current UX hardening stream:
 
@@ -91,9 +91,8 @@ Implemented in current baseline candidate:
 - Deterministic cost engine for acquisition cost selection, cost traceability, commercial coverage, and project-only quick-add product support
 
 Remaining Phase 2 refinements:
-- D-02A Estimate Engine and Cost Snapshot Architecture (documentation-only)
-- D-02 Bid Package Review Orchestration (implementation deferred pending D-02A sign-off)
-- D-03 Scope and Risk Diagnostics (deferred)
+- D-03A Assemblies, Accessories, and Labor Rollups architecture (documentation-only)
+- D-03 Scope and Risk Diagnostics (implementation deferred pending D-03A sign-off)
 - PDF ingestion and indexing robustness
 - Drawing/spec intelligence quality refinements
 - Device schedule extraction quality refinements

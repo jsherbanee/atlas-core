@@ -112,9 +112,9 @@ Deferred beyond C-02:
 Status: Active
 
 - D-01 Core Cost Selection Engine (Closed)
-- D-02A Estimate Engine and Cost Snapshot Architecture (Documentation-Only, Current Sprint)
-- D-02 Bid Package Review Orchestration (Implementation Deferred Pending D-02A Sign-Off)
-- D-03 Scope and Risk Diagnostics (Deferred)
+- D-02 Estimate Engine and Cost Snapshot Architecture (Implemented)
+- D-03A Assemblies, Accessories, and Labor Rollups Architecture (Documentation-Only, Current Sprint)
+- D-03 Scope and Risk Diagnostics (Implementation Deferred Pending D-03A Sign-Off)
 - D-04 Bid Completeness and Readiness Scoring
 - D-05 Estimator Brief and Final Estimator Review
 - D-06 Estimate Workflow Integration and Exports

@@ -2,8 +2,8 @@
 
 Atlas documentation defines the platform vision, architecture, engineering-intelligence surfaces, and implementation status for Atlas Core.
 
-Current implementation sprint focus: D-01 Core Cost Selection Engine.
-Deferred in current sprint scope: D-02 Bid Package Review Orchestration and D-03 Scope and Risk Diagnostics.
+Current implementation sprint focus: D-03A Assemblies, Accessories, and Labor Rollups architecture documentation.
+Deferred in current sprint scope: D-03 implementation.
 
 Current UX stream: Epic A Sprint A-04 Engineering Workstation UX Consolidation.
 Scope: interaction and terminology consistency only, with no new D-03 capability introduction.
@@ -143,6 +143,11 @@ Future releases should follow this structure.
 - Purpose: Defines milestone trajectory and implementation planning direction.
 - Audience: Product and engineering planning stakeholders.
 - When to reference: During milestone planning and sequencing decisions.
+
+### [ASSEMBLIES_AND_LABOR.md](ASSEMBLIES_AND_LABOR.md)
+- Purpose: Defines D-03A architecture for deterministic assemblies, accessories, and labor rollups.
+- Audience: Estimating architecture, service, and workspace contributors.
+- When to reference: Before implementing D-03 composition, rollup, and revision-integration behavior.
 
 ### [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)
 - Purpose: Captures the current implementation state and active focus.

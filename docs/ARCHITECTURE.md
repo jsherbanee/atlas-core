@@ -125,16 +125,18 @@ In-scope architecture delivered:
 - quantity normalization preview and confidence/provenance retrieval helpers
 - BOM Review Cost Selection Inspector integration in existing workspace
 
-## D-02A Estimate Engine and Cost Snapshot Architecture (Documentation-Only)
-D-02A defines the architecture for:
+## D-02 Estimate Engine and Cost Snapshot Architecture (Implemented)
+D-02 implementation is complete.
+
+Delivered architecture:
 - estimate identity and revision history
 - immutable cost snapshots built from D-01
 - deterministic estimate totals and validation
 - controlled refresh and replay workflows
 
-D-02A does not implement D-02 code.
-
 Authoritative detail is maintained in [ESTIMATING.md](ESTIMATING.md), with D-01 dependencies in [COST_ENGINE.md](COST_ENGINE.md).
 
-Deferred architecture work after D-02 implementation start:
-- D-03 scope diagnostics extensions for assemblies/accessories/labor rollups
+## D-03A Assemblies, Accessories, and Labor Rollups (Documentation-Only)
+D-03A is an architecture sprint that defines deterministic composition and labor rollup design without implementation changes.
+
+Authoritative detail is maintained in [ASSEMBLIES_AND_LABOR.md](ASSEMBLIES_AND_LABOR.md).

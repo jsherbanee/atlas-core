@@ -9,6 +9,7 @@
 - [PRICE_VERSIONING.md](PRICE_VERSIONING.md)
 - [COST_ENGINE.md](COST_ENGINE.md)
 - [PRICING_ENGINE.md](PRICING_ENGINE.md)
+- [ASSEMBLIES_AND_LABOR.md](ASSEMBLIES_AND_LABOR.md)
 
 ## 1. Purpose
 Sprint D-02 implements deterministic estimate identity, revision history, immutable cost snapshots, reproducible replay, and controlled cost refresh workflows.
@@ -37,7 +38,7 @@ D-02 explicit non-goals:
 - freight, escalation, currency conversion calculations
 - procurement, POs, accounting, ERP
 
-D-03 remains deferred and is responsible for assemblies, accessories, and labor rollups.
+D-03A is documentation-only architecture in progress for assemblies, accessories, and labor rollups. D-03 implementation remains deferred.
 
 ## 3. D-01 Dependency Contract
 D-02 consumes D-01 outputs and contracts:
