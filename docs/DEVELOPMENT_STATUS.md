@@ -31,12 +31,14 @@ Sprint D-01 Core Cost Selection Engine now establishes acquisition-cost-first de
 Sprint D-02 Estimate Engine and Cost Snapshot implementation is complete, including immutable revision lifecycle, line-item snapshots, replay/reselection workflows, and deterministic totals/validation.
 Sprint D-03 Assemblies, Accessories, and Labor Rollups implementation is complete and formally closed.
 Sprint A-04 consolidates Engineering Workstation UX consistency with shared workspace section headers, recommendation dedupe/grouping in Mission Control, terminology normalization for Products (Master Library), resettable dense-table filters, and source-object linking from estimate snapshot views.
+Sprint A-05 performs end-to-end GUI validation and workflow refinement across Mission Control, Project Workspace, Knowledge, Estimate, and D-03 integration flows.
+Sprint X-01 performs pilot-readiness walkthrough validation and usability hardening for existing workflows.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1055 tests)
+- pytest: full suite passing (1063 tests)
 
 ## Tooling Status
 - GitHub Actions configured
@@ -45,13 +47,13 @@ Sprint A-04 consolidates Engineering Workstation UX consistency with shared work
   - .pre-commit-config.yaml
 
 ## Active Focus
-Sprint D-03 is closed with full quality gates passing.
+Sprint X-01 pilot-readiness walkthrough and product-hardening refinements.
 
 Secondary active focus:
-- apply Sprint A-04 workstation UX consistency updates while preserving D-03 boundaries.
+- low-risk UI helper refinement and consistency hardening in existing workspaces.
 
 Current implementation scope note:
-- no post-D-03 epic implementation has started in this closeout pass
+- no post-D-03 epic implementation has started in this refinement pass
 
 
 Lifecycle object definitions and cross-phase module boundaries are documented in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).

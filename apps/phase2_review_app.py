@@ -640,6 +640,85 @@ def _normalize_recommendation_text(value: Any) -> str:
     return " ".join(_safe_text(value, "").strip().lower().split())
 
 
+def _recommendation_destination_page(destination: Any) -> str:
+    target = _safe_text(destination, "Mission Control")
+    aliases = {
+        "Price Sheets": "Price List Library",
+        "Vendor Offerings": "Knowledge",
+        "Assemblies": "Knowledge",
+    }
+    resolved = aliases.get(target, target)
+    if resolved in ALL_ACTIVE_PAGES:
+        return resolved
+    return "Mission Control"
+
+
+def _validate_assembly_component_reference(
+    component_type: Any,
+    component_ref: Any,
+) -> tuple[bool, str]:
+    ctype = _safe_text(component_type, "")
+    ref = _safe_text(component_ref, "")
+    required_types = {
+        "product",
+        "consumable",
+        "infrastructure_material",
+        "nested_assembly",
+        "labor_activity",
+    }
+    if ctype in required_types and not ref:
+        return False, "Component reference is required for the selected component type."
+    return True, ""
+
+
+def _recommendation_guidance(row: dict[str, Any]) -> dict[str, str]:
+    priority = _safe_text(row.get("Priority"), "Medium")
+    recommendation = _safe_text(row.get("Recommendation"), "")
+    source = _safe_text(row.get("Source"), "Workspace")
+    destination = _safe_text(row.get("Destination"), "Mission Control")
+
+    why = "This recommendation is generated from deterministic workspace signals."
+    if "Estimate Engine D-03" in source:
+        why = "This recommendation is generated from deterministic estimate/assembly readiness diagnostics."
+    elif "Deterministic Cost" in source:
+        why = "This recommendation is generated from deterministic cost selection coverage signals."
+    elif "Commercial Knowledge" in source:
+        why = "This recommendation is generated from deterministic commercial completeness signals."
+
+    if priority == "High":
+        matters = (
+            "This can block revision readiness or materially increase estimate risk."
+        )
+        ignored = "If ignored, lock/readiness confidence can degrade and unresolved risk can accumulate."
+    elif priority == "Medium":
+        matters = "This directly improves estimate clarity and workflow continuity."
+        ignored = "If ignored, workflow friction and rework risk increase."
+    else:
+        matters = "This improves consistency and overall project hygiene."
+        ignored = "If ignored, quality may drift gradually without immediate blockers."
+
+    next_step = (
+        f"Open {destination} and complete the recommended action: {recommendation}"
+        if recommendation
+        else f"Open {destination} and review the next deterministic action."
+    )
+    return {
+        "Why am I seeing this?": why,
+        "Why does it matter?": matters,
+        "What happens if I ignore it?": ignored,
+        "What should I do?": next_step,
+    }
+
+
+def _persist_assembly_library_state(
+    st: Any,
+    engine: EstimateEngineService,
+    assembly_service: AssemblyExpansionService,
+) -> None:
+    engine.state["assembly_state"] = assembly_service.to_dict()
+    _save_estimate_engine_service(st, engine)
+
+
 def _dedupe_recommendation_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     merged: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -4846,7 +4925,63 @@ def _render_home_page(
     st.markdown("### Workspace Recommendations")
     deduped_recommendations = _dedupe_recommendation_rows(recommendation_rows)
     if deduped_recommendations:
+        summary_counts: dict[str, int] = defaultdict(int)
+        for row in deduped_recommendations:
+            priority = _safe_text(row.get("Priority"), "Medium")
+            summary_counts[priority] += int(row.get("Count", 1) or 1)
+        st.caption(
+            "Open recommendations: "
+            + ", ".join(
+                [
+                    f"High {summary_counts.get('High', 0)}",
+                    f"Medium {summary_counts.get('Medium', 0)}",
+                    f"Low {summary_counts.get('Low', 0)}",
+                ]
+            )
+        )
         st.dataframe(deduped_recommendations, use_container_width=True, hide_index=True)
+
+        destination_options = [
+            {
+                "label": (
+                    f"[{_safe_text(item.get('Priority'), 'Medium')}] "
+                    + _safe_text(item.get("Recommendation"), "")
+                    + f" -> {_safe_text(item.get('Destination'), 'Mission Control')}"
+                ),
+                "destination": _safe_text(item.get("Destination"), "Mission Control"),
+                "row": dict(item),
+            }
+            for item in deduped_recommendations
+        ]
+        selected_label = st.selectbox(
+            "Recommendation Destination",
+            options=[item["label"] for item in destination_options],
+            key="atlas_mission_control_recommendation_destination",
+        )
+        selected = next(
+            (item for item in destination_options if item["label"] == selected_label),
+            {},
+        )
+        selected_row = selected.get("row")
+        selected_recommendation: dict[str, Any] = (
+            dict(selected_row) if isinstance(selected_row, dict) else {}
+        )
+        guidance = _recommendation_guidance(selected_recommendation)
+        st.markdown("#### Recommendation Guidance")
+        st.dataframe(
+            [guidance],
+            use_container_width=True,
+            hide_index=True,
+        )
+        if st.button(
+            "Open Recommendation Destination",
+            key="atlas_mission_control_open_recommendation_destination",
+            use_container_width=True,
+        ):
+            st.session_state["atlas_active_page"] = _recommendation_destination_page(
+                selected.get("destination")
+            )
+            st.rerun()
     else:
         st.caption("No deterministic recommendations are currently open.")
 
@@ -5666,8 +5801,7 @@ def _render_application_knowledge_page(
                     assembly_id=_safe_text(new_assembly_id, ""),
                     category=_safe_text(new_category, "general"),
                 )
-                engine.state["assembly_state"] = assembly_service.to_dict()
-                _save_estimate_engine_service(st, engine)
+                _persist_assembly_library_state(st, engine, assembly_service)
                 st.rerun()
             except Exception as exc:
                 st.error(f"Unable to create assembly: {exc}")
@@ -5773,6 +5907,14 @@ def _render_application_knowledge_page(
                 use_container_width=True,
             ):
                 try:
+                    is_valid, validation_message = (
+                        _validate_assembly_component_reference(
+                            component_type,
+                            component_ref,
+                        )
+                    )
+                    if not is_valid:
+                        raise ValueError(validation_message)
                     payload = {
                         "component_type": component_type,
                         "quantity_rule": {
@@ -5799,8 +5941,7 @@ def _render_application_knowledge_page(
                         assembly_version_id=selected_version,
                         component=payload,
                     )
-                    engine.state["assembly_state"] = assembly_service.to_dict()
-                    _save_estimate_engine_service(st, engine)
+                    _persist_assembly_library_state(st, engine, assembly_service)
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to add component: {exc}")
@@ -5815,8 +5956,7 @@ def _render_application_knowledge_page(
                     assembly_version_id=selected_version,
                 )
                 st.session_state["atlas_assembly_library_validation"] = result
-                engine.state["assembly_state"] = assembly_service.to_dict()
-                _save_estimate_engine_service(st, engine)
+                _persist_assembly_library_state(st, engine, assembly_service)
                 st.rerun()
             if lifecycle_cols[1].button(
                 "Activate",
@@ -5827,8 +5967,7 @@ def _render_application_knowledge_page(
                     assembly_service.activate_assembly_version(
                         assembly_version_id=selected_version,
                     )
-                    engine.state["assembly_state"] = assembly_service.to_dict()
-                    _save_estimate_engine_service(st, engine)
+                    _persist_assembly_library_state(st, engine, assembly_service)
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to activate assembly version: {exc}")
@@ -5841,8 +5980,7 @@ def _render_application_knowledge_page(
                     assembly_service.supersede_assembly_version(
                         assembly_version_id=selected_version,
                     )
-                    engine.state["assembly_state"] = assembly_service.to_dict()
-                    _save_estimate_engine_service(st, engine)
+                    _persist_assembly_library_state(st, engine, assembly_service)
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to supersede assembly version: {exc}")
@@ -5855,11 +5993,25 @@ def _render_application_knowledge_page(
                     assembly_service.archive_assembly_version(
                         assembly_version_id=selected_version,
                     )
-                    engine.state["assembly_state"] = assembly_service.to_dict()
-                    _save_estimate_engine_service(st, engine)
+                    _persist_assembly_library_state(st, engine, assembly_service)
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to archive assembly version: {exc}")
+
+            validation_result = dict(
+                st.session_state.get("atlas_assembly_library_validation") or {}
+            )
+            if (
+                validation_result
+                and _safe_text(validation_result.get("assembly_version_id"), "")
+                == selected_version
+            ):
+                st.markdown("#### Validation Result")
+                st.dataframe(
+                    [validation_result],
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
             with st.expander("Expansion Preview", expanded=False):
                 try:
@@ -6622,7 +6774,8 @@ def _render_estimate_revision_engine(
                 st.dataframe(
                     [refresh_preview], use_container_width=True, hide_index=True
                 )
-                if st.button(
+                refresh_actions = st.columns(2)
+                if refresh_actions[0].button(
                     "Apply Refresh",
                     key="atlas_estimate_d03_apply_refresh",
                     use_container_width=True,
@@ -6640,6 +6793,13 @@ def _render_estimate_revision_engine(
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Unable to apply refresh: {exc}")
+                if refresh_actions[1].button(
+                    "Dismiss Preview",
+                    key="atlas_estimate_d03_dismiss_refresh_preview",
+                    use_container_width=True,
+                ):
+                    st.session_state.pop("atlas_estimate_d03_refresh_preview", None)
+                    st.rerun()
 
             provenance = dict(
                 st.session_state.get("atlas_estimate_d03_provenance") or {}

@@ -222,6 +222,25 @@ D-03 Knowledge workspace additions:
 D-03 Mission Control additions:
 - recommendation rows now include estimate-engine D-03 readiness recommendations
 
+A-05 workflow refinement additions:
+- Mission Control recommendations include quick destination navigation controls
+- recommendation summary counts reduce recommendation-fatigue during triage
+- Assembly Library component entry validates required references before submit
+- Estimate D-03 refresh preview includes explicit dismiss action before apply
+
+A-05 deferred UX debt (non-blocking):
+- very large deterministic recommendation lists still render as a single table
+- table-level pagination patterns are not yet unified across all workspace pages
+
+X-01 pilot-readiness refinements:
+- Mission Control recommendation guidance now explains why each selected recommendation appears and what action to take.
+- Assembly Library now surfaces validation results inline for the selected assembly version.
+- Assembly Library persistence writes use shared helper logic to reduce repeated state-write code paths.
+
+X-01 remaining UX debt (non-blocking):
+- recommendation guidance remains table-based and could be further simplified into compact cards
+- some high-density engineering evidence tables still require substantial scrolling on smaller displays
+
 Price List Library (C-02) now includes PDF import review controls for:
 - PDF source inspection
 - page list/range selection

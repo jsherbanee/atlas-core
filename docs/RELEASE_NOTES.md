@@ -23,6 +23,32 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic A Sprint A-04 Engineering Workstation UX Consolidation)
 
+## Unreleased (Epic X Sprint X-01 Pilot Readiness and Application Walkthrough)
+
+### Improved
+
+- Mission Control recommendation selection now includes deterministic guidance framing (why seen, impact, ignore risk, and next action).
+- Assembly Library now shows selected-version validation results inline after validation actions.
+- Assembly Library state persistence writes are consolidated through shared helper logic for maintainability.
+
+### Scope Notes
+
+- product-hardening and usability refinement only for existing capabilities
+- no Commercial Intelligence, Sell Pricing, Proposal Generation, or post-D architecture expansion
+
+## Unreleased (Epic A Sprint A-05 End-to-End GUI Validation and Workflow Refinement)
+
+### Improved
+
+- Mission Control recommendation panel now includes priority summary counts and direct destination navigation.
+- Assembly Library component add workflow now validates required reference inputs with clearer user-facing errors.
+- Estimate D-03 refresh comparison workflow now supports explicit preview dismissal before apply.
+
+### Scope Notes
+
+- usability and workflow refinement only across existing capabilities
+- no Epic E start and no Commercial Intelligence/Sell Pricing/Proposal Generation implementation
+
 ## Unreleased (Sprint D-03 Assemblies, Accessories, and Labor Rollups)
 
 ### Added
