@@ -18,6 +18,7 @@ It represents the current implementation state of Atlas Core.
 Atlas Core is in active Phase 2 Bid Intelligence development with a stabilization baseline candidate prepared and a project-specific Atlas workspace shell implemented.
 Sprint 3 UX delivery added guided project review progression, explicit review status modeling, checklist visibility, and a concise project summary report center with deterministic exports.
 Sprint 4 UI refinement adds repository-backed Open Existing Project, a stronger Projects library workflow, application-wide Knowledge scope, compact active-project identity, concise breadcrumbs, and a two-column Project Workspace layout (no persistent third context column).
+Sprint 5 introduces an Equipment Object Workspace that treats equipment as first-class engineering objects with deterministic detail, relationship navigation, evidence, and recommended actions.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
@@ -46,6 +47,9 @@ Current workspace behavior:
 - Opening a project switches Atlas into a dedicated Project Workspace with project-specific navigation.
 - Local project records are stored under AtlasProjects/.
 - Project Workspace emphasizes Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate (advisory), Notebook, Reports, and project details/settings pages.
+- Equipment Workspace now provides object-first equipment investigation from canonical BOM lines with summary, list/detail workflow, relationship navigation, evidence/warnings, and deterministic recommended actions.
+- BOM Review now includes an Open Equipment Detail action for selected BOM rows while preserving BOM table reconciliation behavior.
+- Drawing and Specification workspaces now expose referenced equipment as human-readable objects that can open Equipment Workspace.
 - Project Workspace now includes a non-blocking guided review sequence with statuses (not started/ready/needs review/blocked/complete).
 - Overview and Reports expose a deterministic project review checklist and specific next-step navigation.
 - Reports now provide Project Summary, Estimator Brief, BOM Export, Scope and Risk Export, and Engineering Review Export views.

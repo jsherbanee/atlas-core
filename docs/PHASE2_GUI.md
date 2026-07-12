@@ -171,6 +171,7 @@ Project:
 Project Details:
 - Drawings
 - Specifications
+- Equipment
 - Schedules
 - Addenda
 - Evidence
@@ -429,30 +430,53 @@ Specification objects display:
 - cross references
 - extraction confidence
 
-## Equipment Browser
-Equipment Browser supports:
-- search
-- sorting
-- filtering
-- grouping
+## Equipment Object Workspace
+Equipment Workspace is object-first and built from canonical BOM lines plus existing scope/risk/evidence data.
 
-Equipment attributes include:
+Structure:
+- Search and Filters
+- Equipment Summary
+- Equipment List
+- Selected Equipment Detail
+- Related Objects
+- Evidence and Warnings
+- Recommended Actions
+
+Filters:
 - manufacturer
-- model
-- description
 - system
 - room
-- drawing references
-- specification references
-- current status
+- completeness
 - confidence
-- potential RFIs
+- responsibility
+- lifecycle status
+- items requiring review
 
-Grouping options:
-- System
-- Manufacturer
-- Room
-- Discipline
+Summary metrics:
+- total equipment items
+- complete items
+- incomplete items
+- unresolved items
+- quantity conflicts
+- missing manufacturer
+- missing model
+- discontinued or legacy references
+- items without known cost
+- items requiring review
+
+Selected Equipment Detail sections:
+- Overview
+- Engineering
+- References
+- Scope and Risk
+- Pricing
+- Evidence
+
+Recommended actions are deterministic from current object state and include:
+- priority
+- reason
+- destination
+- affected source references
 
 ## Systems Workspace
 Systems Workspace includes:
@@ -498,6 +522,16 @@ Examples:
 - equipment → drawings/specifications/systems/RFIs
 - specification → drawings/equipment/systems/evidence
 - drawing → equipment/specifications/systems/evidence/RFIs
+
+BOM integration:
+- BOM Review keeps project-wide reconciliation behavior
+- selected BOM lines now include Open Equipment Detail action
+- Open Equipment Detail navigates to Equipment Workspace with the selected object
+
+Drawing and Specification integration:
+- Drawing Workspace shows related equipment as human-readable object labels
+- Specification Workspace shows related equipment as human-readable object labels
+- related equipment links open Equipment Workspace and preserve origin context where practical
 
 Context panel quick navigation allows one-click movement between related workspaces.
 

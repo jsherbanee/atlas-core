@@ -201,6 +201,7 @@ Atlas components should be optimized for engineering clarity.
 - Navigation should remain persistent and predictable.
 - Search should help users move from object discovery to decision context.
 - Contextual object detail should expose canonical values, supporting evidence, and uncertainty through inline or on-demand detail surfaces.
+- Object workspaces should use one primary object detail view and avoid repeating the same properties across multiple simultaneous tables/panels.
 - Empty states should explain why data is empty, how to populate it, and what the next step is.
 - Detailed diagnostics should be discoverable through drill-down, not forced into the default page view.
 - Checklist-driven review summaries should make completion state understandable at a glance.

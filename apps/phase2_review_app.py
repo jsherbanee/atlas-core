@@ -266,6 +266,7 @@ PROJECT_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
         [
             ("Drawings", "Drawings"),
             ("Specifications", "Specifications"),
+            ("Equipment", "Equipment"),
             ("Schedules", "Schedules"),
             ("Addenda", "Addenda"),
             ("Evidence", "Evidence"),
@@ -1676,6 +1677,351 @@ def _canonical_bom_export_payload(
     return csv_buffer.getvalue(), json.dumps(json_payload, indent=2, sort_keys=True)
 
 
+def _equipment_lookup_by_id(
+    context: dict[str, Any] | None,
+) -> dict[str, dict[str, Any]]:
+    rows = list(_workspace_objects(context).get("equipment") or [])
+    return {
+        _safe_text(item.get("equipment_id"), ""): item
+        for item in rows
+        if _safe_text(item.get("equipment_id"), "")
+    }
+
+
+def _equipment_human_label(context: dict[str, Any] | None, equipment_id: str) -> str:
+    equipment = _equipment_lookup_by_id(context).get(_safe_text(equipment_id, ""))
+    if equipment is None:
+        return _safe_text(equipment_id, "Equipment")
+    manufacturer = _safe_text(equipment.get("manufacturer"), "Unknown")
+    model = _safe_text(equipment.get("model"), "Unknown")
+    description = _safe_text(equipment.get("description"), "")
+    descriptor = " ".join(
+        part for part in [manufacturer, model] if _safe_text(part, "")
+    ).strip()
+    if description and description.lower() not in descriptor.lower():
+        return f"{descriptor} - {description} ({equipment_id})"
+    return f"{descriptor} ({equipment_id})".strip()
+
+
+def _equipment_lifecycle_status(
+    manufacturer: str,
+    model: str,
+    warnings: list[str],
+    master_rows: list[dict[str, Any]],
+) -> str:
+    matched_status = ""
+    for row in master_rows:
+        if _safe_text(row.get("manufacturer"), "").lower() != manufacturer.lower():
+            continue
+        if _safe_text(row.get("model"), "").lower() != model.lower():
+            continue
+        matched_status = _safe_text(row.get("status"), "")
+        if matched_status:
+            break
+
+    warning_text = " ".join(warnings).lower()
+    if "discontinued" in warning_text:
+        return "Discontinued"
+    if "legacy" in warning_text:
+        return "Legacy"
+    if matched_status:
+        normalized = matched_status.replace("_", " ").strip().lower()
+        if normalized in {"discontinued", "legacy", "obsolete"}:
+            return normalized.title()
+        if normalized in {"active", "current", "supported"}:
+            return "Active"
+        return matched_status.replace("_", " ").title()
+    return "Active"
+
+
+def _equipment_workspace_rows(
+    st: Any,
+    context: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if context is None:
+        return []
+
+    bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+    if not bom_rows:
+        return []
+
+    objects = _workspace_objects(context)
+    evidence_rows = list(objects.get("evidence") or [])
+    scope_findings = _scope_risk_findings(context)
+    rfi_rows = list(objects.get("rfis") or [])
+    spec_rows = list(objects.get("specifications") or [])
+    master_rows = _master_library_rows(context)
+
+    result: list[dict[str, Any]] = []
+    for row in bom_rows:
+        equipment_id = _safe_text(
+            row.get("bom_item_id"),
+            _safe_text(row.get("equipment_id"), "Unknown Equipment"),
+        )
+        manufacturer = _safe_text(row.get("manufacturer"), "Unknown")
+        model = _safe_text(row.get("model"), "Unknown")
+        drawing_refs = list(row.get("drawing_references") or [])
+        specification_refs = list(row.get("specification_references") or [])
+        source_documents = list(row.get("source_documents") or [])
+        source_pages = list(row.get("source_pages") or [])
+        warnings = list(row.get("warnings") or [])
+        pricing_warning = _safe_text(row.get("pricing_warning"), "")
+        if pricing_warning:
+            warnings.append(pricing_warning)
+
+        schedule_refs = sorted(
+            {
+                _safe_text(schedule, "")
+                for spec_row in spec_rows
+                if _safe_text(spec_row.get("section"), "") in specification_refs
+                for schedule in list(spec_row.get("related_schedules") or [])
+                if _safe_text(schedule, "")
+            }
+        )
+
+        related_risks = [
+            _safe_text(item.get("title"), "Risk")
+            for item in scope_findings
+            if _contains_any(
+                str(item),
+                [equipment_id, model, manufacturer],
+            )
+        ]
+
+        related_rfis = sorted(
+            {
+                *[
+                    _safe_text(item, "")
+                    for item in list(row.get("related_rfi_candidates") or [])
+                    if _safe_text(item, "")
+                ],
+                *[
+                    _safe_text(
+                        rfi.get("rfi_id"),
+                        _safe_text(rfi.get("title"), "rfi"),
+                    )
+                    for rfi in rfi_rows
+                    if _contains_any(str(rfi), [equipment_id, model])
+                ],
+            }
+        )
+
+        evidence_refs = sorted(
+            {
+                *[
+                    f"{source} p.{page}"
+                    for source in source_documents
+                    for page in source_pages or ["n/a"]
+                ],
+                *[
+                    f"{_safe_text(item.get('source_file'), 'file')} p.{item.get('page', 'n/a')}"
+                    for item in evidence_rows
+                    if _contains_any(
+                        item.get("source_file"),
+                        [*source_documents, *drawing_refs, *specification_refs],
+                    )
+                ],
+            }
+        )
+
+        completeness_status = _safe_text(
+            row.get("completeness_status"),
+            "unresolved",
+        )
+        missing_components: list[str] = []
+        if completeness_status == "missing_manufacturer":
+            missing_components.append("manufacturer")
+        if completeness_status == "missing_model":
+            missing_components.append("model")
+        if completeness_status == "unresolved":
+            missing_components.append("equipment mapping")
+        if completeness_status == "conflicting_quantity":
+            missing_components.append("quantity confirmation")
+
+        confidence_value = row.get("confidence")
+        confidence = (
+            float(confidence_value)
+            if isinstance(confidence_value, (int, float))
+            else 0.0
+        )
+
+        responsibility = _safe_text(row.get("responsibility"), "Needs Review")
+        lifecycle_status = _equipment_lifecycle_status(
+            manufacturer,
+            model,
+            warnings,
+            master_rows,
+        )
+
+        requires_review = (
+            completeness_status
+            not in {"complete", "drawing_only", "specification_only"}
+            or confidence < 0.65
+            or bool(warnings)
+            or bool(related_risks)
+            or "unknown" in responsibility.lower()
+        )
+
+        result.append(
+            {
+                "equipment_id": equipment_id,
+                "manufacturer": manufacturer,
+                "model": model,
+                "description": _safe_text(row.get("description"), "n/a"),
+                "quantity": row.get("quantity"),
+                "system": _safe_text(row.get("system"), "Unknown"),
+                "room_or_area": _safe_text(row.get("room_or_area"), "Unknown"),
+                "confidence": confidence,
+                "completeness_status": completeness_status,
+                "responsibility": responsibility,
+                "lifecycle_status": lifecycle_status,
+                "source_documents": source_documents,
+                "drawing_references": drawing_refs,
+                "specification_references": specification_refs,
+                "schedule_references": schedule_refs,
+                "related_risks": related_risks,
+                "related_rfi_candidates": related_rfis,
+                "labor_allowance": None,
+                "known_cost": row.get("known_cost"),
+                "pricing_source": _safe_text(row.get("pricing_source"), ""),
+                "missing_components": missing_components,
+                "warnings": warnings,
+                "evidence_refs": evidence_refs,
+                "requires_review": requires_review,
+            }
+        )
+
+    result.sort(key=lambda item: _safe_text(item.get("equipment_id"), ""))
+    return result
+
+
+def _equipment_recommended_actions(item: dict[str, Any]) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+
+    def _add(
+        priority: str,
+        action: str,
+        reason: str,
+        destination: str,
+        refs: list[str],
+    ) -> None:
+        actions.append(
+            {
+                "priority": priority,
+                "action": action,
+                "reason": reason,
+                "destination": destination,
+                "affected_sources": ", ".join(refs[:4]) or "n/a",
+            }
+        )
+
+    references = list(item.get("evidence_refs") or [])
+    completeness = _safe_text(item.get("completeness_status"), "")
+    manufacturer = _safe_text(item.get("manufacturer"), "")
+    model = _safe_text(item.get("model"), "")
+    quantity = _safe_text(item.get("quantity"), "")
+    responsibility = _safe_text(item.get("responsibility"), "")
+    lifecycle = _safe_text(item.get("lifecycle_status"), "")
+    known_cost = item.get("known_cost")
+    confidence = float(item.get("confidence", 0.0) or 0.0)
+
+    if completeness == "missing_manufacturer" or manufacturer.lower() in {
+        "",
+        "unknown",
+    }:
+        _add(
+            "Critical",
+            "Confirm manufacturer",
+            "Manufacturer is missing or unresolved in canonical BOM data.",
+            "BOM Review",
+            references,
+        )
+    if completeness == "missing_model" or model.lower() in {"", "unknown"}:
+        _add(
+            "Critical",
+            "Confirm model number",
+            "Model is missing or unresolved for this equipment object.",
+            "BOM Review",
+            references,
+        )
+    if completeness == "conflicting_quantity" or "conflict" in quantity.lower():
+        _add(
+            "High",
+            "Verify quantity",
+            "Quantity evidence is conflicting across source references.",
+            "Scope & Risk",
+            references,
+        )
+    if list(item.get("missing_components") or []):
+        _add(
+            "High",
+            "Add missing accessories to BOM",
+            "Completeness status indicates missing equipment components.",
+            "BOM Review",
+            references,
+        )
+    if "unknown" in responsibility.lower() or "review" in responsibility.lower():
+        _add(
+            "High",
+            "Confirm OFCI/CFCI responsibility",
+            "Responsibility assignment is ambiguous for this item.",
+            "Scope & Risk",
+            references,
+        )
+    if lifecycle.lower() in {"discontinued", "legacy", "obsolete"}:
+        _add(
+            "High",
+            "Review discontinued product substitution",
+            "Lifecycle status indicates legacy or discontinued product risk.",
+            "Engineering Review",
+            references,
+        )
+    if known_cost is None:
+        _add(
+            "Medium",
+            "Review pricing source",
+            "Known cost is not available in deterministic price matching.",
+            "Price List Library",
+            references,
+        )
+    if confidence < 0.7:
+        _add(
+            "Medium",
+            "Match to manufacturer product",
+            "Object confidence is below preferred engineering review threshold.",
+            "Master Library Explorer",
+            references,
+        )
+    if not actions:
+        _add(
+            "Low",
+            "No immediate action",
+            "Equipment object appears complete for current project evidence.",
+            "Equipment",
+            references,
+        )
+
+    rank = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
+    actions.sort(key=lambda item: rank.get(_safe_text(item.get("priority"), "Low"), 3))
+    return actions
+
+
+def _open_equipment_detail(
+    st: Any,
+    *,
+    equipment_id: str,
+    origin_page: str,
+    origin_key: str,
+) -> None:
+    st.session_state["atlas_equipment_origin"] = {
+        "page": origin_page,
+        "key": origin_key,
+    }
+    st.session_state["atlas_active_page"] = "Equipment"
+    _set_context_selection(st, "equipment", {"equipment_id": equipment_id})
+    st.rerun()
+
+
 def _scope_risk_findings(context: dict[str, Any] | None) -> list[dict[str, Any]]:
     if context is None:
         return []
@@ -1855,6 +2201,7 @@ def _init_session_state(st: Any) -> None:
     )
     st.session_state.setdefault("atlas_price_list_signature", "")
     st.session_state.setdefault("atlas_review_flags", {})
+    st.session_state.setdefault("atlas_equipment_origin", {})
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -4274,6 +4621,22 @@ def _render_bom_review_page(
                 use_container_width=True,
                 hide_index=True,
             )
+
+            equipment_target_id = _safe_text(
+                selected_row.get("bom_item_id"),
+                _safe_text(selected_row.get("equipment_id"), ""),
+            )
+            if equipment_target_id and st.button(
+                "Open Equipment Detail",
+                key=f"atlas_bom_open_equipment_{equipment_target_id}",
+                use_container_width=True,
+            ):
+                _open_equipment_detail(
+                    st,
+                    equipment_id=equipment_target_id,
+                    origin_page="BOM Review",
+                    origin_key=equipment_target_id,
+                )
 
     st.markdown("### Export")
     export_csv, export_json = _canonical_bom_export_payload(filtered_rows)
@@ -10971,12 +11334,32 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
     )
 
     with related_tabs[0]:
-        equipment_rows = [
-            {"Equipment": value}
-            for value in list(selected.get("referenced_equipment") or [])
-        ]
-        if equipment_rows:
-            st.dataframe(equipment_rows, use_container_width=True, hide_index=True)
+        equipment_refs = list(selected.get("referenced_equipment") or [])
+        if equipment_refs:
+            st.dataframe(
+                [
+                    {
+                        "Equipment": _equipment_human_label(context, ref),
+                        "ID": ref,
+                    }
+                    for ref in equipment_refs
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+            for ref in equipment_refs[:12]:
+                label = _equipment_human_label(context, ref)
+                if st.button(
+                    f"Open {label}",
+                    key=f"atlas_drawing_open_equipment_{_safe_text(selected.get('drawing_number'), 'drawing')}_{ref}",
+                    use_container_width=True,
+                ):
+                    _open_equipment_detail(
+                        st,
+                        equipment_id=ref,
+                        origin_page="Drawings",
+                        origin_key=_safe_text(selected.get("drawing_number"), ""),
+                    )
         else:
             _render_guided_empty_state(
                 st,
@@ -11451,12 +11834,32 @@ def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None
             st.info("No related drawings were detected for this specification section.")
 
     with relationship_tabs[2]:
-        equipment_rows = [
-            {"Equipment": value}
-            for value in list(selected.get("referenced_equipment") or [])
-        ]
-        if equipment_rows:
-            st.dataframe(equipment_rows, use_container_width=True, hide_index=True)
+        equipment_refs = list(selected.get("referenced_equipment") or [])
+        if equipment_refs:
+            st.dataframe(
+                [
+                    {
+                        "Equipment": _equipment_human_label(context, ref),
+                        "ID": ref,
+                    }
+                    for ref in equipment_refs
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+            for ref in equipment_refs[:12]:
+                label = _equipment_human_label(context, ref)
+                if st.button(
+                    f"Open {label}",
+                    key=f"atlas_spec_open_equipment_{_safe_text(selected.get('section'), 'section')}_{ref}",
+                    use_container_width=True,
+                ):
+                    _open_equipment_detail(
+                        st,
+                        equipment_id=ref,
+                        origin_page="Specifications",
+                        origin_key=_safe_text(selected.get("section"), ""),
+                    )
         else:
             st.info("No related equipment was detected for this specification section.")
 
@@ -11892,120 +12295,523 @@ def _render_specification_explorer_page(
 
 
 def _render_equipment_page(st: Any, context: dict[str, Any] | None) -> None:
-    st.subheader("Equipment Browser")
-    objects = _workspace_objects(context)
-    rows = list(objects.get("equipment", []))
+    _render_page_header(
+        st,
+        "Equipment Workspace",
+        "Object-first engineering view built from canonical BOM lines, scope findings, and source evidence.",
+    )
+
+    rows = _equipment_workspace_rows(st, context)
     if not rows:
-        st.info("No equipment objects available.")
+        _render_guided_empty_state(
+            st,
+            why_empty="No equipment objects are available yet.",
+            action_to_populate="Run project analysis to build canonical BOM lines and equipment relationships.",
+            next_location="Go to Documents and run project analysis.",
+        )
         return
 
-    filter_cols = st.columns([2.0, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2])
-    search = filter_cols[0].text_input(
-        "Search",
-        key="atlas_equipment_search",
-        placeholder="manufacturer, model, description, system, room",
+    st.markdown("### Search and Filters")
+    filter_cols = st.columns([2.3, 1.2, 1.1, 1.1, 1.1, 1.1, 1.1, 1.2])
+    search_text = (
+        filter_cols[0]
+        .text_input(
+            "Search equipment",
+            key="atlas_equipment_search",
+            placeholder="equipment id, manufacturer, model, description, system, room",
+        )
+        .strip()
+        .lower()
     )
-    system_filter = filter_cols[1].selectbox(
-        "System",
-        options=["All"] + sorted({item["system"] for item in rows}),
-    )
-    manufacturer_filter = filter_cols[2].selectbox(
+    manufacturer_filter = filter_cols[1].selectbox(
         "Manufacturer",
-        options=["All"] + sorted({item["manufacturer"] for item in rows}),
+        options=["All"]
+        + sorted({_safe_text(item.get("manufacturer"), "") for item in rows}),
+        key="atlas_equipment_filter_manufacturer",
+    )
+    system_filter = filter_cols[2].selectbox(
+        "System",
+        options=["All"] + sorted({_safe_text(item.get("system"), "") for item in rows}),
+        key="atlas_equipment_filter_system",
     )
     room_filter = filter_cols[3].selectbox(
         "Room",
-        options=["All"] + sorted({item["room"] for item in rows}),
+        options=["All"]
+        + sorted({_safe_text(item.get("room_or_area"), "") for item in rows}),
+        key="atlas_equipment_filter_room",
     )
-    discipline_filter = filter_cols[4].selectbox(
-        "Discipline",
-        options=["All"] + sorted({item["discipline"] for item in rows}),
+    completeness_filter = filter_cols[4].selectbox(
+        "Completeness",
+        options=["All"]
+        + sorted({_safe_text(item.get("completeness_status"), "") for item in rows}),
+        key="atlas_equipment_filter_completeness",
     )
-    sort_field = filter_cols[5].selectbox(
-        "Sort",
-        options=[
-            "equipment_id",
-            "manufacturer",
-            "model",
-            "system",
-            "room",
-            "current_status",
-            "confidence",
-        ],
+    responsibility_filter = filter_cols[5].selectbox(
+        "Responsibility",
+        options=["All"]
+        + sorted({_safe_text(item.get("responsibility"), "") for item in rows}),
+        key="atlas_equipment_filter_responsibility",
     )
-    group_by = filter_cols[6].selectbox(
-        "Group By",
-        options=["System", "Manufacturer", "Room", "Discipline", "None"],
+    lifecycle_filter = filter_cols[6].selectbox(
+        "Lifecycle",
+        options=["All"]
+        + sorted({_safe_text(item.get("lifecycle_status"), "") for item in rows}),
+        key="atlas_equipment_filter_lifecycle",
+    )
+    review_only = filter_cols[7].checkbox(
+        "Requires review",
+        key="atlas_equipment_filter_review_only",
+        value=False,
+    )
+
+    confidence_min = st.slider(
+        "Minimum confidence",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.0,
+        step=0.05,
+        key="atlas_equipment_filter_confidence",
     )
 
     filtered = [
         item
         for item in rows
-        if (
-            not search
-            or _contains_any(
-                str(item),
-                [search],
-            )
-        )
-        and (system_filter == "All" or item["system"] == system_filter)
+        if (not search_text or search_text in str(item).lower())
         and (
-            manufacturer_filter == "All" or item["manufacturer"] == manufacturer_filter
+            manufacturer_filter == "All"
+            or _safe_text(item.get("manufacturer"), "") == manufacturer_filter
         )
-        and (room_filter == "All" or item["room"] == room_filter)
-        and (discipline_filter == "All" or item["discipline"] == discipline_filter)
+        and (
+            system_filter == "All"
+            or _safe_text(item.get("system"), "") == system_filter
+        )
+        and (
+            room_filter == "All"
+            or _safe_text(item.get("room_or_area"), "") == room_filter
+        )
+        and (
+            completeness_filter == "All"
+            or _safe_text(item.get("completeness_status"), "") == completeness_filter
+        )
+        and (
+            responsibility_filter == "All"
+            or _safe_text(item.get("responsibility"), "") == responsibility_filter
+        )
+        and (
+            lifecycle_filter == "All"
+            or _safe_text(item.get("lifecycle_status"), "") == lifecycle_filter
+        )
+        and (float(item.get("confidence", 0.0) or 0.0) >= confidence_min)
+        and (not review_only or bool(item.get("requires_review")))
     ]
-
-    filtered.sort(key=lambda item: str(item.get(sort_field) or "").lower())
 
     if not filtered:
-        st.info("No equipment matches current filters.")
+        _render_guided_empty_state(
+            st,
+            why_empty="No equipment objects match the current filters.",
+            action_to_populate="Relax filter settings or clear the search query.",
+            next_location="Use Search and Filters above to broaden results.",
+        )
         return
 
-    display_rows = [
+    st.markdown("### Equipment Summary")
+    quantity_conflicts = sum(
+        1
+        for item in filtered
+        if _safe_text(item.get("completeness_status"), "") == "conflicting_quantity"
+    )
+    discontinued_or_legacy = sum(
+        1
+        for item in filtered
+        if _safe_text(item.get("lifecycle_status"), "").lower()
+        in {"discontinued", "legacy", "obsolete"}
+    )
+    summary_row = {
+        "total equipment items": len(filtered),
+        "complete items": sum(
+            1
+            for item in filtered
+            if _safe_text(item.get("completeness_status"), "") == "complete"
+        ),
+        "incomplete items": sum(
+            1
+            for item in filtered
+            if _safe_text(item.get("completeness_status"), "")
+            not in {"complete", "drawing_only", "specification_only"}
+        ),
+        "unresolved items": sum(
+            1
+            for item in filtered
+            if _safe_text(item.get("completeness_status"), "") == "unresolved"
+        ),
+        "quantity conflicts": quantity_conflicts,
+        "missing manufacturer": sum(
+            1
+            for item in filtered
+            if _safe_text(item.get("completeness_status"), "") == "missing_manufacturer"
+        ),
+        "missing model": sum(
+            1
+            for item in filtered
+            if _safe_text(item.get("completeness_status"), "") == "missing_model"
+        ),
+        "discontinued or legacy references": discontinued_or_legacy,
+        "items without known cost": sum(
+            1 for item in filtered if item.get("known_cost") is None
+        ),
+        "items requiring review": sum(
+            1 for item in filtered if bool(item.get("requires_review"))
+        ),
+    }
+    st.dataframe([summary_row], use_container_width=True, hide_index=True)
+
+    st.markdown("### Equipment List")
+    list_rows = [
         {
-            "equipment": item["equipment_id"],
-            "manufacturer": item["manufacturer"],
-            "model": item["model"],
-            "description": item["description"],
-            "system": item["system"],
-            "room": item["room"],
-            "drawing refs": ", ".join(item["drawing_references"]) or "n/a",
-            "spec refs": ", ".join(item["specification_references"]) or "n/a",
-            "status": item["current_status"],
-            "confidence": item["confidence"],
-            "potential rfis": len(item["potential_rfis"]),
+            "equipment": item.get("equipment_id"),
+            "manufacturer": item.get("manufacturer"),
+            "model": item.get("model"),
+            "description": item.get("description"),
+            "quantity": item.get("quantity"),
+            "system": item.get("system"),
+            "room": item.get("room_or_area"),
+            "confidence": round(float(item.get("confidence", 0.0) or 0.0), 2),
+            "completeness": item.get("completeness_status"),
+            "responsibility": item.get("responsibility"),
+            "lifecycle": item.get("lifecycle_status"),
+            "requires review": bool(item.get("requires_review")),
         }
         for item in filtered
     ]
+    st.dataframe(list_rows, use_container_width=True, hide_index=True)
 
-    if group_by != "None":
-        bucket_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        key_map = {
-            "System": "system",
-            "Manufacturer": "manufacturer",
-            "Room": "room",
-            "Discipline": "discipline",
-        }
-        group_key = key_map[group_by]
-        for row in display_rows:
-            bucket_map[str(row[group_key]).strip() or "Unassigned"].append(row)
-
-        for bucket_name in sorted(bucket_map.keys()):
-            st.markdown(f"#### {group_by}: {bucket_name}")
-            st.dataframe(
-                bucket_map[bucket_name], use_container_width=True, hide_index=True
-            )
-    else:
-        st.dataframe(display_rows, use_container_width=True, hide_index=True)
-
-    labels = [
-        f"{item['equipment_id']} · {item['manufacturer']} {item['model']}"
+    selection_labels = [
+        f"{_safe_text(item.get('equipment_id'), '')} - {_safe_text(item.get('manufacturer'), '')} {_safe_text(item.get('model'), '')}".strip()
         for item in filtered
     ]
-    selected_label = st.selectbox("Select Equipment Object", options=labels)
-    selected = filtered[labels.index(selected_label)]
+
+    default_index = 0
+    current_selection = dict(st.session_state.get("atlas_context_selection") or {})
+    current_equipment_id = _safe_text(
+        dict(current_selection.get("data") or {}).get("equipment_id"),
+        "",
+    )
+    if current_equipment_id:
+        default_index = next(
+            (
+                idx
+                for idx, item in enumerate(filtered)
+                if _safe_text(item.get("equipment_id"), "") == current_equipment_id
+            ),
+            0,
+        )
+
+    selected_label = st.selectbox(
+        "Select Equipment Detail",
+        options=selection_labels,
+        index=default_index,
+        key="atlas_equipment_selected_label",
+    )
+    selected = filtered[selection_labels.index(selected_label)]
     _set_context_selection(st, "equipment", selected)
+
+    origin = dict(st.session_state.get("atlas_equipment_origin") or {})
+    origin_page = _safe_text(origin.get("page"), "")
+    if origin_page:
+        origin_cols = st.columns([7.5, 2.5])
+        origin_cols[0].caption(
+            f"Opened from {origin_page} ({_safe_text(origin.get('key'), 'context')})."
+        )
+        if origin_cols[1].button(
+            f"Back to {origin_page}",
+            key="atlas_equipment_back_to_origin",
+            use_container_width=True,
+        ):
+            st.session_state["atlas_active_page"] = origin_page
+            st.rerun()
+
+    st.markdown("### Selected Equipment Detail")
+    title_text = (
+        f"{_safe_text(selected.get('manufacturer'), 'Unknown')} "
+        f"{_safe_text(selected.get('model'), 'Unknown')}"
+    ).strip()
+    subtitle_text = _safe_text(selected.get("description"), "Equipment item")
+    status_badges = [
+        _safe_text(selected.get("completeness_status"), "Needs Review")
+        .replace("_", " ")
+        .title(),
+        f"Confidence {int(float(selected.get('confidence', 0.0) or 0.0) * 100)}%",
+        _safe_text(selected.get("lifecycle_status"), "Active"),
+        _safe_text(selected.get("responsibility"), "Needs Review"),
+    ]
+    st.markdown(f"#### {title_text}")
+    st.caption(subtitle_text)
+    st.markdown(" ".join([f"`{badge}`" for badge in status_badges]))
+
+    detail_tabs = st.tabs(
+        [
+            "Overview",
+            "Engineering",
+            "References",
+            "Scope and Risk",
+            "Pricing",
+            "Evidence",
+        ]
+    )
+
+    with detail_tabs[0]:
+        st.dataframe(
+            [
+                {
+                    "manufacturer": selected.get("manufacturer"),
+                    "model": selected.get("model"),
+                    "description": selected.get("description"),
+                    "quantity": selected.get("quantity"),
+                    "system": selected.get("system"),
+                    "room": selected.get("room_or_area"),
+                    "completeness": selected.get("completeness_status"),
+                    "responsibility": selected.get("responsibility"),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with detail_tabs[1]:
+        engineering_rows = [
+            {
+                "signal type": "n/a",
+                "power": "n/a",
+                "network": "n/a",
+                "mounting": "n/a",
+                "accessories": ", ".join(list(selected.get("missing_components") or []))
+                or "None flagged",
+                "labor": _safe_text(selected.get("labor_allowance"), "n/a"),
+                "known requirements": ", ".join(list(selected.get("warnings") or []))
+                or "n/a",
+            }
+        ]
+        st.dataframe(engineering_rows, use_container_width=True, hide_index=True)
+
+    with detail_tabs[2]:
+        refs = {
+            "drawings": list(selected.get("drawing_references") or []),
+            "specifications": list(selected.get("specification_references") or []),
+            "schedules": list(selected.get("schedule_references") or []),
+            "addenda": [],
+        }
+        if any(refs.values()):
+            st.dataframe(
+                [
+                    {
+                        "drawings": ", ".join(refs["drawings"]) or "n/a",
+                        "specifications": ", ".join(refs["specifications"]) or "n/a",
+                        "schedules": ", ".join(refs["schedules"]) or "n/a",
+                        "addenda": ", ".join(refs["addenda"]) or "n/a",
+                    }
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No source references are linked to this equipment object.",
+                action_to_populate="Review BOM extraction and source mapping for this item.",
+                next_location="Open BOM Review and Documents for source validation.",
+            )
+
+    with detail_tabs[3]:
+        st.dataframe(
+            [
+                {
+                    "missing accessories": ", ".join(
+                        list(selected.get("missing_components") or [])
+                    )
+                    or "none",
+                    "quantity conflict": (
+                        "yes"
+                        if _safe_text(selected.get("completeness_status"), "")
+                        == "conflicting_quantity"
+                        else "no"
+                    ),
+                    "discontinued status": selected.get("lifecycle_status"),
+                    "responsibility ambiguity": (
+                        "yes"
+                        if "unknown"
+                        in _safe_text(selected.get("responsibility"), "").lower()
+                        else "no"
+                    ),
+                    "related scope findings": ", ".join(
+                        list(selected.get("related_risks") or [])
+                    )
+                    or "none",
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with detail_tabs[4]:
+        st.dataframe(
+            [
+                {
+                    "known cost": selected.get("known_cost"),
+                    "list price": "n/a",
+                    "vendor source": _safe_text(selected.get("pricing_source"), "n/a"),
+                    "effective date": "n/a",
+                    "match confidence": round(
+                        float(selected.get("confidence", 0.0) or 0.0), 2
+                    ),
+                    "pricing warnings": ", ".join(
+                        [
+                            item
+                            for item in list(selected.get("warnings") or [])
+                            if "price" in item.lower()
+                        ]
+                    )
+                    or "none",
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with detail_tabs[5]:
+        evidence_refs = list(selected.get("evidence_refs") or [])
+        if evidence_refs:
+            st.dataframe(
+                [
+                    {
+                        "reference": ref,
+                    }
+                    for ref in evidence_refs[:25]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No evidence references are currently linked to this equipment object.",
+                action_to_populate="Confirm source document mapping for equipment extraction.",
+                next_location="Review Documents and BOM evidence drill-down.",
+            )
+
+    st.markdown("### Related Objects")
+    related_cols = st.columns(2)
+    with related_cols[0]:
+        st.markdown("Referenced Drawings")
+        drawing_refs = list(selected.get("drawing_references") or [])
+        if drawing_refs:
+            for drawing_ref in drawing_refs[:12]:
+                if st.button(
+                    f"Open {drawing_ref}",
+                    key=f"atlas_equipment_open_drawing_{_safe_text(selected.get('equipment_id'), 'eq')}_{drawing_ref}",
+                    use_container_width=True,
+                ):
+                    st.session_state["atlas_active_page"] = "Drawings"
+                    _set_context_selection(
+                        st, "drawing", {"drawing_number": drawing_ref}
+                    )
+                    st.rerun()
+        else:
+            st.caption("No drawing references.")
+
+        st.markdown("Referenced Specifications")
+        spec_refs = list(selected.get("specification_references") or [])
+        if spec_refs:
+            for spec_ref in spec_refs[:12]:
+                if st.button(
+                    f"Open {spec_ref}",
+                    key=f"atlas_equipment_open_spec_{_safe_text(selected.get('equipment_id'), 'eq')}_{spec_ref}",
+                    use_container_width=True,
+                ):
+                    st.session_state["atlas_active_page"] = "Specifications"
+                    _set_context_selection(st, "specification", {"section": spec_ref})
+                    st.rerun()
+        else:
+            st.caption("No specification references.")
+
+    with related_cols[1]:
+        st.markdown("System")
+        system_name = _safe_text(selected.get("system"), "Unknown")
+        if st.button(
+            f"Open {system_name}",
+            key=f"atlas_equipment_open_system_{_safe_text(selected.get('equipment_id'), 'eq')}",
+            use_container_width=True,
+        ):
+            st.session_state["atlas_active_page"] = "Systems"
+            _set_context_selection(st, "system", {"system": system_name})
+            st.rerun()
+
+        st.markdown("Room")
+        room_name = _safe_text(selected.get("room_or_area"), "Unknown")
+        st.caption(room_name)
+
+        st.markdown("Related Risks")
+        related_risks = list(selected.get("related_risks") or [])
+        if related_risks:
+            st.dataframe(
+                [{"risk": value} for value in related_risks[:12]],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No related risks linked.")
+
+        st.markdown("Related RFIs")
+        related_rfis = list(selected.get("related_rfi_candidates") or [])
+        if related_rfis:
+            st.dataframe(
+                [{"rfi": value} for value in related_rfis[:12]],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No related RFI candidates linked.")
+
+    st.markdown("### Evidence and Warnings")
+    warn_cols = st.columns(2)
+    with warn_cols[0]:
+        warnings = list(selected.get("warnings") or [])
+        if warnings:
+            st.dataframe(
+                [{"warning": value} for value in warnings[:20]],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No warnings.")
+    with warn_cols[1]:
+        st.dataframe(
+            [
+                {"evidence": value}
+                for value in list(selected.get("evidence_refs") or [])[:20]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown("### Recommended Actions")
+    actions = _equipment_recommended_actions(selected)
+    st.dataframe(actions, use_container_width=True, hide_index=True)
+    action_destinations = sorted(
+        {
+            _safe_text(item.get("destination"), "")
+            for item in actions
+            if _safe_text(item.get("destination"), "")
+        }
+    )
+    if action_destinations:
+        selected_destination = st.selectbox(
+            "Navigate to action destination",
+            options=action_destinations,
+            key="atlas_equipment_action_destination",
+        )
+        if st.button("Open Action Destination", use_container_width=True):
+            st.session_state["atlas_active_page"] = selected_destination
+            st.rerun()
 
 
 def _render_systems_page(
@@ -13825,6 +14631,8 @@ def _render_main_content(
         _render_drawings_page(st, context)
     elif page == "Specifications":
         _render_specifications_page(st, context)
+    elif page == "Equipment":
+        _render_equipment_page(st, context)
     elif page == "Schedules":
         _render_project_folder_page(st, context, "Schedules", "Schedules")
     elif page == "Addenda":
