@@ -22,6 +22,7 @@ from atlas_core.domain.deterministic_estimate import (
     MaterialCost,
     ProductResolutionStatus,
 )
+from atlas_core.domain.product_resolution import ProductResolution
 
 
 class VendorRegistryGateway(Protocol):
@@ -115,9 +116,28 @@ class DeterministicEstimateService:
         project_name: str,
         bom_rows: list[dict[str, Any]],
         labor_estimate: Any | None = None,
+        product_resolutions: list[ProductResolution | dict[str, Any]] | None = None,
     ) -> Estimate:
+        resolution_by_source: dict[str, ProductResolution] = {}
+        for item in list(product_resolutions or []):
+            resolution = (
+                item
+                if isinstance(item, ProductResolution)
+                else ProductResolution(**item)
+            )
+            resolution_by_source[resolution.source_object_id] = resolution
+
         lines = [
-            self._line_from_bom_row(index, row, labor_estimate=labor_estimate)
+            self._line_from_bom_row(
+                index,
+                row,
+                labor_estimate=labor_estimate,
+                resolution=resolution_by_source.get(
+                    _safe_text(
+                        row.get("bom_item_id"), _safe_text(row.get("equipment_id"), "")
+                    )
+                ),
+            )
             for index, row in enumerate(list(bom_rows or []), start=1)
         ]
 
@@ -219,6 +239,7 @@ class DeterministicEstimateService:
         row: dict[str, Any],
         *,
         labor_estimate: Any | None,
+        resolution: ProductResolution | None,
     ) -> EstimateLine:
         manufacturer = _safe_text(row.get("manufacturer"), "Unknown")
         model = _safe_text(row.get("model"), "Unknown")
@@ -228,18 +249,26 @@ class DeterministicEstimateService:
         warnings = [_safe_text(item, "") for item in list(row.get("warnings") or [])]
         completeness_status = _safe_text(row.get("completeness_status"), "")
 
-        resolution_status = self._resolution_status_for_row(
-            manufacturer=manufacturer,
-            model=model,
-            completeness_status=completeness_status,
-            warnings=warnings,
+        resolution_status = (
+            resolution.resolution_status
+            if resolution is not None
+            else self._resolution_status_for_row(
+                manufacturer=manufacturer,
+                model=model,
+                completeness_status=completeness_status,
+                warnings=warnings,
+            )
         )
         pricing_status = self._pricing_status_for_row(
             known_cost=known_cost,
             pricing_source=pricing_source,
             warnings=warnings,
         )
-        if resolution_status is ProductResolutionStatus.UNKNOWN_PRODUCT:
+        if resolution_status not in {
+            ProductResolutionStatus.EXACT_PRODUCT,
+            ProductResolutionStatus.APPROVED_SUBSTITUTE,
+            ProductResolutionStatus.PREFERRED_ALTERNATE,
+        }:
             pricing_status = CostStatus.NO_PRICING
             known_cost = None
         labor_status = (
@@ -277,6 +306,9 @@ class DeterministicEstimateService:
                 quantity=quantity,
                 manufacturer=manufacturer,
                 model=model,
+                external_confidence=(
+                    resolution.resolution_confidence if resolution is not None else None
+                ),
             ),
             source_references=source_refs,
             product_resolution_status=resolution_status,
@@ -465,6 +497,7 @@ class DeterministicEstimateService:
         quantity: float,
         manufacturer: str,
         model: str,
+        external_confidence: float | None,
     ) -> float:
         confidence = 1.0
 
@@ -493,6 +526,9 @@ class DeterministicEstimateService:
             confidence -= 0.15
         if model.lower() == "unknown":
             confidence -= 0.15
+
+        if isinstance(external_confidence, (int, float)):
+            confidence = (confidence * 0.6) + (float(external_confidence) * 0.4)
 
         return round(max(0.0, min(confidence, 1.0)), 4)
 

@@ -67,3 +67,21 @@ Extension boundaries are interface-only for future adapters:
 - labor rules and regional multipliers
 - tax/currency
 - proposal/RFQ generators
+
+## Deterministic Product Resolution Engine
+Sprint 9 adds a dedicated deterministic Product Resolution engine that sits between reviewed engineering objects and estimate preparation.
+
+Design posture:
+- No AI guessing; every match has explicit deterministic reason paths.
+- Not pricing, not procurement, and not quote generation.
+- Manual overrides are permitted only with reviewer/timestamp/reason audit fields while preserving original auto-match context.
+
+Implementation structure:
+- domain: product resolution models and override audit model
+- services: deterministic candidate ranking and resolution assignment
+- workspace shell: dedicated Product Resolution page with filters and manual override controls
+- review/estimate integration: engineering summary metrics and estimate pricing gate enforcement
+
+Source-of-truth references:
+- [PRODUCT_RESOLUTION.md](PRODUCT_RESOLUTION.md)
+- [MANUFACTURER_REGISTRY.md](MANUFACTURER_REGISTRY.md)

@@ -98,6 +98,11 @@ from atlas_core.domain.deterministic_estimate import (
     ProductResolutionStatus,
     Subtotal,
 )
+from atlas_core.domain.product_resolution import (
+    ProductResolution,
+    ProductResolutionCandidate,
+    ProductResolutionManualOverride,
+)
 
 __all__ = [
     "BidPackageReview",
@@ -144,6 +149,9 @@ __all__ = [
     "CostStatus",
     "EstimateConfidenceModel",
     "LaborCategory",
+    "ProductResolution",
+    "ProductResolutionCandidate",
+    "ProductResolutionManualOverride",
     "MasterProduct",
     "ProductCategory",
     "ProductFamily",

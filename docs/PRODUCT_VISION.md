@@ -20,9 +20,16 @@ Atlas is intentionally inspired by engineering discipline and decision support r
 The engine currently prioritizes:
 - Drawing/spec/schedule intelligence
 - Scope reconciliation and risk surfacing
+- Deterministic product resolution between engineering scope and estimate readiness
 - Engineering assumptions and RFI candidate generation
 - Estimator brief/final review outputs
 - Exportable data contracts (CSV, JSON, Markdown)
+
+Product resolution posture:
+- deterministic and explainable canonical product matching only
+- no pricing logic
+- no procurement logic
+- no quote generation
 
 ## Deferred Future Phases
 The following areas are intentionally deferred until core bid intelligence is fully complete:

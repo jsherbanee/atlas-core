@@ -6,6 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import hashlib
+import json
 from pathlib import Path
 import platform
 import subprocess
@@ -34,11 +35,13 @@ from atlas_core.services.specification_intelligence import (
 from atlas_core.services.coordination_intelligence import CoordinationIntelligenceEngine
 from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 from atlas_core.services.master_library import MasterLibraryService
+from atlas_core.services.product_resolution_service import ProductResolutionService
 from atlas_core.services.bom_review_service import BomReviewService
 from atlas_core.services.pricing_service import PricingService
 from atlas_core.services.sales_design_review_service import SalesDesignReviewService
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 from atlas_core.services.estimate_service import DeterministicEstimateService
+from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
 from atlas_core.services.runtime_workspace import ensure_runtime_workspace_root
@@ -60,6 +63,7 @@ WORKFLOW_PAGES = [
     "BOM Review",
     "Scope & Risk",
     "Engineering Review",
+    "Product Resolution",
     "Reports",
 ]
 
@@ -73,6 +77,7 @@ NAV_DROPDOWN_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("BOM Review", "BOM Review"),
             ("Scope & Risk", "Scope & Risk"),
             ("Engineering Review", "Engineering Review"),
+            ("Product Resolution", "Product Resolution"),
             ("Reports", "Reports"),
         ],
     ),
@@ -225,6 +230,7 @@ ALL_ACTIVE_PAGES = (
     + [
         "Knowledge",
         "Administration",
+        "Product Resolution",
         "Estimate",
         "Notebook",
         "Timeline",
@@ -259,6 +265,7 @@ PROJECT_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("BOM Review", "BOM Review"),
             ("Scope & Risk", "Scope & Risk"),
             ("Engineering Review", "Engineering Review"),
+            ("Product Resolution", "Product Resolution"),
             ("Estimate", "Estimate"),
             ("Notebook", "Notebook"),
             ("Reports", "Reports"),
@@ -516,6 +523,19 @@ def _estimate_cost_status_chip(value: str) -> str:
         return "🔴 Expired"
     if normalized == "unavailable":
         return "🔴 Unavailable"
+    return "⚪ " + _safe_text(value, "Unknown")
+
+
+def _product_resolution_badge(value: str) -> str:
+    normalized = _safe_text(value, "").replace("_", " ").lower()
+    if normalized in {"exact product", "approved substitute"}:
+        return "🟢 " + normalized.title()
+    if normalized == "preferred alternate":
+        return "🔵 Preferred Alternate"
+    if normalized == "generic allowance":
+        return "🟠 Generic Allowance"
+    if normalized == "unknown product":
+        return "🔴 Unknown Product"
     return "⚪ " + _safe_text(value, "Unknown")
 
 
@@ -2235,6 +2255,97 @@ def _sales_design_review(
     return review.to_dict()
 
 
+def _product_resolution_overrides(st: Any) -> dict[str, dict[str, Any]]:
+    raw = st.session_state.get("atlas_product_resolution_overrides")
+    if isinstance(raw, dict):
+        return {str(key): dict(value or {}) for key, value in raw.items()}
+    return {}
+
+
+def _resolution_source_id(row: dict[str, Any]) -> str:
+    return _safe_text(
+        row.get("bom_item_id"),
+        _safe_text(row.get("equipment_id"), "unknown_equipment"),
+    )
+
+
+def _resolved_product_rows(st: Any, bom_rows: list[dict[str, Any]]) -> list[Any]:
+    if not bom_rows:
+        return []
+
+    overrides = _product_resolution_overrides(st)
+    signature_payload = {
+        "rows": [
+            {
+                "source": _resolution_source_id(row),
+                "manufacturer": _safe_text(row.get("manufacturer"), "Unknown"),
+                "model": _safe_text(row.get("model"), "Unknown"),
+                "description": _safe_text(row.get("description"), ""),
+                "completeness_status": _safe_text(row.get("completeness_status"), ""),
+            }
+            for row in bom_rows
+        ],
+        "overrides": overrides,
+    }
+    signature = hashlib.sha1(
+        json.dumps(signature_payload, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    cache_key = "atlas_product_resolution_cache"
+    cached = st.session_state.get(cache_key)
+    if isinstance(cached, dict) and cached.get("signature") == signature:
+        return list(cached.get("resolutions") or [])
+
+    registry = ManufacturerRegistry(build_manufacturer_seed_data())
+    service = ProductResolutionService(
+        master_library_service=MasterLibraryService(),
+        manufacturer_registry=registry,
+    )
+    resolutions = service.resolve_equipment_rows(
+        list(bom_rows),
+        manual_overrides=overrides,
+    )
+    st.session_state[cache_key] = {
+        "signature": signature,
+        "resolutions": resolutions,
+    }
+    return resolutions
+
+
+def _resolution_summary_rows(resolutions: list[Any]) -> dict[str, int]:
+    summary = {
+        "resolved_products": 0,
+        "unknown_products": 0,
+        "generic_allowances": 0,
+        "substitutions": 0,
+        "requires_review": 0,
+    }
+    for item in resolutions:
+        status = _normalized_resolution_status(item)
+        confidence = float(getattr(item, "resolution_confidence", 0.0) or 0.0)
+
+        if status in {
+            "exact_product",
+            "approved_substitute",
+            "preferred_alternate",
+        }:
+            summary["resolved_products"] += 1
+        if status == "unknown_product":
+            summary["unknown_products"] += 1
+        if status == "generic_allowance":
+            summary["generic_allowances"] += 1
+        if status in {"approved_substitute", "preferred_alternate"}:
+            summary["substitutions"] += 1
+        if status in {"unknown_product", "generic_allowance"} or confidence < 0.75:
+            summary["requires_review"] += 1
+    return summary
+
+
+def _normalized_resolution_status(item: Any) -> str:
+    raw_status = getattr(item, "resolution_status", "")
+    value = getattr(raw_status, "value", raw_status)
+    return _safe_text(value, "").replace("ProductResolutionStatus.", "").lower()
+
+
 def _current_commit() -> str:
     try:
         result = subprocess.run(
@@ -2290,6 +2401,8 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_pinned_objects", [])
     st.session_state.setdefault("atlas_recent_search_queries", [])
     st.session_state.setdefault("atlas_recent_opened_results", [])
+    st.session_state.setdefault("atlas_product_resolution_overrides", {})
+    st.session_state.setdefault("atlas_product_resolution_cache", {})
     st.session_state.setdefault("atlas_global_search_open", False)
     st.session_state.setdefault("atlas_active_project_name", "")
     st.session_state.setdefault(
@@ -3595,6 +3708,12 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
             st.session_state.get("atlas_notebook_entries") or []
         ),
         "review_flags": dict(st.session_state.get("atlas_review_flags") or {}),
+        "product_resolution_overrides": dict(
+            st.session_state.get("atlas_product_resolution_overrides") or {}
+        ),
+        "product_resolution_filters": list(
+            st.session_state.get("atlas_product_resolution_filters") or []
+        ),
         "recently_viewed_objects": list(
             st.session_state.get("atlas_recently_viewed_objects") or []
         ),
@@ -3666,6 +3785,18 @@ def _restore_workspace_state(
     review_flags = state.get("review_flags")
     if isinstance(review_flags, dict):
         st.session_state["atlas_review_flags"] = dict(review_flags)
+
+    product_resolution_overrides = state.get("product_resolution_overrides")
+    if isinstance(product_resolution_overrides, dict):
+        st.session_state["atlas_product_resolution_overrides"] = dict(
+            product_resolution_overrides
+        )
+
+    product_resolution_filters = state.get("product_resolution_filters")
+    if isinstance(product_resolution_filters, list):
+        st.session_state["atlas_product_resolution_filters"] = list(
+            product_resolution_filters
+        )
 
     recently_viewed = state.get("recently_viewed_objects")
     if isinstance(recently_viewed, list):
@@ -4735,12 +4866,14 @@ def _render_estimate_page(
     review = context.get("review") if context else None
     labor_estimate = getattr(review, "labor_estimate", None) if review else None
     bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+    product_resolutions = _resolved_product_rows(st, bom_rows)
     service = DeterministicEstimateService()
     estimate = service.build(
         project_id=record.project.project_id,
         project_name=record.project.name,
         bom_rows=bom_rows,
         labor_estimate=labor_estimate,
+        product_resolutions=product_resolutions,
     )
     dashboard = service.build_dashboard(estimate)
     confidence_model = estimate.confidence_model
@@ -4783,6 +4916,28 @@ def _render_estimate_page(
         )
         st.caption(
             "Every estimate line is traceable to source engineering objects. Proposal, RFQ, and purchasing output is intentionally out of scope."
+        )
+        resolution_summary = _resolution_summary_rows(product_resolutions)
+        st.dataframe(
+            [
+                {
+                    "Resolved Products": resolution_summary["resolved_products"],
+                    "Unknown Products": resolution_summary["unknown_products"],
+                    "Generic Allowances": resolution_summary["generic_allowances"],
+                    "Substitutions": resolution_summary["substitutions"],
+                    "Requires Review": resolution_summary["requires_review"],
+                    "Pricing Gate": (
+                        "Blocked"
+                        if resolution_summary["requires_review"] > 0
+                        else "Ready"
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.caption(
+            "Pricing remains deterministic and blocked for unresolved, generic allowance, or low-confidence product resolution lines."
         )
 
     with tabs[1]:
@@ -4984,6 +5139,228 @@ def _render_estimate_page(
         "estimate",
         mark_label="Mark Estimate Coverage Reviewed",
     )
+
+
+def _render_product_resolution_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    _render_page_header(
+        st,
+        "Product Resolution",
+        "Deterministic bridge between reviewed engineering objects and estimate-ready canonical products.",
+    )
+
+    bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
+    if not bom_rows:
+        _render_guided_empty_state(
+            st,
+            why_empty="No BOM/equipment rows are available for deterministic product resolution.",
+            action_to_populate="Run project analysis to build reviewed equipment rows.",
+            next_location="Go to Documents and execute Project Analysis.",
+        )
+        return
+
+    resolutions = _resolved_product_rows(st, bom_rows)
+    by_source = {getattr(item, "source_object_id", ""): item for item in resolutions}
+
+    filter_map = {
+        "Unknown": lambda item: _normalized_resolution_status(item)
+        == "unknown_product",
+        "Low Confidence": lambda item: float(
+            getattr(item, "resolution_confidence", 0.0) or 0.0
+        )
+        < 0.75,
+        "Needs Review": lambda item: _normalized_resolution_status(item)
+        in {"unknown_product", "generic_allowance"}
+        or float(getattr(item, "resolution_confidence", 0.0) or 0.0) < 0.75,
+        "Resolved": lambda item: _normalized_resolution_status(item)
+        in {"exact_product", "approved_substitute", "preferred_alternate"},
+        "Substituted": lambda item: _normalized_resolution_status(item)
+        in {"approved_substitute", "preferred_alternate"},
+    }
+    selected_filters = st.multiselect(
+        "Filters",
+        options=list(filter_map.keys()),
+        default=["Needs Review"],
+        key="atlas_product_resolution_filters",
+    )
+
+    filtered = list(resolutions)
+    for filter_name in selected_filters:
+        predicate = filter_map.get(filter_name)
+        if predicate is not None:
+            filtered = [item for item in filtered if predicate(item)]
+
+    display_rows = []
+    for row in bom_rows:
+        source_id = _resolution_source_id(row)
+        resolution = by_source.get(source_id)
+        if resolution is None or resolution not in filtered:
+            continue
+
+        normalized_status = _normalized_resolution_status(resolution)
+        confidence = float(getattr(resolution, "resolution_confidence", 0.0) or 0.0)
+        candidates = list(getattr(resolution, "candidate_matches", []) or [])
+        top = candidates[0] if candidates else None
+        display_rows.append(
+            {
+                "Equipment": source_id,
+                "Current Resolution": _product_resolution_badge(normalized_status),
+                "Confidence": f"{int(confidence * 100)}%",
+                "Reason": _safe_text(getattr(resolution, "resolution_reason", ""), ""),
+                "Manufacturer": _safe_text(row.get("manufacturer"), "Unknown"),
+                "Model": _safe_text(row.get("model"), "Unknown"),
+                "Candidate Matches": (
+                    f"{len(candidates)} candidates"
+                    if top is None
+                    else f"{len(candidates)} candidates · top={_safe_text(getattr(top, 'product_id', ''), '')}"
+                ),
+                "Required Action": (
+                    "Review Required"
+                    if (
+                        normalized_status in {"unknown_product", "generic_allowance"}
+                        or confidence < 0.75
+                    )
+                    else "Ready"
+                ),
+            }
+        )
+
+    if display_rows:
+        st.dataframe(display_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("No rows match the active filter set.")
+
+    available_sources = [
+        _resolution_source_id(row)
+        for row in bom_rows
+        if _resolution_source_id(row) in by_source
+    ]
+    selected_source = st.selectbox(
+        "Select equipment row for manual review",
+        options=available_sources,
+        key="atlas_product_resolution_selected_source",
+    )
+    selected_resolution = by_source.get(selected_source)
+    if selected_resolution is None:
+        return
+
+    candidates = list(getattr(selected_resolution, "candidate_matches", []) or [])
+    candidate_rows = [
+        {
+            "product_id": _safe_text(getattr(item, "product_id", ""), ""),
+            "manufacturer": _safe_text(getattr(item, "manufacturer", ""), ""),
+            "model": _safe_text(getattr(item, "model", ""), ""),
+            "match_type": _safe_text(getattr(item, "match_type", ""), ""),
+            "confidence": float(getattr(item, "confidence", 0.0) or 0.0),
+            "reason": _safe_text(getattr(item, "reason", ""), ""),
+        }
+        for item in candidates
+    ]
+
+    st.markdown("### Candidate Matches")
+    if candidate_rows:
+        st.dataframe(candidate_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("No deterministic candidates were found for this row.")
+
+    override_state = _product_resolution_overrides(st)
+    existing_override = dict(override_state.get(selected_source) or {})
+    selected_product_option = st.selectbox(
+        "Manual selection",
+        options=[row["product_id"] for row in candidate_rows] or [""],
+        index=0,
+        key=f"atlas_product_resolution_manual_select_{selected_source}",
+    )
+    status_option = st.selectbox(
+        "Manual status",
+        options=[
+            "exact_product",
+            "approved_substitute",
+            "preferred_alternate",
+            "generic_allowance",
+            "unknown_product",
+        ],
+        index=0,
+        key=f"atlas_product_resolution_manual_status_{selected_source}",
+    )
+    reviewer = st.text_input(
+        "Reviewer",
+        value=_safe_text(existing_override.get("reviewer"), "Engineering Reviewer"),
+        key=f"atlas_product_resolution_manual_reviewer_{selected_source}",
+    )
+    reason = st.text_input(
+        "Manual override reason",
+        value=_safe_text(
+            existing_override.get("reason"),
+            "Deterministic manual selection for project standards.",
+        ),
+        key=f"atlas_product_resolution_manual_reason_{selected_source}",
+    )
+
+    action_cols = st.columns(2)
+    if action_cols[0].button(
+        "Apply Manual Override",
+        use_container_width=True,
+        disabled=not selected_product_option,
+        key=f"atlas_product_resolution_manual_apply_{selected_source}",
+    ):
+        override_state[selected_source] = {
+            "selected_product_id": selected_product_option,
+            "resolution_status": status_option,
+            "reviewer": _safe_text(reviewer, "Engineering Reviewer"),
+            "timestamp": _now_iso(),
+            "reason": _safe_text(
+                reason,
+                "Deterministic manual selection for project standards.",
+            ),
+        }
+        st.session_state["atlas_product_resolution_overrides"] = override_state
+        st.session_state["atlas_product_resolution_cache"] = {}
+        st.rerun()
+
+    if action_cols[1].button(
+        "Clear Manual Override",
+        use_container_width=True,
+        key=f"atlas_product_resolution_manual_clear_{selected_source}",
+    ):
+        if selected_source in override_state:
+            del override_state[selected_source]
+            st.session_state["atlas_product_resolution_overrides"] = override_state
+            st.session_state["atlas_product_resolution_cache"] = {}
+            st.rerun()
+
+    manual_override = getattr(selected_resolution, "manual_override", None)
+    st.markdown("### Override Audit")
+    if manual_override is None:
+        st.caption("No manual override is currently applied for this row.")
+    else:
+        st.dataframe(
+            [
+                {
+                    "Reviewer": _safe_text(
+                        getattr(manual_override, "reviewer", ""),
+                        "n/a",
+                    ),
+                    "Timestamp": _safe_text(
+                        getattr(manual_override, "timestamp", ""),
+                        "n/a",
+                    ),
+                    "Reason": _safe_text(
+                        getattr(manual_override, "reason", ""),
+                        "n/a",
+                    ),
+                    "Original Match": _safe_text(
+                        str(getattr(manual_override, "original_match", None) or {}),
+                        "{}",
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 def _render_pinned_projects_page(
@@ -6028,6 +6405,11 @@ def _render_engineering_review_page(
     summary = dict(review.get("project_summary") or {})
     bom_summary = dict(review.get("bom_summary") or {})
     cost_coverage = dict(review.get("preliminary_cost_coverage") or {})
+    product_resolutions = _resolved_product_rows(
+        st,
+        _enriched_bom_rows(st, _canonical_bom_items(context)),
+    )
+    resolution_summary = _resolution_summary_rows(product_resolutions)
 
     st.dataframe(
         [
@@ -6100,6 +6482,21 @@ def _render_engineering_review_page(
                     "0%",
                 ),
                 "Labor Confidence": _safe_text(review.get("labor_confidence"), "n/a"),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("### Product Resolution Summary")
+    st.dataframe(
+        [
+            {
+                "Resolved Products": resolution_summary["resolved_products"],
+                "Unknown Products": resolution_summary["unknown_products"],
+                "Generic Allowances": resolution_summary["generic_allowances"],
+                "Substitutions": resolution_summary["substitutions"],
+                "Products Requiring Review": resolution_summary["requires_review"],
             }
         ],
         use_container_width=True,
@@ -16459,6 +16856,8 @@ def _render_main_content(
         _render_scope_risk_page(st, record, context)
     elif page == "Engineering Review":
         _render_engineering_review_page(st, record, context)
+    elif page == "Product Resolution":
+        _render_product_resolution_page(st, record, context)
     elif page == "Estimate":
         _render_estimate_page(st, record, context)
     elif page == "Notebook":

@@ -23,6 +23,7 @@ Sprint 6 implements the Atlas object navigation layer, adding shared object navi
 Sprint 7 delivers persistent Global Object Search and Working Set workflows, including deterministic ranking, grouped result presentation, local search history, and object-context breadcrumbs.
 Sprint 7.5 completes UI repair and runtime-state isolation with shared project context header rendering, configuration-driven navigation cleanup, shared object detail section scaffolding, and mutable runtime workspace storage outside immutable source fixtures.
 Sprint 8 introduces the Deterministic Estimating Foundation: Estimate Workspace architecture, traceable estimate line entities, resolution/pricing status modeling, confidence scoring, and extension-point interfaces for future pricing engines.
+Sprint 9 implements the Deterministic Product Resolution Engine: canonical product resolution domain/service models, dedicated Product Resolution workspace page, manual override audit behavior, engineering summary integration, and deterministic estimate pricing gate enforcement based on resolution completeness.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
@@ -68,6 +69,9 @@ Current workspace behavior:
 - Cost status now surfaces no pricing, estimated, quoted, verified, expired, and unavailable.
 - Unknown products now remain no-pricing in deterministic mode.
 - Estimate confidence now reports known pricing coverage, product resolution coverage, labor/pricing gaps, quantity uncertainty, and generic allowance exposure.
+- Product Resolution workspace now provides deterministic filters (Unknown, Low Confidence, Needs Review, Resolved, Substituted), explainable candidate ranking, and manual override auditing.
+- Engineering Review now includes Product Resolution summary metrics (resolved, unknown, generic allowance, substitutions, requiring review).
+- Estimate workspace now consumes deterministic Product Resolution outputs and blocks pricing on unresolved/generic/low-confidence resolution states.
 - BOM Review now includes an Open Equipment Detail action for selected BOM rows while preserving BOM table reconciliation behavior.
 - Drawing and Specification workspaces now expose referenced equipment as human-readable objects that can open Equipment Workspace.
 - Project Workspace now includes a non-blocking guided review sequence with statuses (not started/ready/needs review/blocked/complete).
@@ -93,3 +97,7 @@ Current workspace behavior:
 1. Drawing/spec intelligence refinements
 2. PDF ingestion and indexing refinements
 3. Device schedule extraction refinements
+
+## Reference Documents for Current Baseline
+- [PRODUCT_RESOLUTION.md](PRODUCT_RESOLUTION.md)
+- [MANUFACTURER_REGISTRY.md](MANUFACTURER_REGISTRY.md)

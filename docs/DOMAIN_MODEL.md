@@ -198,6 +198,11 @@ Status legend:
 - Relationships: belongs to Estimate; references Equipment, Product, System, Room, Area.
 - Lifecycle Role: Unit of continuity for downstream order and financial mapping.
 
+### Product Resolution
+- Purpose: Deterministic canonical-product mapping record between scoped Equipment and estimate preparation.
+- Relationships: linked to Equipment, Product, Manufacturer, Evidence, and Estimate Line preparation context.
+- Lifecycle Role: Explicit pre-pricing gate that enforces explainable product identity before any deterministic pricing workflow can proceed.
+
 ### Labor Estimate
 - Purpose: Labor hours and confidence model.
 - Relationships: belongs to Estimate; linked to Estimate Line and System.

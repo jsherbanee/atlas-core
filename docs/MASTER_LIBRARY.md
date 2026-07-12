@@ -21,6 +21,7 @@ Atlas Preview 0.6 implements the Master Library foundation:
 - Canonical product model
 - Deterministic alias resolution
 - Deterministic product matching
+- Deterministic product-resolution candidate generation (engineering to estimate bridge)
 - Workspace explorer integration for engineering review
 
 Excluded from scope:
@@ -158,3 +159,5 @@ Planned integration direction:
 - [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)
 - [ROADMAP.md](ROADMAP.md)
+- [PRODUCT_RESOLUTION.md](PRODUCT_RESOLUTION.md)
+- [MANUFACTURER_REGISTRY.md](MANUFACTURER_REGISTRY.md)
