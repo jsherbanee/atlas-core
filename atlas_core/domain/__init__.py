@@ -124,6 +124,16 @@ from atlas_core.domain.pricing_engine import (
     PricingSummary,
     PricingWarning,
 )
+from atlas_core.domain.commercial_product import (
+    CanonicalProduct,
+    PriceListVersionRecord,
+    ProductCommercialMetadata,
+    ProductEngineeringMetadata,
+    ProductFutureHooks,
+    ProductLifecycleStatus,
+    ProductPriceHistoryRecord,
+    VendorOfferingRecord,
+)
 from atlas_core.domain.cost_engine import (
     CommercialCoverage,
     CostCandidate,
@@ -203,6 +213,14 @@ __all__ = [
     "PricingSummary",
     "CommercialCoverageSummary",
     "PricingResult",
+    "CanonicalProduct",
+    "ProductLifecycleStatus",
+    "ProductCommercialMetadata",
+    "ProductEngineeringMetadata",
+    "ProductFutureHooks",
+    "VendorOfferingRecord",
+    "PriceListVersionRecord",
+    "ProductPriceHistoryRecord",
     "VendorClassification",
     "CostEngineStatus",
     "CostFreshness",

@@ -204,6 +204,18 @@ Estimate Workspace behavior:
 - line navigation supports Equipment, Specification, Drawing, Relationships, and Evidence routes
 - object detail headers include Open Estimate Workspace for source-to-estimate return
 
+Price List Library (C-02) now includes PDF import review controls for:
+- PDF source inspection
+- page list/range selection
+- table-candidate selection
+- header-row confirmation
+- column mapping confirmation
+- raw extraction preview and transformed draft preview
+- draft corrections before finalization
+- diagnostics review with error/warning/informational severities
+
+PDF finalization follows the same immutable draft -> validated -> finalized lifecycle used by CSV/XLSX imports.
+
 Project Details:
 - Drawings
 - Specifications

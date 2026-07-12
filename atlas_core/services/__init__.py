@@ -222,6 +222,7 @@ from atlas_core.services.coordination_intelligence import (
 )
 from atlas_core.services.master_library import (
     AliasResolver,
+    CommercialProductService,
     LibraryResolver,
     MasterLibraryRepository,
     MasterLibraryService,
@@ -331,6 +332,7 @@ __all__ = [
     "LibraryResolver",
     "AliasResolver",
     "ProductMatcher",
+    "CommercialProductService",
     "PackageDiscoveryResult",
     "UploadedIntakeFile",
     "UploadSessionResult",

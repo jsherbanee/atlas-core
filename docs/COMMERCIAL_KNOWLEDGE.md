@@ -59,6 +59,13 @@ Key fields:
 ### Price Sheet Version
 Price Sheet Version is immutable and created for every import.
 
+C-02 lifecycle adds explicit state transitions before immutable finalization:
+
+- draft: parsed and mapped preview, may contain unresolved records and diagnostics
+- validated: no blocking `error` diagnostics; `warning` diagnostics explicitly acknowledged
+- finalized: immutable version and immutable price records created
+- failed: import attempt could not be validated/finalized
+
 Key fields:
 
 - version_id
@@ -113,6 +120,76 @@ Detections:
 - Vendor SKU Changed
 
 Comparison output is deterministic and included in import history and change reports.
+
+## C-02 Import Validation Model
+
+Supported import diagnostics:
+
+- error (blocking finalize)
+- warning (requires explicit acknowledgment)
+- informational (non-blocking context)
+
+Core C-02 controls:
+
+- deterministic column mapping suggestions from normalized header synonyms
+- worksheet/header-row selection for XLSX imports
+- PDF inspection and staged extraction for text-native, table-based, multi-page, and scanned sources
+- row-level preview records with resolved/unresolved status
+- duplicate source file hash detection against immutable version history
+- manual draft creation and manual record insertion for exceptional data entry
+
+## PDF Import Support (C-02 Amendment)
+
+Supported PDF types:
+
+- text-native PDFs
+- table-oriented PDFs
+- multi-page PDFs
+- PDFs with repeated page headers/footers
+- scanned PDFs using existing OCR-capable intake infrastructure when available
+
+Deterministic PDF workflow:
+
+1. source inspection (validity, encryption, page count, rotation, text availability)
+2. extraction (embedded text first, OCR fallback by page where required)
+3. table candidate detection (page-aware regions, repeated header/footer awareness)
+4. user-controlled page/table/header/column selection
+5. row transformation into the shared draft preview model
+6. diagnostics review and optional draft corrections
+7. validation and immutable finalization
+
+User-control requirements:
+
+- page-range selection
+- table-candidate selection
+- header-row confirmation
+- column mapping confirmation
+- correction of extracted row values while draft is mutable
+
+Finalized records remain immutable.
+Post-finalization corrections require a new Price Sheet Version.
+
+PDF diagnostics include deterministic `error`, `warning`, and `informational` severities for extraction uncertainty and mapping/validation failures.
+Atlas does not silently accept uncertain OCR or ambiguous extraction output.
+
+PDF limitations in C-02:
+
+- common commercial table layouts are supported
+- brochure-style or highly irregular catalog layouts may require manual page/region/header selection
+- no generative interpretation or autonomous commercial judgment is performed
+
+## C-02 Completeness Signals
+
+Commercial completeness rollups include:
+
+- products without offerings
+- products without finalized price records
+- products without currently effective pricing
+- offerings without pricing and stale/expired/future-only freshness states
+- vendors with unresolved records
+- price sheets without finalized versions
+- price sheets with pending drafts
+- unresolved price record totals
 
 ## Lifecycle Handling
 Missing products are not immediately discontinued.
@@ -177,5 +254,8 @@ No estimate pricing calculation is performed in this layer.
 ## Source Files
 - `atlas_core/domain/commercial_knowledge.py`
 - `atlas_core/services/commercial_knowledge_service.py`
+- `atlas_core/domain/commercial_product.py`
+- `atlas_core/services/master_library/commercial_product_service.py`
 - `apps/phase2_review_app.py`
 - `tests/test_commercial_knowledge_service.py`
+- `tests/test_commercial_product_service.py`

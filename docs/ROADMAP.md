@@ -1,5 +1,9 @@
 # Atlas Core Roadmap
 
+Detailed implementation planning by epic and sprint stream is maintained in [EPICS.md](EPICS.md).
+
+This roadmap is the executive milestone view.
+
 Domain object continuity and lifecycle boundaries referenced in this roadmap are defined in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).
 
 ## Product Milestones

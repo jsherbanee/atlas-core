@@ -127,6 +127,11 @@ Future releases should follow this structure.
 
 ## Development
 
+### [EPICS.md](EPICS.md)
+- Purpose: Master implementation roadmap organized by epic and sprint stream IDs.
+- Audience: Product and engineering planning stakeholders, plus Codex session operators.
+- When to reference: Before drafting or executing sprint prompts to anchor work in the correct domain stream.
+
 ### [ROADMAP.md](ROADMAP.md)
 - Purpose: Defines milestone trajectory and implementation planning direction.
 - Audience: Product and engineering planning stakeholders.
@@ -146,3 +151,8 @@ Future releases should follow this structure.
 - Purpose: Defines AI-assisted engineering workflow and execution conventions.
 - Audience: Contributors using Codex/Copilot-assisted development.
 - When to reference: Before running sprint execution workflows or agent-driven development.
+
+### [CODEX_SESSION_INIT.md](CODEX_SESSION_INIT.md)
+- Purpose: Defines the required repository-initialization checklist for every new Codex session.
+- Audience: Contributors starting a new Codex/Copilot coding session in Atlas.
+- When to reference: At session start, before pasting sprint instructions or implementing code changes.

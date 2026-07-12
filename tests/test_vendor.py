@@ -107,15 +107,20 @@ def test_to_dict_output():
         active=False,
     )
 
-    assert vendor.to_dict() == {
-        "vendor_id": "starin",
-        "name": "Starin",
-        "vendor_type": "distributor",
-        "status": "review_required",
-        "account_number": "12345",
-        "contact_name": "Jane Smith",
-        "contact_email": "jane@example.com",
-        "phone": "555-0100",
-        "notes": ["Confirm freight terms."],
-        "active": False,
-    }
+    payload = vendor.to_dict()
+    assert payload["vendor_id"] == "starin"
+    assert payload["name"] == "Starin"
+    assert payload["vendor_type"] == "distributor"
+    assert payload["status"] == "review_required"
+    assert payload["account_number"] == "12345"
+    assert payload["contact_name"] == "Jane Smith"
+    assert payload["contact_email"] == "jane@example.com"
+    assert payload["phone"] == "555-0100"
+    assert payload["notes"] == ["Confirm freight terms."]
+    assert payload["active"] is False
+    assert payload["display_name"] == "Starin"
+    assert payload["normalized_name"] == "STARIN"
+    assert payload["vendor_code"] == "STARIN"
+    assert payload["aliases"] == []
+    assert payload["created_at"]
+    assert payload["updated_at"]

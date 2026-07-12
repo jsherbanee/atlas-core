@@ -1,5 +1,7 @@
 """Manufacturer domain model for Atlas Core."""
 
+from datetime import UTC, datetime
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -40,6 +42,11 @@ class Manufacturer:
     manufacturer_id: str
     name: str
     discipline: ManufacturerDiscipline
+    display_name: str | None = None
+    normalized_name: str | None = None
+    manufacturer_code: str | None = None
+    website: str | None = None
+    aliases: list[str] = field(default_factory=list)
     tier: ManufacturerTier = ManufacturerTier.APPROVED
     product_families: list[str] = field(default_factory=list)
     preferred_vendor: str | None = None
@@ -47,12 +54,29 @@ class Manufacturer:
     notes: list[str] = field(default_factory=list)
     active: bool = True
     confidence: float = 0.75
+    created_at: str = field(default_factory=lambda: _now_iso())
+    updated_at: str = field(default_factory=lambda: _now_iso())
 
     def __post_init__(self) -> None:
         self.manufacturer_id = self._normalize_required_text(
             "manufacturer_id", self.manufacturer_id
         )
         self.name = self._normalize_required_text("name", self.name)
+        self.display_name = self._normalize_required_text(
+            "display_name", self.display_name or self.name
+        )
+        self.normalized_name = self._normalize_name(
+            self.normalized_name or self.display_name
+        )
+        self.manufacturer_code = self._normalize_optional_text(
+            self.manufacturer_code or self.manufacturer_id.upper()
+        )
+        self.website = self._normalize_optional_text(self.website)
+        self.aliases = [
+            self._normalize_required_text("alias", alias)
+            for alias in list(self.aliases)
+            if self._normalize_optional_text(alias)
+        ]
 
         if not isinstance(self.discipline, ManufacturerDiscipline):
             self.discipline = ManufacturerDiscipline(self.discipline)
@@ -77,6 +101,8 @@ class Manufacturer:
         self.notes = [
             self._normalize_required_text("note", note) for note in self.notes
         ]
+        self.created_at = self._normalize_required_text("created_at", self.created_at)
+        self.updated_at = self._normalize_required_text("updated_at", self.updated_at)
 
     def add_product_family(self, product_family: str) -> None:
         self.product_families.append(
@@ -85,6 +111,13 @@ class Manufacturer:
 
     def add_note(self, note: str) -> None:
         self.notes.append(self._normalize_required_text("note", note))
+        self.updated_at = _now_iso()
+
+    def add_alias(self, alias: str) -> None:
+        normalized = self._normalize_required_text("alias", alias)
+        if normalized not in self.aliases:
+            self.aliases.append(normalized)
+            self.updated_at = _now_iso()
 
     def add_vendor_relationship(self, relationship: VendorRelationship) -> None:
         self.vendor_relationships.append(
@@ -121,6 +154,11 @@ class Manufacturer:
         return {
             "manufacturer_id": self.manufacturer_id,
             "name": self.name,
+            "display_name": self.display_name,
+            "normalized_name": self.normalized_name,
+            "manufacturer_code": self.manufacturer_code,
+            "website": self.website,
+            "aliases": list(self.aliases),
             "discipline": self.discipline.value,
             "tier": self.tier.value,
             "product_families": list(self.product_families),
@@ -131,6 +169,8 @@ class Manufacturer:
             "notes": list(self.notes),
             "active": self.active,
             "confidence": self.confidence,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
         }
 
     @staticmethod
@@ -144,6 +184,17 @@ class Manufacturer:
         return value.strip()
 
     @staticmethod
+    def _normalize_optional_text(value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @staticmethod
+    def _normalize_name(value: str) -> str:
+        return " ".join(value.strip().upper().split())
+
+    @staticmethod
     def _validate_vendor_relationship(
         relationship: VendorRelationship,
     ) -> VendorRelationship:
@@ -151,3 +202,7 @@ class Manufacturer:
             raise ValueError("vendor_relationships must be VendorRelationship objects")
 
         return relationship
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat()

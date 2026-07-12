@@ -20,11 +20,16 @@ Per import:
 6. Update active version pointer on the Price Sheet.
 7. Emit Import History entry and Product Change Report.
 
+All supported source types (CSV, XLSX, PDF) converge into the same normalized draft-import representation before validation/finalization.
+PDF extraction does not create a separate commercial record model.
+
 ## Immutability Guarantees
 - Version IDs are unique per import.
 - Price Record IDs are unique per version-row-product tuple.
 - Previous version rows remain queryable for historical replay.
 - Latest version is a pointer; history is append-only.
+
+For PDF-derived records, immutable row traceability includes source filename/hash, page number, source row/region reference, extraction method, OCR status, and raw extracted values retained with the finalized record.
 
 ## Deterministic Comparison
 Comparison key:

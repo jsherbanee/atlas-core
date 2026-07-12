@@ -149,18 +149,23 @@ def test_to_dict_output():
     manufacturer.add_product_family("Core")
     manufacturer.add_note("Preferred for conference rooms.")
 
-    assert manufacturer.to_dict() == {
-        "manufacturer_id": "qsc",
-        "name": "Q-SYS",
-        "discipline": "audio",
-        "tier": "preferred",
-        "product_families": ["Core"],
-        "preferred_vendor": "Acme AV Supply",
-        "vendor_relationships": [],
-        "notes": ["Preferred for conference rooms."],
-        "active": True,
-        "confidence": 0.9,
-    }
+    payload = manufacturer.to_dict()
+    assert payload["manufacturer_id"] == "qsc"
+    assert payload["name"] == "Q-SYS"
+    assert payload["discipline"] == "audio"
+    assert payload["tier"] == "preferred"
+    assert payload["product_families"] == ["Core"]
+    assert payload["preferred_vendor"] == "Acme AV Supply"
+    assert payload["vendor_relationships"] == []
+    assert payload["notes"] == ["Preferred for conference rooms."]
+    assert payload["active"] is True
+    assert payload["confidence"] == 0.9
+    assert payload["display_name"] == "Q-SYS"
+    assert payload["normalized_name"] == "Q-SYS"
+    assert payload["manufacturer_code"] == "QSC"
+    assert payload["aliases"] == []
+    assert payload["created_at"]
+    assert payload["updated_at"]
 
 
 def test_adding_vendor_relationship():

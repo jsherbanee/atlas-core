@@ -34,7 +34,13 @@ from atlas_core.services.specification_intelligence import (
 )
 from atlas_core.services.coordination_intelligence import CoordinationIntelligenceEngine
 from atlas_core.services.resolver import EngineeringResolver, ResolverContext
-from atlas_core.services.master_library import MasterLibraryService
+from atlas_core.services.master_library import (
+    CommercialProductService,
+    MasterLibraryService,
+)
+from atlas_core.services.master_library.commercial_product_service import (
+    ALLOWED_PURCHASING_CHANNELS,
+)
 from atlas_core.services.product_resolution_service import ProductResolutionService
 from atlas_core.services.bom_review_service import BomReviewService
 from atlas_core.services.pricing_service import PricingService
@@ -1860,7 +1866,7 @@ def _equipment_workspace_rows(
     scope_findings = _scope_risk_findings(context)
     rfi_rows = list(objects.get("rfis") or [])
     spec_rows = list(objects.get("specifications") or [])
-    master_rows = _master_library_rows(context)
+    master_rows = _master_library_rows(st, context)
 
     result: list[dict[str, Any]] = []
     for row in bom_rows:
@@ -2221,6 +2227,7 @@ def _default_price_list_library_state() -> dict[str, Any]:
         "vendor_offers": [],
         "import_warnings": [],
         "commercial_knowledge": CommercialKnowledgeService.empty_state(),
+        "commercial_products": CommercialProductService.empty_state(),
         "commercial_import_results": [],
     }
 
@@ -2244,6 +2251,141 @@ def _commercial_knowledge_state(st: Any) -> dict[str, Any]:
 
 def _commercial_service(st: Any) -> CommercialKnowledgeService:
     return CommercialKnowledgeService(state=_commercial_knowledge_state(st))
+
+
+def _commercial_product_state(st: Any) -> dict[str, Any]:
+    library = _price_list_library_state(st)
+    state = library.get("commercial_products")
+    if isinstance(state, dict):
+        return dict(state)
+    return CommercialProductService.empty_state()
+
+
+def _commercial_product_service(st: Any) -> CommercialProductService:
+    return CommercialProductService(state=_commercial_product_state(st))
+
+
+def _save_commercial_product_state(st: Any, service: CommercialProductService) -> None:
+    library = _price_list_library_state(st)
+    library["commercial_products"] = service.to_dict()
+    st.session_state["atlas_price_list_library"] = library
+
+
+def _ensure_commercial_seed_data(st: Any) -> CommercialProductService:
+    service = _commercial_product_service(st)
+    if service.list_manufacturers() and service.list_vendors():
+        return service
+
+    for manufacturer_seed in build_manufacturer_seed_data():
+        payload = manufacturer_seed.to_dict()
+        try:
+            service.create_manufacturer(
+                manufacturer_id=_safe_text(payload.get("manufacturer_id"), ""),
+                canonical_name=_safe_text(payload.get("name"), ""),
+                display_name=_safe_text(payload.get("name"), ""),
+                manufacturer_code=_safe_text(payload.get("manufacturer_id"), ""),
+                website="",
+                aliases=[],
+                notes="seed",
+                active=bool(payload.get("active", True)),
+            )
+        except Exception:
+            continue
+
+    for vendor_seed in build_vendor_seed_data():
+        payload = vendor_seed.to_dict()
+        try:
+            service.create_vendor(
+                vendor_id=_safe_text(payload.get("vendor_id"), ""),
+                canonical_name=_safe_text(payload.get("name"), ""),
+                display_name=_safe_text(payload.get("name"), ""),
+                vendor_code=_safe_text(payload.get("vendor_id"), ""),
+                website="",
+                aliases=[],
+                notes="seed",
+                active=bool(payload.get("active", True)),
+            )
+        except Exception:
+            continue
+
+    _save_commercial_product_state(st, service)
+    return service
+
+
+def _commercial_recommendation_rows(st: Any) -> list[dict[str, Any]]:
+    service = _commercial_product_service(st)
+    dashboard = service.dashboard_summary()
+    products = service.list_products(include_inactive=True)
+    offerings = list(service.to_dict().get("vendor_offerings", {}).values())
+    sheets = service.list_price_sheets()
+
+    recommendations: list[dict[str, Any]] = []
+    products_without_offerings = [
+        item
+        for item in products
+        if not service.list_vendor_offerings_by_product(
+            _safe_text(item.get("atlas_product_uuid"), "")
+        )
+    ]
+    if products_without_offerings:
+        recommendations.append(
+            {
+                "Priority": "High",
+                "Recommendation": "Add a vendor source for products without vendor offerings.",
+                "Count": len(products_without_offerings),
+                "Destination": "Knowledge",
+            }
+        )
+
+    unclassified = [
+        item
+        for item in offerings
+        if _safe_text(item.get("purchasing_channel"), "")
+        not in ALLOWED_PURCHASING_CHANNELS
+    ]
+    if unclassified:
+        recommendations.append(
+            {
+                "Priority": "High",
+                "Recommendation": "Classify vendor offerings as direct, distributor, dealer/reseller, or other.",
+                "Count": len(unclassified),
+                "Destination": "Knowledge",
+            }
+        )
+
+    if int(dashboard.get("missing_preferred_vendor", 0) or 0) > 0:
+        recommendations.append(
+            {
+                "Priority": "Medium",
+                "Recommendation": "Assign preferred vendor metadata for active products.",
+                "Count": int(dashboard.get("missing_preferred_vendor", 0) or 0),
+                "Destination": "Knowledge",
+            }
+        )
+
+    if offerings and not sheets:
+        recommendations.append(
+            {
+                "Priority": "Medium",
+                "Recommendation": "Create a Price Sheet for active vendors to anchor immutable versions.",
+                "Count": 1,
+                "Destination": "Price List Library",
+            }
+        )
+
+    return recommendations
+
+
+def _record_by_id(
+    rows: list[dict[str, Any]],
+    *,
+    id_field: str,
+    selected_id: str,
+) -> dict[str, Any] | None:
+    for row in rows:
+        if _safe_text(row.get(id_field), "") == _safe_text(selected_id, ""):
+            return row
+    return None
 
 
 def _commercial_product_key(
@@ -2963,14 +3105,17 @@ def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
     if page in {"Mission Control", "Reports", "Administration"}:
         return f"Atlas / {page_label}"
 
+    st_module: Any | None = None
     try:
         import streamlit as _st
+
+        st_module = _st
     except Exception:
-        _st = None
+        st_module = None
 
     selection = (
-        dict(_st.session_state.get("atlas_context_selection") or {})
-        if _st is not None
+        dict(st_module.session_state.get("atlas_context_selection") or {})
+        if st_module is not None
         else {}
     )
     kind = _safe_text(selection.get("kind"), "")
@@ -3518,7 +3663,10 @@ def _object_id_for_selection(kind: str, data: dict[str, Any]) -> str:
     if kind == "notebook_entry":
         return _safe_text(data.get("entry_id"), _safe_text(data.get("title"), ""))
     if kind == "master_product":
-        return _safe_text(data.get("product_id"), _safe_text(data.get("model"), ""))
+        return _safe_text(
+            data.get("atlas_product_uuid"),
+            _safe_text(data.get("product_id"), _safe_text(data.get("model"), "")),
+        )
     return _safe_text(data.get("object_id"), "")
 
 
@@ -3556,7 +3704,14 @@ def _object_display_name(kind: str, data: dict[str, Any]) -> str:
     if kind == "notebook_entry":
         return _safe_text(data.get("title"), "Notebook Entry")
     if kind == "master_product":
-        return _safe_text(data.get("model"), "Product")
+        model = _safe_text(
+            data.get("canonical_sku"), _safe_text(data.get("model"), "Product")
+        )
+        manufacturer = _safe_text(data.get("manufacturer"), "")
+        return (
+            " ".join([item for item in [manufacturer, model] if item]).strip()
+            or "Product"
+        )
     return _safe_text(data.get("title"), _safe_text(data.get("object_id"), "Object"))
 
 
@@ -3576,7 +3731,27 @@ def _object_secondary_label(kind: str, data: dict[str, Any]) -> str:
     if kind == "evidence":
         return f"page {_safe_text(data.get('page'), 'n/a')}"
     if kind == "master_product":
-        return _safe_text(data.get("manufacturer"), "")
+        lifecycle = _safe_text(
+            data.get("lifecycle_status"), _safe_text(data.get("status"), "")
+        )
+        vendor = _safe_text(data.get("vendor"), "")
+        confidence = _safe_text(
+            dict(data.get("confidence") or data.get("confidence_summary") or {}).get(
+                "overall_confidence"
+            ),
+            "",
+        )
+        return " | ".join(
+            [
+                item
+                for item in [
+                    lifecycle,
+                    vendor,
+                    f"confidence {confidence}" if confidence else "",
+                ]
+                if item
+            ]
+        )
     if kind == "vendor":
         return _safe_text(data.get("vendor_type"), _safe_text(data.get("status"), ""))
     if kind == "customer":
@@ -4492,6 +4667,13 @@ def _render_home_page(
         st.markdown("### Portfolio Signals")
         _render_mission_control_panels(st, mission_control_payload)
 
+    st.markdown("### Commercial Knowledge Recommendations")
+    recommendations = _commercial_recommendation_rows(st)
+    if recommendations:
+        st.dataframe(recommendations, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No deterministic commercial foundation recommendations right now.")
+
 
 def _render_application_knowledge_page(
     st: Any, workspace_service: ProjectWorkspaceService
@@ -4507,8 +4689,9 @@ def _render_application_knowledge_page(
         include_archived=True,
         limit=500,
     )
-    manufacturer_rows = [item.to_dict() for item in build_manufacturer_seed_data()]
-    vendor_rows = [item.to_dict() for item in build_vendor_seed_data()]
+    product_service = _ensure_commercial_seed_data(st)
+    manufacturer_rows = product_service.list_manufacturers()
+    vendor_rows = product_service.list_vendors()
     customers = sorted(
         {_safe_text(item.get("customer"), "n/a") for item in project_rows}
     )
@@ -4532,10 +4715,18 @@ def _render_application_knowledge_page(
         service.import_workspace_equipment(equipment_rows)
         product_rows.extend(service.explorer_rows())
 
+    product_rows.extend(product_service.product_rows(include_project_only=True))
+
     # Deduplicate by canonical product id.
     deduped_products: dict[str, dict[str, Any]] = {}
     for row in product_rows:
-        key = _safe_text(row.get("product_id"), "")
+        key = _safe_text(
+            row.get("product_id"),
+            _safe_text(
+                row.get("atlas_product_uuid"),
+                f"{_safe_text(row.get('manufacturer'), '')}::{_safe_text(row.get('canonical_sku'), _safe_text(row.get('model'), ''))}",
+            ),
+        )
         if key and key not in deduped_products:
             deduped_products[key] = row
     product_rows = list(deduped_products.values())
@@ -4546,6 +4737,7 @@ def _render_application_knowledge_page(
     vendor_offers = list(library_state.get("vendor_offers") or [])
     commercial_service = _commercial_service(st)
     commercial_dashboard = commercial_service.dashboard_summary()
+    product_dashboard = product_service.dashboard_summary()
     commercial_import_history = commercial_service.import_history_rows()
 
     import_history: list[dict[str, Any]] = []
@@ -4596,8 +4788,8 @@ def _render_application_knowledge_page(
     )
     _metric_card(
         cards[7],
-        "Coverage %",
-        str(commercial_dashboard.get("coverage_percentage", 0.0)),
+        "Avg Confidence",
+        str(product_dashboard.get("average_confidence", 0.0)),
     )
 
     tabs = st.tabs(
@@ -4696,6 +4888,18 @@ def _render_application_knowledge_page(
                     "Commercial Confidence": commercial_dashboard.get(
                         "commercial_confidence", 0.0
                     ),
+                    "Active Products": product_dashboard.get("active_products", 0),
+                    "Missing Preferred Vendor": product_dashboard.get(
+                        "missing_preferred_vendor", 0
+                    ),
+                    "Recent Price Changes": product_dashboard.get(
+                        "recent_price_changes", 0
+                    ),
+                    "New Products": product_dashboard.get("new_products", 0),
+                    "EOL/Obsolete": product_dashboard.get("end_of_life_products", 0),
+                    "Replacement Candidates": product_dashboard.get(
+                        "replacement_candidates", 0
+                    ),
                 }
             ],
             use_container_width=True,
@@ -4704,6 +4908,40 @@ def _render_application_knowledge_page(
 
     with tabs[2]:
         st.markdown("### Manufacturers")
+        with st.expander("Add Manufacturer", expanded=False):
+            m_cols = st.columns(2)
+            m_id = m_cols[0].text_input("Manufacturer ID", key="atlas_ck_mfr_id")
+            m_name = m_cols[1].text_input("Canonical Name", key="atlas_ck_mfr_name")
+            m_display = m_cols[0].text_input("Display Name", key="atlas_ck_mfr_display")
+            m_code = m_cols[1].text_input("Code", key="atlas_ck_mfr_code")
+            m_site = st.text_input("Website", key="atlas_ck_mfr_site")
+            m_notes = st.text_input("Notes", key="atlas_ck_mfr_notes")
+            duplicates = product_service.detect_duplicate_manufacturers(
+                canonical_name=m_name,
+                normalized_name=product_service.normalize_name(m_name),
+            )
+            if duplicates:
+                st.warning("Potential duplicate manufacturer names detected.")
+            if st.button(
+                "Create Manufacturer",
+                key="atlas_ck_create_manufacturer",
+                use_container_width=True,
+            ):
+                try:
+                    product_service.create_manufacturer(
+                        manufacturer_id=m_id,
+                        canonical_name=m_name,
+                        display_name=m_display,
+                        manufacturer_code=m_code,
+                        website=m_site,
+                        notes=m_notes,
+                    )
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Manufacturer created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create manufacturer: {exc}")
+
         if not manufacturer_rows:
             _render_guided_empty_state(
                 st,
@@ -4715,13 +4953,17 @@ def _render_application_knowledge_page(
             st.dataframe(
                 [
                     {
-                        "Manufacturer": _safe_text(item.get("name"), "n/a"),
-                        "Tier": _safe_text(item.get("tier"), "n/a"),
-                        "Discipline": _safe_text(item.get("discipline"), "n/a"),
-                        "Active": bool(item.get("active", True)),
-                        "Product Families": len(
-                            list(item.get("product_families") or [])
+                        "Manufacturer": _safe_text(
+                            item.get("canonical_name"),
+                            _safe_text(item.get("name"), "n/a"),
                         ),
+                        "Code": _safe_text(
+                            item.get("manufacturer_code"),
+                            _safe_text(item.get("manufacturer_id"), "n/a"),
+                        ),
+                        "Website": _safe_text(item.get("website"), ""),
+                        "Active": bool(item.get("active", True)),
+                        "Aliases": len(list(item.get("aliases") or [])),
                     }
                     for item in manufacturer_rows
                 ],
@@ -4731,6 +4973,42 @@ def _render_application_knowledge_page(
 
     with tabs[3]:
         st.markdown("### Vendors")
+        with st.expander("Add Vendor", expanded=False):
+            v_cols = st.columns(2)
+            v_id = v_cols[0].text_input("Vendor ID", key="atlas_ck_vendor_id")
+            v_name = v_cols[1].text_input("Canonical Name", key="atlas_ck_vendor_name")
+            v_display = v_cols[0].text_input(
+                "Display Name", key="atlas_ck_vendor_display"
+            )
+            v_code = v_cols[1].text_input("Code", key="atlas_ck_vendor_code")
+            v_site = st.text_input("Website", key="atlas_ck_vendor_site")
+            v_notes = st.text_input("Notes", key="atlas_ck_vendor_notes")
+            duplicates = product_service.detect_duplicate_vendors(
+                canonical_name=v_name,
+                normalized_name=product_service.normalize_name(v_name),
+            )
+            if duplicates:
+                st.warning("Potential duplicate vendor names detected.")
+            if st.button(
+                "Create Vendor",
+                key="atlas_ck_create_vendor",
+                use_container_width=True,
+            ):
+                try:
+                    product_service.create_vendor(
+                        vendor_id=v_id,
+                        canonical_name=v_name,
+                        display_name=v_display,
+                        vendor_code=v_code,
+                        website=v_site,
+                        notes=v_notes,
+                    )
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Vendor created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create vendor: {exc}")
+
         if not vendor_rows:
             _render_guided_empty_state(
                 st,
@@ -4742,9 +5020,15 @@ def _render_application_knowledge_page(
             st.dataframe(
                 [
                     {
-                        "Vendor": _safe_text(item.get("name"), "n/a"),
-                        "Type": _safe_text(item.get("vendor_type"), "n/a"),
-                        "Status": _safe_text(item.get("status"), "n/a"),
+                        "Vendor": _safe_text(
+                            item.get("canonical_name"),
+                            _safe_text(item.get("name"), "n/a"),
+                        ),
+                        "Code": _safe_text(
+                            item.get("vendor_code"),
+                            _safe_text(item.get("vendor_id"), "n/a"),
+                        ),
+                        "Website": _safe_text(item.get("website"), ""),
                         "Active": bool(item.get("active", True)),
                     }
                     for item in vendor_rows
@@ -4781,6 +5065,154 @@ def _render_application_knowledge_page(
 
     with tabs[5]:
         st.markdown("### Products / Master Library")
+        with st.expander("Manual Single-SKU Workflow", expanded=False):
+            st.caption(
+                "Add one isolated SKU without requiring full catalog or price-sheet import."
+            )
+            p_cols = st.columns(2)
+            manufacturer_options = sorted(
+                {
+                    _safe_text(item.get("manufacturer_id"), "")
+                    for item in manufacturer_rows
+                    if _safe_text(item.get("manufacturer_id"), "")
+                }
+            )
+            vendor_options = sorted(
+                {
+                    _safe_text(item.get("vendor_id"), "")
+                    for item in vendor_rows
+                    if _safe_text(item.get("vendor_id"), "")
+                }
+            )
+
+            selected_mfr = p_cols[0].selectbox(
+                "Manufacturer",
+                options=manufacturer_options,
+                key="atlas_ck_product_mfr_id",
+            )
+            selected_vendor = p_cols[1].selectbox(
+                "Vendor",
+                options=vendor_options,
+                key="atlas_ck_product_vendor_id",
+            )
+            part_number = p_cols[0].text_input(
+                "Manufacturer Part Number",
+                key="atlas_ck_product_part_number",
+            )
+            product_name = p_cols[1].text_input(
+                "Product Name",
+                key="atlas_ck_product_name",
+            )
+            product_desc = st.text_input(
+                "Description", key="atlas_ck_product_description"
+            )
+            channel = st.selectbox(
+                "Purchasing Channel",
+                options=[
+                    "direct_from_manufacturer",
+                    "distributor",
+                    "dealer_reseller",
+                    "other",
+                ],
+                key="atlas_ck_offering_channel",
+            )
+            vendor_sku = st.text_input("Vendor SKU", key="atlas_ck_offering_vendor_sku")
+            uom_cols = st.columns(3)
+            uom = uom_cols[0].text_input(
+                "Unit of Measure", value="ea", key="atlas_ck_offering_uom"
+            )
+            moq = uom_cols[1].number_input(
+                "Minimum Order Qty",
+                min_value=0,
+                value=0,
+                step=1,
+                key="atlas_ck_offering_moq",
+            )
+            pack_qty = uom_cols[2].number_input(
+                "Pack Quantity",
+                min_value=0,
+                value=0,
+                step=1,
+                key="atlas_ck_offering_pack_qty",
+            )
+
+            selected_manufacturer = _record_by_id(
+                manufacturer_rows,
+                id_field="manufacturer_id",
+                selected_id=selected_mfr,
+            )
+            selected_vendor_record = _record_by_id(
+                vendor_rows,
+                id_field="vendor_id",
+                selected_id=selected_vendor,
+            )
+
+            existing_duplicate = product_service.find_product_by_identity(
+                manufacturer=_safe_text(
+                    dict(selected_manufacturer or {}).get("canonical_name"),
+                    "",
+                ),
+                normalized_part_number=product_service.normalize_part_number(
+                    part_number
+                ),
+            )
+            if existing_duplicate:
+                st.warning(
+                    "Potential duplicate product detected for manufacturer + normalized part number."
+                )
+
+            if st.button(
+                "Create Product and Vendor Offering",
+                key="atlas_ck_create_product_and_offering",
+                use_container_width=True,
+            ):
+                try:
+                    mfr_record = selected_manufacturer
+                    vendor_record = selected_vendor_record
+                    if not isinstance(mfr_record, dict) or not isinstance(
+                        vendor_record, dict
+                    ):
+                        raise ValueError("Select valid manufacturer and vendor records")
+
+                    product = product_service.create_product(
+                        manufacturer_id=_safe_text(
+                            mfr_record.get("manufacturer_id"), ""
+                        ),
+                        manufacturer=_safe_text(mfr_record.get("canonical_name"), ""),
+                        manufacturer_part_number=part_number,
+                        product_name=product_name,
+                        product_description=product_desc,
+                        category="other",
+                        lifecycle_status="pending_verification",
+                        active=True,
+                        notes="manual_single_sku",
+                    )
+                    product_service.create_vendor_offering(
+                        vendor_id=_safe_text(vendor_record.get("vendor_id"), ""),
+                        vendor=_safe_text(vendor_record.get("canonical_name"), ""),
+                        atlas_product_uuid=_safe_text(
+                            product.get("atlas_product_uuid"), ""
+                        ),
+                        vendor_sku=vendor_sku or part_number,
+                        purchasing_channel=channel,
+                        direct_from_manufacturer=(
+                            channel == "direct_from_manufacturer"
+                        ),
+                        authorization_status="unknown",
+                        minimum_order_quantity=int(moq),
+                        order_multiple=1,
+                        unit_of_measure=uom,
+                        pack_quantity=int(pack_qty),
+                        lead_time_notes="",
+                        active=True,
+                        notes="manual_single_sku",
+                    )
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Created Product and Vendor Offering.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create Product/Offering: {exc}")
+
         if not product_rows:
             _render_guided_empty_state(
                 st,
@@ -4789,16 +5221,139 @@ def _render_application_knowledge_page(
                 next_location="Open a project and run Documents analysis.",
             )
         else:
+            filter_cols = st.columns(6)
+            query = filter_cols[0].text_input(
+                "Search",
+                key="atlas_ck_product_search",
+                placeholder="part number, name, description",
+            )
+            manufacturer_filter = filter_cols[1].multiselect(
+                "Manufacturer",
+                options=sorted(
+                    {
+                        _safe_text(item.get("manufacturer"), "")
+                        for item in product_rows
+                        if _safe_text(item.get("manufacturer"), "")
+                    }
+                ),
+                default=[],
+                key="atlas_ck_product_mfr_filter",
+            )
+            lifecycle_filter = filter_cols[2].multiselect(
+                "Lifecycle",
+                options=sorted(
+                    {
+                        _safe_text(
+                            item.get("lifecycle_status"),
+                            _safe_text(item.get("status"), ""),
+                        )
+                        for item in product_rows
+                    }
+                ),
+                default=[],
+                key="atlas_ck_product_lifecycle_filter",
+            )
+            active_filter = filter_cols[3].selectbox(
+                "Active",
+                options=["All", "Active", "Inactive"],
+                key="atlas_ck_product_active_filter",
+            )
+            missing_commercial_filter = filter_cols[4].selectbox(
+                "Missing Commercial",
+                options=["All", "Yes", "No"],
+                key="atlas_ck_product_missing_commercial_filter",
+            )
+            sort_field = filter_cols[5].selectbox(
+                "Sort",
+                options=["manufacturer", "model", "status", "updated_at"],
+                key="atlas_ck_product_sort",
+            )
+
+            filtered_products: list[dict[str, Any]] = []
+            for item in product_rows:
+                if (
+                    manufacturer_filter
+                    and _safe_text(item.get("manufacturer"), "")
+                    not in manufacturer_filter
+                ):
+                    continue
+                lifecycle_value = _safe_text(
+                    item.get("lifecycle_status"),
+                    _safe_text(item.get("status"), ""),
+                )
+                if lifecycle_filter and lifecycle_value not in lifecycle_filter:
+                    continue
+                if active_filter == "Active" and not bool(item.get("active", True)):
+                    continue
+                if active_filter == "Inactive" and bool(item.get("active", True)):
+                    continue
+
+                offerings = product_service.list_vendor_offerings_by_product(
+                    _safe_text(item.get("atlas_product_uuid"), "")
+                )
+                missing_commercial = len(offerings) == 0
+                if missing_commercial_filter == "Yes" and not missing_commercial:
+                    continue
+                if missing_commercial_filter == "No" and missing_commercial:
+                    continue
+
+                searchable = " ".join(
+                    [
+                        _safe_text(
+                            item.get("manufacturer_part_number"),
+                            _safe_text(item.get("model"), ""),
+                        ),
+                        _safe_text(item.get("product_name"), ""),
+                        _safe_text(
+                            item.get("product_description"),
+                            _safe_text(item.get("description"), ""),
+                        ),
+                    ]
+                ).lower()
+                if query.strip() and query.strip().lower() not in searchable:
+                    continue
+                filtered_products.append(
+                    {**item, "_missing_commercial": missing_commercial}
+                )
+
+            filtered_products.sort(
+                key=lambda item: _safe_text(item.get(sort_field), "")
+            )
+            page_size = 50
+            max_page = max((len(filtered_products) - 1) // page_size, 0)
+            page = st.number_input(
+                "Page",
+                min_value=1,
+                max_value=max_page + 1,
+                value=1,
+                step=1,
+                key="atlas_ck_product_page",
+            )
+            start = (int(page) - 1) * page_size
+            visible = filtered_products[start : start + page_size]
             st.dataframe(
                 [
                     {
                         "Manufacturer": _safe_text(item.get("manufacturer"), "n/a"),
-                        "Model": _safe_text(item.get("model"), "n/a"),
+                        "Part Number": _safe_text(
+                            item.get("manufacturer_part_number"),
+                            _safe_text(item.get("model"), "n/a"),
+                        ),
+                        "Name": _safe_text(
+                            item.get("product_name"),
+                            _safe_text(item.get("model"), "n/a"),
+                        ),
                         "Category": _safe_text(item.get("category"), "n/a"),
-                        "Status": _safe_text(item.get("status"), "n/a"),
-                        "Aliases": len(list(item.get("aliases") or [])),
+                        "Lifecycle": _safe_text(
+                            item.get("lifecycle_status"),
+                            _safe_text(item.get("status"), "n/a"),
+                        ),
+                        "Active": bool(item.get("active", True)),
+                        "Missing Commercial": bool(
+                            item.get("_missing_commercial", False)
+                        ),
                     }
-                    for item in product_rows[:500]
+                    for item in visible
                 ],
                 use_container_width=True,
                 hide_index=True,
@@ -7085,35 +7640,379 @@ def _render_price_list_library_page(
         if st.session_state.get("atlas_price_list_signature") != signature:
             st.session_state["atlas_price_list_signature"] = signature
 
+    pdf_uploaded_files = [
+        file
+        for file in list(uploaded_files or [])
+        if Path(str(file.name)).suffix.lower() == ".pdf"
+    ]
+    non_pdf_uploaded_files = [
+        file
+        for file in list(uploaded_files or [])
+        if Path(str(file.name)).suffix.lower() != ".pdf"
+    ]
+
+    if pdf_uploaded_files:
+        st.markdown("### PDF Import Review (C-02)")
+        st.caption(
+            "Review page ranges, table candidates, header row, and column mapping before creating a draft."
+        )
+        pdf_service = _commercial_product_service(st)
+        pdf_source_options = [str(file.name) for file in pdf_uploaded_files]
+        selected_pdf_source = st.selectbox(
+            "PDF Source File",
+            options=pdf_source_options,
+            key="atlas_pdf_source_file",
+        )
+        selected_pdf_file = next(
+            (
+                item
+                for item in pdf_uploaded_files
+                if str(item.name) == selected_pdf_source
+            ),
+            pdf_uploaded_files[0],
+        )
+        selected_pdf_bytes = bytes(selected_pdf_file.getvalue())
+
+        pdf_inspection_key = f"atlas_pdf_inspection::{selected_pdf_source}"
+        if st.button(
+            "Inspect PDF Source",
+            key="atlas_pdf_inspect_source",
+            use_container_width=True,
+        ):
+            st.session_state[pdf_inspection_key] = (
+                pdf_service.inspect_pdf_import_source(
+                    source_filename=selected_pdf_source,
+                    file_bytes=selected_pdf_bytes,
+                )
+            )
+            _save_commercial_product_state(st, pdf_service)
+
+        inspected = dict(st.session_state.get(pdf_inspection_key) or {})
+        if inspected:
+            page_rows = list(inspected.get("pages") or [])
+            st.dataframe(
+                [
+                    {
+                        "Page": item.get("page_number"),
+                        "Text Source": item.get("text_source"),
+                        "OCR Derived": bool(item.get("ocr_derived", False)),
+                        "Rotation": item.get("rotation"),
+                        "Line Count": item.get("line_count"),
+                        "Preview": item.get("preview"),
+                    }
+                    for item in page_rows
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+            selectable_pages = [
+                int(item.get("page_number") or 0)
+                for item in page_rows
+                if int(item.get("page_number") or 0) > 0
+            ]
+            selected_pages = st.multiselect(
+                "Page Range",
+                options=selectable_pages,
+                default=selectable_pages,
+                key="atlas_pdf_selected_pages",
+            )
+
+            candidates = list(inspected.get("table_candidates") or [])
+            if candidates:
+                candidate_lookup = {
+                    f"{item.get('candidate_id')} | pages={','.join(str(v) for v in list(item.get('page_numbers') or []))} | rows={item.get('row_count', 0)}": item
+                    for item in candidates
+                }
+                selected_candidate_label = st.selectbox(
+                    "Table Candidate",
+                    options=list(candidate_lookup.keys()),
+                    key="atlas_pdf_selected_candidate",
+                )
+                selected_candidate = dict(candidate_lookup[selected_candidate_label])
+                candidate_rows = [
+                    row
+                    for row in list(selected_candidate.get("rows") or [])
+                    if int(row.get("page_number") or 0) in set(selected_pages or [])
+                ]
+                max_cell_count = max(
+                    (len(list(row.get("cells") or [])) for row in candidate_rows),
+                    default=0,
+                )
+                candidate_preview_rows = []
+                for row in candidate_rows:
+                    candidate_preview_rows.append(
+                        {
+                            "sequence_number": int(row.get("sequence_number") or 0),
+                            "page_number": int(row.get("page_number") or 0),
+                            "region_id": row.get("region_id"),
+                            **{
+                                f"column_{idx + 1}": (
+                                    list(row.get("cells") or [""] * max_cell_count)[idx]
+                                    if idx < len(list(row.get("cells") or []))
+                                    else ""
+                                )
+                                for idx in range(max_cell_count)
+                            },
+                        }
+                    )
+
+                header_row_index = st.number_input(
+                    "Header Row Index (within selected candidate rows)",
+                    min_value=0,
+                    max_value=max(len(candidate_preview_rows) - 1, 0),
+                    value=0,
+                    step=1,
+                    key="atlas_pdf_header_row_index",
+                )
+                editable_candidate = st.data_editor(
+                    candidate_preview_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                    key="atlas_pdf_candidate_editor",
+                )
+
+                detected_headers = (
+                    [
+                        str(
+                            (editable_candidate[int(header_row_index)] or {}).get(
+                                f"column_{idx + 1}", ""
+                            )
+                        ).strip()
+                        or f"column_{idx + 1}"
+                        for idx in range(max_cell_count)
+                    ]
+                    if editable_candidate
+                    else [f"column_{idx + 1}" for idx in range(max_cell_count)]
+                )
+
+                mapping_targets = [
+                    "manufacturer_part_number",
+                    "vendor_sku",
+                    "description",
+                    "unit_cost",
+                    "list_price",
+                    "currency",
+                    "unit_of_measure",
+                    "pack_quantity",
+                    "minimum_order_quantity",
+                    "effective_date_override",
+                    "source_category",
+                    "notes",
+                ]
+                suggested_mapping = pdf_service.suggest_column_mapping(detected_headers)
+                mapping: dict[str, str] = {}
+                mapping_cols = st.columns(3)
+                for index, target in enumerate(mapping_targets):
+                    options = [""] + detected_headers
+                    default_value = suggested_mapping.get(target, "")
+                    if default_value not in options:
+                        default_value = ""
+                    mapping[target] = mapping_cols[index % 3].selectbox(
+                        f"Map {target}",
+                        options=options,
+                        index=options.index(default_value),
+                        key=f"atlas_pdf_map_{target}",
+                    )
+
+                info_cols = st.columns(4)
+                vendor_name = info_cols[0].text_input(
+                    "Vendor",
+                    value="Unknown Vendor",
+                    key="atlas_pdf_vendor_name",
+                )
+                manufacturer_name = info_cols[1].text_input(
+                    "Manufacturer",
+                    value="Unknown Manufacturer",
+                    key="atlas_pdf_manufacturer_name",
+                )
+                effective_date_value = info_cols[2].text_input(
+                    "Effective Date",
+                    value=datetime.now(UTC).date().isoformat(),
+                    key="atlas_pdf_effective_date",
+                )
+                version_label = info_cols[3].text_input(
+                    "Version Label",
+                    value=f"{selected_pdf_source} - pdf",
+                    key="atlas_pdf_version_label",
+                )
+
+                vendor_id = f"vendor-{hashlib.sha1(vendor_name.lower().encode('utf-8')).hexdigest()[:12]}"
+                manufacturer_id = f"mfr-{hashlib.sha1(manufacturer_name.lower().encode('utf-8')).hexdigest()[:12]}"
+                matching_sheets = [
+                    item
+                    for item in pdf_service.list_price_sheets(
+                        vendor_id=vendor_id, manufacturer_id=manufacturer_id
+                    )
+                    if _safe_text(item.get("name"), "") == selected_pdf_source
+                ]
+                if matching_sheets:
+                    pdf_sheet = matching_sheets[0]
+                else:
+                    pdf_sheet = pdf_service.create_price_sheet(
+                        name=selected_pdf_source,
+                        vendor_id=vendor_id,
+                        vendor=vendor_name,
+                        manufacturer_id=manufacturer_id,
+                        manufacturer=manufacturer_name,
+                        purchasing_channel="other",
+                        currency="USD",
+                        notes="PDF import review",
+                    )
+
+                row_corrections: dict[int, dict[str, Any]] = {}
+                for row in editable_candidate:
+                    seq = int(row.get("sequence_number") or 0)
+                    if seq <= 0:
+                        continue
+                    correction_payload: dict[str, Any] = {}
+                    for idx, header in enumerate(detected_headers):
+                        correction_payload[header] = row.get(f"column_{idx + 1}", "")
+                    row_corrections[seq] = correction_payload
+
+                if st.button(
+                    "Create PDF Draft",
+                    key="atlas_pdf_create_draft",
+                    use_container_width=True,
+                ):
+                    draft = pdf_service.create_pdf_import_draft(
+                        price_sheet_id=_safe_text(pdf_sheet.get("price_sheet_id"), ""),
+                        source_filename=selected_pdf_source,
+                        file_bytes=selected_pdf_bytes,
+                        version_label=version_label,
+                        effective_date=effective_date_value,
+                        expiration_date="",
+                        currency="USD",
+                        selected_pages=[
+                            int(value) for value in list(selected_pages or [])
+                        ],
+                        table_candidate_id=_safe_text(
+                            selected_candidate.get("candidate_id"), ""
+                        ),
+                        header_row_index=int(header_row_index),
+                        column_mapping=mapping,
+                        row_corrections=row_corrections,
+                        imported_by="Atlas Workspace",
+                    )
+                    st.session_state[f"atlas_pdf_draft::{selected_pdf_source}"] = (
+                        draft.get("draft_id")
+                    )
+                    _save_commercial_product_state(st, pdf_service)
+
+                current_draft_id = _safe_text(
+                    st.session_state.get(f"atlas_pdf_draft::{selected_pdf_source}"), ""
+                )
+                current_draft = (
+                    pdf_service.get_price_sheet_draft(current_draft_id)
+                    if current_draft_id
+                    else None
+                )
+                if current_draft:
+                    st.markdown("#### PDF Draft Preview")
+                    preview_rows = list(current_draft.get("preview_rows") or [])
+                    editable_preview = st.data_editor(
+                        preview_rows,
+                        use_container_width=True,
+                        hide_index=True,
+                        key=f"atlas_pdf_preview_editor::{selected_pdf_source}",
+                    )
+                    correction_cols = st.columns(3)
+                    if correction_cols[0].button(
+                        "Apply Draft Corrections",
+                        key="atlas_pdf_apply_draft_corrections",
+                        use_container_width=True,
+                    ):
+                        updated = pdf_service.update_price_sheet_draft_preview_rows(
+                            current_draft_id,
+                            preview_rows=list(editable_preview or []),
+                        )
+                        st.session_state[f"atlas_pdf_draft::{selected_pdf_source}"] = (
+                            _safe_text(updated.get("draft_id"), "")
+                        )
+                        _save_commercial_product_state(st, pdf_service)
+                    acknowledge_warnings = correction_cols[1].checkbox(
+                        "Acknowledge Warnings",
+                        value=True,
+                        key="atlas_pdf_ack_warnings",
+                    )
+                    if correction_cols[1].button(
+                        "Validate Draft",
+                        key="atlas_pdf_validate_draft",
+                        use_container_width=True,
+                    ):
+                        try:
+                            validated = pdf_service.validate_price_sheet_draft(
+                                current_draft_id,
+                                acknowledge_warnings=bool(acknowledge_warnings),
+                            )
+                            st.session_state[
+                                f"atlas_pdf_draft::{selected_pdf_source}"
+                            ] = _safe_text(validated.get("draft_id"), "")
+                            _save_commercial_product_state(st, pdf_service)
+                            st.success("Draft validated.")
+                        except ValueError as exc:
+                            st.error(f"Validation failed: {exc}")
+                    if correction_cols[2].button(
+                        "Finalize PDF Draft",
+                        key="atlas_pdf_finalize_draft",
+                        use_container_width=True,
+                    ):
+                        try:
+                            pdf_service.finalize_price_sheet_draft(
+                                current_draft_id,
+                                imported_by="Atlas Workspace",
+                                block_duplicate_hash=False,
+                            )
+                            _save_commercial_product_state(st, pdf_service)
+                            st.success(
+                                "PDF draft finalized into immutable version and records."
+                            )
+                        except ValueError as exc:
+                            st.error(f"Finalize failed: {exc}")
+
+                    st.dataframe(
+                        list(current_draft.get("diagnostics") or []),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            else:
+                st.warning(
+                    "No table candidates detected for this PDF. Adjust page selection or use OCR-capable source."
+                )
+
     if st.button(
         "Import Price Lists",
         type="primary",
-        disabled=not uploaded_files,
+        disabled=not non_pdf_uploaded_files,
         use_container_width=True,
     ):
         with st.spinner("Importing and normalizing price lists..."):
             existing_library = _price_list_library_state(st)
             file_payload_by_name = {
                 str(file.name): bytes(file.getvalue())
-                for file in list(uploaded_files or [])
+                for file in list(non_pdf_uploaded_files or [])
             }
             result = PricingService().ingest_price_lists(
                 [
                     (str(file.name), file_payload_by_name[str(file.name)])
-                    for file in list(uploaded_files or [])
+                    for file in list(non_pdf_uploaded_files or [])
                 ]
             )
 
             commercial_service = CommercialKnowledgeService(
                 state=dict(existing_library.get("commercial_knowledge") or {})
             )
+            commercial_product_service = CommercialProductService(
+                state=dict(existing_library.get("commercial_products") or {})
+            )
 
             import_results: list[dict[str, Any]] = []
+            c02_import_results: list[dict[str, Any]] = []
             vendor_offers = list(result.get("vendor_offers") or [])
             manufacturer_products = list(result.get("manufacturer_products") or [])
 
             for summary in list(result.get("uploaded_price_lists") or []):
                 source_file = _safe_text(summary.get("source_file"), "uploaded")
+                source_extension = Path(source_file).suffix.lower()
                 import_rows = [
                     item
                     for item in vendor_offers
@@ -7164,6 +8063,180 @@ def _render_price_list_library_page(
                     )
                 )
 
+                if source_extension in {".csv", ".xlsx", ".xls"}:
+                    vendor_name = _safe_text(summary.get("vendor"), "Unknown Vendor")
+                    manufacturer_name = _safe_text(
+                        summary.get("manufacturer"),
+                        "Unknown Manufacturer",
+                    )
+                    vendor_id = f"vendor-{hashlib.sha1(vendor_name.lower().encode('utf-8')).hexdigest()[:12]}"
+                    manufacturer_id = f"mfr-{hashlib.sha1(manufacturer_name.lower().encode('utf-8')).hexdigest()[:12]}"
+
+                    sheets = [
+                        item
+                        for item in commercial_product_service.list_price_sheets(
+                            vendor_id=vendor_id,
+                            manufacturer_id=manufacturer_id,
+                        )
+                        if _safe_text(item.get("name"), "") == source_file
+                    ]
+                    if sheets:
+                        sheet = sheets[0]
+                    else:
+                        sheet = commercial_product_service.create_price_sheet(
+                            name=source_file,
+                            vendor_id=vendor_id,
+                            vendor=vendor_name,
+                            manufacturer_id=manufacturer_id,
+                            manufacturer=manufacturer_name,
+                            purchasing_channel="other",
+                            currency="USD",
+                            notes="Imported from Price List Library",
+                        )
+
+                    try:
+                        parsed = commercial_product_service.parse_import_source(
+                            source_filename=source_file,
+                            file_bytes=file_payload_by_name.get(source_file, b""),
+                            worksheet=None,
+                            header_row_index=0,
+                        )
+                        mapping = commercial_product_service.suggest_column_mapping(
+                            list(parsed.get("headers") or [])
+                        )
+                        draft = commercial_product_service.create_import_draft(
+                            price_sheet_id=_safe_text(sheet.get("price_sheet_id"), ""),
+                            source_filename=source_file,
+                            file_bytes=file_payload_by_name.get(source_file, b""),
+                            version_label=f"{source_file} - auto",
+                            effective_date=_safe_text(summary.get("effective_date"), "")
+                            or datetime.now(UTC).date().isoformat(),
+                            expiration_date="",
+                            currency="USD",
+                            worksheet=_safe_text(parsed.get("selected_worksheet"), "")
+                            or None,
+                            header_row_index=int(
+                                parsed.get("header_row_index", 0) or 0
+                            ),
+                            column_mapping=mapping,
+                            imported_by="Atlas Workspace",
+                        )
+                        draft = commercial_product_service.validate_price_sheet_draft(
+                            _safe_text(draft.get("draft_id"), ""),
+                            acknowledge_warnings=True,
+                        )
+                        finalized = (
+                            commercial_product_service.finalize_price_sheet_draft(
+                                _safe_text(draft.get("draft_id"), ""),
+                                imported_by="Atlas Workspace",
+                                block_duplicate_hash=False,
+                            )
+                        )
+                        c02_import_results.append(
+                            {
+                                "source_file": source_file,
+                                "draft_id": _safe_text(draft.get("draft_id"), ""),
+                                "draft_status": _safe_text(draft.get("status"), ""),
+                                "diagnostics": list(draft.get("diagnostics") or []),
+                                "record_count": int(draft.get("record_count", 0) or 0),
+                                "unresolved_count": int(
+                                    draft.get("unresolved_count", 0) or 0
+                                ),
+                                "finalized_version_id": _safe_text(
+                                    dict(finalized.get("version") or {}).get(
+                                        "version_id"
+                                    ),
+                                    "",
+                                ),
+                            }
+                        )
+                    except ValueError as exc:
+                        c02_import_results.append(
+                            {
+                                "source_file": source_file,
+                                "draft_id": "",
+                                "draft_status": "failed",
+                                "diagnostics": [
+                                    {
+                                        "severity": "error",
+                                        "code": "import_failed",
+                                        "message": _safe_text(
+                                            str(exc), "Import failed"
+                                        ),
+                                        "row_number": None,
+                                    }
+                                ],
+                                "record_count": 0,
+                                "unresolved_count": 0,
+                                "finalized_version_id": "",
+                            }
+                        )
+                else:
+                    commercial_product_rows = [
+                        {
+                            "vendor": _safe_text(
+                                item.get("vendor"),
+                                _safe_text(summary.get("vendor"), "Unknown Vendor"),
+                            ),
+                            "manufacturer": _safe_text(
+                                item.get("manufacturer"),
+                                _safe_text(
+                                    summary.get("manufacturer"), "Unknown Manufacturer"
+                                ),
+                            ),
+                            "canonical_sku": _safe_text(
+                                item.get("model"),
+                                _safe_text(item.get("vendor_sku"), "Unknown"),
+                            ),
+                            "manufacturer_sku": _safe_text(
+                                item.get("model"),
+                                _safe_text(item.get("vendor_sku"), "Unknown"),
+                            ),
+                            "alternate_skus": (
+                                [_safe_text(item.get("vendor_sku"), "")]
+                                if _safe_text(item.get("vendor_sku"), "")
+                                else []
+                            ),
+                            "description": _safe_text(item.get("description"), ""),
+                            "category": _safe_text(item.get("category"), "other"),
+                            "discipline": _safe_text(
+                                item.get("discipline"),
+                                _safe_text(summary.get("discipline"), "general"),
+                            ),
+                            "preferred_cost": item.get("unit_cost"),
+                            "msrp": item.get("list_price"),
+                            "currency": _safe_text(item.get("currency"), "USD"),
+                            "lead_time": _safe_text(item.get("lead_time"), ""),
+                            "availability_status": _safe_text(
+                                item.get("availability_status"), "unknown"
+                            ),
+                            "effective_date": _safe_text(
+                                item.get("effective_date"),
+                                _safe_text(summary.get("effective_date"), ""),
+                            ),
+                            "vendor_sku": _safe_text(
+                                item.get("vendor_sku"),
+                                _safe_text(item.get("model"), "Unknown"),
+                            ),
+                            "vendor_type": _safe_text(item.get("vendor_type"), "other"),
+                            "comments": _safe_text(item.get("notes"), ""),
+                        }
+                        for item in import_rows
+                    ]
+                    commercial_product_service.import_price_list_version(
+                        manufacturer=_safe_text(
+                            summary.get("manufacturer"),
+                            "Unknown Manufacturer",
+                        ),
+                        vendor=_safe_text(summary.get("vendor"), "Unknown Vendor"),
+                        source_file=source_file,
+                        file_bytes=file_payload_by_name.get(source_file, b""),
+                        import_user="Atlas Workspace",
+                        rows=commercial_product_rows,
+                        effective_date=_safe_text(summary.get("effective_date"), ""),
+                        version_notes="Imported from Price List Library",
+                    )
+
             st.session_state["atlas_price_list_library"] = {
                 "uploaded_price_lists": list(
                     existing_library.get("uploaded_price_lists") or []
@@ -7178,13 +8251,18 @@ def _render_price_list_library_page(
                 "import_warnings": list(existing_library.get("import_warnings") or [])
                 + list(result.get("import_warnings") or []),
                 "commercial_knowledge": commercial_service.to_dict(),
+                "commercial_products": commercial_product_service.to_dict(),
                 "commercial_import_results": import_results,
+                "commercial_c02_import_results": c02_import_results,
+                "commercial_c02_completeness": commercial_product_service.commercial_completeness_summary(),
             }
 
     library = _price_list_library_state(st)
     summaries = list(library.get("uploaded_price_lists") or [])
     manufacturer_products = list(library.get("manufacturer_products") or [])
     vendor_offers = list(library.get("vendor_offers") or [])
+    c02_results = list(library.get("commercial_c02_import_results") or [])
+    c02_completeness = dict(library.get("commercial_c02_completeness") or {})
 
     cards = st.columns(4)
     _metric_card(cards[0], "Uploaded Price Lists", str(len(summaries)))
@@ -7197,6 +8275,7 @@ def _render_price_list_library_page(
     )
 
     commercial_dashboard = _commercial_service(st).dashboard_summary()
+    product_dashboard = _commercial_product_service(st).dashboard_summary()
     st.markdown("### Commercial Health")
     st.dataframe(
         [
@@ -7216,11 +8295,49 @@ def _render_price_list_library_page(
                 "Commercial Confidence": commercial_dashboard.get(
                     "commercial_confidence", 0.0
                 ),
+                "Active Products": product_dashboard.get("active_products", 0),
+                "Missing Preferred Vendor": product_dashboard.get(
+                    "missing_preferred_vendor", 0
+                ),
+                "Recent Price Changes": product_dashboard.get(
+                    "recent_price_changes", 0
+                ),
+                "Average Product Confidence": product_dashboard.get(
+                    "average_confidence", 0.0
+                ),
             }
         ],
         use_container_width=True,
         hide_index=True,
     )
+
+    if c02_completeness:
+        st.markdown("### C-02 Completeness")
+        st.dataframe([c02_completeness], use_container_width=True, hide_index=True)
+
+    if c02_results:
+        st.markdown("### C-02 Import Lifecycle")
+        st.dataframe(
+            [
+                {
+                    "Source File": item.get("source_file"),
+                    "Draft ID": item.get("draft_id"),
+                    "Draft Status": item.get("draft_status"),
+                    "Record Count": item.get("record_count"),
+                    "Unresolved Count": item.get("unresolved_count"),
+                    "Finalized Version": item.get("finalized_version_id"),
+                    "Diagnostics": "; ".join(
+                        [
+                            f"{diag.get('severity')}: {diag.get('message')}"
+                            for diag in list(item.get("diagnostics") or [])
+                        ]
+                    ),
+                }
+                for item in c02_results
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
 
     st.markdown("### Upload Summary")
     if summaries:
@@ -9364,15 +10481,80 @@ def _workspace_objects(
     return result
 
 
-def _master_library_rows(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+def _master_library_rows(
+    st: Any, context: dict[str, Any] | None
+) -> list[dict[str, Any]]:
     cached = _context_cached(context, "master_library_rows")
     if isinstance(cached, list):
         return cached
 
     objects = _workspace_objects(context)
-    service = MasterLibraryService()
-    service.import_workspace_equipment(list(objects.get("equipment") or []))
-    rows = service.explorer_rows()
+    master_service = MasterLibraryService()
+    master_service.import_workspace_equipment(list(objects.get("equipment") or []))
+    rows = master_service.explorer_rows()
+
+    commercial_service = _commercial_product_service(st)
+    commercial_rows = commercial_service.product_rows(include_project_only=True)
+    commercial_state = commercial_service.to_dict()
+    all_vendor_offerings = list(commercial_state.get("vendor_offerings", {}).values())
+    commercial_by_model: dict[str, dict[str, Any]] = {}
+    for item in commercial_rows:
+        manufacturer = _safe_text(item.get("manufacturer"), "").upper()
+        for sku in [
+            _safe_text(item.get("canonical_sku"), ""),
+            _safe_text(item.get("manufacturer_sku"), ""),
+        ] + list(item.get("alternate_skus") or []):
+            if manufacturer and _safe_text(sku, ""):
+                commercial_by_model[
+                    f"{manufacturer}::{_safe_text(sku, '').upper()}"
+                ] = item
+
+    enriched_rows: list[dict[str, Any]] = []
+    for row in rows:
+        key = (
+            f"{_safe_text(row.get('manufacturer'), '').upper()}::"
+            f"{_safe_text(row.get('model'), '').upper()}"
+        )
+        commercial = dict(commercial_by_model.get(key) or {})
+        enriched_rows.append(
+            {
+                **row,
+                "atlas_product_uuid": _safe_text(
+                    commercial.get("atlas_product_uuid"), ""
+                ),
+                "canonical_sku": _safe_text(
+                    commercial.get("canonical_sku"), _safe_text(row.get("model"), "")
+                ),
+                "alternate_skus": list(commercial.get("alternate_skus") or []),
+                "discipline": _safe_text(commercial.get("discipline"), "general"),
+                "lifecycle_status": _safe_text(
+                    commercial.get("lifecycle_status"),
+                    _safe_text(row.get("status"), "pending_verification"),
+                ),
+                "vendor": _safe_text(
+                    dict(commercial.get("commercial") or {}).get("preferred_vendor"),
+                    "",
+                ),
+                "commercial_metadata": dict(commercial.get("commercial") or {}),
+                "commercial_health": dict(commercial.get("commercial_health") or {}),
+                "product_intelligence": dict(
+                    commercial.get("product_intelligence") or {}
+                ),
+                "confidence_summary": dict(commercial.get("confidence") or {}),
+                "vendor_offerings": [
+                    item
+                    for item in all_vendor_offerings
+                    if _safe_text(item.get("atlas_product_uuid"), "")
+                    == _safe_text(commercial.get("atlas_product_uuid"), "")
+                ],
+                "price_history": list(commercial.get("price_history") or []),
+                "import_history": list(commercial.get("import_history") or []),
+                "project_references": list(commercial.get("project_references") or []),
+                "project_only": bool(commercial.get("project_only", False)),
+            }
+        )
+
+    rows = enriched_rows
     _set_context_cached(context, "master_library_rows", rows)
     return rows
 
@@ -9613,9 +10795,25 @@ def _application_search_entries(
         reference["scope"] = "application"
         reference["match_fields"] = [
             _safe_text(item.get("product_id"), ""),
+            _safe_text(item.get("atlas_product_uuid"), ""),
             _safe_text(item.get("model"), ""),
+            _safe_text(item.get("canonical_sku"), ""),
+            _safe_text(item.get("manufacturer_sku"), ""),
             _safe_text(item.get("manufacturer"), ""),
             _safe_text(item.get("category"), ""),
+            _safe_text(item.get("discipline"), ""),
+            _safe_text(item.get("product_family"), _safe_text(item.get("family"), "")),
+            _safe_text(
+                item.get("lifecycle_status"), _safe_text(item.get("status"), "")
+            ),
+            _safe_text(item.get("vendor"), ""),
+            _safe_text(item.get("price_version"), ""),
+            str(
+                dict(
+                    item.get("confidence") or item.get("confidence_summary") or {}
+                ).get("overall_confidence", "")
+            ),
+            " ".join(list(item.get("alternate_skus") or [])),
         ]
         references.append(reference)
 
@@ -15987,7 +17185,7 @@ def _render_master_library_explorer_page(
         )
         return
 
-    rows = _master_library_rows(context)
+    rows = _master_library_rows(st, context)
     if not rows:
         _render_empty_state(
             st,
@@ -16006,7 +17204,14 @@ def _render_master_library_explorer_page(
         }
     )
     statuses = sorted(
-        {str(item.get("status") or "unknown") for item in rows if item.get("status")}
+        {
+            str(
+                item.get("lifecycle_status")
+                or item.get("status")
+                or "pending_verification"
+            )
+            for item in rows
+        }
     )
 
     filter_cols = st.columns([2.4, 1.6, 1.6, 1.4])
@@ -16061,7 +17266,12 @@ def _render_master_library_explorer_page(
             )
             and (
                 not selected_statuses
-                or str(item.get("status") or "unknown") in selected_statuses
+                or str(
+                    item.get("lifecycle_status")
+                    or item.get("status")
+                    or "pending_verification"
+                )
+                in selected_statuses
             )
         )
     ]
@@ -16097,7 +17307,13 @@ def _render_master_library_explorer_page(
         st.markdown("#### Status")
         status_counts: dict[str, int] = defaultdict(int)
         for item in filtered:
-            status_counts[str(item.get("status") or "unknown")] += 1
+            status_counts[
+                str(
+                    item.get("lifecycle_status")
+                    or item.get("status")
+                    or "pending_verification"
+                )
+            ] += 1
         st.dataframe(
             [
                 {"status": key, "products": value}
@@ -16117,10 +17333,14 @@ def _render_master_library_explorer_page(
                 "description": item.get("description"),
                 "category": item.get("category"),
                 "family": item.get("family"),
-                "status": item.get("status"),
+                "status": item.get("lifecycle_status") or item.get("status"),
+                "vendor": item.get("vendor"),
                 "aliases": len(list(item.get("aliases") or [])),
                 "relationships": len(list(item.get("related_products") or [])),
-                "confidence": item.get("confidence"),
+                "confidence": dict(item.get("confidence_summary") or {}).get(
+                    "overall_confidence",
+                    item.get("confidence"),
+                ),
             }
             for item in filtered
         ],
@@ -16144,61 +17364,169 @@ def _render_master_library_explorer_page(
     selected = filtered[labels.index(selected_label)]
     _set_context_selection(st, "master_product", selected)
 
-    detail_cols = st.columns([2.5, 1.5])
-    with detail_cols[0]:
-        st.markdown("#### Product Detail")
+    tabs = st.tabs(
+        [
+            "Overview",
+            "Commercial",
+            "Vendor Pricing",
+            "Price History",
+            "Engineering",
+            "Compatibility",
+            "Documents",
+            "Lifecycle",
+            "Related Products",
+            "Project References",
+            "Import History",
+        ]
+    )
+
+    commercial_metadata = dict(selected.get("commercial_metadata") or {})
+    engineering_metadata = dict(selected.get("engineering_attributes") or {})
+    commercial_health = dict(selected.get("commercial_health") or {})
+    product_intelligence = dict(selected.get("product_intelligence") or {})
+    confidence_summary = dict(selected.get("confidence_summary") or {})
+    vendor_offerings = list(selected.get("vendor_offerings") or [])
+    price_history = list(selected.get("price_history") or [])
+    import_history = list(selected.get("import_history") or [])
+    project_refs = list(selected.get("project_references") or [])
+    relationships = list(selected.get("related_products") or [])
+    aliases = list(selected.get("aliases") or [])
+
+    with tabs[0]:
         st.dataframe(
             [
                 {
-                    "field": "Product ID",
-                    "value": _safe_text(selected.get("product_id"), "n/a"),
-                },
-                {
-                    "field": "Manufacturer",
-                    "value": _safe_text(selected.get("manufacturer"), "n/a"),
-                },
-                {"field": "Model", "value": _safe_text(selected.get("model"), "n/a")},
-                {
-                    "field": "Normalized Model",
-                    "value": _safe_text(selected.get("normalized_model"), "n/a"),
-                },
-                {
-                    "field": "Description",
-                    "value": _safe_text(selected.get("description"), "n/a"),
-                },
-                {
-                    "field": "Category",
-                    "value": _safe_text(selected.get("category"), "n/a"),
-                },
-                {"field": "Family", "value": _safe_text(selected.get("family"), "n/a")},
-                {"field": "Status", "value": _safe_text(selected.get("status"), "n/a")},
-                {
-                    "field": "Confidence",
-                    "value": _safe_text(selected.get("confidence"), "n/a"),
-                },
-                {
-                    "field": "Created",
-                    "value": _safe_text(selected.get("created_at"), "n/a"),
-                },
-                {
-                    "field": "Updated",
-                    "value": _safe_text(selected.get("updated_at"), "n/a"),
-                },
+                    "Atlas Product UUID": _safe_text(
+                        selected.get("atlas_product_uuid"), "n/a"
+                    ),
+                    "Product ID": _safe_text(selected.get("product_id"), "n/a"),
+                    "Manufacturer": _safe_text(selected.get("manufacturer"), "n/a"),
+                    "Model": _safe_text(selected.get("model"), "n/a"),
+                    "Canonical SKU": _safe_text(
+                        selected.get("canonical_sku"),
+                        _safe_text(selected.get("model"), "n/a"),
+                    ),
+                    "Category": _safe_text(selected.get("category"), "n/a"),
+                    "Family": _safe_text(
+                        selected.get("product_family"),
+                        _safe_text(selected.get("family"), "n/a"),
+                    ),
+                    "Discipline": _safe_text(selected.get("discipline"), "n/a"),
+                    "Description": _safe_text(selected.get("description"), "n/a"),
+                    "Confidence": _safe_text(
+                        confidence_summary.get("overall_confidence"),
+                        _safe_text(selected.get("confidence"), "n/a"),
+                    ),
+                }
             ],
             use_container_width=True,
             hide_index=True,
         )
         st.markdown("#### Aliases")
-        aliases = list(selected.get("aliases") or [])
         st.dataframe(
             [{"alias": str(item)} for item in aliases],
             use_container_width=True,
             hide_index=True,
         )
 
-    with detail_cols[1]:
-        st.markdown("#### Relationship Browser")
-        relationships = list(selected.get("related_products") or [])
+    with tabs[1]:
+        st.dataframe(
+            [commercial_metadata or {"status": "No commercial metadata"}],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.markdown("#### Commercial Health")
+        st.dataframe(
+            [commercial_health or {"status": "No health metrics"}],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[2]:
+        if vendor_offerings:
+            st.dataframe(vendor_offerings, use_container_width=True, hide_index=True)
+        else:
+            st.info("No vendor offerings recorded for this product.")
+
+    with tabs[3]:
+        if price_history:
+            st.dataframe(price_history, use_container_width=True, hide_index=True)
+        else:
+            st.info("No price history available.")
+
+    with tabs[4]:
+        st.dataframe(
+            [engineering_metadata or {"status": "No engineering metadata"}],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[5]:
+        st.dataframe(
+            [
+                {
+                    "compatible_products": " | ".join(
+                        list(product_intelligence.get("compatible_products") or [])
+                    )
+                    or "None",
+                    "related_accessories": " | ".join(
+                        list(product_intelligence.get("related_accessories") or [])
+                    )
+                    or "None",
+                    "replacement_product": _safe_text(
+                        product_intelligence.get("replacement_product"),
+                        _safe_text(selected.get("replacement_product_uuid"), "None"),
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[6]:
+        st.dataframe(
+            [
+                {
+                    "product_image": _safe_text(selected.get("product_image"), ""),
+                    "datasheet": _safe_text(selected.get("datasheet"), ""),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[7]:
+        st.dataframe(
+            [
+                {
+                    "lifecycle_status": _safe_text(
+                        selected.get("lifecycle_status"),
+                        _safe_text(selected.get("status"), "n/a"),
+                    ),
+                    "active": bool(selected.get("active", True)),
+                    "replacement_product_uuid": _safe_text(
+                        selected.get("replacement_product_uuid"),
+                        "",
+                    ),
+                    "project_only": bool(selected.get("project_only", False)),
+                    "created_at": _safe_text(selected.get("created_at"), "n/a"),
+                    "updated_at": _safe_text(selected.get("updated_at"), "n/a"),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.markdown("#### Confidence Breakdown")
+        st.dataframe(
+            [
+                confidence_summary
+                or {"overall_confidence": _safe_text(selected.get("confidence"), "n/a")}
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[8]:
         if relationships:
             st.dataframe(
                 [
@@ -16224,6 +17552,22 @@ def _render_master_library_explorer_page(
                     _open_linked_object(st, target)
         else:
             st.info("No related products mapped yet.")
+
+    with tabs[9]:
+        if project_refs:
+            st.dataframe(
+                [{"project_reference": item} for item in project_refs],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No project references recorded.")
+
+    with tabs[10]:
+        if import_history:
+            st.dataframe(import_history, use_container_width=True, hide_index=True)
+        else:
+            st.caption("No import history available.")
 
     st.markdown("#### Alias Resolution")
     resolver_cols = st.columns([2.1, 2.1, 3.8])
