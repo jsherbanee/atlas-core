@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 from pathlib import Path
+import platform
 import subprocess
 from typing import Any
 
@@ -2204,6 +2205,14 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_equipment_origin", {})
     st.session_state.setdefault("atlas_recently_viewed_objects", [])
     st.session_state.setdefault("atlas_pinned_objects", [])
+    st.session_state.setdefault("atlas_recent_search_queries", [])
+    st.session_state.setdefault("atlas_recent_opened_results", [])
+    st.session_state.setdefault("atlas_global_search_open", False)
+    st.session_state.setdefault("atlas_active_project_name", "")
+    st.session_state.setdefault(
+        "atlas_os",
+        "macos" if platform.system().lower() == "darwin" else "other",
+    )
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -2487,7 +2496,7 @@ def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
         "Open Existing Project",
     }:
         return f"Atlas / Projects / {page}"
-    if page in {"Mission Control", "Knowledge", "Reports", "Administration"}:
+    if page in {"Mission Control", "Reports", "Administration"}:
         return f"Atlas / {page}"
 
     try:
@@ -2511,6 +2520,20 @@ def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
     if expected_kind is not None and kind == expected_kind:
         name = _object_display_name(kind, data)
         return f"Atlas / Projects / {record.project.name} / {page} / {name}"
+
+    if page == "Knowledge":
+        knowledge_segments = {
+            "manufacturer": "Manufacturers",
+            "vendor": "Vendors",
+            "customer": "Customers",
+            "master_product": "Products",
+            "price_list": "Price Lists",
+        }
+        segment = knowledge_segments.get(kind)
+        if segment:
+            name = _object_display_name(kind, data)
+            return f"Atlas / Knowledge / {segment} / {name}"
+        return "Atlas / Knowledge"
 
     return f"Atlas / Projects / {record.project.name} / {page}"
 
@@ -2632,6 +2655,90 @@ def _open_project_from_local_path(
     )
 
 
+def _keyboard_shortcut_label(st: Any) -> str:
+    return (
+        "Cmd+K"
+        if _safe_text(st.session_state.get("atlas_os"), "macos") == "macos"
+        else "Ctrl+K"
+    )
+
+
+def _render_global_search_control(st: Any, host: Any) -> None:
+    host.text_input(
+        "Global Object Search",
+        key="atlas_global_search",
+        placeholder="Search projects, equipment, drawings, specs, systems, rooms, RFIs, risks, manufacturers, products...",
+    )
+    control_cols = host.columns([1, 1])
+    if control_cols[0].button(
+        "Open Search",
+        key="atlas_open_global_search",
+        use_container_width=True,
+    ):
+        st.session_state["atlas_global_search_open"] = True
+    if control_cols[1].button(
+        "Close",
+        key="atlas_close_global_search",
+        use_container_width=True,
+    ):
+        st.session_state["atlas_global_search_open"] = False
+        st.session_state["atlas_global_search"] = ""
+
+    host.caption(
+        f"Shortcut: {_keyboard_shortcut_label(st)} to focus/open search where supported. Press Esc to close search."
+    )
+
+
+def _render_header_history_popover(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    popover = st.popover("History")
+    popover.markdown("#### Recently Viewed")
+    recent = list(st.session_state.get("atlas_recently_viewed_objects") or [])
+    if recent:
+        labels = [
+            f"{_safe_text(item.get('object_type'), '')}: {_safe_text(item.get('display_name'), '')}"
+            for item in recent[:8]
+        ]
+        selected_label = popover.selectbox(
+            "Open recent",
+            options=labels,
+            key="atlas_header_recent_open",
+        )
+        selected = recent[:8][labels.index(selected_label)]
+        if popover.button(
+            "Open",
+            key="atlas_header_open_recent",
+            use_container_width=True,
+        ):
+            _open_search_reference(st, workspace_service, selected)
+    else:
+        popover.caption("No recently viewed objects.")
+
+    popover.markdown("#### Working Set")
+    working_set = _working_set(st)
+    if working_set:
+        labels = [
+            f"{_safe_text(item.get('object_type'), '')}: {_safe_text(item.get('display_name'), '')}"
+            for item in working_set[:8]
+        ]
+        selected_label = popover.selectbox(
+            "Open working set object",
+            options=labels,
+            key="atlas_header_working_set_open",
+        )
+        selected = working_set[:8][labels.index(selected_label)]
+        if popover.button(
+            "Open Working Set Object",
+            key="atlas_header_open_working_set",
+            use_container_width=True,
+        ):
+            _open_search_reference(st, workspace_service, selected)
+    else:
+        popover.caption("Working Set is empty.")
+
+
 def _render_header(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -2643,19 +2750,24 @@ def _render_header(
         st.session_state.get("atlas_active_page"), "Mission Control"
     )
 
-    header_cols = st.columns([1.3, 2.2, 2.0])
+    header_cols = st.columns([1.1, 2.0, 2.8, 1.6])
     if header_cols[0].button("Atlas", use_container_width=True, type="secondary"):
         st.session_state["atlas_active_page"] = "Mission Control"
         st.rerun()
 
+    _render_global_search_control(st, header_cols[2])
+
     if record is None:
+        st.session_state["atlas_active_project_name"] = ""
         header_cols[1].caption(f"Application Workspace · {current_page}")
-        if header_cols[2].button("Open Projects", use_container_width=True):
+        if header_cols[3].button("Open Projects", use_container_width=True):
             st.session_state["atlas_active_page"] = "Projects"
             st.rerun()
+        _render_header_history_popover(st, workspace_service)
         return
 
     summary = _build_project_analysis_summary(record, context)
+    st.session_state["atlas_active_project_name"] = record.project.name
     next_action = _next_review_action(_review_step_status_rows(st, record, context))
     review = context.get("review") if context else None
     confidence = getattr(review, "confidence", None)
@@ -2696,9 +2808,11 @@ def _render_header(
     else:
         header_cols[1].caption("Project selector unavailable.")
 
-    if header_cols[2].button("Back to Projects", use_container_width=True):
+    if header_cols[3].button("Back to Projects", use_container_width=True):
         st.session_state["atlas_active_page"] = "Projects"
         st.rerun()
+
+    _render_header_history_popover(st, workspace_service)
 
     st.markdown(
         "<div class='atlas-project-header'>"
@@ -2768,6 +2882,11 @@ def _object_type_label(kind: str) -> str:
         "rfi": "RFI Candidate",
         "evidence": "Evidence",
         "manufacturer": "Manufacturer",
+        "vendor": "Vendor",
+        "customer": "Customer",
+        "price_list": "Price List",
+        "project_record": "Project",
+        "notebook_entry": "Notebook Entry",
         "master_product": "Product",
         "model": "Product",
     }
@@ -2793,6 +2912,16 @@ def _object_id_for_selection(kind: str, data: dict[str, Any]) -> str:
         return f"{source_file}:{page}"
     if kind == "manufacturer":
         return _safe_text(data.get("manufacturer"), "")
+    if kind == "vendor":
+        return _safe_text(data.get("vendor"), _safe_text(data.get("name"), ""))
+    if kind == "customer":
+        return _safe_text(data.get("customer"), "")
+    if kind == "price_list":
+        return _safe_text(data.get("source_file"), "Price List")
+    if kind == "project_record":
+        return _safe_text(data.get("workspace_id"), "")
+    if kind == "notebook_entry":
+        return _safe_text(data.get("entry_id"), _safe_text(data.get("title"), ""))
     if kind == "master_product":
         return _safe_text(data.get("product_id"), _safe_text(data.get("model"), ""))
     return _safe_text(data.get("object_id"), "")
@@ -2821,6 +2950,16 @@ def _object_display_name(kind: str, data: dict[str, Any]) -> str:
         return _safe_text(data.get("source_file"), "Evidence")
     if kind == "manufacturer":
         return _safe_text(data.get("manufacturer"), "Manufacturer")
+    if kind == "vendor":
+        return _safe_text(data.get("vendor"), _safe_text(data.get("name"), "Vendor"))
+    if kind == "customer":
+        return _safe_text(data.get("customer"), "Customer")
+    if kind == "price_list":
+        return _safe_text(data.get("source_file"), "Price List")
+    if kind == "project_record":
+        return _safe_text(data.get("project_name"), "Project")
+    if kind == "notebook_entry":
+        return _safe_text(data.get("title"), "Notebook Entry")
     if kind == "master_product":
         return _safe_text(data.get("model"), "Product")
     return _safe_text(data.get("title"), _safe_text(data.get("object_id"), "Object"))
@@ -2843,6 +2982,16 @@ def _object_secondary_label(kind: str, data: dict[str, Any]) -> str:
         return f"page {_safe_text(data.get('page'), 'n/a')}"
     if kind == "master_product":
         return _safe_text(data.get("manufacturer"), "")
+    if kind == "vendor":
+        return _safe_text(data.get("vendor_type"), _safe_text(data.get("status"), ""))
+    if kind == "customer":
+        return _safe_text(data.get("portfolio"), "")
+    if kind == "price_list":
+        return _safe_text(data.get("vendor"), _safe_text(data.get("manufacturer"), ""))
+    if kind == "project_record":
+        return _safe_text(data.get("customer"), "")
+    if kind == "notebook_entry":
+        return _safe_text(data.get("entry_type"), "")
     return ""
 
 
@@ -2856,6 +3005,11 @@ def _selection_route(kind: str) -> str:
         "rfi": "RFI Candidates",
         "evidence": "Evidence",
         "manufacturer": "Master Library Explorer",
+        "vendor": "Knowledge",
+        "customer": "Knowledge",
+        "price_list": "Knowledge",
+        "project_record": "Overview",
+        "notebook_entry": "Notebook",
         "master_product": "Master Library Explorer",
     }
     return mapping.get(kind, "Overview")
@@ -2866,6 +3020,7 @@ def _build_object_reference(
     kind: str,
     data: dict[str, Any],
     project_id: str,
+    project_name: str | None = None,
     route: str,
     relationship_count: int = 0,
     warning_count: int = 0,
@@ -2891,6 +3046,7 @@ def _build_object_reference(
         "status": status,
         "confidence": confidence_text,
         "project_id": project_id,
+        "project_name": _safe_text(project_name, project_id),
         "route": route,
         "source_refs": [item for item in source_refs if _safe_text(item, "")],
         "relationship_count": int(relationship_count),
@@ -2920,6 +3076,10 @@ def _track_recently_viewed(st: Any, reference: dict[str, Any]) -> None:
     st.session_state["atlas_recently_viewed_objects"] = filtered[:30]
 
 
+def _working_set(st: Any) -> list[dict[str, Any]]:
+    return list(st.session_state.get("atlas_pinned_objects") or [])
+
+
 def _toggle_pin_reference(st: Any, reference: dict[str, Any], should_pin: bool) -> None:
     object_id = _safe_text(reference.get("object_id"), "")
     object_type = _safe_text(reference.get("object_type"), "")
@@ -2937,6 +3097,65 @@ def _toggle_pin_reference(st: Any, reference: dict[str, Any], should_pin: bool) 
     if should_pin:
         filtered.insert(0, dict(reference))
     st.session_state["atlas_pinned_objects"] = filtered[:40]
+
+
+def _move_working_set_item(
+    st: Any,
+    *,
+    object_id: str,
+    object_type: str,
+    direction: int,
+) -> None:
+    items = _working_set(st)
+    index = next(
+        (
+            i
+            for i, item in enumerate(items)
+            if _safe_text(item.get("object_id"), "") == object_id
+            and _safe_text(item.get("object_type"), "") == object_type
+        ),
+        None,
+    )
+    if index is None:
+        return
+    target = index + direction
+    if target < 0 or target >= len(items):
+        return
+    items[index], items[target] = items[target], items[index]
+    st.session_state["atlas_pinned_objects"] = items
+
+
+def _record_recent_search_query(st: Any, query: str) -> None:
+    normalized = query.strip()
+    if len(normalized) < 2:
+        return
+    existing = [
+        str(item)
+        for item in list(st.session_state.get("atlas_recent_search_queries") or [])
+    ]
+    deduped = [item for item in existing if item.lower() != normalized.lower()]
+    deduped.insert(0, normalized)
+    st.session_state["atlas_recent_search_queries"] = deduped[:12]
+
+
+def _record_recent_search_open(st: Any, reference: dict[str, Any]) -> None:
+    object_id = _safe_text(reference.get("object_id"), "")
+    object_type = _safe_text(reference.get("object_type"), "")
+    if not object_id or not object_type:
+        return
+    existing = list(st.session_state.get("atlas_recent_opened_results") or [])
+    filtered = [
+        item
+        for item in existing
+        if not (
+            _safe_text(item.get("object_id"), "") == object_id
+            and _safe_text(item.get("object_type"), "") == object_type
+        )
+    ]
+    updated = dict(reference)
+    updated["last_opened_at"] = _now_iso()
+    filtered.insert(0, updated)
+    st.session_state["atlas_recent_opened_results"] = filtered[:15]
 
 
 def _is_reference_pinned(st: Any, reference: dict[str, Any]) -> bool:
@@ -2962,9 +3181,14 @@ def _set_context_selection(st: Any, kind: str, data: dict[str, Any]) -> None:
         "rfi",
         "evidence",
         "manufacturer",
+        "vendor",
+        "customer",
+        "price_list",
+        "project_record",
         "master_product",
         "resolver_conflict",
         "resolved",
+        "notebook_entry",
     }:
         return
 
@@ -2975,6 +3199,9 @@ def _set_context_selection(st: Any, kind: str, data: dict[str, Any]) -> None:
         kind=kind,
         data=data,
         project_id=project_id,
+        project_name=_safe_text(
+            st.session_state.get("atlas_active_project_name"), project_id
+        ),
         route=route,
         relationship_count=0,
         warning_count=len(warnings),
@@ -3022,7 +3249,7 @@ def _render_object_card(
 
     pinned = _is_reference_pinned(st, reference)
     if cols[1].button(
-        "Unpin" if pinned else "Pin",
+        "Remove" if pinned else "Add to Working Set",
         key=f"{key_prefix}_pin_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
         use_container_width=True,
     ):
@@ -3051,12 +3278,43 @@ def _render_object_header(
     header_cols[0].caption(f"Recommended action: {recommended_action}")
     pinned = _is_reference_pinned(st, reference)
     if header_cols[1].button(
-        "Unpin Object" if pinned else "Pin Object",
+        "Remove from Working Set" if pinned else "Add to Working Set",
         key=f"atlas_object_header_pin_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
         use_container_width=True,
     ):
         _toggle_pin_reference(st, reference, should_pin=not pinned)
         st.rerun()
+
+
+def _open_search_reference(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    reference: dict[str, Any],
+) -> None:
+    selection_kind = _safe_text(reference.get("selection_kind"), "project")
+    selection_data = dict(reference.get("selection_data") or {})
+    if selection_kind == "project_record":
+        workspace_id = _safe_text(selection_data.get("workspace_id"), "")
+        if workspace_id:
+            records = {
+                item.workspace_id: item
+                for item in workspace_service.list_workspaces(
+                    include_archived=True,
+                    limit=1000,
+                )
+            }
+            selected_record = records.get(workspace_id)
+            if selected_record is not None:
+                _record_recent_search_open(st, reference)
+                _open_project_record(st, selected_record)
+                return
+
+    st.session_state["atlas_active_page"] = _safe_text(
+        reference.get("route"), "Overview"
+    )
+    _set_context_selection(st, selection_kind, selection_data)
+    _record_recent_search_open(st, reference)
+    st.rerun()
 
 
 def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
@@ -3109,6 +3367,12 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
             st.session_state.get("atlas_recently_viewed_objects") or []
         ),
         "pinned_objects": list(st.session_state.get("atlas_pinned_objects") or []),
+        "recent_search_queries": list(
+            st.session_state.get("atlas_recent_search_queries") or []
+        ),
+        "recent_opened_results": list(
+            st.session_state.get("atlas_recent_opened_results") or []
+        ),
     }
 
 
@@ -3178,6 +3442,14 @@ def _restore_workspace_state(
     pinned_objects = state.get("pinned_objects")
     if isinstance(pinned_objects, list):
         st.session_state["atlas_pinned_objects"] = list(pinned_objects)
+
+    recent_search_queries = state.get("recent_search_queries")
+    if isinstance(recent_search_queries, list):
+        st.session_state["atlas_recent_search_queries"] = list(recent_search_queries)
+
+    recent_opened_results = state.get("recent_opened_results")
+    if isinstance(recent_opened_results, list):
+        st.session_state["atlas_recent_opened_results"] = list(recent_opened_results)
 
     st.session_state["atlas_loaded_workspace_state_for"] = record.workspace_id
 
@@ -6121,7 +6393,7 @@ def _render_overview_page(
     st.markdown("### Object Navigation")
     nav_cols = st.columns(2)
     recent = list(st.session_state.get("atlas_recently_viewed_objects") or [])
-    pinned = list(st.session_state.get("atlas_pinned_objects") or [])
+    working_set = _working_set(st)
 
     with nav_cols[0]:
         st.markdown("#### Recently Viewed Objects")
@@ -6131,7 +6403,7 @@ def _render_overview_page(
                     {
                         "Object": _safe_text(item.get("display_name"), "Object"),
                         "Type": _safe_text(item.get("object_type"), "n/a"),
-                        "Route": _safe_text(item.get("route"), "Overview"),
+                        "Project": _safe_text(item.get("project_name"), "n/a"),
                         "Last Viewed": _safe_text(item.get("last_viewed_at"), "n/a"),
                     }
                     for item in recent[:10]
@@ -6177,37 +6449,39 @@ def _render_overview_page(
             )
 
     with nav_cols[1]:
-        st.markdown("#### Pinned Objects")
-        if pinned:
+        st.markdown("#### Working Set")
+        st.caption("Keep important project objects close while you review the project.")
+        if working_set:
             st.dataframe(
                 [
                     {
                         "Object": _safe_text(item.get("display_name"), "Object"),
                         "Type": _safe_text(item.get("object_type"), "n/a"),
+                        "Project": _safe_text(item.get("project_name"), "n/a"),
                         "Route": _safe_text(item.get("route"), "Overview"),
                     }
-                    for item in pinned[:10]
+                    for item in working_set[:10]
                 ],
                 use_container_width=True,
                 hide_index=True,
             )
             target = st.selectbox(
-                "Open pinned",
+                "Open Working Set object",
                 options=[
                     f"{_safe_text(item.get('object_type'), '')}: {_safe_text(item.get('display_name'), '')}"
-                    for item in pinned[:10]
+                    for item in working_set[:10]
                 ],
                 key="atlas_overview_pinned_open",
             )
-            selected = pinned[:10][
+            selected = working_set[:10][
                 [
                     f"{_safe_text(item.get('object_type'), '')}: {_safe_text(item.get('display_name'), '')}"
-                    for item in pinned[:10]
+                    for item in working_set[:10]
                 ].index(target)
             ]
-            open_col, unpin_col = st.columns(2)
+            open_col, remove_col, up_col, down_col = st.columns(4)
             if open_col.button(
-                "Open Pinned",
+                "Open",
                 key="atlas_overview_open_pinned",
                 use_container_width=True,
             ):
@@ -6221,19 +6495,51 @@ def _render_overview_page(
                     dict(selected.get("selection_data") or {}),
                 )
                 st.rerun()
-            if unpin_col.button(
-                "Unpin",
+            if remove_col.button(
+                "Remove",
                 key="atlas_overview_unpin_selected",
                 use_container_width=True,
             ):
                 _toggle_pin_reference(st, selected, should_pin=False)
                 st.rerun()
+            if up_col.button(
+                "Move Up",
+                key="atlas_overview_working_set_up",
+                use_container_width=True,
+            ):
+                _move_working_set_item(
+                    st,
+                    object_id=_safe_text(selected.get("object_id"), ""),
+                    object_type=_safe_text(selected.get("object_type"), ""),
+                    direction=-1,
+                )
+                st.rerun()
+            if down_col.button(
+                "Move Down",
+                key="atlas_overview_working_set_down",
+                use_container_width=True,
+            ):
+                _move_working_set_item(
+                    st,
+                    object_id=_safe_text(selected.get("object_id"), ""),
+                    object_type=_safe_text(selected.get("object_type"), ""),
+                    direction=1,
+                )
+                st.rerun()
+
+            if st.button(
+                "Clear Working Set",
+                key="atlas_overview_clear_working_set",
+                use_container_width=True,
+            ):
+                st.session_state["atlas_pinned_objects"] = []
+                st.rerun()
         else:
             _render_guided_empty_state(
                 st,
-                why_empty="No pinned objects yet.",
-                action_to_populate="Pin important objects from equipment, drawing, or specification detail headers.",
-                next_location="Open object detail pages and use Pin Object.",
+                why_empty="Working Set is empty.",
+                action_to_populate="Add important objects from search or object detail pages.",
+                next_location="Use Add to Working Set on object cards and detail headers.",
             )
 
     st.markdown("### Project Review Checklist")
@@ -7263,182 +7569,456 @@ def _master_library_rows(context: dict[str, Any] | None) -> list[dict[str, Any]]
     return rows
 
 
-def _global_search_entries(context: dict[str, Any] | None) -> list[dict[str, Any]]:
-    cached = _context_cached(context, "global_search_entries")
-    if isinstance(cached, list):
-        return cached
+def _search_match_candidates(reference: dict[str, Any]) -> tuple[str, str, str, str]:
+    object_id = _safe_text(reference.get("object_id"), "").lower()
+    name = _safe_text(reference.get("display_name"), "").lower()
+    secondary = _safe_text(reference.get("secondary_label"), "").lower()
+    extra = " ".join(
+        _safe_text(item, "")
+        for item in list(reference.get("match_fields") or [])
+        if _safe_text(item, "")
+    ).lower()
+    return object_id, name, secondary, extra
+
+
+def _search_rank(
+    reference: dict[str, Any],
+    query: str,
+    *,
+    project_open: bool,
+) -> tuple[int, int, str, str]:
+    normalized_query = query.strip().lower()
+    object_id, name, secondary, extra = _search_match_candidates(reference)
+    exact_fields = {item for item in [object_id, name] + extra.split(" ") if item}
+
+    tier = 9
+    if normalized_query and normalized_query == object_id:
+        tier = 0
+    elif normalized_query and normalized_query == name:
+        tier = 1
+    elif normalized_query and normalized_query in exact_fields:
+        tier = 2
+    elif normalized_query and any(
+        value.startswith(normalized_query)
+        for value in [object_id, name, secondary, extra]
+        if value
+    ):
+        tier = 3
+    elif normalized_query and normalized_query in " ".join(
+        [object_id, name, secondary, extra]
+    ):
+        tier = 4
+
+    scope = _safe_text(reference.get("scope"), "application")
+    scope_penalty = 0
+    if project_open and scope != "project" and tier > 2:
+        scope_penalty = 1
+
+    return (
+        tier,
+        scope_penalty,
+        _safe_text(reference.get("object_type"), "Object"),
+        _safe_text(reference.get("display_name"), "Object"),
+    )
+
+
+def _filter_search_results(
+    references: list[dict[str, Any]],
+    *,
+    query: str,
+    selected_types: list[str],
+    project_open: bool,
+) -> list[dict[str, Any]]:
+    filtered = [
+        item
+        for item in references
+        if (
+            not selected_types
+            or _safe_text(item.get("object_type"), "") in selected_types
+        )
+    ]
+    if query:
+        filtered = [
+            item
+            for item in filtered
+            if _search_rank(item, query, project_open=project_open)[0] <= 4
+        ]
+    filtered.sort(
+        key=lambda item: _search_rank(
+            item,
+            query,
+            project_open=project_open,
+        )
+    )
+    return filtered
+
+
+def _group_search_results(
+    references: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    grouped_refs: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for reference in references:
+        grouped_refs[_safe_text(reference.get("object_type"), "Object")].append(
+            reference
+        )
+    return grouped_refs
+
+
+def _application_search_entries(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+) -> list[dict[str, Any]]:
+    references: list[dict[str, Any]] = []
+    project_rows = _project_library_rows(
+        workspace_service,
+        include_archived=True,
+        limit=500,
+    )
+    for item in project_rows:
+        record = item["record"]
+        data = {
+            "workspace_id": record.workspace_id,
+            "project_name": record.project.name,
+            "customer": _safe_text(item.get("customer"), "n/a"),
+            "status": _safe_text(item.get("review_status"), "Needs Review"),
+        }
+        reference = _build_object_reference(
+            kind="project_record",
+            data=data,
+            project_id=record.workspace_id,
+            route="Overview",
+            relationship_count=0,
+            warning_count=0,
+        )
+        reference["project_name"] = record.project.name
+        reference["scope"] = "application"
+        reference["match_fields"] = [
+            record.workspace_id,
+            record.project.name,
+            _safe_text(item.get("customer"), ""),
+        ]
+        references.append(reference)
+
+    manufacturer_rows = [item.to_dict() for item in build_manufacturer_seed_data()]
+    for item in manufacturer_rows:
+        data = {
+            "manufacturer": _safe_text(item.get("name"), "Manufacturer"),
+            "status": "active" if bool(item.get("active", True)) else "inactive",
+            "discipline": _safe_text(item.get("discipline"), "n/a"),
+        }
+        reference = _build_object_reference(
+            kind="manufacturer",
+            data=data,
+            project_id="application",
+            route="Knowledge",
+            relationship_count=0,
+            warning_count=0,
+        )
+        reference["project_name"] = "Knowledge"
+        reference["scope"] = "application"
+        reference["match_fields"] = [
+            _safe_text(item.get("name"), ""),
+            _safe_text(item.get("discipline"), ""),
+        ]
+        references.append(reference)
+
+    vendor_rows = [item.to_dict() for item in build_vendor_seed_data()]
+    for item in vendor_rows:
+        data = {
+            "vendor": _safe_text(item.get("name"), "Vendor"),
+            "vendor_type": _safe_text(item.get("vendor_type"), "n/a"),
+            "status": _safe_text(item.get("status"), "n/a"),
+        }
+        reference = _build_object_reference(
+            kind="vendor",
+            data=data,
+            project_id="application",
+            route="Knowledge",
+            relationship_count=0,
+            warning_count=0,
+        )
+        reference["project_name"] = "Knowledge"
+        reference["scope"] = "application"
+        reference["match_fields"] = [
+            _safe_text(item.get("name"), ""),
+            _safe_text(item.get("vendor_type"), ""),
+        ]
+        references.append(reference)
+
+    customers = sorted(
+        {_safe_text(item.get("customer"), "n/a") for item in project_rows}
+    )
+    for customer in customers:
+        data = {
+            "customer": customer,
+            "portfolio": f"projects {sum(1 for row in project_rows if _safe_text(row.get('customer'), '') == customer)}",
+            "status": "indexed",
+        }
+        reference = _build_object_reference(
+            kind="customer",
+            data=data,
+            project_id="application",
+            route="Knowledge",
+            relationship_count=0,
+            warning_count=0,
+        )
+        reference["project_name"] = "Knowledge"
+        reference["scope"] = "application"
+        reference["match_fields"] = [customer]
+        references.append(reference)
+
+    product_rows: list[dict[str, Any]] = []
+    for item in project_rows:
+        project_record = item["record"]
+        try:
+            artifact = workspace_service.manager.review_repository.load_artifact(
+                project_record.workspace_id,
+                "bid_package_review",
+            )
+        except Exception:
+            artifact = None
+        if not isinstance(artifact, dict):
+            continue
+        equipment_rows = list(artifact.get("equipment") or [])
+        if not equipment_rows:
+            continue
+        service = MasterLibraryService()
+        service.import_workspace_equipment(equipment_rows)
+        product_rows.extend(service.explorer_rows())
+
+    deduped_products: dict[str, dict[str, Any]] = {}
+    for row in product_rows:
+        key = _safe_text(row.get("product_id"), "")
+        if key and key not in deduped_products:
+            deduped_products[key] = row
+
+    for item in list(deduped_products.values()):
+        reference = _build_object_reference(
+            kind="master_product",
+            data=item,
+            project_id="application",
+            route="Knowledge",
+            relationship_count=0,
+            warning_count=0,
+        )
+        reference["project_name"] = "Knowledge"
+        reference["scope"] = "application"
+        reference["match_fields"] = [
+            _safe_text(item.get("product_id"), ""),
+            _safe_text(item.get("model"), ""),
+            _safe_text(item.get("manufacturer"), ""),
+            _safe_text(item.get("category"), ""),
+        ]
+        references.append(reference)
+
+    library_state = _price_list_library_state(st)
+    for item in list(library_state.get("uploaded_price_lists") or []):
+        data = {
+            "source_file": _safe_text(item.get("source_file"), "Price List"),
+            "manufacturer": _safe_text(item.get("manufacturer"), ""),
+            "vendor": _safe_text(item.get("vendor"), ""),
+            "status": _safe_text(item.get("status"), "indexed"),
+            "confidence": item.get("confidence", "n/a"),
+        }
+        reference = _build_object_reference(
+            kind="price_list",
+            data=data,
+            project_id="application",
+            route="Knowledge",
+            relationship_count=0,
+            warning_count=int(item.get("unmatched_rows", 0) or 0),
+        )
+        reference["project_name"] = "Knowledge"
+        reference["scope"] = "application"
+        reference["match_fields"] = [
+            _safe_text(item.get("source_file"), ""),
+            _safe_text(item.get("manufacturer"), ""),
+            _safe_text(item.get("vendor"), ""),
+        ]
+        references.append(reference)
+
+    return references
+
+
+def _global_search_entries(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord | None,
+    context: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = _application_search_entries(st, workspace_service)
+
+    if record is None or context is None:
+        return entries
 
     objects = _workspace_objects(context)
     resolver_result = _build_engineering_resolver(record=None, context=context)
-    entries: list[dict[str, Any]] = []
 
+    def _append_project_reference(
+        *,
+        kind: str,
+        data: dict[str, Any],
+        route: str,
+        warning_count: int = 0,
+        match_fields: list[str] | None = None,
+    ) -> None:
+        reference = _build_object_reference(
+            kind=kind,
+            data=data,
+            project_id=record.project.project_id,
+            route=route,
+            relationship_count=0,
+            warning_count=warning_count,
+        )
+        reference["project_name"] = record.project.name
+        reference["scope"] = "project"
+        reference["match_fields"] = list(match_fields or [])
+        entries.append(reference)
+
+    for item in objects["equipment"]:
+        _append_project_reference(
+            kind="equipment",
+            data=item,
+            route="Equipment",
+            warning_count=len(list(item.get("warnings") or [])),
+            match_fields=[
+                _safe_text(item.get("equipment_id"), ""),
+                _safe_text(item.get("manufacturer"), ""),
+                _safe_text(item.get("model"), ""),
+            ],
+        )
     for item in objects["drawings"]:
-        entries.append(
-            {
-                "kind": "Drawing",
-                "name": _safe_text(item.get("drawing_number"), "Drawing"),
-                "subtitle": _safe_text(item.get("title"), ""),
-                "page": "Drawing Explorer",
-                "selection_kind": "drawing",
-                "data": item,
-            }
+        _append_project_reference(
+            kind="drawing",
+            data=item,
+            route="Drawings",
+            warning_count=len(list(item.get("warnings") or [])),
+            match_fields=[
+                _safe_text(item.get("drawing_number"), ""),
+                _safe_text(item.get("title"), ""),
+            ],
         )
     for item in objects["specifications"]:
-        entries.append(
-            {
-                "kind": "Specification",
-                "name": _safe_text(item.get("section"), "Specification"),
-                "subtitle": _safe_text(item.get("title"), ""),
-                "page": "Specification Explorer",
-                "selection_kind": "specification",
-                "data": item,
-            }
-        )
-    for item in objects["equipment"]:
-        entries.append(
-            {
-                "kind": "Equipment",
-                "name": _safe_text(item.get("equipment_id"), "Equipment"),
-                "subtitle": f"{_safe_text(item.get('manufacturer'), '')} {_safe_text(item.get('model'), '')}".strip(),
-                "page": "Equipment",
-                "selection_kind": "equipment",
-                "data": item,
-            }
+        _append_project_reference(
+            kind="specification",
+            data=item,
+            route="Specifications",
+            warning_count=0,
+            match_fields=[
+                _safe_text(item.get("section"), ""),
+                _safe_text(item.get("title"), ""),
+            ],
         )
     for item in objects["systems"]:
-        entries.append(
-            {
-                "kind": "System",
-                "name": _safe_text(item.get("system"), "System"),
-                "subtitle": f"equipment {item.get('equipment_count', 0)}",
-                "page": "Systems",
-                "selection_kind": "system",
-                "data": item,
-            }
+        _append_project_reference(
+            kind="system",
+            data=item,
+            route="Systems",
+            match_fields=[_safe_text(item.get("system"), "")],
         )
     for item in objects["rooms"]:
-        entries.append(
-            {
-                "kind": "Room",
-                "name": _safe_text(item.get("room"), "Room"),
-                "subtitle": "equipment location",
-                "page": "Equipment",
-                "selection_kind": "room",
-                "data": item,
-            }
-        )
-    for item in objects["manufacturers"]:
-        entries.append(
-            {
-                "kind": "Manufacturer",
-                "name": _safe_text(item.get("manufacturer"), "Manufacturer"),
-                "subtitle": "equipment manufacturer",
-                "page": "Equipment",
-                "selection_kind": "manufacturer",
-                "data": item,
-            }
-        )
-    for item in objects["models"]:
-        entries.append(
-            {
-                "kind": "Model",
-                "name": _safe_text(item.get("model"), "Model"),
-                "subtitle": "equipment model",
-                "page": "Equipment",
-                "selection_kind": "model",
-                "data": item,
-            }
-        )
-    for item in _master_library_rows(context):
-        entries.append(
-            {
-                "kind": "Master Product",
-                "name": _safe_text(item.get("model"), "Product"),
-                "subtitle": (
-                    f"{_safe_text(item.get('manufacturer'), '')}"
-                    f" · {_safe_text(item.get('category'), 'other')}"
-                ),
-                "page": "Master Library Explorer",
-                "selection_kind": "master_product",
-                "data": item,
-            }
-        )
-    for item in objects["rfis"]:
-        entries.append(
-            {
-                "kind": "RFI",
-                "name": _safe_text(
-                    item.get("rfi_id"), _safe_text(item.get("title"), "RFI")
-                ),
-                "subtitle": _safe_text(item.get("title"), ""),
-                "page": "RFI Candidates",
-                "selection_kind": "rfi",
-                "data": item,
-            }
+        _append_project_reference(
+            kind="room",
+            data=item,
+            route="Equipment",
+            match_fields=[
+                _safe_text(item.get("room"), ""),
+                _safe_text(item.get("room_or_area"), ""),
+            ],
         )
     for item in objects["coordination_findings"]:
-        entries.append(
-            {
-                "kind": "Coordination Finding",
-                "name": _safe_text(item.get("title"), "Coordination Finding"),
-                "subtitle": _safe_text(item.get("category"), ""),
-                "page": "Coordination Review",
-                "selection_kind": "project",
-                "data": item,
-            }
+        data = {
+            "title": _safe_text(item.get("title"), "Risk"),
+            "status": _safe_text(item.get("severity"), "needs review"),
+            "category": _safe_text(item.get("category"), ""),
+        }
+        _append_project_reference(
+            kind="risk",
+            data=data,
+            route="Scope & Risk",
+            warning_count=(
+                1
+                if _safe_text(item.get("severity"), "").lower() in {"high", "critical"}
+                else 0
+            ),
+            match_fields=[
+                _safe_text(item.get("title"), ""),
+                _safe_text(item.get("category"), ""),
+                _safe_text(item.get("severity"), ""),
+            ],
         )
-    user_notebook_entries = list(
-        _context_cached(context, "notebook_user_entries") or []
-    )
-    for item in user_notebook_entries:
-        entries.append(
-            {
-                "kind": "Notebook Entry",
-                "name": _safe_text(item.get("title"), "Notebook Entry"),
-                "subtitle": _safe_text(item.get("entry_type"), ""),
-                "page": "Engineering Notebook",
-                "selection_kind": "notebook_entry",
-                "data": item,
-            }
+    for item in objects["rfis"]:
+        _append_project_reference(
+            kind="rfi",
+            data=item,
+            route="Scope & Risk",
+            match_fields=[
+                _safe_text(item.get("rfi_id"), ""),
+                _safe_text(item.get("title"), ""),
+            ],
         )
-    if resolver_result is not None:
-        for item in list(getattr(resolver_result, "resolved_objects", []) or []):
-            item_dict = item.to_dict()
-            entries.append(
-                {
-                    "kind": "Resolved Object",
-                    "name": _safe_text(item_dict.get("object_id"), "Resolved"),
-                    "subtitle": _safe_text(item_dict.get("object_type"), "object"),
-                    "page": "Engineering Workbench",
-                    "selection_kind": "resolved",
-                    "data": item_dict,
-                }
-            )
-        for item in list(getattr(resolver_result, "conflicts", []) or []):
-            item_dict = item.to_dict()
-            entries.append(
-                {
-                    "kind": "Resolver Conflict",
-                    "name": _safe_text(item_dict.get("conflict_id"), "Conflict"),
-                    "subtitle": _safe_text(item_dict.get("message"), ""),
-                    "page": "Resolver Conflict Center",
-                    "selection_kind": "resolver_conflict",
-                    "data": item_dict,
-                }
-            )
     for item in objects["evidence"]:
-        entries.append(
-            {
-                "kind": "Evidence",
-                "name": _safe_text(item.get("source_file"), "Evidence"),
-                "subtitle": f"page {item.get('page', 'n/a')}",
-                "page": "Evidence",
-                "selection_kind": "evidence",
-                "data": item,
-            }
+        _append_project_reference(
+            kind="evidence",
+            data=item,
+            route="Evidence",
+            match_fields=[
+                _safe_text(item.get("source_file"), ""),
+                _safe_text(item.get("excerpt"), ""),
+            ],
         )
 
-    _set_context_cached(context, "global_search_entries", entries)
+    for item in list(st.session_state.get("atlas_notebook_entries") or []):
+        _append_project_reference(
+            kind="notebook_entry",
+            data=item,
+            route="Notebook",
+            match_fields=[
+                _safe_text(item.get("title"), ""),
+                _safe_text(item.get("entry_type"), ""),
+                _safe_text(item.get("summary"), ""),
+            ],
+        )
+
+    if resolver_result is not None:
+        for item in list(getattr(resolver_result, "conflicts", []) or []):
+            item_dict = item.to_dict()
+            _append_project_reference(
+                kind="risk",
+                data={
+                    "title": _safe_text(item_dict.get("message"), "Resolver Conflict"),
+                    "status": "needs review",
+                    "category": "resolver",
+                },
+                route="Relationships",
+                warning_count=1,
+                match_fields=[
+                    _safe_text(item_dict.get("conflict_id"), ""),
+                    _safe_text(item_dict.get("message"), ""),
+                ],
+            )
+
+    graph = _build_knowledge_graph(record, context)
+    for edge in list(graph.get("edges") or []):
+        rel_type = _safe_text(edge.get("relationship"), "relationship")
+        source = _node_label(graph, _safe_text(edge.get("source"), "source"))
+        target = _node_label(graph, _safe_text(edge.get("target"), "target"))
+        _append_project_reference(
+            kind="risk",
+            data={
+                "title": f"{source} -> {target}",
+                "status": "linked",
+                "category": rel_type,
+            },
+            route="Relationships",
+            match_fields=[
+                source,
+                target,
+                rel_type,
+                _safe_text(edge.get("source_evidence"), ""),
+            ],
+        )
+
     return entries
 
 
@@ -11456,129 +12036,62 @@ def _render_engineering_resolver_page(
 
 def _render_global_search_panel(
     st: Any,
-    record: ProjectWorkspaceRecord,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> None:
     query = str(st.session_state.get("atlas_global_search") or "").strip()
-    if not query:
+    is_open = bool(st.session_state.get("atlas_global_search_open", False))
+    if not is_open and not query:
         return
 
-    entries = _global_search_entries(context)
-    kind_options = sorted(
-        {str(item.get("kind") or "") for item in entries if item.get("kind")}
+    references = _global_search_entries(st, workspace_service, record, context)
+    object_types = sorted(
+        {
+            _safe_text(item.get("object_type"), "")
+            for item in references
+            if item.get("object_type")
+        }
     )
+
+    if query:
+        _record_recent_search_query(st, query)
 
     with st.expander("Search Filters", expanded=False):
         selected_types = st.multiselect(
             "Type filters",
-            options=kind_options,
+            options=object_types,
             default=[],
             key="atlas_search_type_filters",
-            help="Filter by object type (drawing, specification, room, system, manufacturer, model, evidence, etc.).",
-        )
-        relationship_search = st.checkbox(
-            "Enable relationship search",
-            key="atlas_relationship_search_enabled",
-            value=False,
+            help="Filter by object type.",
         )
 
-    graph = (
-        _build_knowledge_graph(record=record, context=context)
-        if context
-        else {"nodes": [], "edges": []}
+    filtered = _filter_search_results(
+        references,
+        query=query,
+        selected_types=list(selected_types),
+        project_open=record is not None,
     )
+    grouped_refs = _group_search_results(filtered)
 
-    def _score(item: dict[str, Any]) -> int:
-        name = _safe_text(item.get("name"), "").lower()
-        subtitle = _safe_text(item.get("subtitle"), "").lower()
-        q = query.lower()
-        if name == q:
-            return 0
-        if name.startswith(q):
-            return 1
-        if q in name:
-            return 2
-        if subtitle == q:
-            return 3
-        if q in subtitle:
-            return 4
-        if _in_text(item.get("kind"), query):
-            return 5
-        return 9
-
-    filtered = []
-    for item in entries:
-        if selected_types and str(item.get("kind")) not in selected_types:
-            continue
-
-        text_match = (
-            _in_text(item.get("name"), query)
-            or _in_text(item.get("subtitle"), query)
-            or _in_text(item.get("kind"), query)
-        )
-
-        if relationship_search and not text_match:
-            node_label = _safe_text(item.get("name"), "")
-            node_matches = [
-                node
-                for node in graph.get("nodes", [])
-                if _in_text(node.get("label"), node_label)
-            ]
-            for node in node_matches:
-                relationships = _node_relationships(
-                    graph, _safe_text(node.get("id"), "")
-                )
-                related_text = " ".join(
-                    [
-                        _safe_text(edge.get("relationship"), "")
-                        + " "
-                        + _safe_text(edge.get("source_evidence"), "")
-                        for edge in relationships.get("incoming", [])
-                        + relationships.get("outgoing", [])
-                    ]
-                )
-                if _in_text(related_text, query):
-                    text_match = True
-                    break
-
-        if text_match:
-            filtered.append(item)
-
-    filtered.sort(key=_score)
-
-    references: list[dict[str, Any]] = []
-    for item in filtered:
-        data = dict(item.get("data") or {})
-        kind = _safe_text(item.get("selection_kind"), "project")
-        warnings = list(data.get("warnings") or [])
-        references.append(
-            _build_object_reference(
-                kind=kind,
-                data=data,
-                project_id=record.project.project_id,
-                route=_safe_text(item.get("page"), _selection_route(kind)),
-                relationship_count=0,
-                warning_count=len(warnings),
-            )
-        )
-
-    grouped_refs: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for reference in references:
-        grouped_refs[_safe_text(reference.get("object_type"), "Object")].append(
-            reference
-        )
-
-    with st.expander(f"Global Search Results ({len(references)})", expanded=True):
+    with st.expander(f"Global Search Results ({len(filtered)})", expanded=True):
         st.caption(
-            "Use arrow keys in the result selector for keyboard navigation, then press Enter."
+            "Ranking: exact identifier, exact name, exact model/drawing/spec number, prefix, then partial matches."
         )
-        if not references:
+        if not filtered:
             _render_guided_empty_state(
                 st,
-                why_empty="No search results match the current query.",
-                action_to_populate="Try a broader term or disable restrictive type filters.",
-                next_location="Use project object search across equipment, drawings, specifications, systems, risks, RFIs, and evidence.",
+                why_empty=f"No search results match \"{query or 'current filters'}\".",
+                action_to_populate="Try broader terms, remove type filters, or search by identifier/model/drawing/spec number.",
+                next_location="Atlas searched projects, knowledge objects, equipment, drawings, specifications, systems, rooms, risks, RFIs, evidence, notebook entries, and relationships.",
             )
+            if st.button(
+                "Clear Search Filters",
+                key="atlas_search_clear_filters",
+                use_container_width=True,
+            ):
+                st.session_state["atlas_search_type_filters"] = []
+                st.rerun()
             return
 
         for object_type in sorted(grouped_refs.keys()):
@@ -11588,11 +12101,13 @@ def _render_global_search_panel(
                     {
                         "Display Name": _safe_text(item.get("display_name"), "Object"),
                         "Type": _safe_text(item.get("object_type"), "Object"),
+                        "Secondary": _safe_text(item.get("secondary_label"), "n/a"),
+                        "Project": _safe_text(item.get("project_name"), "n/a"),
                         "Status": _safe_text(item.get("status"), "n/a"),
-                        "Project": _safe_text(item.get("project_id"), "n/a"),
                         "Confidence": _safe_text(item.get("confidence"), "n/a"),
+                        "Warnings": int(item.get("warning_count", 0) or 0),
                     }
-                    for item in grouped_refs[object_type][:20]
+                    for item in grouped_refs[object_type][:15]
                 ],
                 use_container_width=True,
                 hide_index=True,
@@ -11600,12 +12115,12 @@ def _render_global_search_panel(
 
         labels = [
             f"{_safe_text(item.get('object_type'), 'Object')}: {_safe_text(item.get('display_name'), 'Object')} | {_safe_text(item.get('secondary_label'), '')}"
-            for item in references
+            for item in filtered
         ]
         selected_label = st.selectbox(
             "Results", options=labels, key="atlas_search_result"
         )
-        selected = references[labels.index(selected_label)]
+        selected = filtered[labels.index(selected_label)]
 
         st.markdown(
             "<div class='atlas-object-card'>"
@@ -11615,31 +12130,91 @@ def _render_global_search_panel(
             unsafe_allow_html=True,
         )
 
-        action_cols = st.columns(2)
+        action_cols = st.columns(3)
         if action_cols[0].button(
             "Open Result",
             key="atlas_open_search_result",
             type="primary",
             use_container_width=True,
         ):
-            st.session_state["atlas_active_page"] = _safe_text(
-                selected.get("route"),
-                "Overview",
-            )
-            _set_context_selection(
-                st,
-                _safe_text(selected.get("selection_kind"), "project"),
-                dict(selected.get("selection_data") or {}),
-            )
-            st.rerun()
+            _open_search_reference(st, workspace_service, selected)
 
         pinned = _is_reference_pinned(st, selected)
         if action_cols[1].button(
-            "Unpin" if pinned else "Pin",
+            "Remove from Working Set" if pinned else "Add to Working Set",
             key="atlas_search_pin_result",
             use_container_width=True,
         ):
             _toggle_pin_reference(st, selected, should_pin=not pinned)
+            st.rerun()
+
+        if action_cols[2].button(
+            "Clear Working Set",
+            key="atlas_search_clear_working_set",
+            use_container_width=True,
+        ):
+            st.session_state["atlas_pinned_objects"] = []
+            st.rerun()
+
+        st.markdown("#### Working Set")
+        st.caption("Keep important project objects close while you review the project.")
+        working_set = _working_set(st)
+        if working_set:
+            st.dataframe(
+                [
+                    {
+                        "Object": _safe_text(item.get("display_name"), "Object"),
+                        "Type": _safe_text(item.get("object_type"), "n/a"),
+                        "Project": _safe_text(item.get("project_name"), "n/a"),
+                    }
+                    for item in working_set[:12]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("Working Set is empty.")
+
+        st.markdown("#### Recent Searches")
+        recent_queries = list(st.session_state.get("atlas_recent_search_queries") or [])
+        recent_opened = list(st.session_state.get("atlas_recent_opened_results") or [])
+        if recent_queries:
+            st.dataframe(
+                [{"Query": item} for item in recent_queries[:8]],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No recent queries.")
+
+        if recent_opened:
+            st.dataframe(
+                [
+                    {
+                        "Object": _safe_text(item.get("display_name"), "Object"),
+                        "Type": _safe_text(item.get("object_type"), "n/a"),
+                        "Opened": _safe_text(item.get("last_opened_at"), "n/a"),
+                    }
+                    for item in recent_opened[:8]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        clear_cols = st.columns(2)
+        if clear_cols[0].button(
+            "Clear Recent Queries",
+            key="atlas_clear_recent_queries",
+            use_container_width=True,
+        ):
+            st.session_state["atlas_recent_search_queries"] = []
+            st.rerun()
+        if clear_cols[1].button(
+            "Clear Recently Opened",
+            key="atlas_clear_recent_opened",
+            use_container_width=True,
+        ):
+            st.session_state["atlas_recent_opened_results"] = []
             st.rerun()
 
         st.markdown("#### Recently Viewed")
@@ -11650,7 +12225,8 @@ def _render_global_search_panel(
                     {
                         "Object": _safe_text(item.get("display_name"), "Object"),
                         "Type": _safe_text(item.get("object_type"), "n/a"),
-                        "Route": _safe_text(item.get("route"), "Overview"),
+                        "Project": _safe_text(item.get("project_name"), "n/a"),
+                        "Last Viewed": _safe_text(item.get("last_viewed_at"), "n/a"),
                     }
                     for item in recent[:8]
                 ],
@@ -15636,6 +16212,13 @@ def _render_shell(
     st.markdown(
         f"<div class='atlas-breadcrumb'>{_breadcrumb(record, current_page)}</div>",
         unsafe_allow_html=True,
+    )
+
+    _render_global_search_panel(
+        st,
+        workspace_service,
+        record,
+        context,
     )
 
     layout_mode = st.session_state.get("atlas_layout_mode", "Desktop")

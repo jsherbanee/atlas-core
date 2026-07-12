@@ -139,6 +139,9 @@ Navigation should always help answer four questions:
 Object navigation should feel model-first rather than page-first.
 Core object types (equipment, drawings, specifications, systems, rooms, risks, RFIs, and evidence) should expose a consistent object identity pattern and deterministic cross-object movement from any workspace where they appear.
 
+Global object discovery should be persistent and immediate.
+Search should remain available in the header across application and project workspaces so users can move directly to objects without page-by-page navigation.
+
 Navigation should be persistent, require minimal clicks, and maintain a predictable hierarchy. The interface should feel like a workspace, not a maze.
 
 Project Workspace pages should follow an action-first hierarchy:
@@ -210,7 +213,10 @@ Atlas components should be optimized for engineering clarity.
 - Navigation should remain persistent and predictable.
 - Search should help users move from object discovery to decision context.
 - Search should support object-type grouping, recent context recall, and fast object handoff into related workspaces.
+- Search results should show enough context to reduce ambiguity: display name, object type, secondary label, project context, status, confidence, and warnings where applicable.
+- Search empty states should explain what was searched and provide a clear next action.
 - Contextual object detail should expose canonical values, supporting evidence, and uncertainty through inline or on-demand detail surfaces.
+- Working Set should remain compact and purposeful: a small, persistent set of active review objects, not a permanent third-column panel.
 - Object workspaces should use one primary object detail view and avoid repeating the same properties across multiple simultaneous tables/panels.
 - Empty states should explain why data is empty, how to populate it, and what the next step is.
 - Detailed diagnostics should be discoverable through drill-down, not forced into the default page view.

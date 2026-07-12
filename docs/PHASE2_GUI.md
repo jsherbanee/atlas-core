@@ -13,6 +13,8 @@ Atlas Workspace UI Sprint 4 adds repository-first project access, a scoped appli
 
 Atlas Workspace UI Sprint 6 adds an object navigation layer that connects equipment, drawings, specifications, systems, rooms, risks, RFIs, and evidence through shared object headers, references/referenced-by groups, relationship explorer filters, and quick cross-object navigation actions.
 
+Atlas Workspace UI Sprint 7 adds persistent Global Object Search and a project-scoped Working Set for active review objects.
+
 - Status bar
 
 The shell remains visible while page content changes.
@@ -187,6 +189,26 @@ Object navigation behavior in Project Workspace:
 - global search groups object results by type and supports open and pin/unpin actions
 - overview surfaces Recently Viewed and Pinned object lists for fast context return
 - Relationship Explorer provides relationship-type and connected-object-type filters with connected object cards
+
+Global Search behavior:
+- persistent header search control visible in application and project workspaces
+- search scope includes application objects (projects, manufacturers, vendors, customers, products, price lists) and project objects (equipment, drawings, specifications, systems, rooms, risks/findings, RFIs, evidence, notebook entries, relationships)
+- deterministic ranking: exact identifier, exact name, exact model/drawing/spec number, prefix, then partial text
+- when a project is open, project-scoped matches rank ahead of application-scoped partial matches
+- results are grouped by object type and display name/type/secondary label/project/status/confidence/warnings
+- selecting a result opens the target object or workspace route and preserves object context for breadcrumbs
+- keyboard hint is always visible and supports Cmd+K on macOS / Ctrl+K on Windows/Linux where available; Esc closes active search panel
+
+Search memory:
+- recent search queries are persisted locally in workspace state
+- recently opened search results are persisted locally in workspace state
+- users can clear recent query and recent-opened history
+
+Working Set behavior:
+- replaces pinned object language with Working Set
+- purpose statement: Keep important project objects close while you review the project.
+- available in Project Overview, Global Search panel, object detail headers, and compact header history popover
+- supports add/remove/open/clear and lightweight reordering controls
 
 Project Settings:
 - Project Metadata

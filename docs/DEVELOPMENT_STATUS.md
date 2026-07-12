@@ -20,6 +20,7 @@ Sprint 3 UX delivery added guided project review progression, explicit review st
 Sprint 4 UI refinement adds repository-backed Open Existing Project, a stronger Projects library workflow, application-wide Knowledge scope, compact active-project identity, concise breadcrumbs, and a two-column Project Workspace layout (no persistent third context column).
 Sprint 5 introduces an Equipment Object Workspace that treats equipment as first-class engineering objects with deterministic detail, relationship navigation, evidence, and recommended actions.
 Sprint 6 implements the Atlas object navigation layer, adding shared object navigation patterns across Drawings, Specifications, Equipment, global object search, and Relationship Explorer.
+Sprint 7 delivers persistent Global Object Search and Working Set workflows, including deterministic ranking, grouped result presentation, local search history, and object-context breadcrumbs.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
@@ -51,7 +52,10 @@ Current workspace behavior:
 - Equipment Workspace now provides object-first equipment investigation from canonical BOM lines with summary, list/detail workflow, relationship navigation, evidence/warnings, and deterministic recommended actions.
 - Drawings, Specifications, and Equipment now use shared object headers plus deterministic References/Referenced By relationship groups for connected-object traversal.
 - Relationship Explorer now supports relationship-type filtering, connected-object-type filtering, connected object cards, and richer edge context (originating document and warnings).
-- Global object search now groups by object type and supports direct open plus pin/unpin actions; Project Overview exposes recently viewed and pinned objects.
+- Global object search is now persistent in the header, spans application and project object scopes, and uses deterministic ranking with project-first preference for non-exact matches.
+- Search now persists recent queries and recently opened results in local workspace state.
+- Pinned object UX is renamed to Working Set across object detail and search workflows, with add/remove/open/clear and compact reorder actions.
+- Project Overview and header history now surface recently viewed objects and Working Set for fast return to active review objects.
 - BOM Review now includes an Open Equipment Detail action for selected BOM rows while preserving BOM table reconciliation behavior.
 - Drawing and Specification workspaces now expose referenced equipment as human-readable objects that can open Equipment Workspace.
 - Project Workspace now includes a non-blocking guided review sequence with statuses (not started/ready/needs review/blocked/complete).
