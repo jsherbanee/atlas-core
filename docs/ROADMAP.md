@@ -27,6 +27,7 @@ Milestones describe customer-visible product capability.
 - Symbol libraries
 - Title block intelligence
 - Future OCR integration points
+- Commercial Knowledge Foundation with immutable price versioning
 
 ### Beta 1.0
 - Internal production-ready
@@ -68,6 +69,9 @@ Implemented in current baseline candidate:
 - Plan review readiness scoring
 - Estimator brief enhancements
 - Revision comparison engine
+- Commercial knowledge model (vendor offerings, price sheets, immutable versions, and price records)
+- Deterministic price version comparison and product change reporting
+- Commercial freshness and lifecycle tracking for price recency and missing-from-latest detection
 
 Remaining Phase 2 refinements:
 - PDF ingestion and indexing robustness

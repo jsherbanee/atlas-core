@@ -31,6 +31,15 @@ Product Resolution consumes registry data to classify candidates:
 
 This logic is deterministic and explainable through explicit relationship checks.
 
+## Commercial Knowledge Usage
+Commercial knowledge uses manufacturer identity as the top-level anchor for immutable price-sheet history.
+
+Registry identity supports deterministic grouping for:
+
+- manufacturer-specific price sheets
+- cross-version product presence/missing detection
+- commercial freshness and coverage reporting
+
 ## Source Files
 - `atlas_core/registry/manufacturer_registry.py`
 - `atlas_core/sample_data/manufacturer_seed.py`

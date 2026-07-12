@@ -21,6 +21,7 @@ The engine currently prioritizes:
 - Drawing/spec/schedule intelligence
 - Scope reconciliation and risk surfacing
 - Deterministic product resolution between engineering scope and estimate readiness
+- Commercial knowledge foundation with immutable price sheet version history
 - Engineering assumptions and RFI candidate generation
 - Estimator brief/final review outputs
 - Exportable data contracts (CSV, JSON, Markdown)
@@ -30,6 +31,13 @@ Product resolution posture:
 - no pricing logic
 - no procurement logic
 - no quote generation
+
+Commercial knowledge posture:
+- immutable commercial reference history for deterministic readiness
+- every price-sheet import is permanent historical record
+- no procurement execution
+- no quote generation
+- no purchase-order workflow
 
 ## Deferred Future Phases
 The following areas are intentionally deferred until core bid intelligence is fully complete:

@@ -24,6 +24,7 @@ Sprint 7 delivers persistent Global Object Search and Working Set workflows, inc
 Sprint 7.5 completes UI repair and runtime-state isolation with shared project context header rendering, configuration-driven navigation cleanup, shared object detail section scaffolding, and mutable runtime workspace storage outside immutable source fixtures.
 Sprint 8 introduces the Deterministic Estimating Foundation: Estimate Workspace architecture, traceable estimate line entities, resolution/pricing status modeling, confidence scoring, and extension-point interfaces for future pricing engines.
 Sprint 9 implements the Deterministic Product Resolution Engine: canonical product resolution domain/service models, dedicated Product Resolution workspace page, manual override audit behavior, engineering summary integration, and deterministic estimate pricing gate enforcement based on resolution completeness.
+Sprint 9 Commercial Knowledge Foundation adds immutable price-sheet versioning, deterministic version comparison, product change reporting, and commercial freshness/lifecycle visibility without introducing procurement or quote-generation workflows.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
@@ -72,6 +73,9 @@ Current workspace behavior:
 - Product Resolution workspace now provides deterministic filters (Unknown, Low Confidence, Needs Review, Resolved, Substituted), explainable candidate ranking, and manual override auditing.
 - Engineering Review now includes Product Resolution summary metrics (resolved, unknown, generic allowance, substitutions, requiring review).
 - Estimate workspace now consumes deterministic Product Resolution outputs and blocks pricing on unresolved/generic/low-confidence resolution states.
+- Price List Library now imports into immutable Price Sheet Versions and Price Records through Commercial Knowledge services.
+- Import History page now exposes deterministic version-level change summaries and historical replay of previous commercial versions.
+- Knowledge workspace now includes Commercial Health metrics for coverage, freshness, missing pricing, stale pricing, and commercial confidence.
 - BOM Review now includes an Open Equipment Detail action for selected BOM rows while preserving BOM table reconciliation behavior.
 - Drawing and Specification workspaces now expose referenced equipment as human-readable objects that can open Equipment Workspace.
 - Project Workspace now includes a non-blocking guided review sequence with statuses (not started/ready/needs review/blocked/complete).
@@ -101,3 +105,5 @@ Current workspace behavior:
 ## Reference Documents for Current Baseline
 - [PRODUCT_RESOLUTION.md](PRODUCT_RESOLUTION.md)
 - [MANUFACTURER_REGISTRY.md](MANUFACTURER_REGISTRY.md)
+- [COMMERCIAL_KNOWLEDGE.md](COMMERCIAL_KNOWLEDGE.md)
+- [PRICE_VERSIONING.md](PRICE_VERSIONING.md)

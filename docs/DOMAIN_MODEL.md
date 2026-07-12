@@ -203,6 +203,11 @@ Status legend:
 - Relationships: linked to Equipment, Product, Manufacturer, Evidence, and Estimate Line preparation context.
 - Lifecycle Role: Explicit pre-pricing gate that enforces explainable product identity before any deterministic pricing workflow can proceed.
 
+### Commercial Knowledge
+- Purpose: Immutable commercial history layer for product availability and versioned pricing records.
+- Relationships: links Manufacturer, Product, Vendor, Vendor Offering, Price Sheet, Price Sheet Version, and Price Record.
+- Lifecycle Role: preserves historical commercial context for deterministic estimate readiness and historical bid recreation without mutating prior imports.
+
 ### Labor Estimate
 - Purpose: Labor hours and confidence model.
 - Relationships: belongs to Estimate; linked to Estimate Line and System.

@@ -103,6 +103,14 @@ from atlas_core.domain.product_resolution import (
     ProductResolutionCandidate,
     ProductResolutionManualOverride,
 )
+from atlas_core.domain.commercial_knowledge import (
+    CommercialProductLifecycleStatus,
+    KnowledgeFreshnessStatus,
+    PriceRecord,
+    PriceSheet,
+    PriceSheetVersion,
+    VendorOffering,
+)
 
 __all__ = [
     "BidPackageReview",
@@ -152,6 +160,12 @@ __all__ = [
     "ProductResolution",
     "ProductResolutionCandidate",
     "ProductResolutionManualOverride",
+    "CommercialProductLifecycleStatus",
+    "KnowledgeFreshnessStatus",
+    "PriceSheet",
+    "PriceSheetVersion",
+    "PriceRecord",
+    "VendorOffering",
     "MasterProduct",
     "ProductCategory",
     "ProductFamily",

@@ -150,6 +150,7 @@ Planned integration direction:
 ## Future Capability Direction
 - Manufacturer and vendor normalization references
 - Product and equipment canonical mapping
+- Commercial knowledge linkage to immutable price-sheet versions
 - Standards and code reference indexing
 - Reusable system-template knowledge
 - Shared mappings used by drawing/specification/coordination intelligence
@@ -161,3 +162,5 @@ Planned integration direction:
 - [ROADMAP.md](ROADMAP.md)
 - [PRODUCT_RESOLUTION.md](PRODUCT_RESOLUTION.md)
 - [MANUFACTURER_REGISTRY.md](MANUFACTURER_REGISTRY.md)
+- [COMMERCIAL_KNOWLEDGE.md](COMMERCIAL_KNOWLEDGE.md)
+- [PRICE_VERSIONING.md](PRICE_VERSIONING.md)

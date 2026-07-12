@@ -100,10 +100,22 @@ Engineering Review includes a Product Resolution summary with:
 
 Estimate workspace consumes resolution output and enforces deterministic pricing gating.
 
+Commercial knowledge integration on resolved products includes:
+
+- known vendors
+- current price-sheet lifecycle status
+- latest commercial version
+- historical commercial versions
+- commercial freshness status
+- pricing availability signal
+
+This integration remains read-only in Sprint 9 and does not calculate estimate pricing.
+
 ## Source Files
 - `atlas_core/domain/product_resolution.py`
 - `atlas_core/services/product_resolution_service.py`
 - `apps/phase2_review_app.py`
 - `atlas_core/services/estimate_service.py`
+- `atlas_core/services/commercial_knowledge_service.py`
 - `tests/test_product_resolution_domain.py`
 - `tests/test_product_resolution_service.py`

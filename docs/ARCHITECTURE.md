@@ -85,3 +85,22 @@ Implementation structure:
 Source-of-truth references:
 - [PRODUCT_RESOLUTION.md](PRODUCT_RESOLUTION.md)
 - [MANUFACTURER_REGISTRY.md](MANUFACTURER_REGISTRY.md)
+
+## Commercial Knowledge Foundation
+Sprint 9 adds a commercial knowledge subsystem built around immutable price-sheet versioning.
+
+Design posture:
+- products do not own prices
+- vendor offerings own commercial availability
+- price records are immutable and tied to price-sheet versions
+- every import creates a new permanent historical version
+- commercial history supports deterministic readiness, not procurement execution
+
+Implementation structure:
+- domain: commercial object model (Vendor Offering, Price Sheet, Price Sheet Version, Price Record)
+- service: immutable import, version comparison, change report generation, lifecycle/freshness metrics
+- workspace shell: commercial health dashboard, import history page, and product-resolution commercial context panel
+
+Source-of-truth references:
+- [COMMERCIAL_KNOWLEDGE.md](COMMERCIAL_KNOWLEDGE.md)
+- [PRICE_VERSIONING.md](PRICE_VERSIONING.md)

@@ -41,6 +41,7 @@ from atlas_core.services.pricing_service import PricingService
 from atlas_core.services.sales_design_review_service import SalesDesignReviewService
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 from atlas_core.services.estimate_service import DeterministicEstimateService
+from atlas_core.services.commercial_knowledge_service import CommercialKnowledgeService
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
@@ -60,6 +61,7 @@ WORKFLOW_PAGES = [
     "Project Summary",
     "Documents",
     "Price List Library",
+    "Import History",
     "BOM Review",
     "Scope & Risk",
     "Engineering Review",
@@ -74,6 +76,7 @@ NAV_DROPDOWN_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("Project Summary", "Project Summary"),
             ("Documents", "Documents"),
             ("Price List Library", "Price List Library"),
+            ("Import History", "Import History"),
             ("BOM Review", "BOM Review"),
             ("Scope & Risk", "Scope & Risk"),
             ("Engineering Review", "Engineering Review"),
@@ -262,6 +265,8 @@ PROJECT_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
         [
             ("Overview", "Overview"),
             ("Documents", "Documents"),
+            ("Price List Library", "Price List Library"),
+            ("Import History", "Import History"),
             ("BOM Review", "BOM Review"),
             ("Scope & Risk", "Scope & Risk"),
             ("Engineering Review", "Engineering Review"),
@@ -2214,6 +2219,8 @@ def _default_price_list_library_state() -> dict[str, Any]:
         "manufacturer_products": [],
         "vendor_offers": [],
         "import_warnings": [],
+        "commercial_knowledge": CommercialKnowledgeService.empty_state(),
+        "commercial_import_results": [],
     }
 
 
@@ -2224,6 +2231,28 @@ def _price_list_library_state(st: Any) -> dict[str, Any]:
     state = _default_price_list_library_state()
     st.session_state["atlas_price_list_library"] = state
     return state
+
+
+def _commercial_knowledge_state(st: Any) -> dict[str, Any]:
+    library = _price_list_library_state(st)
+    state = library.get("commercial_knowledge")
+    if isinstance(state, dict):
+        return dict(state)
+    return CommercialKnowledgeService.empty_state()
+
+
+def _commercial_service(st: Any) -> CommercialKnowledgeService:
+    return CommercialKnowledgeService(state=_commercial_knowledge_state(st))
+
+
+def _commercial_product_key(
+    *,
+    manufacturer: str,
+    model: str,
+) -> str:
+    mfr = _safe_text(manufacturer, "Unknown")
+    mdl = _safe_text(model, "Unknown")
+    return f"{mfr}::{mdl}"
 
 
 def _enriched_bom_rows(st: Any, bom_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -3708,6 +3737,7 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
             st.session_state.get("atlas_notebook_entries") or []
         ),
         "review_flags": dict(st.session_state.get("atlas_review_flags") or {}),
+        "price_list_library": dict(_price_list_library_state(st)),
         "product_resolution_overrides": dict(
             st.session_state.get("atlas_product_resolution_overrides") or {}
         ),
@@ -3785,6 +3815,10 @@ def _restore_workspace_state(
     review_flags = state.get("review_flags")
     if isinstance(review_flags, dict):
         st.session_state["atlas_review_flags"] = dict(review_flags)
+
+    price_list_library = state.get("price_list_library")
+    if isinstance(price_list_library, dict):
+        st.session_state["atlas_price_list_library"] = dict(price_list_library)
 
     product_resolution_overrides = state.get("product_resolution_overrides")
     if isinstance(product_resolution_overrides, dict):
@@ -4282,12 +4316,9 @@ def _render_application_knowledge_page(
     uploaded_price_lists = list(library_state.get("uploaded_price_lists") or [])
     manufacturer_products = list(library_state.get("manufacturer_products") or [])
     vendor_offers = list(library_state.get("vendor_offers") or [])
-    unmatched_rows = sum(
-        int(item.get("unmatched_rows", 0) or 0) for item in uploaded_price_lists
-    )
-    expired_rows = sum(
-        int(item.get("expired_pricing", 0) or 0) for item in uploaded_price_lists
-    )
+    commercial_service = _commercial_service(st)
+    commercial_dashboard = commercial_service.dashboard_summary()
+    commercial_import_history = commercial_service.import_history_rows()
 
     import_history: list[dict[str, Any]] = []
     for item in project_rows:
@@ -4314,26 +4345,44 @@ def _render_application_knowledge_page(
     cards = st.columns(8)
     _metric_card(cards[0], "Manufacturers", str(len(manufacturer_rows)))
     _metric_card(cards[1], "Vendors", str(len(vendor_rows)))
-    _metric_card(cards[2], "Customers", str(len(customers)))
-    _metric_card(cards[3], "Products", str(len(product_rows)))
+    _metric_card(cards[2], "Products", str(commercial_dashboard.get("products", 0)))
+    _metric_card(
+        cards[3],
+        "Vendor Offerings",
+        str(commercial_dashboard.get("vendor_offerings", 0)),
+    )
     _metric_card(
         cards[4],
         "Active Price Lists",
-        str(max(len(uploaded_price_lists) - expired_rows, 0)),
+        str(commercial_dashboard.get("active_price_sheets", 0)),
     )
-    _metric_card(cards[5], "Expired Price Lists", str(expired_rows))
-    _metric_card(cards[6], "Unmatched Imported Rows", str(unmatched_rows))
-    _metric_card(cards[7], "Recent Knowledge Imports", str(len(import_history[:12])))
+    _metric_card(
+        cards[5],
+        "Pricing Stale",
+        str(commercial_dashboard.get("pricing_stale", 0)),
+    )
+    _metric_card(
+        cards[6],
+        "Missing From Latest",
+        str(commercial_dashboard.get("products_missing_from_latest_version", 0)),
+    )
+    _metric_card(
+        cards[7],
+        "Coverage %",
+        str(commercial_dashboard.get("coverage_percentage", 0.0)),
+    )
 
     tabs = st.tabs(
         [
             "Summary",
+            "Commercial Health",
             "Manufacturers",
             "Vendors",
             "Customers",
             "Products",
             "Price Lists",
             "Imports",
+            "Import History",
         ]
     )
 
@@ -4367,14 +4416,14 @@ def _render_application_knowledge_page(
                     "Next Action": "Run project analysis to generate equipment rows and master product mappings.",
                 },
                 {
-                    "Knowledge Area": "Price Lists",
+                    "Knowledge Area": "Commercial Knowledge",
                     "State": (
                         "Available"
-                        if uploaded_price_lists
+                        if commercial_dashboard.get("active_price_sheets", 0)
                         else "Foundation in progress"
                     ),
-                    "Why It Matters": "Pricing foundations improve deterministic BOM cost coverage.",
-                    "Next Action": "Upload manufacturer/vendor price lists from Price List Library.",
+                    "Why It Matters": "Immutable price-sheet versions preserve historical commercial context for deterministic bid recreation.",
+                    "Next Action": "Upload manufacturer/vendor price lists and review Import History change reports.",
                 },
                 {
                     "Knowledge Area": "Knowledge Imports",
@@ -4390,6 +4439,42 @@ def _render_application_knowledge_page(
         )
 
     with tabs[1]:
+        freshness = commercial_dashboard.get("knowledge_freshness", {})
+        st.dataframe(
+            [
+                {
+                    "Manufacturers": commercial_dashboard.get("manufacturers", 0),
+                    "Vendors": commercial_dashboard.get("vendors", 0),
+                    "Products": commercial_dashboard.get("products", 0),
+                    "Vendor Offerings": commercial_dashboard.get("vendor_offerings", 0),
+                    "Active Price Sheets": commercial_dashboard.get(
+                        "active_price_sheets", 0
+                    ),
+                    "Latest Imports": len(
+                        commercial_dashboard.get("latest_imports") or []
+                    ),
+                    "Products Missing Pricing": commercial_dashboard.get(
+                        "products_missing_pricing", 0
+                    ),
+                    "Pricing Stale": commercial_dashboard.get("pricing_stale", 0),
+                    "Recently Updated": commercial_dashboard.get("recently_updated", 0),
+                    "Missing From Latest Version": commercial_dashboard.get(
+                        "products_missing_from_latest_version", 0
+                    ),
+                    "Coverage Percentage": commercial_dashboard.get(
+                        "coverage_percentage", 0.0
+                    ),
+                    "Knowledge Freshness": f"fresh={freshness.get('fresh', 0)} review={freshness.get('review_recommended', 0)} stale={freshness.get('stale', 0)} missing={freshness.get('missing', 0)}",
+                    "Commercial Confidence": commercial_dashboard.get(
+                        "commercial_confidence", 0.0
+                    ),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[2]:
         st.markdown("### Manufacturers")
         if not manufacturer_rows:
             _render_guided_empty_state(
@@ -4416,7 +4501,7 @@ def _render_application_knowledge_page(
                 hide_index=True,
             )
 
-    with tabs[2]:
+    with tabs[3]:
         st.markdown("### Vendors")
         if not vendor_rows:
             _render_guided_empty_state(
@@ -4440,7 +4525,7 @@ def _render_application_knowledge_page(
                 hide_index=True,
             )
 
-    with tabs[3]:
+    with tabs[4]:
         st.markdown("### Customers")
         if not customers:
             _render_guided_empty_state(
@@ -4466,7 +4551,7 @@ def _render_application_knowledge_page(
                 hide_index=True,
             )
 
-    with tabs[4]:
+    with tabs[5]:
         st.markdown("### Products / Master Library")
         if not product_rows:
             _render_guided_empty_state(
@@ -4491,7 +4576,7 @@ def _render_application_knowledge_page(
                 hide_index=True,
             )
 
-    with tabs[5]:
+    with tabs[6]:
         st.markdown("### Price Lists")
         st.caption(
             "Price list uploads are discoverable here and managed in Project Workspace Price List Library."
@@ -4524,7 +4609,7 @@ def _render_application_knowledge_page(
                 else:
                     st.info("No vendor price lists are indexed yet.")
 
-    with tabs[6]:
+    with tabs[7]:
         st.markdown("### Knowledge Imports")
         if not import_history:
             _render_guided_empty_state(
@@ -4536,6 +4621,29 @@ def _render_application_knowledge_page(
         else:
             st.dataframe(
                 import_history[:100], use_container_width=True, hide_index=True
+            )
+
+    with tabs[8]:
+        st.markdown("### Commercial Import History")
+        if not commercial_import_history:
+            st.info("No commercial import history available.")
+        else:
+            st.dataframe(
+                [
+                    {
+                        "Import Date": item.get("import_date"),
+                        "Vendor": item.get("vendor"),
+                        "Manufacturer": item.get("manufacturer"),
+                        "Version": item.get("version"),
+                        "Rows Imported": item.get("rows_imported"),
+                        "Products Added": item.get("products_added"),
+                        "Products Removed": item.get("products_removed"),
+                        "Products Changed": item.get("products_changed"),
+                    }
+                    for item in commercial_import_history
+                ],
+                use_container_width=True,
+                hide_index=True,
             )
 
 
@@ -5361,6 +5469,54 @@ def _render_product_resolution_page(
             use_container_width=True,
             hide_index=True,
         )
+
+    canonical = dict(getattr(selected_resolution, "canonical_product", {}) or {})
+    commercial_product = _commercial_product_key(
+        manufacturer=_safe_text(
+            canonical.get("manufacturer"), selected_resolution.manufacturer
+        ),
+        model=_safe_text(canonical.get("model"), selected_resolution.model),
+    )
+    commercial_service = _commercial_service(st)
+    product_history = commercial_service.price_history_for_product(commercial_product)
+    freshness_by_product = {
+        item.get("product"): item for item in commercial_service.freshness_rows()
+    }
+    freshness = dict(freshness_by_product.get(commercial_product) or {})
+    lifecycle = (
+        commercial_service.to_dict()
+        .get("product_lifecycle", {})
+        .get(commercial_product, {})
+    )
+
+    st.markdown("### Commercial Knowledge")
+    st.dataframe(
+        [
+            {
+                "Known Vendors": ", ".join(product_history.get("known_vendors") or [])
+                or "None",
+                "Current Price Sheet Status": _safe_text(
+                    lifecycle.get("lifecycle_status"), "unknown"
+                ),
+                "Latest Version": _safe_text(
+                    product_history.get("latest_version"), "n/a"
+                ),
+                "Historical Versions": len(
+                    list(product_history.get("historical_versions") or [])
+                ),
+                "Commercial Freshness": _safe_text(
+                    freshness.get("current_status"), "missing"
+                ),
+                "Pricing Availability": (
+                    "Available"
+                    if list(product_history.get("historical_prices") or [])
+                    else "Missing"
+                ),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 def _render_pinned_projects_page(
@@ -6311,13 +6467,94 @@ def _render_price_list_library_page(
         use_container_width=True,
     ):
         with st.spinner("Importing and normalizing price lists..."):
+            existing_library = _price_list_library_state(st)
+            file_payload_by_name = {
+                str(file.name): bytes(file.getvalue())
+                for file in list(uploaded_files or [])
+            }
             result = PricingService().ingest_price_lists(
                 [
-                    (str(file.name), bytes(file.getvalue()))
+                    (str(file.name), file_payload_by_name[str(file.name)])
                     for file in list(uploaded_files or [])
                 ]
             )
-            st.session_state["atlas_price_list_library"] = result
+
+            commercial_service = CommercialKnowledgeService(
+                state=dict(existing_library.get("commercial_knowledge") or {})
+            )
+
+            import_results: list[dict[str, Any]] = []
+            vendor_offers = list(result.get("vendor_offers") or [])
+            manufacturer_products = list(result.get("manufacturer_products") or [])
+
+            for summary in list(result.get("uploaded_price_lists") or []):
+                source_file = _safe_text(summary.get("source_file"), "uploaded")
+                import_rows = [
+                    item
+                    for item in vendor_offers
+                    if _safe_text(item.get("source_file"), "") == source_file
+                ]
+                if not import_rows:
+                    import_rows = [
+                        {
+                            "vendor": _safe_text(
+                                summary.get("vendor"),
+                                "Manufacturer Catalog",
+                            ),
+                            "manufacturer": _safe_text(
+                                item.get("manufacturer"),
+                                _safe_text(summary.get("manufacturer"), "Unknown"),
+                            ),
+                            "model": _safe_text(item.get("model"), "Unknown"),
+                            "vendor_sku": _safe_text(item.get("model"), "Unknown"),
+                            "unit_cost": item.get("list_price"),
+                            "list_price": item.get("list_price"),
+                            "currency": "USD",
+                            "lead_time": "unknown",
+                            "availability_status": "unknown",
+                            "effective_date": item.get("effective_date"),
+                            "expiration_date": item.get("discontinued_date"),
+                            "description": item.get("description"),
+                            "confidence": item.get("confidence", 0.8),
+                            "notes": "Manufacturer price-sheet import",
+                        }
+                        for item in manufacturer_products
+                        if _safe_text(item.get("source_file"), "") == source_file
+                    ]
+
+                import_results.append(
+                    commercial_service.import_price_sheet(
+                        vendor=_safe_text(summary.get("vendor"), "Unknown Vendor"),
+                        manufacturer=_safe_text(
+                            summary.get("manufacturer"),
+                            "Unknown Manufacturer",
+                        ),
+                        sheet_name=source_file,
+                        description="Imported from Price List Library",
+                        source_filename=source_file,
+                        file_bytes=file_payload_by_name.get(source_file, b""),
+                        imported_by="Atlas Workspace",
+                        rows=import_rows,
+                        effective_date=_safe_text(summary.get("effective_date"), ""),
+                    )
+                )
+
+            st.session_state["atlas_price_list_library"] = {
+                "uploaded_price_lists": list(
+                    existing_library.get("uploaded_price_lists") or []
+                )
+                + list(result.get("uploaded_price_lists") or []),
+                "manufacturer_products": list(
+                    existing_library.get("manufacturer_products") or []
+                )
+                + list(result.get("manufacturer_products") or []),
+                "vendor_offers": list(existing_library.get("vendor_offers") or [])
+                + list(result.get("vendor_offers") or []),
+                "import_warnings": list(existing_library.get("import_warnings") or [])
+                + list(result.get("import_warnings") or []),
+                "commercial_knowledge": commercial_service.to_dict(),
+                "commercial_import_results": import_results,
+            }
 
     library = _price_list_library_state(st)
     summaries = list(library.get("uploaded_price_lists") or [])
@@ -6332,6 +6569,32 @@ def _render_price_list_library_page(
         cards[3],
         "Expired Pricing",
         str(sum(int(item.get("expired_pricing", 0) or 0) for item in summaries)),
+    )
+
+    commercial_dashboard = _commercial_service(st).dashboard_summary()
+    st.markdown("### Commercial Health")
+    st.dataframe(
+        [
+            {
+                "Manufacturers": commercial_dashboard.get("manufacturers", 0),
+                "Vendors": commercial_dashboard.get("vendors", 0),
+                "Products": commercial_dashboard.get("products", 0),
+                "Vendor Offerings": commercial_dashboard.get("vendor_offerings", 0),
+                "Active Price Sheets": commercial_dashboard.get(
+                    "active_price_sheets", 0
+                ),
+                "Products Missing Pricing": commercial_dashboard.get(
+                    "products_missing_pricing", 0
+                ),
+                "Pricing Stale": commercial_dashboard.get("pricing_stale", 0),
+                "Coverage %": commercial_dashboard.get("coverage_percentage", 0.0),
+                "Commercial Confidence": commercial_dashboard.get(
+                    "commercial_confidence", 0.0
+                ),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
     )
 
     st.markdown("### Upload Summary")
@@ -6614,6 +6877,88 @@ def _render_engineering_review_page(
         context,
         "engineering",
         mark_label="Mark Engineering Findings Reviewed",
+    )
+
+
+def _render_import_history_page(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+) -> None:
+    del record, context
+    _render_page_header(
+        st,
+        "Import History",
+        "Immutable price sheet import history with deterministic version comparisons.",
+    )
+
+    commercial_service = _commercial_service(st)
+    history_rows = commercial_service.import_history_rows()
+    if not history_rows:
+        _render_guided_empty_state(
+            st,
+            why_empty="No commercial import history exists yet.",
+            action_to_populate="Upload and import one or more price lists in Price List Library.",
+            next_location="Open Price List Library and run Import Price Lists.",
+        )
+        return
+
+    st.dataframe(
+        [
+            {
+                "Import Date": row.get("import_date"),
+                "Vendor": row.get("vendor"),
+                "Manufacturer": row.get("manufacturer"),
+                "Version": row.get("version"),
+                "Rows Imported": row.get("rows_imported"),
+                "Products Added": row.get("products_added"),
+                "Products Removed": row.get("products_removed"),
+                "Products Changed": row.get("products_changed"),
+                "Warnings": "; ".join(list(row.get("warnings") or [])),
+                "Comparison Summary": (
+                    f"+{len((row.get('comparison_summary') or {}).get('products_added') or [])} "
+                    f"-{len((row.get('comparison_summary') or {}).get('products_removed') or [])} "
+                    f"~{len((row.get('comparison_summary') or {}).get('products_updated') or [])}"
+                ),
+            }
+            for row in history_rows
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    version_lookup = {
+        f"{row.get('version')} | {row.get('vendor')} | {row.get('manufacturer')} | {row.get('import_date')}": row
+        for row in history_rows
+    }
+    selected = st.selectbox(
+        "Open previous version",
+        options=list(version_lookup.keys()),
+        key="atlas_commercial_history_selected_version",
+    )
+    selected_row = dict(version_lookup[selected])
+    comparison = dict(selected_row.get("comparison_summary") or {})
+
+    st.markdown("### Selected Version Detail")
+    st.dataframe(
+        [
+            {
+                "Version": selected_row.get("version"),
+                "Vendor": selected_row.get("vendor"),
+                "Manufacturer": selected_row.get("manufacturer"),
+                "Rows Imported": selected_row.get("rows_imported"),
+                "Products Added": len(comparison.get("products_added") or []),
+                "Products Removed": len(comparison.get("products_removed") or []),
+                "Price Increased": len(comparison.get("price_increased") or []),
+                "Price Decreased": len(comparison.get("price_decreased") or []),
+                "Lead Time Changed": len(comparison.get("lead_time_changed") or []),
+                "Availability Changed": len(
+                    comparison.get("availability_changed") or []
+                ),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
     )
 
 
@@ -16850,6 +17195,10 @@ def _render_main_content(
         _render_project_summary_page(st, record, context)
     elif page == "Documents":
         _render_project_files_page(st, workspace_service, record, context)
+    elif page == "Price List Library":
+        _render_price_list_library_page(st, record, context)
+    elif page == "Import History":
+        _render_import_history_page(st, record, context)
     elif page == "BOM Review":
         _render_bom_review_page(st, record, context)
     elif page == "Scope & Risk":
