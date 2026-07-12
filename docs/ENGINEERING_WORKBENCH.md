@@ -87,12 +87,27 @@ Workbench and adjacent project workspaces now align to common UX conventions:
 - object-centric navigation continuity from estimate and review pages into engineering investigation surfaces
 - consistent recommendation phrasing and priority ordering across action-oriented tables
 
+
 This sprint does not introduce new engineering-intelligence capabilities; it consolidates interaction consistency.
 
-- resolver decisions
-- knowledge-graph relationship count
+- resolver decisions remain traceable and reviewable in context
+- knowledge-graph relationship visibility remains investigation-first
+
 
 Traceability remains deterministic and derived from existing resolver/intelligence outputs.
+
+## Sprint A-05 Workflow Validation Notes
+
+Workbench validation in A-05 confirms:
+
+- object-context retention remains stable when navigating from review, estimate, and recommendation flows
+- deterministic recommendation wording remains aligned with action-oriented engineering language
+- no new engineering capability was introduced; refinements are usability-only
+
+Deferred non-blocking UX debt:
+
+- selected-object detail density can still feel heavy on smaller laptop viewports
+- additional progressive disclosure opportunities remain for long evidence tables
 
 ## Resolver Conflict Center
 

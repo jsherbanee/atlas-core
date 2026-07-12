@@ -21,10 +21,10 @@ Status: Active
 - A-02 Mission Control and Application Workspace
 - A-03 Project Repository and Persistence Contracts
 - A-04 Engineering Workstation UX Consolidation
-- A-05 Deterministic State, Caching, and Session Recovery
+- A-05 End-to-End GUI Validation and Workflow Refinement
 - A-06 Quality Gates, CI, and Regression Baseline
 
-### A-04 Scope (Current)
+### A-04 Scope (Completed)
 
 - standardize shared workspace section-header pattern
 - normalize workstation terminology for core knowledge/commercial views
@@ -36,6 +36,19 @@ Explicitly out of scope:
 
 - D-03 implementation work
 - new domain services or cross-system integrations
+
+### A-05 Scope (Completed)
+
+- validate complete user workflow from project intake through estimate lock and reporting
+- refine navigation and recommendation affordances for existing deterministic workspaces
+- improve table/form consistency and empty-state clarity across major pages
+- apply low-risk helper-level UI organization improvements in `apps/phase2_review_app.py`
+
+Explicitly out of scope:
+
+- Epic E implementation
+- Commercial Intelligence implementation
+- Sell Pricing or Proposal Generation implementation
 
 
 ## Epic B: Engineering Intelligence
@@ -109,7 +122,7 @@ Deferred beyond C-02:
 
 ## Epic D: Deterministic Estimating
 
-Status: Active
+Status: Implemented and Closed for current roadmap baseline
 
 - D-01 Core Cost Selection Engine (Closed)
 - D-02 Estimate Engine and Cost Snapshot Architecture (Implemented)
@@ -119,9 +132,15 @@ Status: Active
 - D-05 Estimator Brief and Final Estimator Review
 - D-06 Estimate Workflow Integration and Exports
 
+## Epic X: Product Hardening
+
+Status: Implemented (X-01 Closed)
+
+- X-01 Pilot Readiness and Application Walkthrough (Implemented, Closed)
+
 ## Epic E: Knowledge and Shared Objects
 
-Status: Active
+Status: Not Started
 
 - E-01 Object-Centric Knowledge Graph and Relationships
 - E-02 Cross-Project Shared Knowledge Reuse

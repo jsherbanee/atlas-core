@@ -94,6 +94,26 @@ Scope boundary for A-04:
 - UX and consistency consolidation only
 - no new D-03 capabilities and no procurement/accounting/ERP workflow expansion
 
+## 8.1 Sprint A-05 and X-01 Workflow Hardening Posture
+
+Completed hardening sprints (A-05 and X-01) apply usability validation to existing workflows and keep the same scope boundaries:
+
+- no new engineering features
+- no Commercial Intelligence, Sell Pricing, or Proposal Generation implementation
+- no post-D-03 epic starts
+
+Hardening priorities:
+
+- recommendation clarity, prioritization, and direct navigation affordances
+- table/form consistency and reduced click depth for common workflows
+- explicit preview/apply/dismiss semantics where deterministic write actions are involved
+
+Remaining non-blocking UX debt:
+
+- table density and pagination consistency across high-volume workflows
+- progressive disclosure opportunities in long evidence tables
+- smaller-screen ergonomics for dense engineering review contexts
+
 
 ## 8. Things Atlas Will Never Become
 

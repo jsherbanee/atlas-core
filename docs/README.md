@@ -2,11 +2,11 @@
 
 Atlas documentation defines the platform vision, architecture, engineering-intelligence surfaces, and implementation status for Atlas Core.
 
-Current implementation sprint focus: Sprint D-03 closeout completion (implemented and closed).
-Deferred in current sprint scope: post-D-03 epic work (not started).
+Current implementation sprint focus: Sprint X-01 Pilot Readiness and Application Walkthrough (implemented and closed).
+Deferred in current sprint scope: Epic E and post-D feature-epic implementation (not started).
 
-Current UX stream: Epic A Sprint A-04 Engineering Workstation UX Consolidation.
-Scope: interaction and terminology consistency while preserving D-03 production boundaries.
+Current UX stream: Epic X Product Hardening closeout (A-05 and X-01 completed).
+Scope: controlled pilot hardening, workflow consistency, and navigation clarity for already-implemented capabilities only.
 
 These documents are intended to be used as a cohesive reference library, not isolated notes.
 

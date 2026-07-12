@@ -60,13 +60,13 @@ Completed outcomes:
 
 ## Phase 2: Bid Intelligence (Active)
 Current objective:
-Sprint D-03 Assemblies, Accessories, and Labor Rollups is implemented and closed.
+Sprint X-01 Pilot Readiness and Application Walkthrough is implemented and closed.
 
 Current UX hardening stream:
 
-- Epic A Sprint A-04 Engineering Workstation UX Consolidation
-- focused on interaction consistency and deterministic navigation continuity
-- preserves D-03 scope boundaries while workstation consistency updates continue
+- Epic X Product Hardening closeout (A-05 and X-01 complete)
+- focused on estimator/project-engineer/design-engineer workflow usability hardening for existing capabilities
+- preserves D-03 scope boundaries and does not start Epic E or Commercial Intelligence implementation
 
 Implemented in current baseline candidate:
 - Bid package review orchestration
@@ -91,8 +91,9 @@ Implemented in current baseline candidate:
 - Deterministic cost engine for acquisition cost selection, cost traceability, commercial coverage, and project-only quick-add product support
 
 Remaining Phase 2 refinements:
-- D-03 closeout verified: full quality-gate validation and architecture review complete
-- post-D-03 epic implementation has not started in this pass
+- D-03/A-05/X-01 closeout verified: full quality-gate validation and architecture review complete
+- Epic E and post-D feature-epic implementation has not started in this pass
+- remaining UX debt: table-density/pagination consistency, progressive disclosure, and smaller-screen ergonomics
 - PDF ingestion and indexing robustness
 - Drawing/spec intelligence quality refinements
 - Device schedule extraction quality refinements

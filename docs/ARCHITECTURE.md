@@ -67,6 +67,27 @@ A-04 is a workstation UX consolidation sprint and preserves architecture boundar
 
 Consolidation focus is UI composition consistency, deterministic recommendation presentation, and object-link continuity across existing pages.
 
+## Sprint A-05 GUI Validation and Workflow Refinement Constraints (Closed)
+
+A-05 is a product-refinement sprint and preserves architecture boundaries:
+
+- no new engineering feature implementation
+- no Epic E implementation start
+- no Commercial Intelligence implementation
+- no Sell Pricing or Proposal Generation implementation
+
+A-05 focus is end-to-end workflow clarity, navigation continuity, table/form consistency, and low-risk UI helper refinements.
+
+## Sprint X-01 Pilot Readiness Constraints (Closed)
+
+X-01 continues product-hardening posture without adding architecture surface area:
+
+- no new domain capability expansion
+- no Epic E implementation start
+- no Commercial Intelligence, Sell Pricing, or Proposal Generation implementation
+
+X-01 focus is pilot-readiness validation, deterministic workflow clarity, and documentation/status synchronization.
+
 
 Implementation structure:
 - domain: deterministic estimate entities and status enums
