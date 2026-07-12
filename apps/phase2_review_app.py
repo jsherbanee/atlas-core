@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 import hashlib
 from pathlib import Path
 import platform
@@ -40,6 +40,7 @@ from atlas_core.services.sales_design_review_service import SalesDesignReviewSer
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
+from atlas_core.services.runtime_workspace import ensure_runtime_workspace_root
 
 PROJECT_MANAGER_PAGES = [
     "Mission Control",
@@ -283,6 +284,10 @@ PROJECT_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("Workspace Settings", "Workspace Settings"),
         ],
     ),
+    (
+        "Future Lifecycle (Disabled)",
+        [(item, item) for item in DISABLED_LIFECYCLE_PAGES],
+    ),
 ]
 
 SUPPORTED_UPLOAD_TYPES = [
@@ -310,6 +315,17 @@ class SelectorOption:
     value: str | None = None
 
 
+@dataclass
+class ProjectContextHeader:
+    project_name: str
+    customer: str
+    lifecycle_stage: str
+    current_status: str
+    last_analysis: str
+    confidence: str
+    recommended_next_action: str
+
+
 def _load_streamlit() -> Any:
     try:
         import streamlit as st
@@ -327,6 +343,7 @@ def _inject_styles(st: Any) -> None:
         <style>
         :root {
             --atlas-gray: #6b7280;
+            --atlas-primary: #2563eb;
             --atlas-blue: #2563eb;
             --atlas-green: #16a34a;
             --atlas-amber: #d97706;
@@ -460,8 +477,10 @@ def _status_chip(value: str) -> str:
         return "🔵 " + value
     if normalized in {"needs review", "warning", "partial", "amber"}:
         return "🟠 " + value
-    if normalized in {"critical", "failed", "requires_ocr", "red", "blocked"}:
+    if normalized in {"critical", "failed", "red", "blocked"}:
         return "🔴 " + value
+    if normalized in {"requires_ocr", "unknown", "inactive"}:
+        return "🟠 " + value
     if normalized in {"not started"}:
         return "⚪ " + value
     return "⚪ " + value
@@ -493,7 +512,8 @@ def _render_guided_empty_state(
     next_location: str,
 ) -> None:
     st.info(
-        f"{why_empty}\n\n"
+        f"What is missing: {why_empty}\n\n"
+        f"Why it matters: this view cannot provide reliable review context until data exists.\n\n"
         f"Action to populate: {action_to_populate}\n\n"
         f"Next: {next_location}"
     )
@@ -529,7 +549,7 @@ def _set_context_cached(
 
 
 def _now_iso() -> str:
-    return datetime.utcnow().replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _date_prefix(value: Any) -> str:
@@ -2484,9 +2504,20 @@ def _group_for_page(page: str, record: ProjectWorkspaceRecord | None) -> str:
     return "Project Workspace"
 
 
+def _breadcrumb_page_label(page: str) -> str:
+    mapping = {
+        "Project Metadata": "Project Settings",
+        "Workspace Settings": "Workspace Settings",
+        "Relationship Visualization": "Relationship Graph",
+        "RFI Candidates": "RFI Candidates",
+    }
+    return mapping.get(page, page)
+
+
 def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
+    page_label = _breadcrumb_page_label(page)
     if record is None:
-        return f"Atlas / {page}"
+        return f"Atlas / {page_label}"
     if page in {
         "Projects",
         "Pinned Projects",
@@ -2495,9 +2526,9 @@ def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
         "Create New Project",
         "Open Existing Project",
     }:
-        return f"Atlas / Projects / {page}"
+        return f"Atlas / Projects / {page_label}"
     if page in {"Mission Control", "Reports", "Administration"}:
-        return f"Atlas / {page}"
+        return f"Atlas / {page_label}"
 
     try:
         import streamlit as _st
@@ -2519,7 +2550,7 @@ def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
     expected_kind = object_pages.get(page)
     if expected_kind is not None and kind == expected_kind:
         name = _object_display_name(kind, data)
-        return f"Atlas / Projects / {record.project.name} / {page} / {name}"
+        return f"Atlas / Projects / {record.project.name} / {page_label} / {name}"
 
     if page == "Knowledge":
         knowledge_segments = {
@@ -2535,7 +2566,41 @@ def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
             return f"Atlas / Knowledge / {segment} / {name}"
         return "Atlas / Knowledge"
 
-    return f"Atlas / Projects / {record.project.name} / {page}"
+    return f"Atlas / Projects / {record.project.name} / {page_label}"
+
+
+def _build_project_context_header(
+    record: ProjectWorkspaceRecord,
+    *,
+    customer: str,
+    confidence: str,
+    recommended_next_action: str,
+) -> ProjectContextHeader:
+    return ProjectContextHeader(
+        project_name=record.project.name,
+        customer=customer,
+        lifecycle_stage=_project_stage(record),
+        current_status=_safe_text(record.metadata.get("status"), "needs review")
+        .replace("_", " ")
+        .title(),
+        last_analysis=_safe_text(record.updated_at, "Not available"),
+        confidence=confidence,
+        recommended_next_action=recommended_next_action,
+    )
+
+
+def _render_project_context_header(st: Any, header: ProjectContextHeader) -> None:
+    st.markdown(
+        "<div class='atlas-project-header'>"
+        f"<div class='atlas-project-name'>{header.project_name}</div>"
+        f"<div class='atlas-project-customer'>{header.customer}</div>"
+        f"<span class='atlas-chip'>{header.lifecycle_stage}</span>"
+        f"<span class='atlas-chip'>{header.current_status}</span>"
+        f"<div class='atlas-project-meta'>Last analysis: {header.last_analysis} · Confidence: {header.confidence}</div>"
+        f"<div class='atlas-project-meta'>Recommended next action: {header.recommended_next_action}</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _open_project_record(st: Any, record: ProjectWorkspaceRecord) -> None:
@@ -2814,16 +2879,16 @@ def _render_header(
 
     _render_header_history_popover(st, workspace_service)
 
-    st.markdown(
-        "<div class='atlas-project-header'>"
-        f"<div class='atlas-project-name'>{record.project.name}</div>"
-        f"<div class='atlas-project-customer'>{_safe_text(summary.get('customer'), 'n/a')}</div>"
-        f"<span class='atlas-chip'>{_project_stage(record)}</span>"
-        f"<span class='atlas-chip'>{_project_status(context)}</span>"
-        f"<div class='atlas-project-meta'>Last analysis: {_safe_text(record.updated_at, 'n/a')} · Confidence: {confidence_text}</div>"
-        "</div>",
-        unsafe_allow_html=True,
+    project_header = _build_project_context_header(
+        record,
+        customer=_safe_text(summary.get("customer"), "Not available"),
+        confidence=confidence_text,
+        recommended_next_action=_safe_text(
+            next_action.get("step"),
+            "Review project overview",
+        ),
     )
+    _render_project_context_header(st, project_header)
 
     if st.button(
         f"Recommended Next: {_safe_text(next_action.get('step'), 'Review project overview')}",
@@ -2861,14 +2926,111 @@ def _nav_buttons(
             expanded=active_page in [item[1] for item in entries],
         ):
             for label, page in entries:
+                is_future_disabled = page in DISABLED_LIFECYCLE_PAGES
                 if host.button(
                     label,
                     key=f"atlas_nav_{mode}_{group_name}_{label}_{page}",
                     type="primary" if active_page == page else "secondary",
+                    disabled=is_future_disabled,
                     use_container_width=True,
                 ):
                     st.session_state["atlas_active_page"] = page
                     st.rerun()
+                if is_future_disabled:
+                    host.caption(f"{label} is reserved for future lifecycle scope.")
+
+
+def _render_object_metadata_table(
+    st: Any,
+    title: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    st.markdown(f"### {title}")
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+def _render_object_reference_sections(
+    st: Any,
+    *,
+    record: ProjectWorkspaceRecord,
+    graph: dict[str, Any],
+    kind: str,
+    selected: dict[str, Any],
+    key_prefix: str,
+) -> None:
+    st.markdown("### References and Referenced By")
+    references, referenced_by = _reference_groups_for_selection(
+        record,
+        graph,
+        kind,
+        selected,
+    )
+    reference_cols = st.columns(2)
+    with reference_cols[0]:
+        _render_reference_group(
+            st,
+            title="References",
+            references=references,
+            empty_message=f"This {_object_type_label(kind).lower()} has no outgoing references yet.",
+            key_prefix=f"{key_prefix}_refs",
+        )
+    with reference_cols[1]:
+        _render_reference_group(
+            st,
+            title="Referenced By",
+            references=referenced_by,
+            empty_message=f"No objects currently reference this {_object_type_label(kind).lower()}.",
+            key_prefix=f"{key_prefix}_refby",
+        )
+
+
+def _object_recommended_actions(
+    kind: str, data: dict[str, Any]
+) -> list[dict[str, str]]:
+    if kind == "equipment":
+        return _equipment_recommended_actions(data)
+
+    warnings = list(data.get("warnings") or [])
+    has_links = any(
+        list(data.get(field) or [])
+        for field in [
+            "referenced_equipment",
+            "referenced_specifications",
+            "referenced_drawings",
+            "referenced_systems",
+            "referenced_evidence",
+        ]
+    )
+
+    actions: list[dict[str, str]] = []
+    if warnings:
+        actions.append(
+            {
+                "priority": "High",
+                "action": "Review warnings and evidence",
+                "destination": "Evidence",
+                "reason": "Warnings indicate unresolved review context for this object.",
+            }
+        )
+    if not has_links:
+        actions.append(
+            {
+                "priority": "Medium",
+                "action": "Validate cross-object references",
+                "destination": "Relationships",
+                "reason": "No connected objects were detected for this item.",
+            }
+        )
+    if not actions:
+        actions.append(
+            {
+                "priority": "Low",
+                "action": "Continue review",
+                "destination": "Relationships",
+                "reason": "Object has linked context and no active warnings.",
+            }
+        )
+    return actions
 
 
 def _object_type_label(kind: str) -> str:
@@ -12511,7 +12673,9 @@ def _render_drawings_page(
         recommended_action="Review related equipment, specifications, and evidence.",
     )
 
-    st.dataframe(
+    _render_object_metadata_table(
+        st,
+        "Metadata",
         [
             {"Property": "Drawing Number", "Value": selected["drawing_number"]},
             {"Property": "Title", "Value": selected["title"]},
@@ -12524,43 +12688,25 @@ def _render_drawings_page(
             },
             {
                 "Property": "Sheet Sequence",
-                "Value": _safe_text(selected.get("sheet_sequence"), "n/a"),
+                "Value": _safe_text(selected.get("sheet_sequence"), "Not available"),
             },
             {
                 "Property": "Drawing Scale",
-                "Value": _safe_text(selected.get("drawing_scale"), "n/a"),
+                "Value": _safe_text(selected.get("drawing_scale"), "Not available"),
             },
             {"Property": "OCR Status", "Value": selected["ocr_status"]},
             {"Property": "Extraction Quality", "Value": selected["extraction_quality"]},
         ],
-        use_container_width=True,
-        hide_index=True,
     )
 
-    st.markdown("### References and Referenced By")
-    references, referenced_by = _reference_groups_for_selection(
-        record,
-        graph,
-        "drawing",
-        selected,
+    _render_object_reference_sections(
+        st,
+        record=record,
+        graph=graph,
+        kind="drawing",
+        selected=selected,
+        key_prefix=f"atlas_drawing_{_safe_text(selected.get('drawing_number'), 'drawing')}",
     )
-    reference_cols = st.columns(2)
-    with reference_cols[0]:
-        _render_reference_group(
-            st,
-            title="References",
-            references=references,
-            empty_message="This drawing has no outgoing references yet.",
-            key_prefix=f"atlas_drawing_refs_{_safe_text(selected.get('drawing_number'), 'drawing')}",
-        )
-    with reference_cols[1]:
-        _render_reference_group(
-            st,
-            title="Referenced By",
-            references=referenced_by,
-            empty_message="No objects currently reference this drawing.",
-            key_prefix=f"atlas_drawing_refby_{_safe_text(selected.get('drawing_number'), 'drawing')}",
-        )
 
     st.markdown("### Related Objects")
     related_tabs = st.tabs(
@@ -12679,6 +12825,10 @@ def _render_drawings_page(
         if nav_cols[4].button("Evidence", use_container_width=True):
             st.session_state["atlas_active_page"] = "Evidence"
             st.rerun()
+
+    st.markdown("### Recommended Actions")
+    drawing_actions = _object_recommended_actions("drawing", selected)
+    st.dataframe(drawing_actions, use_container_width=True, hide_index=True)
 
 
 def _render_drawing_explorer_page(st: Any, context: dict[str, Any] | None) -> None:
@@ -13026,7 +13176,9 @@ def _render_specifications_page(
         recommended_action="Review references, requirements, and evidence consistency.",
     )
 
-    st.dataframe(
+    _render_object_metadata_table(
+        st,
+        "Metadata",
         [
             {"property": "Division", "value": selected["division"]},
             {"property": "Section", "value": selected["section"]},
@@ -13041,49 +13193,31 @@ def _render_specifications_page(
             },
             {
                 "property": "Revision",
-                "value": _safe_text(selected.get("revision"), "n/a"),
+                "value": _safe_text(selected.get("revision"), "Not available"),
             },
             {
                 "property": "Issue Date",
-                "value": _safe_text(selected.get("issue_date"), "n/a"),
+                "value": _safe_text(selected.get("issue_date"), "Not available"),
             },
             {
                 "property": "Cross References",
-                "value": ", ".join(selected["cross_references"]) or "n/a",
+                "value": ", ".join(selected["cross_references"]) or "Not linked",
             },
             {
                 "property": "Extraction Confidence",
                 "value": selected["extraction_confidence"],
             },
         ],
-        use_container_width=True,
-        hide_index=True,
     )
 
-    st.markdown("### References and Referenced By")
-    references, referenced_by = _reference_groups_for_selection(
-        record,
-        graph,
-        "specification",
-        selected,
+    _render_object_reference_sections(
+        st,
+        record=record,
+        graph=graph,
+        kind="specification",
+        selected=selected,
+        key_prefix=f"atlas_spec_{_safe_text(selected.get('section'), 'spec')}",
     )
-    reference_cols = st.columns(2)
-    with reference_cols[0]:
-        _render_reference_group(
-            st,
-            title="References",
-            references=references,
-            empty_message="This specification has no outgoing references yet.",
-            key_prefix=f"atlas_spec_refs_{_safe_text(selected.get('section'), 'spec')}",
-        )
-    with reference_cols[1]:
-        _render_reference_group(
-            st,
-            title="Referenced By",
-            references=referenced_by,
-            empty_message="No objects currently reference this specification.",
-            key_prefix=f"atlas_spec_refby_{_safe_text(selected.get('section'), 'spec')}",
-        )
 
     relationship_tabs = st.tabs(
         [
@@ -13192,6 +13326,10 @@ def _render_specifications_page(
         if nav_cols[4].button("Evidence", use_container_width=True):
             st.session_state["atlas_active_page"] = "Evidence"
             st.rerun()
+
+    st.markdown("### Recommended Actions")
+    spec_actions = _object_recommended_actions("specification", selected)
+    st.dataframe(spec_actions, use_container_width=True, hide_index=True)
 
 
 def _render_specification_explorer_page(
@@ -13994,31 +14132,14 @@ def _render_equipment_page(
                 next_location="Review Documents and BOM evidence drill-down.",
             )
 
-    st.markdown("### References and Referenced By")
-    references, referenced_by = _reference_groups_for_selection(
-        record,
-        graph,
-        "equipment",
-        selected,
+    _render_object_reference_sections(
+        st,
+        record=record,
+        graph=graph,
+        kind="equipment",
+        selected=selected,
+        key_prefix=f"atlas_equipment_{_safe_text(selected.get('equipment_id'), 'eq')}",
     )
-    related_cols = st.columns(2)
-    with related_cols[0]:
-        _render_reference_group(
-            st,
-            title="References",
-            references=references,
-            empty_message="This equipment object has no outgoing references yet.",
-            key_prefix=f"atlas_equipment_refs_{_safe_text(selected.get('equipment_id'), 'eq')}",
-        )
-
-    with related_cols[1]:
-        _render_reference_group(
-            st,
-            title="Referenced By",
-            references=referenced_by,
-            empty_message="No objects currently reference this equipment object.",
-            key_prefix=f"atlas_equipment_refby_{_safe_text(selected.get('equipment_id'), 'eq')}",
-        )
 
     st.markdown("### Related Objects")
     related_cols = st.columns(2)
@@ -16261,13 +16382,18 @@ def _render_shell(
     _render_status_bar(st, record, context)
 
 
+def _build_workspace_service() -> ProjectWorkspaceService:
+    runtime_root = ensure_runtime_workspace_root()
+    return ProjectWorkspaceService(runtime_root)
+
+
 def main() -> None:
     st = _load_streamlit()
     st.set_page_config(page_title="Atlas Workspace", layout="wide")
     _inject_styles(st)
     _init_session_state(st)
 
-    workspace_service = ProjectWorkspaceService()
+    workspace_service = _build_workspace_service()
     _ensure_active_workspace(st, workspace_service)
 
     record = _active_record(st, workspace_service)

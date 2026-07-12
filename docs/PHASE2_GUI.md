@@ -15,6 +15,8 @@ Atlas Workspace UI Sprint 6 adds an object navigation layer that connects equipm
 
 Atlas Workspace UI Sprint 7 adds persistent Global Object Search and a project-scoped Working Set for active review objects.
 
+Atlas Workspace Sprint 7.5 performs UI repair and runtime-state isolation: shared project context header rendering, configuration-driven navigation (including disabled future lifecycle sections), shared object detail section scaffolding, breadcrumb normalization, meaningful empty-state messaging, and mutable runtime project storage outside immutable repository fixtures.
+
 - Status bar
 
 The shell remains visible while page content changes.
@@ -82,6 +84,16 @@ Secondary identity:
 - last analysis timestamp
 - confidence
 - recommended next action control
+
+Project context header is shared and rendered once by the shell for all Project Workspace pages.
+Fields are restricted to:
+- project name
+- customer
+- lifecycle stage
+- current status
+- last analysis
+- confidence
+- recommended next action
 
 ## Breadcrumb Rules
 Breadcrumbs are concise and do not repeat workspace labels.
@@ -190,6 +202,10 @@ Object navigation behavior in Project Workspace:
 - overview surfaces Recently Viewed and Pinned object lists for fast context return
 - Relationship Explorer provides relationship-type and connected-object-type filters with connected object cards
 
+Object detail scaffolding:
+- Equipment, Drawings, and Specifications use a shared section pattern for metadata, references/referenced-by, warnings/evidence, and recommended actions
+- object-specific tabs remain configurable and do not force unrelated fields
+
 Global Search behavior:
 - persistent header search control visible in application and project workspaces
 - search scope includes application objects (projects, manufacturers, vendors, customers, products, price lists) and project objects (equipment, drawings, specifications, systems, rooms, risks/findings, RFIs, evidence, notebook entries, relationships)
@@ -209,6 +225,19 @@ Working Set behavior:
 - purpose statement: Keep important project objects close while you review the project.
 - available in Project Overview, Global Search panel, object detail headers, and compact header history popover
 - supports add/remove/open/clear and lightweight reordering controls
+
+Navigation behavior:
+- navigation rendering is configuration-driven using shared group definitions
+- supports application-level and project-level navigation from the same renderer
+- responsive navigation remains Desktop sidebar, Tablet popover, and Mobile drawer-style popover
+- disabled future lifecycle sections are visible but non-interactive
+
+Status color rules:
+- red is reserved for critical, blocked, failed, or destructive contexts
+- normal actions and navigation use Atlas primary accent
+- green indicates healthy/complete
+- amber indicates needs review/attention
+- gray indicates unknown/inactive context
 
 Project Settings:
 - Project Metadata

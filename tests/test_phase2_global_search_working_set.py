@@ -318,3 +318,28 @@ def test_open_project_result_activates_workspace() -> None:
 
     assert st.session_state["atlas_active_workspace_id"] == "maw-demo"
     assert st.session_state["atlas_active_page"] == "Overview"
+
+
+def test_project_context_header_builder_returns_expected_fields() -> None:
+    record = _project_record("maw-demo", "MAW")
+
+    header = app._build_project_context_header(
+        record,
+        customer="Music Academy of the West",
+        confidence="84%",
+        recommended_next_action="Review Documents",
+    )
+
+    assert header.project_name == "MAW"
+    assert header.customer == "Music Academy of the West"
+    assert header.confidence == "84%"
+    assert header.recommended_next_action == "Review Documents"
+
+
+def test_project_navigation_contains_disabled_future_lifecycle_group() -> None:
+    group_names = [name for name, _ in app.PROJECT_NAV_GROUPS]
+
+    assert "Future Lifecycle (Disabled)" in group_names
+    assert set(app.DISABLED_LIFECYCLE_PAGES) <= {
+        page for _, entries in app.PROJECT_NAV_GROUPS for _, page in entries
+    }

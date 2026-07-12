@@ -21,6 +21,7 @@ Sprint 4 UI refinement adds repository-backed Open Existing Project, a stronger 
 Sprint 5 introduces an Equipment Object Workspace that treats equipment as first-class engineering objects with deterministic detail, relationship navigation, evidence, and recommended actions.
 Sprint 6 implements the Atlas object navigation layer, adding shared object navigation patterns across Drawings, Specifications, Equipment, global object search, and Relationship Explorer.
 Sprint 7 delivers persistent Global Object Search and Working Set workflows, including deterministic ranking, grouped result presentation, local search history, and object-context breadcrumbs.
+Sprint 7.5 completes UI repair and runtime-state isolation with shared project context header rendering, configuration-driven navigation cleanup, shared object detail section scaffolding, and mutable runtime workspace storage outside immutable source fixtures.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
@@ -56,6 +57,9 @@ Current workspace behavior:
 - Search now persists recent queries and recently opened results in local workspace state.
 - Pinned object UX is renamed to Working Set across object detail and search workflows, with add/remove/open/clear and compact reorder actions.
 - Project Overview and header history now surface recently viewed objects and Working Set for fast return to active review objects.
+- Runtime interactive workspace storage now defaults to a mutable local runtime path (`~/.atlas_core/runtime/AtlasProjects` unless overridden), preventing normal app execution from mutating tracked fixture data.
+- Project navigation now includes explicit disabled future lifecycle sections and shared configuration-driven rendering.
+- Shared object metadata/reference section helpers are reused across Equipment, Drawings, and Specifications detail views.
 - BOM Review now includes an Open Equipment Detail action for selected BOM rows while preserving BOM table reconciliation behavior.
 - Drawing and Specification workspaces now expose referenced equipment as human-readable objects that can open Equipment Workspace.
 - Project Workspace now includes a non-blocking guided review sequence with statuses (not started/ready/needs review/blocked/complete).

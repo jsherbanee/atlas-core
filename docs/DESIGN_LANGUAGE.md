@@ -99,6 +99,13 @@ Status colors should be reserved for state communication only:
 - Critical: urgent and unmistakable
 - Unknown: deliberately subdued and unresolved
 
+Color assignment rules for interface actions:
+- Red is reserved for critical findings, blocking issues, failed operations, and destructive actions only.
+- Primary navigation and normal primary actions use the Atlas primary accent (blue family).
+- Green indicates healthy or complete states.
+- Amber indicates needs review or cautionary states.
+- Gray indicates unknown, inactive, or unavailable states.
+
 Color should support confidence and orientation. It should never compete with the information itself.
 
 ## 10. Typography Philosophy
@@ -177,6 +184,8 @@ Preferred patterns:
 - Atlas / Projects
 - Atlas / Knowledge
 - Atlas / Projects / <Project Name> / <Page>
+
+Breadcrumbs should avoid internal route names, duplicate workspace labels, and implementation terminology.
 
 ## 13. Data Visualization
 

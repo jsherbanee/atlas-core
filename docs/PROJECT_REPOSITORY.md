@@ -56,6 +56,10 @@ Workspace integration is done by atlas_core/services/project_workspace_service.p
 Projects are stored under:
 - AtlasProjects/<project_id>/
 
+Runtime UI sessions use mutable workspace storage outside immutable source fixtures:
+- default runtime path: ~/.atlas_core/runtime/AtlasProjects/
+- optional override: ATLAS_RUNTIME_WORKSPACE_ROOT
+
 Directory structure:
 
 - AtlasProjects/
@@ -159,6 +163,28 @@ Atlas persists the following state to workspace.json:
 - context selection
 
 On load, the workspace restores this state so the user returns to their last working context.
+
+## Immutable Fixtures vs Mutable Runtime Storage
+Atlas distinguishes fixture data from runtime state:
+
+Immutable fixture data:
+- canonical fixture/reference artifacts tracked in source control
+- used for deterministic tests and baseline regression behavior
+- should not be modified by normal interactive app execution
+
+Mutable runtime data:
+- interactive workspace state generated during local UI sessions
+- stored under runtime workspace root (default: ~/.atlas_core/runtime/AtlasProjects)
+- safe to recreate, clear, or discard without affecting tracked fixture baselines
+
+Expected behavior:
+- opening reference projects should not mutate tracked fixture trees
+- workspace_opened and similar runtime events write to mutable runtime storage
+- repeated app runs should not dirty repository fixture files
+
+Cleanup behavior:
+- runtime workspace data can be deleted and recreated automatically on next run
+- immutable fixtures remain tracked and unchanged
 
 ## Project Manager Operations
 Project manager actions are repository-backed:
