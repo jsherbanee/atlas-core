@@ -25,6 +25,24 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic X Sprint X-03 Onboarding and Stakeholder Workflow Hardening)
 
+## Unreleased (Epic X Sprint X-04 Home Page Simplification and Global Search Refinement)
+
+### Improved
+
+- Application Workspace landing-page terminology is standardized to Home.
+- Mission Control remains internal-only as a compatibility route name.
+- Header global search now submits directly on Enter.
+- Empty/whitespace-only search no longer executes or renders result panels.
+- Search results are grouped by user-facing object type with deterministic preferred ordering and safe unknown-type fallback ordering.
+- Home content is simplified to primary project actions plus Action Center and Recent Activity.
+- Action Center now shows prioritized critical/high deduplicated actions only.
+
+### Scope Notes
+
+- product hardening only for existing Home/header/search workflows
+- no Epic E start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
 ### Improved
 
 - Create New Project now enforces strict two-step onboarding: metadata-first create, then Documents upload.

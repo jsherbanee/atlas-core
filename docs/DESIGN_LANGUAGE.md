@@ -167,10 +167,11 @@ Cards should be used only when they improve comprehension. Tables should remain 
 Atlas is project-centric, not document-centric and not estimate-centric.
 
 Atlas navigation uses two explicit workspace layers:
-- Application Workspace for Mission Control, project management, portfolio reporting, and administration.
+- Application Workspace for Home, project management, portfolio reporting, and administration.
 - Project Workspace for project-specific review and decision pages after a project is opened.
 
-Mission Control remains application-level even when a project is active.
+Home remains the public application-level landing page even when a project is active.
+Mission Control remains an internal compatibility route name only.
 
 Navigation should always help answer four questions:
 
@@ -184,6 +185,7 @@ Core object types (equipment, drawings, specifications, systems, rooms, risks, R
 
 Global object discovery should be persistent and immediate.
 Search should remain available in the header across application and project workspaces so users can move directly to objects without page-by-page navigation.
+Header search executes directly on Enter and avoids separate open/close interaction modes.
 
 Navigation should be persistent, require minimal clicks, and maintain a predictable hierarchy. The interface should feel like a workspace, not a maze.
 

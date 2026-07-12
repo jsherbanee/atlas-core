@@ -121,6 +121,16 @@ X-03 continues workflow hardening in project onboarding and stakeholder linkage 
 
 Workbench impact in X-03 remains limited to context continuity from improved project identity and shared organization linkage in existing project shells.
 
+## Sprint X-04 Scope Boundary Note
+
+X-04 continues product hardening for application-shell terminology and navigation clarity only:
+
+- Home is the public landing-page term in Application Workspace surfaces.
+- Mission Control remains an internal compatibility route name.
+- Header search interaction is refined (Enter submit and grouped result presentation) without introducing new engineering-intelligence capabilities.
+
+Workbench capability scope is unchanged in X-04.
+
 ## Resolver Conflict Center
 
 Resolver Conflict Center provides a dedicated conflict workspace.

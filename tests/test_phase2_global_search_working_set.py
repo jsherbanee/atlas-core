@@ -33,6 +33,46 @@ class _FakeStreamlit:
         self.rerun_called = True
 
 
+class _HomeContractStreamlit:
+    def __init__(self, *, pressed: set[str] | None = None) -> None:
+        self.session_state: dict[str, Any] = {}
+        self._pressed = set(pressed or set())
+        self.subheaders: list[str] = []
+        self.markdowns: list[str] = []
+        self.captions: list[str] = []
+        self.dataframes: list[Any] = []
+        self.rerun_called = False
+
+    def subheader(self, text: str) -> None:
+        self.subheaders.append(text)
+
+    def columns(self, count: int) -> list[_HomeContractStreamlit]:
+        return [self for _ in range(count)]
+
+    def button(
+        self,
+        label: str,
+        type: str = "secondary",
+        use_container_width: bool = False,
+        key: str | None = None,
+    ) -> bool:
+        _ = (type, use_container_width, key)
+        return label in self._pressed
+
+    def markdown(self, text: str) -> None:
+        self.markdowns.append(text)
+
+    def caption(self, text: str) -> None:
+        self.captions.append(text)
+
+    def dataframe(self, data: Any, **kwargs: Any) -> None:
+        _ = kwargs
+        self.dataframes.append(data)
+
+    def rerun(self) -> None:
+        self.rerun_called = True
+
+
 class _FakeWorkspaceService:
     def __init__(self, records: list[ProjectWorkspaceRecord]) -> None:
         self._records = records
@@ -446,7 +486,7 @@ def test_project_scope_preferred_for_non_exact_matches() -> None:
     assert filtered[0]["scope"] == "project"
 
 
-def test_search_grouping_uses_object_type() -> None:
+def test_search_grouping_uses_ordered_user_labels() -> None:
     grouped = app._group_search_results(
         [
             _reference(
@@ -461,11 +501,170 @@ def test_search_grouping_uses_object_type() -> None:
                 object_type="Equipment",
                 scope="project",
             ),
+            _reference(
+                object_id="u1",
+                display_name="Custom A",
+                object_type="Alpha Custom",
+                scope="project",
+            ),
+            _reference(
+                object_id="u2",
+                display_name="Custom Z",
+                object_type="Zeta Custom",
+                scope="project",
+            ),
         ]
     )
 
-    assert set(grouped.keys()) == {"Drawing", "Equipment"}
-    assert len(grouped["Drawing"]) == 1
+    assert list(grouped.keys()) == [
+        "Equipment",
+        "Drawings",
+        "Alpha Custom",
+        "Zeta Custom",
+    ]
+    assert len(grouped["Drawings"]) == 1
+
+
+def test_search_grouping_omits_empty_preferred_groups() -> None:
+    grouped = app._group_search_results(
+        [
+            _reference(
+                object_id="v1",
+                display_name="ADI",
+                object_type="Vendor",
+                scope="application",
+            )
+        ]
+    )
+
+    assert list(grouped.keys()) == ["Vendors"]
+    assert "Projects" not in grouped
+
+
+def test_application_nav_exposes_home_with_compatibility_route_key() -> None:
+    app_workspace_entries = app.APPLICATION_NAV_GROUPS[0][1]
+
+    assert ("Home", "Mission Control") in app_workspace_entries
+
+
+def test_group_for_page_keeps_internal_mission_control_compatibility() -> None:
+    assert (
+        app._group_for_page(
+            "Mission Control",
+            _project_record("BID-2026-0001", "Compatibility Project"),
+        )
+        == "Mission Control"
+    )
+
+
+def test_submit_global_search_ignores_empty_query() -> None:
+    st = _FakeStreamlit(session_state={"atlas_global_search": "   "})
+
+    app._submit_global_search(st)
+
+    assert "atlas_global_search_last_submitted" not in st.session_state
+
+
+def test_submit_global_search_records_non_empty_query() -> None:
+    st = _FakeStreamlit(session_state={"atlas_global_search": "  av-601  "})
+
+    app._submit_global_search(st)
+
+    assert st.session_state["atlas_global_search_last_submitted"] == "av-601"
+
+
+def test_breadcrumb_page_label_maps_mission_control_to_home() -> None:
+    assert app._breadcrumb_page_label("Mission Control") == "Home"
+
+
+def test_breadcrumb_for_mission_control_renders_home_for_users() -> None:
+    assert app._breadcrumb(None, "Mission Control") == "Atlas / Home"
+
+
+def test_home_content_contract_headings_and_removed_sections() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_home_page(
+        st,
+        workspace_service=None,
+        record=None,
+        context=None,
+        mission_control_payload={},
+    )
+
+    assert st.subheaders == ["Home"]
+    assert "### Action Center" in st.markdowns
+    assert "### Recent Activity" in st.markdowns
+    removed_titles = {
+        "### Application Areas",
+        "### Portfolio Signals",
+        "### Upcoming Timeline",
+        "### Projects Requiring Attention",
+        "### Workspace Recommendations",
+        "Mission Control",
+    }
+    assert all(title not in st.markdowns for title in removed_titles)
+
+
+def test_home_primary_actions_route_correctly() -> None:
+    actions = {
+        "Create New Project": "Create New Project",
+        "Open Existing Project": "Open Existing Project",
+        "Manage Projects": "Projects",
+    }
+    for button_label, expected_page in actions.items():
+        st = _HomeContractStreamlit(pressed={button_label})
+
+        app._render_home_page(
+            st,
+            workspace_service=None,
+            record=None,
+            context=None,
+            mission_control_payload={},
+        )
+
+        assert st.session_state["atlas_active_page"] == expected_page
+        assert st.rerun_called is True
+
+
+def test_action_center_filters_to_high_priority_and_deduplicates() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_mission_control_panels(
+        st,
+        {
+            "actions": [
+                {
+                    "priority": "High",
+                    "title": "Resolve missing docs",
+                    "project": "P1",
+                    "destination": "Documents",
+                },
+                {
+                    "priority": "High",
+                    "title": "Resolve missing docs",
+                    "project": "P1",
+                    "destination": "Documents",
+                },
+                {
+                    "priority": "Medium",
+                    "title": "Optional review",
+                    "project": "P1",
+                    "destination": "Overview",
+                },
+            ],
+            "timeline": [],
+        },
+    )
+
+    assert "### Action Center" in st.markdowns
+    assert "### Recent Activity" in st.markdowns
+    assert len(st.dataframes) == 1
+    rows = st.dataframes[0]
+    assert isinstance(rows, list)
+    assert len(rows) == 1
+    assert rows[0]["Priority"] == "High"
+    assert rows[0]["Destination"] == "Documents"
 
 
 def test_open_search_reference_routes_to_target_page() -> None:

@@ -60,14 +60,15 @@ Completed outcomes:
 
 ## Phase 2: Bid Intelligence (Active)
 Current objective:
-Sprint X-03 Onboarding and Stakeholder Workflow Hardening is active.
+Sprint X-04 Home/search closeout is complete and under stabilization validation.
 
 Current UX hardening stream:
 
-- Epic X Product Hardening continuation (A-05 and X-01/X-02 complete, X-03 active)
+- Epic X Product Hardening continuation (A-05 and X-01/X-02/X-03/X-04 complete)
 - focused on estimator/project-engineer/design-engineer workflow usability hardening for existing capabilities
 - preserves D-03 scope boundaries and does not start Epic E or Commercial Intelligence implementation
 - includes onboarding/stakeholder hardening in existing project-management workflows and preserves prior X-02 identity model refinements
+- includes Home/header/search simplification with deterministic grouped global search and Home terminology normalization
 
 Implemented in current baseline candidate:
 - Bid package review orchestration

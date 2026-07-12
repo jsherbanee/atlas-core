@@ -35,12 +35,13 @@ Sprint A-05 performs end-to-end GUI validation and workflow refinement across Mi
 Sprint X-01 performs pilot-readiness walkthrough validation and usability hardening for existing workflows.
 Sprint X-02 implements project creation and bid identity refinement with Atlas Bid ID allocation, explicit client/internal project identifiers, and metadata update workflows.
 Sprint X-03 hardens onboarding and stakeholder workflows with strict two-step create-then-upload behavior, pending-upload accumulation semantics, shared organization directory linkage, and compatibility-safe stakeholder persistence.
+Sprint X-04 completes Home/header/search simplification with Home terminology standardization, Enter-submit global search behavior, deterministic grouped search ordering, and removal of redundant Home portfolio sections.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1115 tests)
+- pytest: full suite passing (1127 tests)
 
 ## Tooling Status
 - GitHub Actions configured
@@ -49,7 +50,7 @@ Sprint X-03 hardens onboarding and stakeholder workflows with strict two-step cr
   - .pre-commit-config.yaml
 
 ## Active Focus
-Sprint X-03 onboarding and stakeholder workflow hardening.
+Sprint X-04 closeout and clean-tree validation.
 
 Secondary active focus:
 - low-risk UI helper refinement and consistency hardening in existing workspaces.
@@ -59,6 +60,7 @@ Current implementation scope note:
 - no Epic E implementation has started in this refinement pass
 - no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation features were introduced in X-02
 - no Epic E implementation has started in X-03
+- no Epic E implementation has started in X-04
 - X-03 remains workflow hardening only and does not introduce new estimating/commercial/procurement/execution capabilities
 
 
@@ -70,7 +72,7 @@ Current MAW reference-project behavior:
 - GUI labels explicitly indicate whether Reference Project is using Real package intake or Seed fixture fallback.
 
 Current workspace behavior:
-- Atlas uses an Application Workspace for Mission Control, project management, knowledge, reports, and administration.
+- Atlas uses an Application Workspace for Home, project management, knowledge, reports, and administration.
 - Opening a project switches Atlas into a dedicated Project Workspace with project-specific navigation.
 - Local project records are stored under AtlasProjects/.
 - Project Workspace emphasizes Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate (deterministic foundation), Notebook, Reports, and project details/settings pages.
@@ -116,6 +118,9 @@ Current workspace behavior:
 - Knowledge workspace is application-wide and excludes project-specific review pages.
 - Active project identity is surfaced through a compact project header with lifecycle/status badges and recommended next action.
 - Project Workspace desktop layout is two-column (navigation + working content), with inline/on-demand object detail.
+- Home now contains primary project actions plus Action Center (critical/high deduplicated actions) and Recent Activity only.
+- Mission Control naming remains internal-only for compatibility route/state keys.
+- Global search executes directly on Enter and renders deterministic grouped result sections by user-facing type labels.
 
 ## Latest Completed Feature
 - Estimator Brief Enhancements (deterministic executive summary, prioritized reviewer actions, and evidence traceability)

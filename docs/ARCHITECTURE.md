@@ -115,6 +115,19 @@ X-03 focus is deterministic refinement of existing create/open/settings/document
 - shared organization directory plus project stakeholder relationship persistence
 - legacy metadata compatibility behavior for older project records
 
+## Sprint X-04 Home/Search Simplification Constraints (Closed)
+
+X-04 continues product hardening without architecture expansion:
+
+- Home is the only public landing-page term in Application Workspace.
+- Mission Control remains an internal compatibility route key for existing navigation/state contracts.
+- Header search submits on Enter, with deterministic grouped result presentation by object type.
+- Home composition is reduced to primary actions plus prioritized Action Center and Recent Activity.
+
+Explicitly out of scope:
+- Epic E implementation start
+- new domain services, persistence model expansion, or post-D capability work
+
 
 Implementation structure:
 - domain: deterministic estimate entities and status enums

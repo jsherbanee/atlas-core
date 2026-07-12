@@ -30,10 +30,10 @@ Atlas now operates in two navigation modes:
 - Application Workspace
 - Project Workspace
 
-Application Workspace is used for Mission Control and cross-project operations.
+Application Workspace is used for Home and cross-project operations.
 Project Workspace is entered only after opening a specific project.
 
-Mission Control remains application-level.
+Home remains application-level.
 Opening a project switches Atlas into project-specific navigation.
 
 ## Repository-Backed Open Existing Project
@@ -210,27 +210,35 @@ If expected folders are missing, Atlas shows a warning and still attempts determ
    - streamlit run apps/phase2_review_app.py
 3. Open `Reference Project` to verify MAW source mode.
 
-## Mission Control Content
-Mission Control is now a simple landing page that explains the workflow and provides immediate access to:
+## Home Content
+Home is a simple landing page that provides immediate access to:
 - Create New Project
 - Open Existing Project
 - Manage Projects
 
 Application navigation groups:
-- Mission Control
+- Home
 - Projects
 - Knowledge
 - Reports
 - Administration
 
-Mission Control also shows the active project snapshot:
-- project name
-- customer
-- project type
-- analysis status
-- recommended next action
+Home also shows:
+- Action Center (high-priority deduplicated actions)
+- Recent Activity
 
 Project-specific engineering pages are not shown while no project is open.
+
+Sprint X-04 home/search refinement notes:
+- Home is the only user-facing landing-page term.
+- Mission Control is retained only as an internal compatibility route key.
+- Global search submits directly on Enter from the header input.
+- Empty/whitespace-only search does not execute and does not render results.
+- Search results are grouped by user-facing object type with deterministic preferred ordering.
+- Unknown object types are rendered after preferred groups in alphabetical order.
+- Removed Home sections: Application Areas, Portfolio Signals, Upcoming Timeline, Projects Requiring Attention, and Workspace Recommendations.
+- Action Center is limited to critical/high-priority deduplicated actions.
+- Recent Activity is the only secondary Home section.
 
 ## Project Workspace Navigation
 When a project is opened, Atlas switches to project navigation.

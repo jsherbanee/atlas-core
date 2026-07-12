@@ -259,7 +259,7 @@ APPLICATION_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
     (
         "Application Workspace",
         [
-            ("Mission Control", "Mission Control"),
+            ("Home", "Mission Control"),
             ("Projects", "Projects"),
             ("Knowledge", "Knowledge"),
             ("Reports", "Reports"),
@@ -3262,7 +3262,6 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_product_resolution_overrides", {})
     st.session_state.setdefault("atlas_product_resolution_cache", {})
     st.session_state.setdefault("atlas_quick_add_products", {})
-    st.session_state.setdefault("atlas_global_search_open", False)
     st.session_state.setdefault("atlas_active_project_name", "")
     st.session_state.setdefault("atlas_documents_pending_uploads", {})
     st.session_state.setdefault("atlas_documents_pending_selection_signature", {})
@@ -3636,6 +3635,7 @@ def _group_for_page(page: str, record: ProjectWorkspaceRecord | None) -> str:
 
 def _breadcrumb_page_label(page: str) -> str:
     mapping = {
+        "Mission Control": "Home",
         "Project Metadata": "Project Settings",
         "Workspace Settings": "Workspace Settings",
         "Relationship Visualization": "Relationship Graph",
@@ -3923,38 +3923,21 @@ def _open_project_from_local_path(
     )
 
 
-def _keyboard_shortcut_label(st: Any) -> str:
-    return (
-        "Cmd+K"
-        if _safe_text(st.session_state.get("atlas_os"), "macos") == "macos"
-        else "Ctrl+K"
-    )
-
-
 def _render_global_search_control(st: Any, host: Any) -> None:
     host.text_input(
         "Global Object Search",
         key="atlas_global_search",
         placeholder="Search projects, equipment, drawings, specs, systems, rooms, RFIs, risks, manufacturers, products...",
+        on_change=_submit_global_search,
+        args=(st,),
     )
-    control_cols = host.columns([1, 1])
-    if control_cols[0].button(
-        "Open Search",
-        key="atlas_open_global_search",
-        use_container_width=True,
-    ):
-        st.session_state["atlas_global_search_open"] = True
-    if control_cols[1].button(
-        "Close",
-        key="atlas_close_global_search",
-        use_container_width=True,
-    ):
-        st.session_state["atlas_global_search_open"] = False
-        st.session_state["atlas_global_search"] = ""
 
-    host.caption(
-        f"Shortcut: {_keyboard_shortcut_label(st)} to focus/open search where supported. Press Esc to close search."
-    )
+
+def _submit_global_search(st: Any) -> None:
+    query = _safe_text(st.session_state.get("atlas_global_search"), "").strip()
+    if not query:
+        return
+    st.session_state["atlas_global_search_last_submitted"] = query
 
 
 def _render_header_history_popover(
@@ -4014,25 +3997,19 @@ def _render_header(
     context: dict[str, Any] | None,
 ) -> None:
     records = workspace_service.list_workspaces(include_archived=True, limit=200)
-    current_page = _safe_text(
-        st.session_state.get("atlas_active_page"), "Mission Control"
-    )
 
     header_cols = st.columns([1.1, 2.0, 2.8, 1.6])
     if header_cols[0].button("Atlas", use_container_width=True, type="secondary"):
         st.session_state["atlas_active_page"] = "Mission Control"
         st.rerun()
 
-    _render_global_search_control(st, header_cols[2])
-
     if record is None:
         st.session_state["atlas_active_project_name"] = ""
-        header_cols[1].caption(f"Application Workspace · {current_page}")
-        if header_cols[3].button("Open Projects", use_container_width=True):
-            st.session_state["atlas_active_page"] = "Projects"
-            st.rerun()
+        _render_global_search_control(st, header_cols[2])
         _render_header_history_popover(st, workspace_service)
         return
+
+    _render_global_search_control(st, header_cols[2])
 
     summary = _build_project_analysis_summary(record, context)
     st.session_state["atlas_active_project_name"] = record.project.name
@@ -5262,17 +5239,8 @@ def _render_home_page(
     context: dict[str, Any] | None,
     mission_control_payload: dict[str, Any] | None = None,
 ) -> None:
-    _render_page_header(
-        st,
-        "Mission Control",
-        "Application-level workspace for project selection, portfolio awareness, and administration.",
-    )
-    _render_workspace_section_header(
-        st,
-        workspace="Mission Control",
-        objective="Portfolio awareness and deterministic workspace triage.",
-        current_focus="Review prioritized recommendations and open the next workspace action.",
-    )
+    _ = (workspace_service, record, context)
+    st.subheader("Home")
 
     action_cols = st.columns(3)
     if action_cols[0].button(
@@ -5289,281 +5257,7 @@ def _render_home_page(
         st.session_state["atlas_active_page"] = "Projects"
         st.rerun()
 
-    st.markdown("### Application Areas")
-    st.dataframe(
-        [
-            {"Area": "Mission Control", "Purpose": "Portfolio-level action center."},
-            {
-                "Area": "Projects",
-                "Purpose": "Create, open, and manage project workspaces.",
-            },
-            {"Area": "Knowledge", "Purpose": "Cross-project references and standards."},
-            {"Area": "Reports", "Purpose": "Cross-project reporting and signals."},
-            {
-                "Area": "Administration",
-                "Purpose": "Workspace preferences and repository controls.",
-            },
-        ],
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    if record is not None:
-        summary = _build_project_analysis_summary(record, context)
-        st.markdown("### Active Project Snapshot")
-        st.dataframe(
-            [
-                {
-                    "Project": summary["project_name"],
-                    "Customer": summary["customer"],
-                    "Project Type": summary["project_type"],
-                    "Analysis Status": summary["analysis_status"],
-                    "Recommended Next Action": summary["recommended_next_action"],
-                }
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-        if st.button(
-            "Open Project Workspace", type="primary", use_container_width=True
-        ):
-            st.session_state["atlas_active_page"] = "Overview"
-            st.rerun()
-    else:
-        st.info(
-            "No project is open. Open a project to enter Project Workspace navigation."
-        )
-
-    if mission_control_payload:
-        st.markdown("### Portfolio Signals")
-        _render_mission_control_panels(st, mission_control_payload)
-
-    last_cost_result = dict(st.session_state.get("atlas_last_cost_result") or {})
-    recommendation_rows: list[dict[str, Any]] = []
-    if record is not None:
-        stakeholder_rows: list[dict[str, Any]] = []
-        try:
-            stakeholder_rows = list(
-                workspace_service.list_project_stakeholders(record.workspace_id)
-            )
-        except Exception:
-            stakeholder_rows = []
-
-        recommendation_rows.append(
-            {
-                "Priority": "Medium",
-                "Recommendation": _safe_text(
-                    summary.get("recommended_next_action"),
-                    "Review project readiness in Overview.",
-                ),
-                "Count": 1,
-                "Destination": "Overview",
-                "Source": "Project Workspace",
-            }
-        )
-        if _needs_internal_project_number(record):
-            recommendation_rows.append(
-                {
-                    "Priority": "Medium",
-                    "Recommendation": "Assign Internal Project Number now that lifecycle stage is awarded/execution.",
-                    "Count": 1,
-                    "Destination": "Project Settings",
-                    "Source": "Project Metadata",
-                }
-            )
-
-        legacy_stakeholder_text = [
-            _safe_text(record.metadata.get("owner"), ""),
-            _safe_text(record.metadata.get("general_contractor"), ""),
-            _safe_text(record.metadata.get("electrical_contractor"), ""),
-            _safe_text(record.metadata.get("consultant"), ""),
-            _safe_text(record.metadata.get("architect"), ""),
-            ", ".join(
-                [
-                    _safe_text(item, "")
-                    for item in list(record.metadata.get("engineers") or [])
-                    if _safe_text(item, "")
-                ]
-            ),
-        ]
-        has_owner_link = any(
-            _safe_text(item.get("role"), "") == OrganizationRole.OWNER_CLIENT.value
-            for item in stakeholder_rows
-        )
-        if not has_owner_link:
-            recommendation_rows.append(
-                {
-                    "Priority": "High",
-                    "Recommendation": "Project has no Owner / Client relationship link in shared Organizations.",
-                    "Count": 1,
-                    "Destination": "Project Settings",
-                    "Source": "Stakeholder Directory",
-                }
-            )
-        if any(legacy_stakeholder_text) and not stakeholder_rows:
-            recommendation_rows.append(
-                {
-                    "Priority": "Medium",
-                    "Recommendation": "Project has legacy free-text stakeholders. Link them to shared Organizations.",
-                    "Count": 1,
-                    "Destination": "Project Settings",
-                    "Source": "Stakeholder Migration",
-                }
-            )
-
-        try:
-            manifest = workspace_service.read_manifest(record.workspace_id)
-        except Exception:
-            manifest = {}
-        document_count = sum(
-            int(value) for value in dict(manifest.get("document_counts") or {}).values()
-        )
-        if document_count == 0:
-            recommendation_rows.append(
-                {
-                    "Priority": "High",
-                    "Recommendation": "Project was created but has no bid documents uploaded.",
-                    "Count": 1,
-                    "Destination": "Documents",
-                    "Source": "Document Intake",
-                }
-            )
-        rejected_count = int(record.import_summary.get("rejected_file_count", 0) or 0)
-        if rejected_count > 0:
-            recommendation_rows.append(
-                {
-                    "Priority": "High",
-                    "Recommendation": "Uploaded documents include failed intake files. Review and retry rejected files.",
-                    "Count": rejected_count,
-                    "Destination": "Documents",
-                    "Source": "Document Intake",
-                }
-            )
-    recommendation_rows.extend(
-        [
-            {**item, "Source": "Commercial Knowledge"}
-            for item in _commercial_recommendation_rows(st)
-        ]
-    )
-
-    cost_issue_counts: dict[str, int] = defaultdict(int)
-    for line in list(last_cost_result.get("lines") or []):
-        status = _safe_text(line.get("status"), "")
-        if status not in {"missing", "stale", "expired", "historical", "unavailable"}:
-            continue
-        cost_issue_counts[status] += 1
-
-    for status, count in cost_issue_counts.items():
-        recommendation_rows.append(
-            {
-                "Priority": (
-                    "High"
-                    if status in {"missing", "unavailable", "expired"}
-                    else "Medium"
-                ),
-                "Recommendation": (
-                    "Resolve missing deterministic cost selections before estimate lock."
-                    if status in {"missing", "unavailable"}
-                    else "Refresh stale deterministic costs before estimate lock."
-                ),
-                "Count": count,
-                "Destination": "Estimate",
-                "Source": "Deterministic Cost",
-            }
-        )
-
-    engine_state = st.session_state.get("atlas_estimate_engine_state")
-    if isinstance(engine_state, dict):
-        try:
-            estimate_engine = EstimateEngineService(state=engine_state)
-            estimate_rows = list(estimate_engine.state.get("estimates", {}).values())
-            for estimate_row in estimate_rows:
-                estimate_id = _safe_text(estimate_row.get("estimate_id"), "")
-                if not estimate_id:
-                    continue
-                readiness = estimate_engine.mission_control_readiness(
-                    estimate_id=estimate_id
-                )
-                for text in list(readiness.get("recommendations") or []):
-                    recommendation_rows.append(
-                        {
-                            "Priority": (
-                                "High"
-                                if "blocking" in text.lower()
-                                or "missing" in text.lower()
-                                else "Medium"
-                            ),
-                            "Recommendation": text,
-                            "Count": 1,
-                            "Destination": "Estimate",
-                            "Source": "Estimate Engine D-03",
-                        }
-                    )
-        except Exception:
-            pass
-
-    st.markdown("### Workspace Recommendations")
-    deduped_recommendations = _dedupe_recommendation_rows(recommendation_rows)
-    if deduped_recommendations:
-        summary_counts: dict[str, int] = defaultdict(int)
-        for row in deduped_recommendations:
-            priority = _safe_text(row.get("Priority"), "Medium")
-            summary_counts[priority] += int(row.get("Count", 1) or 1)
-        st.caption(
-            "Open recommendations: "
-            + ", ".join(
-                [
-                    f"High {summary_counts.get('High', 0)}",
-                    f"Medium {summary_counts.get('Medium', 0)}",
-                    f"Low {summary_counts.get('Low', 0)}",
-                ]
-            )
-        )
-        st.dataframe(deduped_recommendations, use_container_width=True, hide_index=True)
-
-        destination_options = [
-            {
-                "label": (
-                    f"[{_safe_text(item.get('Priority'), 'Medium')}] "
-                    + _safe_text(item.get("Recommendation"), "")
-                    + f" -> {_safe_text(item.get('Destination'), 'Mission Control')}"
-                ),
-                "destination": _safe_text(item.get("Destination"), "Mission Control"),
-                "row": dict(item),
-            }
-            for item in deduped_recommendations
-        ]
-        selected_label = st.selectbox(
-            "Recommendation Destination",
-            options=[item["label"] for item in destination_options],
-            key="atlas_mission_control_recommendation_destination",
-        )
-        selected = next(
-            (item for item in destination_options if item["label"] == selected_label),
-            {},
-        )
-        selected_row = selected.get("row")
-        selected_recommendation: dict[str, Any] = (
-            dict(selected_row) if isinstance(selected_row, dict) else {}
-        )
-        guidance = _recommendation_guidance(selected_recommendation)
-        st.markdown("#### Recommendation Guidance")
-        st.dataframe(
-            [guidance],
-            use_container_width=True,
-            hide_index=True,
-        )
-        if st.button(
-            "Open Recommendation Destination",
-            key="atlas_mission_control_open_recommendation_destination",
-            use_container_width=True,
-        ):
-            st.session_state["atlas_active_page"] = _recommendation_destination_page(
-                selected.get("destination")
-            )
-            st.rerun()
-    else:
-        st.caption("No deterministic recommendations are currently open.")
+    _render_mission_control_panels(st, mission_control_payload or {})
 
 
 def _render_application_knowledge_page(
@@ -12779,11 +12473,56 @@ def _filter_search_results(
 def _group_search_results(
     references: list[dict[str, Any]],
 ) -> dict[str, list[dict[str, Any]]]:
-    grouped_refs: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    preferred_order = [
+        "Project",
+        "Equipment",
+        "Drawing",
+        "Specification",
+        "System",
+        "Room",
+        "RFI Candidate",
+        "Risk / Finding",
+        "Manufacturer",
+        "Vendor",
+        "Product",
+        "Organization",
+        "Price List",
+        "Estimate",
+        "Assembly",
+    ]
+    label_map = {
+        "Project": "Projects",
+        "Equipment": "Equipment",
+        "Drawing": "Drawings",
+        "Specification": "Specifications",
+        "System": "Systems",
+        "Room": "Rooms",
+        "RFI Candidate": "RFIs",
+        "Risk / Finding": "Risks",
+        "Manufacturer": "Manufacturers",
+        "Vendor": "Vendors",
+        "Product": "Products",
+        "Organization": "Organizations",
+        "Price List": "Price Sheets",
+        "Estimate": "Estimates",
+        "Assembly": "Assemblies",
+    }
+
+    by_type: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for reference in references:
-        grouped_refs[_safe_text(reference.get("object_type"), "Object")].append(
-            reference
-        )
+        by_type[_safe_text(reference.get("object_type"), "Object")].append(reference)
+
+    grouped_refs: dict[str, list[dict[str, Any]]] = {}
+    for object_type in preferred_order:
+        rows = list(by_type.pop(object_type, []))
+        if rows:
+            grouped_refs[label_map.get(object_type, object_type)] = rows
+
+    for object_type in sorted(by_type.keys()):
+        rows = list(by_type.get(object_type, []))
+        if rows:
+            grouped_refs[label_map.get(object_type, object_type)] = rows
+
     return grouped_refs
 
 
@@ -17232,8 +16971,7 @@ def _render_global_search_panel(
     context: dict[str, Any] | None,
 ) -> None:
     query = str(st.session_state.get("atlas_global_search") or "").strip()
-    is_open = bool(st.session_state.get("atlas_global_search_open", False))
-    if not is_open and not query:
+    if not query:
         return
 
     references = _global_search_entries(st, workspace_service, record, context)
@@ -17266,9 +17004,6 @@ def _render_global_search_panel(
     grouped_refs = _group_search_results(filtered)
 
     with st.expander(f"Global Search Results ({len(filtered)})", expanded=True):
-        st.caption(
-            "Ranking: exact identifier, exact name, exact model/drawing/spec number, prefix, then partial matches."
-        )
         if not filtered:
             _render_guided_empty_state(
                 st,
@@ -17285,18 +17020,17 @@ def _render_global_search_panel(
                 st.rerun()
             return
 
-        for object_type in sorted(grouped_refs.keys()):
+        for object_type in grouped_refs.keys():
             st.markdown(f"#### {object_type}")
             st.dataframe(
                 [
                     {
-                        "Display Name": _safe_text(item.get("display_name"), "Object"),
+                        "Primary": _safe_text(item.get("display_name"), "Object"),
+                        "Context": _safe_text(item.get("secondary_label"), "n/a"),
                         "Type": _safe_text(item.get("object_type"), "Object"),
-                        "Secondary": _safe_text(item.get("secondary_label"), "n/a"),
+                        "Identity": _safe_text(item.get("object_id"), "n/a"),
                         "Project": _safe_text(item.get("project_name"), "n/a"),
-                        "Status": _safe_text(item.get("status"), "n/a"),
-                        "Confidence": _safe_text(item.get("confidence"), "n/a"),
-                        "Warnings": int(item.get("warning_count", 0) or 0),
+                        "Action": "Open",
                     }
                     for item in grouped_refs[object_type][:15]
                 ],
@@ -21696,9 +21430,7 @@ def _render_main_content(
         return
 
     if record is None:
-        st.info(
-            "Open a project from Projects or Mission Control to enter Project Workspace."
-        )
+        st.info("Open a project from Projects or Home to enter Project Workspace.")
         return
 
     if page == "Project Summary" or page == "Project Metadata":
@@ -21753,20 +21485,37 @@ def _render_mission_control_panels(
 ) -> None:
     payload = mission_control_payload or {}
     actions = list(payload.get("actions") or [])
-    signals = list(payload.get("signals") or [])
     timeline = list(payload.get("timeline") or [])
-    pending_timeline = list(payload.get("pending_timeline") or [])
+
+    high_priority_actions: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in actions:
+        priority = _safe_text(item.get("priority"), "").lower()
+        if priority not in {"critical", "high"}:
+            continue
+        key = "|".join(
+            [
+                _normalize_recommendation_text(item.get("title")),
+                _normalize_recommendation_text(item.get("project")),
+                _normalize_recommendation_text(item.get("destination")),
+            ]
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        high_priority_actions.append(item)
 
     st.markdown("### Action Center")
-    if actions:
+    if high_priority_actions:
         st.dataframe(
             [
                 {
                     "Priority": item.get("priority"),
                     "Action": item.get("title"),
                     "Project": item.get("project"),
+                    "Destination": item.get("destination"),
                 }
-                for item in actions[:5]
+                for item in high_priority_actions[:8]
             ],
             use_container_width=True,
             hide_index=True,
@@ -21796,49 +21545,6 @@ def _render_mission_control_panels(
             st.rerun()
     else:
         st.caption("No activity yet.")
-
-    st.markdown("### Upcoming Timeline")
-    if pending_timeline:
-        st.dataframe(
-            [
-                {
-                    "Event": item.get("event"),
-                    "Status": item.get("status"),
-                    "Details": item.get("details"),
-                }
-                for item in pending_timeline[:5]
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-        if st.button("View full timeline", key="atlas_side_view_timeline"):
-            st.session_state["atlas_active_page"] = "Timeline"
-            st.rerun()
-    else:
-        st.caption("No pending timeline items.")
-
-    st.markdown("### Projects Requiring Attention")
-    attention = [
-        item for item in signals if item.get("status") in {"Blocked", "Needs Attention"}
-    ]
-    if attention:
-        st.dataframe(
-            [
-                {
-                    "Project": item.get("project"),
-                    "Status": item.get("status"),
-                    "Reason": item.get("reason"),
-                }
-                for item in attention[:5]
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-        if st.button("View all projects", key="atlas_side_view_projects"):
-            st.session_state["atlas_active_page"] = "Projects"
-            st.rerun()
-    else:
-        st.caption("No blocked projects in recent workspaces.")
 
 
 def _render_shell(
