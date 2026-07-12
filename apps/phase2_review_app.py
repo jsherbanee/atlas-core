@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 import hashlib
 import json
 from pathlib import Path
@@ -47,6 +47,7 @@ from atlas_core.services.pricing_service import PricingService
 from atlas_core.services.sales_design_review_service import SalesDesignReviewService
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 from atlas_core.services.estimate_service import DeterministicEstimateService
+from atlas_core.services.estimate_engine_service import EstimateEngineService
 from atlas_core.services.commercial_knowledge_service import CommercialKnowledgeService
 from atlas_core.services.cost_engine_service import DeterministicCostEngine
 from atlas_core.registry import ManufacturerRegistry
@@ -611,6 +612,78 @@ def _render_guided_empty_state(
         f"Why it matters: this view cannot provide reliable review context until data exists.\n\n"
         f"Action to populate: {action_to_populate}\n\n"
         f"Next: {next_location}"
+    )
+
+
+def _render_workspace_section_header(
+    st: Any,
+    *,
+    workspace: str,
+    objective: str,
+    current_focus: str,
+) -> None:
+    st.dataframe(
+        [
+            {
+                "Workspace": workspace,
+                "Objective": objective,
+                "Current Focus": current_focus,
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+def _normalize_recommendation_text(value: Any) -> str:
+    return " ".join(_safe_text(value, "").strip().lower().split())
+
+
+def _dedupe_recommendation_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        recommendation = _safe_text(row.get("Recommendation"), "")
+        if not recommendation:
+            continue
+        key = _normalize_recommendation_text(recommendation)
+        if not key:
+            continue
+
+        existing = merged.get(key)
+        count = int(row.get("Count", 1) or 1)
+        priority = _safe_text(row.get("Priority"), "Medium")
+        destination = _safe_text(row.get("Destination"), "Overview")
+        source = _safe_text(row.get("Source"), "Workspace")
+
+        if existing is None:
+            merged[key] = {
+                "Priority": priority,
+                "Recommendation": recommendation,
+                "Count": count,
+                "Destination": destination,
+                "Source": source,
+            }
+            continue
+
+        existing["Count"] = int(existing.get("Count", 1) or 1) + count
+        if _priority_rank(priority) < _priority_rank(
+            _safe_text(existing.get("Priority"), "Medium")
+        ):
+            existing["Priority"] = priority
+        existing_sources = {
+            _safe_text(item, "")
+            for item in _safe_text(existing.get("Source"), "").split(" / ")
+            if _safe_text(item, "")
+        }
+        existing_sources.add(source)
+        existing["Source"] = " / ".join(sorted(existing_sources))
+
+    return sorted(
+        list(merged.values()),
+        key=lambda item: (
+            _priority_rank(_safe_text(item.get("Priority"), "Medium")),
+            _safe_text(item.get("Recommendation"), ""),
+        ),
     )
 
 
@@ -2373,7 +2446,7 @@ def _commercial_recommendation_rows(st: Any) -> list[dict[str, Any]]:
             }
         )
 
-    return recommendations
+    return _dedupe_recommendation_rows(recommendations)
 
 
 def _record_by_id(
@@ -2543,6 +2616,7 @@ def _apply_deterministic_pricing(
     preferred_vendor_policy = _pricing_policy(st)
     project_quotes = _pricing_quotes(st)
     generic_allowances = _pricing_allowances(st)
+    manual_overrides = _pricing_manual_overrides(st)
     commercial_state = _commercial_knowledge_state(st)
     quick_add_products = _quick_add_products_for_project(st, record.project.project_id)
 
@@ -2558,6 +2632,7 @@ def _apply_deterministic_pricing(
         "preferred_vendor_policy": preferred_vendor_policy,
         "project_quotes": project_quotes,
         "generic_allowances": generic_allowances,
+        "manual_overrides": manual_overrides,
         "quick_add_products": quick_add_products,
     }
     signature = hashlib.sha1(
@@ -2579,6 +2654,7 @@ def _apply_deterministic_pricing(
             project_quotes=project_quotes,
             allowances=generic_allowances,
             quick_add_products=quick_add_products,
+            manual_overrides=manual_overrides,
         ).to_dict()
         st.session_state[cache_key] = {"signature": signature, "result": cost_result}
 
@@ -2597,13 +2673,19 @@ def _apply_deterministic_pricing(
                 "selected_price_record_id": item.get("price_record_id"),
                 "selected_vendor_offering_id": item.get("vendor_offering_id"),
                 "selected_price_sheet_version_id": item.get("price_sheet_version_id"),
+                "selected_price_sheet_id": item.get("price_sheet_id"),
                 "unit_cost": item.get("unit_cost"),
                 "extended_cost": item.get("extended_cost"),
+                "purchasing_quantity": item.get("purchasing_quantity"),
+                "quantity_uom": item.get("quantity_uom"),
                 "currency": item.get("currency"),
                 "pricing_status": status,
                 "pricing_confidence": confidence.get("score"),
                 "selection_method": selection.get("method"),
                 "selection_reason": selection.get("reason"),
+                "selection_rule_id": item.get("selection_rule_id"),
+                "selection_timestamp": item.get("selection_timestamp"),
+                "candidate_fingerprint": item.get("candidate_fingerprint"),
                 "effective_date": item.get("effective_date"),
                 "expiration_date": item.get("expiration_date"),
                 "import_date": item.get("import_date"),
@@ -2618,9 +2700,12 @@ def _apply_deterministic_pricing(
                         "vendor": item.get("vendor"),
                         "vendor_type": item.get("vendor_type"),
                         "price_sheet_version_id": item.get("price_sheet_version_id"),
+                        "price_sheet_id": item.get("price_sheet_id"),
                         "price_record_id": item.get("price_record_id"),
                         "source_file": item.get("source_file"),
                         "source_row": item.get("source_row"),
+                        "source_filename": item.get("source_filename"),
+                        "import_timestamp": item.get("import_date"),
                     }
                 ],
                 "selection": {
@@ -2692,13 +2777,19 @@ def _apply_deterministic_pricing(
         entry["det_freshness_status"] = priced.get("freshness_status")
         entry["det_selection_reason"] = priced.get("selection_reason")
         entry["det_selection_method"] = priced.get("selection_method")
+        entry["det_selection_rule_id"] = priced.get("selection_rule_id")
+        entry["det_selection_timestamp"] = priced.get("selection_timestamp")
+        entry["det_candidate_fingerprint"] = priced.get("candidate_fingerprint")
         entry["det_selected_price_record_id"] = priced.get("selected_price_record_id")
+        entry["det_selected_price_sheet_id"] = priced.get("selected_price_sheet_id")
         entry["det_selected_price_sheet_version_id"] = priced.get(
             "selected_price_sheet_version_id"
         )
         entry["det_selected_vendor_offering_id"] = priced.get(
             "selected_vendor_offering_id"
         )
+        entry["det_purchasing_quantity"] = priced.get("purchasing_quantity")
+        entry["det_quantity_uom"] = priced.get("quantity_uom")
         entry["det_pricing_warnings"] = ", ".join(
             warning.get("code", "")
             for warning in list(priced.get("warnings") or [])
@@ -4602,6 +4693,12 @@ def _render_home_page(
         "Mission Control",
         "Application-level workspace for project selection, portfolio awareness, and administration.",
     )
+    _render_workspace_section_header(
+        st,
+        workspace="Mission Control",
+        objective="Portfolio awareness and deterministic workspace triage.",
+        current_focus="Review prioritized recommendations and open the next workspace action.",
+    )
 
     action_cols = st.columns(3)
     if action_cols[0].button(
@@ -4667,12 +4764,60 @@ def _render_home_page(
         st.markdown("### Portfolio Signals")
         _render_mission_control_panels(st, mission_control_payload)
 
-    st.markdown("### Commercial Knowledge Recommendations")
-    recommendations = _commercial_recommendation_rows(st)
-    if recommendations:
-        st.dataframe(recommendations, use_container_width=True, hide_index=True)
+    last_cost_result = dict(st.session_state.get("atlas_last_cost_result") or {})
+    recommendation_rows: list[dict[str, Any]] = []
+    if record is not None:
+        recommendation_rows.append(
+            {
+                "Priority": "Medium",
+                "Recommendation": _safe_text(
+                    summary.get("recommended_next_action"),
+                    "Review project readiness in Overview.",
+                ),
+                "Count": 1,
+                "Destination": "Overview",
+                "Source": "Project Workspace",
+            }
+        )
+    recommendation_rows.extend(
+        [
+            {**item, "Source": "Commercial Knowledge"}
+            for item in _commercial_recommendation_rows(st)
+        ]
+    )
+
+    cost_issue_counts: dict[str, int] = defaultdict(int)
+    for line in list(last_cost_result.get("lines") or []):
+        status = _safe_text(line.get("status"), "")
+        if status not in {"missing", "stale", "expired", "historical", "unavailable"}:
+            continue
+        cost_issue_counts[status] += 1
+
+    for status, count in cost_issue_counts.items():
+        recommendation_rows.append(
+            {
+                "Priority": (
+                    "High"
+                    if status in {"missing", "unavailable", "expired"}
+                    else "Medium"
+                ),
+                "Recommendation": (
+                    "Resolve missing deterministic cost selections before estimate lock."
+                    if status in {"missing", "unavailable"}
+                    else "Refresh stale deterministic costs before estimate lock."
+                ),
+                "Count": count,
+                "Destination": "Estimate",
+                "Source": "Deterministic Cost",
+            }
+        )
+
+    st.markdown("### Workspace Recommendations")
+    deduped_recommendations = _dedupe_recommendation_rows(recommendation_rows)
+    if deduped_recommendations:
+        st.dataframe(deduped_recommendations, use_container_width=True, hide_index=True)
     else:
-        st.caption("No deterministic commercial foundation recommendations right now.")
+        st.caption("No deterministic recommendations are currently open.")
 
 
 def _render_application_knowledge_page(
@@ -4682,6 +4827,12 @@ def _render_application_knowledge_page(
         st,
         "Knowledge",
         "Application-wide reusable knowledge. Project-specific review data is intentionally excluded.",
+    )
+    _render_workspace_section_header(
+        st,
+        workspace="Knowledge",
+        objective="Maintain reusable commercial and master-library records.",
+        current_focus="Normalize manufacturer/vendor/product coverage and close missing pricing gaps.",
     )
 
     project_rows = _project_library_rows(
@@ -4830,7 +4981,7 @@ def _render_application_knowledge_page(
                     "Next Action": "Import or create projects to populate customer records.",
                 },
                 {
-                    "Knowledge Area": "Products / Master Library",
+                    "Knowledge Area": "Products (Master Library)",
                     "State": "Available" if product_rows else "Foundation in progress",
                     "Why It Matters": "Canonical products reduce alias ambiguity across projects.",
                     "Next Action": "Run project analysis to generate equipment rows and master product mappings.",
@@ -5064,7 +5215,7 @@ def _render_application_knowledge_page(
             )
 
     with tabs[5]:
-        st.markdown("### Products / Master Library")
+        st.markdown("### Products (Master Library)")
         with st.expander("Manual Single-SKU Workflow", expanded=False):
             st.caption(
                 "Add one isolated SKU without requiring full catalog or price-sheet import."
@@ -5268,6 +5419,19 @@ def _render_application_knowledge_page(
                 options=["manufacturer", "model", "status", "updated_at"],
                 key="atlas_ck_product_sort",
             )
+            if st.button(
+                "Clear Product Filters",
+                key="atlas_ck_product_filters_reset",
+                use_container_width=True,
+            ):
+                st.session_state["atlas_ck_product_search"] = ""
+                st.session_state["atlas_ck_product_mfr_filter"] = []
+                st.session_state["atlas_ck_product_lifecycle_filter"] = []
+                st.session_state["atlas_ck_product_active_filter"] = "All"
+                st.session_state["atlas_ck_product_missing_commercial_filter"] = "All"
+                st.session_state["atlas_ck_product_sort"] = "manufacturer"
+                st.session_state["atlas_ck_product_page"] = 1
+                st.rerun()
 
             filtered_products: list[dict[str, Any]] = []
             for item in product_rows:
@@ -5744,6 +5908,366 @@ def _render_project_folder_page(
     _set_context_selection(st, "file", {"folder": folder_name, "file": selected})
 
 
+def _estimate_engine_state(st: Any) -> dict[str, Any]:
+    state = st.session_state.get("atlas_estimate_engine_state")
+    if not isinstance(state, dict):
+        state = EstimateEngineService.empty_state()
+    st.session_state["atlas_estimate_engine_state"] = state
+    return state
+
+
+def _estimate_engine_service(st: Any) -> EstimateEngineService:
+    return EstimateEngineService(state=_estimate_engine_state(st))
+
+
+def _save_estimate_engine_service(st: Any, service: EstimateEngineService) -> None:
+    st.session_state["atlas_estimate_engine_state"] = service.to_dict()
+
+
+def _ensure_estimate_engine_project(
+    service: EstimateEngineService,
+    *,
+    project_id: str,
+    project_name: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    estimates = list(service.state.get("estimates", {}).values())
+    estimate = next(
+        (
+            dict(item)
+            for item in estimates
+            if _safe_text(item.get("project_id"), "") == project_id
+        ),
+        None,
+    )
+    if estimate is None:
+        created = service.create_estimate(
+            project_id=project_id,
+            name=f"{project_name} Estimate",
+            created_by="atlas-ui",
+            estimate_id=f"estimate:{project_id}:d02",
+        )
+        estimate = dict(created.get("estimate") or {})
+    active_revision_id = _safe_text(estimate.get("active_draft_revision_id"), "")
+    if not active_revision_id:
+        history = service.list_revision_history(
+            estimate_id=_safe_text(estimate.get("estimate_id"), "")
+        )
+        if history:
+            active_revision_id = _safe_text(history[-1].get("revision_id"), "")
+    revision = dict(service.state.get("revisions", {}).get(active_revision_id) or {})
+    return estimate, revision
+
+
+def _sync_estimate_engine_lines(
+    service: EstimateEngineService,
+    *,
+    revision_id: str,
+    line_rows: list[Any],
+    pricing_by_line_id: dict[str, dict[str, Any]],
+    commercial_state: dict[str, Any],
+) -> None:
+    revision = dict(service.state.get("revisions", {}).get(revision_id) or {})
+    if not revision:
+        return
+    existing = {
+        _safe_text(item.get("source_object_id"), ""): dict(item)
+        for item in list(revision.get("line_items") or [])
+        if _safe_text(item.get("source_object_id"), "")
+    }
+
+    for line in list(line_rows or []):
+        source_object_id = _safe_text(getattr(line, "source_object", None), "")
+        if not source_object_id:
+            continue
+        if source_object_id not in existing:
+            pricing = dict(
+                pricing_by_line_id.get(_safe_text(getattr(line, "line_id", None), ""))
+                or {}
+            )
+            product_id = _safe_text(
+                pricing.get("canonical_product_id"),
+                f"{_safe_text(getattr(line, 'manufacturer', None), 'Unknown')}::{_safe_text(getattr(line, 'model', None), 'Unknown')}",
+            )
+            created = service.add_line_item(
+                revision_id=revision_id,
+                actor="atlas-ui",
+                line={
+                    "line_item_id": f"line:{source_object_id}",
+                    "product_id": product_id,
+                    "manufacturer": _safe_text(getattr(line, "manufacturer", None), ""),
+                    "model": _safe_text(getattr(line, "model", None), ""),
+                    "description": _safe_text(getattr(line, "description", None), ""),
+                    "requested_quantity": float(getattr(line, "quantity", 0.0) or 0.0),
+                    "engineering_quantity": float(
+                        getattr(line, "quantity", 0.0) or 0.0
+                    ),
+                    "procurement_quantity": float(
+                        getattr(line, "quantity", 0.0) or 0.0
+                    ),
+                    "unit_of_measure": "ea",
+                    "source_object_id": source_object_id,
+                    "section": "Equipment",
+                    "system": "Unassigned",
+                    "room": "Unassigned",
+                },
+            )
+            if (
+                _safe_text(product_id, "")
+                and _safe_text(product_id, "").count("::") == 1
+            ):
+                service.select_line_cost(
+                    revision_id=revision_id,
+                    line_item_id=_safe_text(created.get("line_item_id"), ""),
+                    commercial_state=commercial_state,
+                    actor="atlas-ui",
+                )
+
+    service.validate_revision(revision_id=revision_id)
+
+
+def _render_estimate_revision_engine(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    *,
+    line_rows: list[Any],
+    pricing_by_line_id: dict[str, dict[str, Any]],
+) -> None:
+    service = _estimate_engine_service(st)
+    estimate, revision = _ensure_estimate_engine_project(
+        service,
+        project_id=record.project.project_id,
+        project_name=record.project.name,
+    )
+    if not revision:
+        _save_estimate_engine_service(st, service)
+        st.info("Estimate engine revision is not available yet.")
+        return
+
+    _sync_estimate_engine_lines(
+        service,
+        revision_id=_safe_text(revision.get("revision_id"), ""),
+        line_rows=line_rows,
+        pricing_by_line_id=pricing_by_line_id,
+        commercial_state=_commercial_knowledge_state(st),
+    )
+
+    history = service.list_revision_history(
+        estimate_id=_safe_text(estimate.get("estimate_id"), "")
+    )
+    revision_options = [
+        _safe_text(item.get("revision_id"), "") for item in history if item
+    ]
+    active_revision = _safe_text(
+        st.session_state.get("atlas_estimate_engine_revision"),
+        _safe_text(revision.get("revision_id"), ""),
+    )
+    if active_revision not in revision_options and revision_options:
+        active_revision = revision_options[-1]
+    selected_revision_id = st.selectbox(
+        "Revision Selector",
+        options=revision_options,
+        index=(
+            revision_options.index(active_revision)
+            if active_revision in revision_options
+            else 0
+        ),
+        key="atlas_estimate_engine_revision",
+    )
+    selected_revision = dict(
+        service.state.get("revisions", {}).get(selected_revision_id) or {}
+    )
+    mutable = _safe_text(selected_revision.get("state"), "") in {
+        "draft",
+        "validating",
+        "ready",
+    }
+
+    st.dataframe(
+        [
+            {
+                "Estimate": _safe_text(estimate.get("name"), ""),
+                "Estimate ID": _safe_text(estimate.get("estimate_id"), ""),
+                "Revision": _safe_text(selected_revision.get("revision_number"), ""),
+                "Revision ID": selected_revision_id,
+                "State": _safe_text(selected_revision.get("state"), ""),
+            }
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    action_cols = st.columns(4)
+    if action_cols[0].button(
+        "Validate Revision",
+        key="atlas_estimate_engine_validate",
+        use_container_width=True,
+    ):
+        service.validate_revision(revision_id=selected_revision_id)
+        _save_estimate_engine_service(st, service)
+        st.rerun()
+    if action_cols[1].button(
+        "Lock Revision",
+        key="atlas_estimate_engine_lock",
+        disabled=not mutable,
+        use_container_width=True,
+    ):
+        try:
+            service.lock_revision(revision_id=selected_revision_id, actor="atlas-ui")
+            _save_estimate_engine_service(st, service)
+            st.rerun()
+        except ValueError as exc:
+            st.warning(str(exc))
+    if action_cols[2].button(
+        "Clone Revision", key="atlas_estimate_engine_clone", use_container_width=True
+    ):
+        service.clone_revision(
+            source_revision_id=selected_revision_id, created_by="atlas-ui"
+        )
+        _save_estimate_engine_service(st, service)
+        st.rerun()
+    if action_cols[3].button(
+        "Refresh All Costs",
+        key="atlas_estimate_engine_refresh_all",
+        use_container_width=True,
+    ):
+        service.refresh_revision_costs(
+            revision_id=selected_revision_id,
+            commercial_state=_commercial_knowledge_state(st),
+            actor="atlas-ui",
+            accept=True,
+        )
+        _save_estimate_engine_service(st, service)
+        st.rerun()
+
+    line_items = list(selected_revision.get("line_items") or [])
+    st.markdown("#### Line-Item Table")
+    st.dataframe(
+        [
+            {
+                "Line Item": _safe_text(item.get("line_item_id"), ""),
+                "Source Object": _safe_text(item.get("source_object_id"), ""),
+                "Product": _safe_text(item.get("product_id"), ""),
+                "Description": _safe_text(item.get("description"), ""),
+                "Qty": item.get("requested_quantity"),
+                "Selection Status": _safe_text(item.get("source_selection_status"), ""),
+                "Snapshot": _safe_text(item.get("selected_cost_snapshot_id"), ""),
+            }
+            for item in line_items
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    line_ids = [
+        _safe_text(item.get("line_item_id"), "")
+        for item in line_items
+        if _safe_text(item.get("line_item_id"), "")
+    ]
+    if line_ids:
+        selected_line_id = st.selectbox(
+            "Snapshot Viewer",
+            options=line_ids,
+            key="atlas_estimate_engine_snapshot_line",
+        )
+        selected_line: dict[str, Any] = next(
+            (
+                item
+                for item in line_items
+                if _safe_text(item.get("line_item_id"), "") == selected_line_id
+            ),
+            {},
+        )
+        snapshot = dict(
+            service.state.get("cost_snapshots", {}).get(
+                _safe_text(selected_line.get("selected_cost_snapshot_id"), ""),
+                {},
+            )
+            or {}
+        )
+        st.dataframe([snapshot], use_container_width=True, hide_index=True)
+        source_object_id = _safe_text(selected_line.get("source_object_id"), "")
+        if st.button(
+            "Open Source Object",
+            key="atlas_estimate_engine_open_source_object",
+            disabled=not source_object_id,
+            use_container_width=True,
+        ):
+            _open_estimate_navigation_target(
+                st,
+                target_kind="equipment",
+                target_value=source_object_id,
+            )
+        refresh_cols = st.columns(2)
+        accept_refresh = refresh_cols[0].checkbox(
+            "Accept refreshed snapshot",
+            value=True,
+            key="atlas_estimate_engine_accept_refresh",
+        )
+        if refresh_cols[1].button(
+            "Refresh Selected Line",
+            key="atlas_estimate_engine_refresh_line",
+            use_container_width=True,
+        ):
+            service.refresh_line_cost(
+                revision_id=selected_revision_id,
+                line_item_id=selected_line_id,
+                commercial_state=_commercial_knowledge_state(st),
+                actor="atlas-ui",
+                accept=bool(accept_refresh),
+            )
+            _save_estimate_engine_service(st, service)
+            st.rerun()
+
+    st.markdown("#### Revision Comparison")
+    if len(revision_options) > 1:
+        baseline_revision = st.selectbox(
+            "Baseline Revision",
+            options=revision_options,
+            index=max(0, len(revision_options) - 2),
+            key="atlas_estimate_engine_baseline_revision",
+        )
+        if st.button(
+            "Compare Revisions",
+            key="atlas_estimate_engine_compare",
+            use_container_width=True,
+        ):
+            comparison = service.compare_revisions(
+                baseline_revision_id=baseline_revision,
+                comparison_revision_id=selected_revision_id,
+            )
+            st.session_state["atlas_estimate_engine_last_comparison"] = comparison
+    comparison_payload = dict(
+        st.session_state.get("atlas_estimate_engine_last_comparison") or {}
+    )
+    if comparison_payload:
+        st.dataframe([comparison_payload], use_container_width=True, hide_index=True)
+
+    st.markdown("#### Diagnostics")
+    st.dataframe(
+        list(selected_revision.get("diagnostics") or []),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("#### Totals")
+    st.dataframe(
+        [dict(selected_revision.get("totals") or {})],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    readiness = service.mission_control_readiness(
+        estimate_id=_safe_text(estimate.get("estimate_id"), "")
+    )
+    st.markdown("#### Readiness")
+    st.dataframe([readiness], use_container_width=True, hide_index=True)
+    st.markdown("#### Mission Control Estimate Recommendations")
+    for recommendation in list(readiness.get("recommendations") or []):
+        st.markdown(f"- {recommendation}")
+
+    _save_estimate_engine_service(st, service)
+
+
 def _render_estimate_page(
     st: Any,
     record: ProjectWorkspaceRecord,
@@ -5753,6 +6277,12 @@ def _render_estimate_page(
         st,
         "Estimate",
         "Deterministic estimate workspace with explicit traceability from engineering objects to estimate lines.",
+    )
+    _render_workspace_section_header(
+        st,
+        workspace="Estimate",
+        objective="Maintain deterministic estimate traceability and cost coverage.",
+        current_focus="Resolve pricing gaps and snapshot warnings before locking revisions.",
     )
     review = context.get("review") if context else None
     labor_estimate = getattr(review, "labor_estimate", None) if review else None
@@ -5783,6 +6313,14 @@ def _render_estimate_page(
     dashboard = service.build_dashboard(estimate)
     confidence_model = estimate.confidence_model
     line_rows = estimate.all_lines()
+
+    with st.expander("D-02 Estimate Revisions and Cost Snapshots", expanded=False):
+        _render_estimate_revision_engine(
+            st,
+            record,
+            line_rows=line_rows,
+            pricing_by_line_id=pricing_by_line_id,
+        )
 
     tabs = st.tabs(
         [
@@ -7022,6 +7560,12 @@ def _render_bom_review_page(
         "BOM Review",
         "Review canonical candidate BOM lines with completeness status, conflict visibility, and source traceability.",
     )
+    _render_workspace_section_header(
+        st,
+        workspace="BOM Review",
+        objective="Confirm complete and traceable candidate BOM lines.",
+        current_focus="Filter unresolved lines, then open source-linked objects for correction.",
+    )
 
     bom_rows = _canonical_bom_items(context)
     if not bom_rows:
@@ -7165,6 +7709,18 @@ def _render_bom_review_page(
         step=0.05,
         key="atlas_bom_confidence_threshold",
     )
+    if st.button(
+        "Clear BOM Filters",
+        key="atlas_bom_filters_reset",
+        use_container_width=True,
+    ):
+        st.session_state["atlas_bom_search"] = ""
+        st.session_state["atlas_bom_filter_system"] = []
+        st.session_state["atlas_bom_filter_room"] = []
+        st.session_state["atlas_bom_filter_manufacturer"] = []
+        st.session_state["atlas_bom_filter_completeness"] = []
+        st.session_state["atlas_bom_confidence_threshold"] = 0.0
+        st.rerun()
 
     filtered_rows: list[dict[str, Any]] = []
     for row in bom_rows:
@@ -7327,6 +7883,10 @@ def _render_bom_review_page(
                         or "None",
                         "Acquisition Cost": selected_row.get("det_acquisition_cost"),
                         "Extended Cost": selected_row.get("det_cost_extended"),
+                        "Purchasing Quantity": selected_row.get(
+                            "det_purchasing_quantity"
+                        ),
+                        "Quantity UOM": selected_row.get("det_quantity_uom") or "ea",
                         "Vendor Type": selected_row.get("det_vendor_type") or "None",
                         "Source File": selected_row.get("det_source_file") or "None",
                         "Source Row": selected_row.get("det_source_row"),
@@ -7334,9 +7894,21 @@ def _render_bom_review_page(
                         "Cost Confidence": selected_row.get("det_cost_confidence"),
                         "Selection Method": selected_row.get("det_selection_method")
                         or "None",
+                        "Selection Rule": selected_row.get("det_selection_rule_id")
+                        or "None",
+                        "Selection Timestamp": selected_row.get(
+                            "det_selection_timestamp"
+                        )
+                        or "None",
                         "Selection Reason": selected_row.get("det_selection_reason")
                         or "None",
+                        "Candidate Fingerprint": selected_row.get(
+                            "det_candidate_fingerprint"
+                        )
+                        or "None",
                         "Price Record": selected_row.get("det_selected_price_record_id")
+                        or "None",
+                        "Price Sheet": selected_row.get("det_selected_price_sheet_id")
                         or "None",
                         "Price Sheet Version": selected_row.get(
                             "det_selected_price_sheet_version_id"
@@ -7398,6 +7970,191 @@ def _render_bom_review_page(
                     origin_page="BOM Review",
                     origin_key=equipment_target_id,
                 )
+
+    st.markdown("### Cost Selection Inspector")
+    candidate_products = []
+    for row in filtered_rows:
+        quantity_value = row.get("quantity")
+        normalized_quantity = (
+            float(quantity_value) if isinstance(quantity_value, (int, float)) else 1.0
+        )
+        candidate_products.append(
+            {
+                "label": (
+                    f"{_safe_text(row.get('bom_item_id'), 'item')} | "
+                    f"{_safe_text(row.get('manufacturer'), 'Unknown')}::"
+                    f"{_safe_text(row.get('model'), 'Unknown')}"
+                ),
+                "product_id": (
+                    f"{_safe_text(row.get('manufacturer'), 'Unknown')}::"
+                    f"{_safe_text(row.get('model'), 'Unknown')}"
+                ),
+                "quantity": normalized_quantity,
+            }
+        )
+    if candidate_products:
+        selected_product_label = st.selectbox(
+            "Inspector Product",
+            options=[item["label"] for item in candidate_products],
+            key="atlas_cost_inspector_product",
+        )
+        selected_product = next(
+            (
+                item
+                for item in candidate_products
+                if item["label"] == selected_product_label
+            ),
+            candidate_products[0],
+        )
+        inspector_cols = st.columns(6)
+        selected_quantity = selected_product.get("quantity")
+        default_quantity = (
+            float(selected_quantity)
+            if isinstance(selected_quantity, (int, float))
+            else 1.0
+        )
+        requested_quantity = inspector_cols[0].number_input(
+            "Requested Qty",
+            min_value=0.0,
+            value=default_quantity,
+            step=1.0,
+            key="atlas_cost_inspector_quantity",
+        )
+        as_of_date = inspector_cols[1].date_input(
+            "As-of Date",
+            value=date.today(),
+            key="atlas_cost_inspector_as_of",
+        )
+        preferred_vendor = (
+            inspector_cols[2]
+            .text_input(
+                "Preferred Vendor",
+                key="atlas_cost_inspector_preferred_vendor",
+                placeholder="optional",
+            )
+            .strip()
+        )
+        preferred_channel = (
+            inspector_cols[3]
+            .text_input(
+                "Preferred Channel",
+                key="atlas_cost_inspector_preferred_channel",
+                placeholder="optional",
+            )
+            .strip()
+        )
+        requested_currency = (
+            inspector_cols[4]
+            .text_input(
+                "Currency",
+                value="USD",
+                key="atlas_cost_inspector_currency",
+            )
+            .strip()
+        )
+        manual_price_record = (
+            inspector_cols[5]
+            .text_input(
+                "Manual Price Record",
+                key="atlas_cost_inspector_manual_price_record",
+                placeholder="optional",
+            )
+            .strip()
+        )
+
+        if st.button(
+            "Run Cost Selection Inspector",
+            key="atlas_cost_selection_inspector_run",
+            use_container_width=True,
+        ):
+            request_payload = {
+                "product_id": selected_product.get("product_id"),
+                "requested_quantity": float(requested_quantity),
+                "as_of_date": as_of_date.isoformat(),
+                "preferred_vendor": preferred_vendor,
+                "preferred_purchasing_channel": preferred_channel,
+                "currency": requested_currency or "USD",
+                "manual_price_record_id": manual_price_record,
+            }
+            inspector_engine = DeterministicCostEngine()
+            inspector_result = inspector_engine.select_cost(
+                request_payload,
+                commercial_state=_commercial_knowledge_state(st),
+            )
+            inspector_payload = inspector_result.to_dict()
+
+            st.dataframe(
+                [
+                    {
+                        "Status": inspector_payload.get("status"),
+                        "Product": selected_product.get("product_id"),
+                        "Requested Quantity": inspector_payload.get(
+                            "normalized_requested_quantity"
+                        ),
+                        "Purchasable Quantity": inspector_payload.get(
+                            "purchasable_quantity"
+                        ),
+                        "Effective Unit Cost": inspector_payload.get(
+                            "effective_per_unit_cost"
+                        ),
+                        "Extended Acquisition Cost": inspector_payload.get(
+                            "extended_acquisition_cost"
+                        ),
+                        "Deterministic Confidence": inspector_payload.get(
+                            "deterministic_confidence"
+                        ),
+                    }
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            selected_candidate = dict(inspector_payload.get("selected_candidate") or {})
+            if selected_candidate:
+                st.markdown("Selected Candidate")
+                st.dataframe(
+                    [selected_candidate],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                normalization = inspector_engine.preview_quantity_normalization(
+                    requested_quantity=float(requested_quantity),
+                    unit_cost=float(selected_candidate.get("acquisition_cost") or 0.0),
+                    pack_quantity=selected_candidate.get("pack_quantity"),
+                    minimum_order_quantity=selected_candidate.get(
+                        "minimum_order_quantity"
+                    ),
+                    purchase_multiple=selected_candidate.get("purchase_multiple"),
+                )
+                st.markdown("Quantity Normalization Preview")
+                st.dataframe(
+                    [normalization],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+            rejected = list(inspector_payload.get("rejected_candidates") or [])
+            if rejected:
+                st.markdown("Rejected Candidates")
+                st.dataframe(rejected, use_container_width=True, hide_index=True)
+
+            diagnostics = list(inspector_payload.get("diagnostics") or [])
+            if diagnostics:
+                st.markdown("Diagnostics")
+                st.dataframe(diagnostics, use_container_width=True, hide_index=True)
+
+            provenance = dict(
+                inspector_engine.get_selection_provenance(inspector_result)
+            )
+            st.markdown("Selection Provenance")
+            st.dataframe([provenance], use_container_width=True, hide_index=True)
+
+            confidence = dict(
+                inspector_engine.get_confidence_breakdown(inspector_result)
+            )
+            st.markdown("Confidence Breakdown")
+            st.dataframe([confidence], use_container_width=True, hide_index=True)
 
     st.markdown("### Export")
     export_csv, export_json = _canonical_bom_export_payload(filtered_rows)
@@ -7623,6 +8380,12 @@ def _render_price_list_library_page(
         st,
         "Price List Library",
         "Ingest manufacturer and vendor price lists and deterministically enrich BOM review.",
+    )
+    _render_workspace_section_header(
+        st,
+        workspace="Price List Library",
+        objective="Create immutable commercial pricing versions.",
+        current_focus="Import clean sources and validate version deltas for deterministic replay.",
     )
     st.caption(
         "This foundation is for pricing knowledge only. Procurement execution workflows are intentionally out of scope."
@@ -8633,6 +9396,12 @@ def _render_import_history_page(
         "Import History",
         "Immutable price sheet import history with deterministic version comparisons.",
     )
+    _render_workspace_section_header(
+        st,
+        workspace="Import History",
+        objective="Audit commercial import lineage and change impact.",
+        current_focus="Review version deltas and route follow-up updates to Price List Library.",
+    )
 
     commercial_service = _commercial_service(st)
     history_rows = commercial_service.import_history_rows()
@@ -9245,6 +10014,12 @@ def _render_overview_page(
         st,
         "Overview",
         "Concise project workspace landing page with status, readiness, and next actions.",
+    )
+    _render_workspace_section_header(
+        st,
+        workspace="Overview",
+        objective="Run a guided, deterministic project review.",
+        current_focus="Complete guided steps and keep decision-critical objects in Working Set.",
     )
 
     summary = _build_project_analysis_summary(record, context)

@@ -79,6 +79,22 @@ Atlas should take the mindset of careful instrumentation and rapid analysis whil
 
 Atlas should not reference or imitate specific telemetry products, software interfaces, logos, branding, or proprietary implementations.
 
+## 8. Sprint A-04 UX Consolidation
+
+Sprint A-04 establishes workstation-level consistency rules across Mission Control and Project Workspace pages:
+
+- use a shared workspace section header pattern that states objective and current focus
+- normalize terminology around Products (Master Library) and deterministic cost language
+- group and deduplicate recommendation surfaces before rendering action tables
+- keep navigation object-centric with explicit open-object actions from estimate snapshot views
+- provide consistent clear-filter controls in dense review tables
+
+Scope boundary for A-04:
+
+- UX and consistency consolidation only
+- no new D-03 capabilities and no procurement/accounting/ERP workflow expansion
+
+
 ## 8. Things Atlas Will Never Become
 
 Atlas will never become a gaming UI, a cyberpunk interface, a sci-fi control panel, a glowing HUD, or a fake telemetry display.

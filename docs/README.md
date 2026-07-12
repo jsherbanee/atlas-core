@@ -2,6 +2,12 @@
 
 Atlas documentation defines the platform vision, architecture, engineering-intelligence surfaces, and implementation status for Atlas Core.
 
+Current implementation sprint focus: D-01 Core Cost Selection Engine.
+Deferred in current sprint scope: D-02 Bid Package Review Orchestration and D-03 Scope and Risk Diagnostics.
+
+Current UX stream: Epic A Sprint A-04 Engineering Workstation UX Consolidation.
+Scope: interaction and terminology consistency only, with no new D-03 capability introduction.
+
 These documents are intended to be used as a cohesive reference library, not isolated notes.
 
 ## How to Use This Library
@@ -70,6 +76,7 @@ Future releases should follow this structure.
 - Purpose: Defines UX philosophy and long-term visual/interaction posture.
 - Audience: Product design, frontend engineers, architecture owners.
 - When to reference: When evaluating UI/UX direction and interaction consistency.
+
 
 ## Architecture
 

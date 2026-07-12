@@ -57,6 +57,17 @@ Design posture:
 - Unknown product resolution states do not receive deterministic pricing.
 - Proposal/procurement/financial workflows remain out of scope.
 
+## Sprint A-04 UX Consolidation Constraints
+
+A-04 is a workstation UX consolidation sprint and preserves architecture boundaries:
+
+- no new domain capabilities
+- no D-03 scope/risk feature expansion
+- no procurement/accounting/ERP or execution workflow introduction
+
+Consolidation focus is UI composition consistency, deterministic recommendation presentation, and object-link continuity across existing pages.
+
+
 Implementation structure:
 - domain: deterministic estimate entities and status enums
 - services: deterministic estimate build, totals, dashboard, and confidence modeling
@@ -104,3 +115,26 @@ Implementation structure:
 Source-of-truth references:
 - [COMMERCIAL_KNOWLEDGE.md](COMMERCIAL_KNOWLEDGE.md)
 - [PRICE_VERSIONING.md](PRICE_VERSIONING.md)
+
+## D-01 Core Cost Selection Engine (Closed)
+D-01 implementation is complete and validated.
+
+In-scope architecture delivered:
+- deterministic cost candidate construction over immutable commercial records
+- deterministic selection API contracts and explainability outputs
+- quantity normalization preview and confidence/provenance retrieval helpers
+- BOM Review Cost Selection Inspector integration in existing workspace
+
+## D-02A Estimate Engine and Cost Snapshot Architecture (Documentation-Only)
+D-02A defines the architecture for:
+- estimate identity and revision history
+- immutable cost snapshots built from D-01
+- deterministic estimate totals and validation
+- controlled refresh and replay workflows
+
+D-02A does not implement D-02 code.
+
+Authoritative detail is maintained in [ESTIMATING.md](ESTIMATING.md), with D-01 dependencies in [COST_ENGINE.md](COST_ENGINE.md).
+
+Deferred architecture work after D-02 implementation start:
+- D-03 scope diagnostics extensions for assemblies/accessories/labor rollups

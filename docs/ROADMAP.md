@@ -60,7 +60,13 @@ Completed outcomes:
 
 ## Phase 2: Bid Intelligence (Active)
 Current objective:
-Build a complete bid analysis and estimating-readiness engine for commercial AV/theatrical work.
+Complete Sprint D-02A Estimate Engine and Cost Snapshot Architecture as implementation-ready documentation.
+
+Current UX hardening stream:
+
+- Epic A Sprint A-04 Engineering Workstation UX Consolidation
+- focused on interaction consistency and deterministic navigation continuity
+- does not start D-03
 
 Implemented in current baseline candidate:
 - Bid package review orchestration
@@ -78,12 +84,16 @@ Implemented in current baseline candidate:
 - Commercial knowledge model (vendor offerings, price sheets, immutable versions, and price records)
 - Deterministic price version comparison and product change reporting
 - Commercial freshness and lifecycle tracking for price recency and missing-from-latest detection
+
 - Deterministic pricing engine for estimate lines with candidate/rule traces, manual override audit, and pricing snapshot reproducibility
 - Advisory pricing impact detection without silent repricing
 - Deterministic pricing exports for summary, priced BOM, coverage, and exceptions
 - Deterministic cost engine for acquisition cost selection, cost traceability, commercial coverage, and project-only quick-add product support
 
 Remaining Phase 2 refinements:
+- D-02A Estimate Engine and Cost Snapshot Architecture (documentation-only)
+- D-02 Bid Package Review Orchestration (implementation deferred pending D-02A sign-off)
+- D-03 Scope and Risk Diagnostics (deferred)
 - PDF ingestion and indexing robustness
 - Drawing/spec intelligence quality refinements
 - Device schedule extraction quality refinements

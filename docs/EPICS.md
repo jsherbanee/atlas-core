@@ -20,9 +20,23 @@ Status: Active
 - A-01 Workspace Shell and Runtime Bootstrap
 - A-02 Mission Control and Application Workspace
 - A-03 Project Repository and Persistence Contracts
-- A-04 Project Lifecycle Routing and Navigation
+- A-04 Engineering Workstation UX Consolidation
 - A-05 Deterministic State, Caching, and Session Recovery
 - A-06 Quality Gates, CI, and Regression Baseline
+
+### A-04 Scope (Current)
+
+- standardize shared workspace section-header pattern
+- normalize workstation terminology for core knowledge/commercial views
+- deduplicate and prioritize recommendation tables in Mission Control flows
+- keep object-centric linking continuity across estimate and review surfaces
+- align filter and empty-state interaction patterns
+
+Explicitly out of scope:
+
+- D-03 implementation work
+- new domain services or cross-system integrations
+
 
 ## Epic B: Engineering Intelligence
 
@@ -97,9 +111,10 @@ Deferred beyond C-02:
 
 Status: Active
 
-- D-01 Deterministic Cost Engine
-- D-02 Bid Package Review Orchestration
-- D-03 Scope and Risk Diagnostics
+- D-01 Core Cost Selection Engine (Closed)
+- D-02A Estimate Engine and Cost Snapshot Architecture (Documentation-Only, Current Sprint)
+- D-02 Bid Package Review Orchestration (Implementation Deferred Pending D-02A Sign-Off)
+- D-03 Scope and Risk Diagnostics (Deferred)
 - D-04 Bid Completeness and Readiness Scoring
 - D-05 Estimator Brief and Final Estimator Review
 - D-06 Estimate Workflow Integration and Exports

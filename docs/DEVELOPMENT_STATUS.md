@@ -27,13 +27,15 @@ Sprint 9 implements the Deterministic Product Resolution Engine: canonical produ
 Sprint 9 Commercial Knowledge Foundation adds immutable price-sheet versioning, deterministic version comparison, product change reporting, and commercial freshness/lifecycle visibility without introducing procurement or quote-generation workflows.
 Sprint 9.5 Commercial Knowledge Completion (C-02) adds deterministic draft/validate/finalize import lifecycle controls for CSV/XLSX/PDF imports, explicit diagnostic severity handling (`error|warning|informational`), unresolved-record surfacing, duplicate source-hash safeguards, mapping profile persistence, PDF page/table/header selection and correction review flow, and commercial completeness rollups without starting Product Resolution, deterministic costing, procurement, accounting, or ERP workflows.
 Sprint 10 implements the Deterministic Pricing Engine: immutable price record selection, explainable candidate/rule traces, deterministic pricing snapshot IDs, manual pricing override audit model, advisory price-update impacts, export payloads, and Estimate/BOM pricing workspace integration.
-Sprint 10 Deterministic Cost Engine now establishes acquisition-cost-first deterministic selection, vendor-type-aware hierarchy, complete cost traceability, quick-add product project isolation, optional promotion to immutable commercial knowledge, and cost-focused Estimate/BOM workspace views.
+Sprint D-01 Core Cost Selection Engine now establishes acquisition-cost-first deterministic selection, vendor-type-aware hierarchy, complete cost traceability, explicit selection APIs, quick-add product project isolation, optional promotion to immutable commercial knowledge, and cost-focused Estimate/BOM workspace views.
+Sprint D-02A Estimate Engine and Cost Snapshot Architecture is now defined as implementation-ready documentation without production-code changes.
+Sprint A-04 consolidates Engineering Workstation UX consistency with shared workspace section headers, recommendation dedupe/grouping in Mission Control, terminology normalization for Products (Master Library), resettable dense-table filters, and source-object linking from estimate snapshot views.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: targeted Sprint 10 suite passing (15 tests)
+- pytest: full suite passing (1034 tests)
 
 ## Tooling Status
 - GitHub Actions configured
@@ -42,7 +44,15 @@ Sprint 10 Deterministic Cost Engine now establishes acquisition-cost-first deter
   - .pre-commit-config.yaml
 
 ## Active Focus
-Finalize and harden the Phase 2 Bid Intelligence baseline before any downstream lifecycle expansion.
+Finalize and review Sprint D-02A architecture documentation before D-02 implementation begins.
+
+Secondary active focus:
+- apply Sprint A-04 workstation UX consistency updates without introducing D-03 capabilities.
+
+Deferred implementation in current sprint scope:
+- D-02 Bid Package Review Orchestration (implementation)
+- D-03 Scope and Risk Diagnostics
+
 
 Lifecycle object definitions and cross-phase module boundaries are documented in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).
 

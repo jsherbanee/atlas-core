@@ -78,6 +78,17 @@ Each selected insight includes an Engineering Trace block that answers "why Atla
 - related objects
 - related drawings
 - related specifications
+
+## Sprint A-04 Workstation Consistency
+
+Workbench and adjacent project workspaces now align to common UX conventions:
+
+- shared workspace section header for objective/focus orientation
+- object-centric navigation continuity from estimate and review pages into engineering investigation surfaces
+- consistent recommendation phrasing and priority ordering across action-oriented tables
+
+This sprint does not introduce new engineering-intelligence capabilities; it consolidates interaction consistency.
+
 - resolver decisions
 - knowledge-graph relationship count
 
