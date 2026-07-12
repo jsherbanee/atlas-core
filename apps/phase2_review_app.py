@@ -37,6 +37,8 @@ from atlas_core.services.bom_review_service import BomReviewService
 from atlas_core.services.pricing_service import PricingService
 from atlas_core.services.sales_design_review_service import SalesDesignReviewService
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
+from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
+from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
 
 PROJECT_MANAGER_PAGES = [
     "Mission Control",
@@ -408,6 +410,32 @@ def _inject_styles(st: Any) -> None:
             font-size: 0.78rem;
             margin-bottom: 0.2rem;
             letter-spacing: 0.01rem;
+        }
+        .atlas-project-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border: 1px solid #dbe3ee;
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 0.7rem 0.85rem;
+            margin: 0.35rem 0 0.55rem 0;
+        }
+        .atlas-project-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 0.05rem;
+        }
+        .atlas-project-customer {
+            color: #334155;
+            font-size: 0.88rem;
+            margin-bottom: 0.3rem;
+        }
+        .atlas-project-meta {
+            color: #475569;
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
         }
         </style>
         """,
@@ -2099,13 +2127,136 @@ def _group_for_page(page: str, record: ProjectWorkspaceRecord | None) -> str:
 
 
 def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
-    if page == "Mission Control":
-        return "Atlas / Application Workspace / Mission Control"
     if record is None:
-        return f"Atlas / Application Workspace / {_group_for_page(page, None)} / {page}"
-    return (
-        f"Atlas / Project Workspace / {record.project.name} / "
-        f"{_group_for_page(page, record)} / {page}"
+        return f"Atlas / {page}"
+    if page in {
+        "Projects",
+        "Pinned Projects",
+        "Reference Projects",
+        "Recent Projects",
+        "Create New Project",
+        "Open Existing Project",
+    }:
+        return f"Atlas / Projects / {page}"
+    if page in {"Mission Control", "Knowledge", "Reports", "Administration"}:
+        return f"Atlas / {page}"
+    return f"Atlas / Projects / {record.project.name} / {page}"
+
+
+def _open_project_record(st: Any, record: ProjectWorkspaceRecord) -> None:
+    st.session_state["atlas_active_workspace_id"] = record.workspace_id
+    st.session_state["atlas_active_page"] = "Overview"
+    st.rerun()
+
+
+def _project_review_status(
+    record: ProjectWorkspaceRecord,
+    manifest: dict[str, Any],
+) -> str:
+    readiness = _safe_text(record.review_summary.get("readiness_level"), "")
+    if readiness:
+        return readiness.replace("_", " ").title()
+    review_artifacts = sum(
+        int(value)
+        for value in dict(manifest.get("review_artifact_counts") or {}).values()
+    )
+    if review_artifacts == 0:
+        return "Not Started"
+    return "Needs Review"
+
+
+def _project_library_rows(
+    workspace_service: ProjectWorkspaceService,
+    *,
+    include_archived: bool,
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for record in workspace_service.list_workspaces(
+        include_archived=include_archived,
+        limit=limit,
+    ):
+        manifest = workspace_service.read_manifest(record.workspace_id)
+        document_count = sum(
+            int(value) for value in dict(manifest.get("document_counts") or {}).values()
+        )
+        rows.append(
+            {
+                "record": record,
+                "workspace_id": record.workspace_id,
+                "project_name": record.project.name,
+                "customer": _safe_text(
+                    record.metadata.get("owner"), record.project.client
+                ),
+                "lifecycle_stage": _safe_text(
+                    record.metadata.get("lifecycle_stage"),
+                    _project_stage(record),
+                )
+                .replace("_", " ")
+                .title(),
+                "current_status": _safe_text(
+                    record.metadata.get("status"),
+                    record.project.status.value,
+                )
+                .replace("_", " ")
+                .title(),
+                "last_opened": _safe_text(
+                    record.last_opened_at,
+                    _safe_text(record.metadata.get("last_opened"), "n/a"),
+                ),
+                "last_modified": _safe_text(
+                    record.metadata.get("last_modified"),
+                    record.updated_at,
+                ),
+                "document_count": document_count,
+                "review_status": _project_review_status(record, manifest),
+                "reference": record.is_reference,
+                "archived": record.archived,
+                "pinned": record.pinned,
+                "source": record.source_label,
+            }
+        )
+    return rows
+
+
+def _open_project_from_local_path(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    path_text: str,
+) -> None:
+    path = Path(path_text).expanduser()
+    if not path.exists():
+        st.error(f"Path not found: {path}")
+        return
+
+    if path.is_dir() and (path / "project.json").exists():
+        _open_project_record(st, workspace_service.load_record(path / "project.json"))
+        return
+
+    if path.is_dir() and (path / "workspace.json").exists():
+        _open_project_record(st, workspace_service.load_record(path / "workspace.json"))
+        return
+
+    if path.name in {"workspace.json", "project.json", "metadata.json"}:
+        _open_project_record(st, workspace_service.load_record(path))
+        return
+
+    if path.name == "intake_snapshot.json":
+        context = build_intake_review_context(path)
+        record = _build_record_from_context(context)
+        workspace_service.save_record(record)
+        _open_project_record(st, record)
+        return
+
+    if path.is_dir():
+        context = build_reference_project_context(path)
+        record = _build_record_from_context(context)
+        workspace_service.save_record(record)
+        _open_project_record(st, record)
+        return
+
+    st.error(
+        "Open a project.json/workspace.json file, intake_snapshot.json file, or project folder."
     )
 
 
@@ -2115,25 +2266,25 @@ def _render_header(
     record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> None:
-    del workspace_service
+    records = workspace_service.list_workspaces(include_archived=True, limit=200)
     current_page = _safe_text(
         st.session_state.get("atlas_active_page"), "Mission Control"
     )
 
-    cols = st.columns([2.2, 2.0])
-    if cols[0].button("Atlas", use_container_width=True, type="secondary"):
-        st.session_state["atlas_active_page"] = "Mission Control"
-        st.rerun()
-
-    if cols[1].button("Return to Mission Control", use_container_width=True):
+    header_cols = st.columns([1.3, 2.2, 2.0])
+    if header_cols[0].button("Atlas", use_container_width=True, type="secondary"):
         st.session_state["atlas_active_page"] = "Mission Control"
         st.rerun()
 
     if record is None:
-        st.caption(f"Application Workspace · Current Page: {current_page}")
+        header_cols[1].caption(f"Application Workspace · {current_page}")
+        if header_cols[2].button("Open Projects", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Projects"
+            st.rerun()
         return
 
     summary = _build_project_analysis_summary(record, context)
+    next_action = _next_review_action(_review_step_status_rows(st, record, context))
     review = context.get("review") if context else None
     confidence = getattr(review, "confidence", None)
     confidence_text = "n/a"
@@ -2142,24 +2293,62 @@ def _render_header(
     elif confidence is not None:
         confidence_text = _safe_text(confidence, "n/a")
 
-    st.dataframe(
-        [
-            {
-                "Project Name": record.project.name,
-                "Customer": _safe_text(summary.get("customer"), "n/a"),
-                "Lifecycle Stage": _project_stage(record),
-                "Current Status": _project_status(context),
-                "Last Analysis": _safe_text(record.updated_at, "n/a"),
-                "Confidence": confidence_text,
-                "Primary Action": _safe_text(
-                    summary.get("recommended_next_action"),
-                    "Review project overview",
-                ),
-            }
-        ],
-        use_container_width=True,
-        hide_index=True,
+    selector_options = {
+        f"{item.project.name} · {item.workspace_id}": item for item in records
+    }
+    if selector_options:
+        active_label = next(
+            (
+                label
+                for label, item in selector_options.items()
+                if item.workspace_id == record.workspace_id
+            ),
+            None,
+        )
+        selected_label = header_cols[1].selectbox(
+            "Project",
+            options=list(selector_options.keys()),
+            index=(
+                list(selector_options.keys()).index(active_label)
+                if active_label in selector_options
+                else 0
+            ),
+            key="atlas_header_project_selector",
+        )
+        selected_record = selector_options.get(selected_label)
+        if (
+            selected_record is not None
+            and selected_record.workspace_id != record.workspace_id
+        ):
+            _open_project_record(st, selected_record)
+    else:
+        header_cols[1].caption("Project selector unavailable.")
+
+    if header_cols[2].button("Back to Projects", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Projects"
+        st.rerun()
+
+    st.markdown(
+        "<div class='atlas-project-header'>"
+        f"<div class='atlas-project-name'>{record.project.name}</div>"
+        f"<div class='atlas-project-customer'>{_safe_text(summary.get('customer'), 'n/a')}</div>"
+        f"<span class='atlas-chip'>{_project_stage(record)}</span>"
+        f"<span class='atlas-chip'>{_project_status(context)}</span>"
+        f"<div class='atlas-project-meta'>Last analysis: {_safe_text(record.updated_at, 'n/a')} · Confidence: {confidence_text}</div>"
+        "</div>",
+        unsafe_allow_html=True,
     )
+
+    if st.button(
+        f"Recommended Next: {_safe_text(next_action.get('step'), 'Review project overview')}",
+        type="primary",
+        use_container_width=True,
+    ):
+        st.session_state["atlas_active_page"] = _safe_text(
+            next_action.get("page"),
+            "Overview",
+        )
+        st.rerun()
 
 
 def _nav_buttons(
@@ -2177,7 +2366,7 @@ def _nav_buttons(
 
     if record is not None and active_page != "Mission Control":
         host.markdown("### Active Project")
-        host.caption(record.project.name)
+        host.caption("Project workspace")
         host.markdown("---")
 
     for group_name, entries in nav_groups:
@@ -2731,25 +2920,306 @@ def _render_application_knowledge_page(
     _render_page_header(
         st,
         "Knowledge",
-        "Application-level knowledge and reusable references across project workspaces.",
+        "Application-wide reusable knowledge. Project-specific review data is intentionally excluded.",
     )
 
-    references = workspace_service.list_reference_workspaces()[:20]
-    st.dataframe(
+    project_rows = _project_library_rows(
+        workspace_service,
+        include_archived=True,
+        limit=500,
+    )
+    manufacturer_rows = [item.to_dict() for item in build_manufacturer_seed_data()]
+    vendor_rows = [item.to_dict() for item in build_vendor_seed_data()]
+    customers = sorted(
+        {_safe_text(item.get("customer"), "n/a") for item in project_rows}
+    )
+
+    product_rows: list[dict[str, Any]] = []
+    for item in project_rows:
+        record = item["record"]
+        try:
+            artifact = workspace_service.manager.review_repository.load_artifact(
+                record.workspace_id,
+                "bid_package_review",
+            )
+        except Exception:
+            artifact = None
+        if not isinstance(artifact, dict):
+            continue
+        equipment_rows = list(artifact.get("equipment") or [])
+        if not equipment_rows:
+            continue
+        service = MasterLibraryService()
+        service.import_workspace_equipment(equipment_rows)
+        product_rows.extend(service.explorer_rows())
+
+    # Deduplicate by canonical product id.
+    deduped_products: dict[str, dict[str, Any]] = {}
+    for row in product_rows:
+        key = _safe_text(row.get("product_id"), "")
+        if key and key not in deduped_products:
+            deduped_products[key] = row
+    product_rows = list(deduped_products.values())
+
+    library_state = _price_list_library_state(st)
+    uploaded_price_lists = list(library_state.get("uploaded_price_lists") or [])
+    manufacturer_products = list(library_state.get("manufacturer_products") or [])
+    vendor_offers = list(library_state.get("vendor_offers") or [])
+    unmatched_rows = sum(
+        int(item.get("unmatched_rows", 0) or 0) for item in uploaded_price_lists
+    )
+    expired_rows = sum(
+        int(item.get("expired_pricing", 0) or 0) for item in uploaded_price_lists
+    )
+
+    import_history: list[dict[str, Any]] = []
+    for item in project_rows:
+        record = item["record"]
+        try:
+            events = workspace_service.list_history(record.workspace_id, limit=20)
+        except Exception:
+            events = []
+        for event in events:
+            event_type = _safe_text(event.get("event_type"), "")
+            if event_type in {"project_imported", "documents_imported"}:
+                import_history.append(
+                    {
+                        "project": record.project.name,
+                        "project_id": record.workspace_id,
+                        "event": event_type.replace("_", " ").title(),
+                        "timestamp": _safe_text(event.get("timestamp"), "n/a"),
+                    }
+                )
+    import_history.sort(
+        key=lambda row: _safe_text(row.get("timestamp"), ""), reverse=True
+    )
+
+    cards = st.columns(8)
+    _metric_card(cards[0], "Manufacturers", str(len(manufacturer_rows)))
+    _metric_card(cards[1], "Vendors", str(len(vendor_rows)))
+    _metric_card(cards[2], "Customers", str(len(customers)))
+    _metric_card(cards[3], "Products", str(len(product_rows)))
+    _metric_card(
+        cards[4],
+        "Active Price Lists",
+        str(max(len(uploaded_price_lists) - expired_rows, 0)),
+    )
+    _metric_card(cards[5], "Expired Price Lists", str(expired_rows))
+    _metric_card(cards[6], "Unmatched Imported Rows", str(unmatched_rows))
+    _metric_card(cards[7], "Recent Knowledge Imports", str(len(import_history[:12])))
+
+    tabs = st.tabs(
         [
-            {
-                "Reference Project": item.project.name,
-                "Project ID": item.project.project_id,
-                "Updated": item.updated_at,
-            }
-            for item in references
-        ],
-        use_container_width=True,
-        hide_index=True,
+            "Summary",
+            "Manufacturers",
+            "Vendors",
+            "Customers",
+            "Products",
+            "Price Lists",
+            "Imports",
+        ]
     )
-    st.caption(
-        "Open a project to review project-specific Drawings, Specifications, Relationships, and Evidence."
-    )
+
+    with tabs[0]:
+        st.dataframe(
+            [
+                {
+                    "Knowledge Area": "Manufacturers",
+                    "State": (
+                        "Available" if manufacturer_rows else "Foundation in progress"
+                    ),
+                    "Why It Matters": "Standardized manufacturer identity supports deterministic product matching.",
+                    "Next Action": "Review manufacturer tiers and preferred vendor paths.",
+                },
+                {
+                    "Knowledge Area": "Vendors",
+                    "State": "Available" if vendor_rows else "Foundation in progress",
+                    "Why It Matters": "Vendor normalization improves price list reconciliation and availability context.",
+                    "Next Action": "Review vendor types and active status.",
+                },
+                {
+                    "Knowledge Area": "Customers",
+                    "State": "Available" if customers else "Foundation in progress",
+                    "Why It Matters": "Customer history supports portfolio-level context and repeatability.",
+                    "Next Action": "Import or create projects to populate customer records.",
+                },
+                {
+                    "Knowledge Area": "Products / Master Library",
+                    "State": "Available" if product_rows else "Foundation in progress",
+                    "Why It Matters": "Canonical products reduce alias ambiguity across projects.",
+                    "Next Action": "Run project analysis to generate equipment rows and master product mappings.",
+                },
+                {
+                    "Knowledge Area": "Price Lists",
+                    "State": (
+                        "Available"
+                        if uploaded_price_lists
+                        else "Foundation in progress"
+                    ),
+                    "Why It Matters": "Pricing foundations improve deterministic BOM cost coverage.",
+                    "Next Action": "Upload manufacturer/vendor price lists from Price List Library.",
+                },
+                {
+                    "Knowledge Area": "Knowledge Imports",
+                    "State": (
+                        "Available" if import_history else "Foundation in progress"
+                    ),
+                    "Why It Matters": "Import history provides auditability for reusable knowledge.",
+                    "Next Action": "Import project packages or document sets to create import events.",
+                },
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with tabs[1]:
+        st.markdown("### Manufacturers")
+        if not manufacturer_rows:
+            _render_guided_empty_state(
+                st,
+                why_empty="No manufacturer records are currently available.",
+                action_to_populate="Load manufacturer seed records or import curated manufacturer data.",
+                next_location="Use Knowledge Imports to initialize manufacturer data.",
+            )
+        else:
+            st.dataframe(
+                [
+                    {
+                        "Manufacturer": _safe_text(item.get("name"), "n/a"),
+                        "Tier": _safe_text(item.get("tier"), "n/a"),
+                        "Discipline": _safe_text(item.get("discipline"), "n/a"),
+                        "Active": bool(item.get("active", True)),
+                        "Product Families": len(
+                            list(item.get("product_families") or [])
+                        ),
+                    }
+                    for item in manufacturer_rows
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    with tabs[2]:
+        st.markdown("### Vendors")
+        if not vendor_rows:
+            _render_guided_empty_state(
+                st,
+                why_empty="No vendor records are currently available.",
+                action_to_populate="Load vendor seed records or import curated vendor data.",
+                next_location="Use Knowledge Imports to initialize vendor data.",
+            )
+        else:
+            st.dataframe(
+                [
+                    {
+                        "Vendor": _safe_text(item.get("name"), "n/a"),
+                        "Type": _safe_text(item.get("vendor_type"), "n/a"),
+                        "Status": _safe_text(item.get("status"), "n/a"),
+                        "Active": bool(item.get("active", True)),
+                    }
+                    for item in vendor_rows
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    with tabs[3]:
+        st.markdown("### Customers")
+        if not customers:
+            _render_guided_empty_state(
+                st,
+                why_empty="No customer records are currently available.",
+                action_to_populate="Create or import projects so Atlas can index customer ownership.",
+                next_location="Go to Projects and create/import a project.",
+            )
+        else:
+            st.dataframe(
+                [
+                    {
+                        "Customer": customer,
+                        "Projects": sum(
+                            1
+                            for item in project_rows
+                            if item.get("customer") == customer
+                        ),
+                    }
+                    for customer in customers
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    with tabs[4]:
+        st.markdown("### Products / Master Library")
+        if not product_rows:
+            _render_guided_empty_state(
+                st,
+                why_empty="No reusable products are indexed yet.",
+                action_to_populate="Run project analysis to generate equipment mappings and canonical products.",
+                next_location="Open a project and run Documents analysis.",
+            )
+        else:
+            st.dataframe(
+                [
+                    {
+                        "Manufacturer": _safe_text(item.get("manufacturer"), "n/a"),
+                        "Model": _safe_text(item.get("model"), "n/a"),
+                        "Category": _safe_text(item.get("category"), "n/a"),
+                        "Status": _safe_text(item.get("status"), "n/a"),
+                        "Aliases": len(list(item.get("aliases") or [])),
+                    }
+                    for item in product_rows[:500]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    with tabs[5]:
+        st.markdown("### Price Lists")
+        st.caption(
+            "Price list uploads are discoverable here and managed in Project Workspace Price List Library."
+        )
+        if not uploaded_price_lists:
+            _render_guided_empty_state(
+                st,
+                why_empty="No price lists are imported.",
+                action_to_populate="Upload manufacturer or vendor price lists.",
+                next_location="Open a project and go to Price List Library.",
+            )
+        else:
+            st.dataframe(
+                uploaded_price_lists, use_container_width=True, hide_index=True
+            )
+            with st.expander("Manufacturer Price Sheets", expanded=False):
+                if manufacturer_products:
+                    st.dataframe(
+                        manufacturer_products[:300],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                else:
+                    st.info("No manufacturer price sheets are indexed yet.")
+            with st.expander("Vendor Price Lists", expanded=False):
+                if vendor_offers:
+                    st.dataframe(
+                        vendor_offers[:300], use_container_width=True, hide_index=True
+                    )
+                else:
+                    st.info("No vendor price lists are indexed yet.")
+
+    with tabs[6]:
+        st.markdown("### Knowledge Imports")
+        if not import_history:
+            _render_guided_empty_state(
+                st,
+                why_empty="No knowledge imports have been recorded.",
+                action_to_populate="Import project packages or upload project documents.",
+                next_location="Use Projects to import project bundles.",
+            )
+        else:
+            st.dataframe(
+                import_history[:100], use_container_width=True, hide_index=True
+            )
 
 
 def _render_application_reports_page(
@@ -2819,56 +3289,149 @@ def _render_application_administration_page(
 
 def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
     _render_page_header(
-        st, "Projects", "Open, manage, and curate local Atlas projects."
+        st,
+        "Projects",
+        "Primary project library for opening, creating, importing, and managing repository projects.",
     )
+
     include_archived = st.checkbox("Show archived projects", value=False)
-    records = workspace_service.list_workspaces(
+    rows = _project_library_rows(
+        workspace_service,
         include_archived=include_archived,
         limit=500,
     )
-    if not records:
-        st.info("No projects available yet.")
+    if not rows:
+        _render_guided_empty_state(
+            st,
+            why_empty="No projects are imported into the Atlas Project Repository.",
+            action_to_populate="Create a new project or import a .atlaspkg bundle.",
+            next_location="Use Create New Project or Import Project Package below.",
+        )
         return
 
-    search = st.text_input("Search Projects", value="")
+    action_cols = st.columns(3)
+    if action_cols[0].button(
+        "Create New Project", type="primary", use_container_width=True
+    ):
+        st.session_state["atlas_active_page"] = "Create New Project"
+        st.rerun()
+
+    project_bundle = action_cols[1].file_uploader(
+        "Import Project Package",
+        type=["atlaspkg"],
+        accept_multiple_files=False,
+        key="atlas_projects_import_bundle",
+        label_visibility="collapsed",
+    )
+    if project_bundle is not None:
+        temp_path = Path("/tmp") / f"atlas-import-{project_bundle.name}"
+        temp_path.write_bytes(project_bundle.getvalue())
+        imported = workspace_service.import_project_bundle(str(temp_path))
+        _open_project_record(st, imported)
+
+    if action_cols[2].button("Open Existing Project", use_container_width=True):
+        st.session_state["atlas_active_page"] = "Open Existing Project"
+        st.rerun()
+
+    filter_cols = st.columns(5)
+    search = filter_cols[0].text_input("Search", value="")
+    lifecycle_filter = filter_cols[1].selectbox(
+        "Lifecycle",
+        options=["All"] + sorted({str(item["lifecycle_stage"]) for item in rows}),
+    )
+    status_filter = filter_cols[2].selectbox(
+        "Status",
+        options=["All"] + sorted({str(item["current_status"]) for item in rows}),
+    )
+    reference_filter = filter_cols[3].selectbox(
+        "Reference",
+        options=["All", "Reference Only", "Standard Only"],
+    )
+    sort_field = filter_cols[4].selectbox(
+        "Sort",
+        options=[
+            "project_name",
+            "customer",
+            "lifecycle_stage",
+            "current_status",
+            "last_opened",
+            "last_modified",
+            "document_count",
+            "review_status",
+        ],
+    )
+
     filtered = [
-        record
-        for record in records
-        if search.strip().lower() in record.project.name.lower()
-        or search.strip().lower() in record.project.project_id.lower()
-        or not search.strip()
+        item
+        for item in rows
+        if (
+            (
+                not search.strip()
+                or _contains_any(
+                    " ".join(
+                        [
+                            _safe_text(item.get("project_name"), ""),
+                            _safe_text(item.get("workspace_id"), ""),
+                            _safe_text(item.get("customer"), ""),
+                        ]
+                    ),
+                    [search.strip().lower()],
+                )
+            )
+            and (
+                lifecycle_filter == "All"
+                or _safe_text(item.get("lifecycle_stage"), "") == lifecycle_filter
+            )
+            and (
+                status_filter == "All"
+                or _safe_text(item.get("current_status"), "") == status_filter
+            )
+            and (
+                reference_filter == "All"
+                or (
+                    reference_filter == "Reference Only" and bool(item.get("reference"))
+                )
+                or (
+                    reference_filter == "Standard Only"
+                    and not bool(item.get("reference"))
+                )
+            )
+        )
     ]
+    filtered.sort(key=lambda item: _safe_text(item.get(sort_field), ""), reverse=True)
 
     st.dataframe(
         [
             {
-                "project": record.project.name,
-                "project_id": record.project.project_id,
-                "source": record.source_label,
-                "status": _project_stage(record),
-                "pinned": record.pinned,
-                "reference": record.is_reference,
-                "archived": record.archived,
-                "updated": record.updated_at,
+                "Project": item["project_name"],
+                "Customer": item["customer"],
+                "Lifecycle": item["lifecycle_stage"],
+                "Status": item["current_status"],
+                "Last Opened": item["last_opened"],
+                "Last Modified": item["last_modified"],
+                "Documents": item["document_count"],
+                "Review Status": item["review_status"],
+                "Reference": "Yes" if item["reference"] else "No",
+                "Archived": "Yes" if item["archived"] else "No",
+                "Pinned": "Yes" if item["pinned"] else "No",
             }
-            for record in filtered
+            for item in filtered
         ],
         use_container_width=True,
         hide_index=True,
     )
 
-    labels = [
-        f"{record.project.name} · {record.project.project_id}" for record in filtered
-    ]
+    labels = [f"{item['project_name']} · {item['workspace_id']}" for item in filtered]
     if labels:
         selected_label = st.selectbox("Open Project", options=labels)
-        selected = filtered[labels.index(selected_label)]
+        selected_item = filtered[labels.index(selected_label)]
+        selected = selected_item["record"]
 
-        action_cols = st.columns(4)
-        if action_cols[0].button("Open Selected Project", type="primary"):
-            st.session_state["atlas_active_workspace_id"] = selected.workspace_id
-            st.session_state["atlas_active_page"] = "Overview"
-            st.rerun()
+        action_cols = st.columns(5)
+        if action_cols[0].button(
+            "Open Project", type="primary", use_container_width=True
+        ):
+            _open_project_record(st, selected)
 
         pin_label = "Unpin" if selected.pinned else "Pin"
         if action_cols[1].button(pin_label, use_container_width=True):
@@ -2877,17 +3440,15 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
             )
             st.rerun()
 
-        reference_label = (
-            "Unmark Reference" if selected.is_reference else "Mark Reference"
-        )
-        if action_cols[2].button(reference_label, use_container_width=True):
-            workspace_service.set_reference_project(
+        if action_cols[2].button("Duplicate Project", use_container_width=True):
+            workspace_service.duplicate_project(
                 selected.workspace_id,
-                reference=not selected.is_reference,
+                new_workspace_id=f"{selected.workspace_id}-copy",
+                new_name=f"{selected.project.name} Copy",
             )
             st.rerun()
 
-        archive_label = "Unarchive" if selected.archived else "Archive"
+        archive_label = "Unarchive Project" if selected.archived else "Archive Project"
         if action_cols[3].button(archive_label, use_container_width=True):
             workspace_service.archive_project(
                 selected.workspace_id,
@@ -2899,6 +3460,22 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
                 st.session_state["atlas_active_workspace_id"] = None
                 st.session_state["atlas_active_page"] = "Mission Control"
             st.rerun()
+
+        delete_confirm = action_cols[4].checkbox(
+            "Confirm Delete",
+            key=f"atlas_confirm_delete_{selected.workspace_id}",
+        )
+        if action_cols[4].button("Delete Project", use_container_width=True):
+            if not delete_confirm:
+                st.warning("Enable Confirm Delete before deleting a project.")
+            else:
+                workspace_service.delete_project(selected.workspace_id)
+                if selected.workspace_id == st.session_state.get(
+                    "atlas_active_workspace_id"
+                ):
+                    st.session_state["atlas_active_workspace_id"] = None
+                    st.session_state["atlas_active_page"] = "Mission Control"
+                st.rerun()
 
         st.markdown("#### Rename Project")
         rename_name = st.text_input(
@@ -2933,19 +3510,6 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
                 new_workspace_id=duplicate_id.strip(),
                 new_name=duplicate_name.strip() or None,
             )
-            st.rerun()
-
-        if st.button(
-            "Delete Project",
-            key=f"atlas_delete_btn_{selected.workspace_id}",
-            type="secondary",
-        ):
-            workspace_service.delete_project(selected.workspace_id)
-            if selected.workspace_id == st.session_state.get(
-                "atlas_active_workspace_id"
-            ):
-                st.session_state["atlas_active_workspace_id"] = None
-                st.session_state["atlas_active_page"] = "Mission Control"
             st.rerun()
 
 
@@ -3202,67 +3766,124 @@ def _render_open_existing_page(
     _render_page_header(
         st,
         "Open Existing Project",
-        "Open an existing project record, snapshot, or package directory.",
-    )
-    path_text = st.text_input(
-        "Workspace file, intake snapshot, or package folder",
-        key="atlas_pending_open_path",
-        placeholder="AtlasProjects/example-project/project.json",
+        "Open imported repository projects. Path-based opening is available in Advanced options.",
     )
 
-    if not st.button("Open Path", type="primary"):
-        return
-
-    path = Path(path_text).expanduser()
-    if not path.exists():
-        st.error(f"Path not found: {path}")
-        return
-
-    if path.is_dir() and (path / "project.json").exists():
-        record = workspace_service.load_record(path / "project.json")
-        workspace_service.save_record(record)
-        st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
-        st.rerun()
-        return
-
-    if path.is_dir() and (path / "workspace.json").exists():
-        record = workspace_service.load_record(path / "workspace.json")
-        workspace_service.save_record(record)
-        st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
-        st.rerun()
-        return
-
-    if path.name in {"workspace.json", "project.json", "metadata.json"}:
-        record = workspace_service.load_record(path)
-        workspace_service.save_record(record)
-        st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
-        st.rerun()
-        return
-
-    if path.name == "intake_snapshot.json":
-        context = build_intake_review_context(path)
-        record = _build_record_from_context(context)
-        workspace_service.save_record(record)
-        st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
-        st.rerun()
-        return
-
-    if path.is_dir():
-        context = build_reference_project_context(path)
-        record = _build_record_from_context(context)
-        workspace_service.save_record(record)
-        st.session_state["atlas_active_workspace_id"] = record.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
-        st.rerun()
-        return
-
-    st.error(
-        "Open a project.json/workspace.json file, intake_snapshot.json file, or project folder."
+    include_archived = st.checkbox("Show archived projects", value=False)
+    rows = _project_library_rows(
+        workspace_service,
+        include_archived=include_archived,
+        limit=500,
     )
+    if not rows:
+        _render_guided_empty_state(
+            st,
+            why_empty="No repository projects are currently imported.",
+            action_to_populate="Create a project or import a .atlaspkg bundle.",
+            next_location="Use Projects page actions to create/import projects.",
+        )
+    else:
+        filters = st.columns(4)
+        search = filters[0].text_input("Search Projects", value="")
+        lifecycle_filter = filters[1].selectbox(
+            "Lifecycle",
+            options=["All"] + sorted({str(item["lifecycle_stage"]) for item in rows}),
+        )
+        status_filter = filters[2].selectbox(
+            "Status",
+            options=["All"] + sorted({str(item["current_status"]) for item in rows}),
+        )
+        sort_field = filters[3].selectbox(
+            "Sort",
+            options=[
+                "last_opened",
+                "last_modified",
+                "project_name",
+                "customer",
+                "review_status",
+            ],
+        )
+
+        filtered = [
+            item
+            for item in rows
+            if (
+                (
+                    not search.strip()
+                    or _contains_any(
+                        " ".join(
+                            [
+                                _safe_text(item.get("project_name"), ""),
+                                _safe_text(item.get("workspace_id"), ""),
+                                _safe_text(item.get("customer"), ""),
+                            ]
+                        ),
+                        [search.strip().lower()],
+                    )
+                )
+                and (
+                    lifecycle_filter == "All"
+                    or _safe_text(item.get("lifecycle_stage"), "") == lifecycle_filter
+                )
+                and (
+                    status_filter == "All"
+                    or _safe_text(item.get("current_status"), "") == status_filter
+                )
+            )
+        ]
+        filtered.sort(
+            key=lambda item: _safe_text(item.get(sort_field), ""), reverse=True
+        )
+
+        st.dataframe(
+            [
+                {
+                    "Project": item["project_name"],
+                    "Customer": item["customer"],
+                    "Lifecycle": item["lifecycle_stage"],
+                    "Status": item["current_status"],
+                    "Last Opened": item["last_opened"],
+                    "Last Modified": item["last_modified"],
+                    "Documents": item["document_count"],
+                    "Review Status": item["review_status"],
+                    "Reference": "Reference" if item["reference"] else "",
+                    "Archived": "Archived" if item["archived"] else "",
+                }
+                for item in filtered
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        labels = [
+            f"{item['project_name']} · {item['workspace_id']}" for item in filtered
+        ]
+        if labels:
+            selected_label = st.selectbox("Select Project", options=labels)
+            selected_item = filtered[labels.index(selected_label)]
+            selected = selected_item["record"]
+
+            actions = st.columns(2)
+            if actions[0].button(
+                "Open Project", type="primary", use_container_width=True
+            ):
+                _open_project_record(st, selected)
+            pin_label = "Unpin" if selected.pinned else "Pin"
+            if actions[1].button(pin_label, use_container_width=True):
+                workspace_service.pin_project(
+                    selected.workspace_id,
+                    pinned=not selected.pinned,
+                )
+                st.rerun()
+
+    with st.expander("Advanced: Open from local path", expanded=False):
+        path_text = st.text_input(
+            "Workspace file, intake snapshot, or package folder",
+            key="atlas_pending_open_path",
+            placeholder="AtlasProjects/example-project/project.json",
+        )
+        if st.button("Open from local path", use_container_width=True):
+            _open_project_from_local_path(st, workspace_service, path_text)
 
 
 def _render_project_summary_page(
@@ -10214,20 +10835,63 @@ def _render_project_files_page(
 
 
 def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
-    st.subheader("Drawing Workspace")
+    _render_page_header(
+        st,
+        "Drawing Workspace",
+        "Search, inspect, and validate drawing relationships without leaving the workspace.",
+    )
     objects = _workspace_objects(context)
     rows = list(objects.get("drawings", []))
     if not rows:
-        st.info("No drawing objects available.")
+        _render_guided_empty_state(
+            st,
+            why_empty="No drawing objects are available.",
+            action_to_populate="Upload drawings and run project analysis.",
+            next_location="Go to Documents and run project analysis.",
+        )
         return
 
-    explorer_col, confidence_col = st.columns([3, 2])
-    with explorer_col:
-        st.caption("Each drawing is a first-class object with relationship links.")
-    with confidence_col:
-        st.caption(
-            f"Drawing intelligence confidence: {_safe_text(objects.get('drawing_intelligence_confidence'), 'n/a')}"
+    st.markdown("### Search and Filters")
+    filter_cols = st.columns([2.8, 1.6, 1.6])
+    query = filter_cols[0].text_input(
+        "Search drawings",
+        value=st.session_state.get("atlas_drawings_search", ""),
+        key="atlas_drawings_search",
+        placeholder="drawing number, title, discipline",
+    )
+    discipline_filter = filter_cols[1].multiselect(
+        "Discipline",
+        options=sorted(
+            {_safe_text(item.get("discipline"), "General") for item in rows}
+        ),
+        default=[],
+    )
+    extraction_filter = filter_cols[2].selectbox(
+        "Extraction",
+        options=["All", "High", "Medium", "Low"],
+    )
+
+    filtered = [
+        item
+        for item in rows
+        if (
+            (not query.strip() or _contains_any(str(item), [query]))
+            and (
+                not discipline_filter
+                or _safe_text(item.get("discipline"), "General") in discipline_filter
+            )
+            and (
+                extraction_filter == "All"
+                or _safe_text(item.get("extraction_quality"), "").lower()
+                == extraction_filter.lower()
+            )
         )
+    ]
+
+    st.markdown("### Drawing List")
+    st.caption(
+        f"Drawing intelligence confidence: {_safe_text(objects.get('drawing_intelligence_confidence'), 'n/a')}"
+    )
 
     summary_rows = [
         {
@@ -10249,183 +10913,147 @@ def _render_drawings_page(st: Any, context: dict[str, Any] | None) -> None:
             "ocr status": item["ocr_status"],
             "warnings": len(item["warnings"]),
         }
-        for item in rows
+        for item in filtered
     ]
+    if not summary_rows:
+        _render_guided_empty_state(
+            st,
+            why_empty="No drawings match the current filters.",
+            action_to_populate="Clear filters or broaden your search.",
+            next_location="Use Search and Filters above.",
+        )
+        return
     st.dataframe(summary_rows, use_container_width=True, hide_index=True)
 
-    labels = [f"{item['drawing_number']} · {item['title']}" for item in rows]
+    labels = [f"{item['drawing_number']} · {item['title']}" for item in filtered]
     selected_label = st.selectbox("Select Drawing Object", options=labels)
-    selected = rows[labels.index(selected_label)]
+    selected = filtered[labels.index(selected_label)]
     _set_context_selection(st, "drawing", selected)
 
-    detail_col, nav_col = st.columns([2.6, 1.4])
-    with detail_col:
-        st.markdown("#### Drawing Detail")
-        st.dataframe(
-            [
-                {"property": "Drawing Number", "value": selected["drawing_number"]},
-                {"property": "Title", "value": selected["title"]},
-                {"property": "Revision", "value": selected["revision"]},
-                {"property": "Issue Date", "value": selected["issue_date"]},
-                {"property": "Discipline", "value": selected["discipline"]},
-                {
-                    "property": "Sheet Category",
-                    "value": _safe_text(selected.get("sheet_category"), "other"),
-                },
-                {
-                    "property": "Sheet Sequence",
-                    "value": _safe_text(selected.get("sheet_sequence"), "n/a"),
-                },
-                {
-                    "property": "Drawing Scale",
-                    "value": _safe_text(selected.get("drawing_scale"), "n/a"),
-                },
-                {"property": "OCR Status", "value": selected["ocr_status"]},
-                {
-                    "property": "Extraction Quality",
-                    "value": selected["extraction_quality"],
-                },
-                {
-                    "property": "Intelligence Confidence",
-                    "value": _safe_text(
-                        selected.get("drawing_intelligence_confidence"), "n/a"
-                    ),
-                },
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
+    st.markdown(
+        f"### Selected Drawing Detail\n\n**{selected['drawing_number']} - {selected['title']}**"
+    )
+    st.dataframe(
+        [
+            {"Property": "Drawing Number", "Value": selected["drawing_number"]},
+            {"Property": "Title", "Value": selected["title"]},
+            {"Property": "Revision", "Value": selected["revision"]},
+            {"Property": "Issue Date", "Value": selected["issue_date"]},
+            {"Property": "Discipline", "Value": selected["discipline"]},
+            {
+                "Property": "Sheet Category",
+                "Value": _safe_text(selected.get("sheet_category"), "other"),
+            },
+            {
+                "Property": "Sheet Sequence",
+                "Value": _safe_text(selected.get("sheet_sequence"), "n/a"),
+            },
+            {
+                "Property": "Drawing Scale",
+                "Value": _safe_text(selected.get("drawing_scale"), "n/a"),
+            },
+            {"Property": "OCR Status", "Value": selected["ocr_status"]},
+            {"Property": "Extraction Quality", "Value": selected["extraction_quality"]},
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
 
-        st.markdown("Referenced Objects")
-        st.dataframe(
-            [
-                {
-                    "relationship": "Drawings",
-                    "objects": ", ".join(selected.get("referenced_drawings", []))
-                    or "n/a",
-                },
-                {
-                    "relationship": "Details",
-                    "objects": ", ".join(selected.get("detail_references", []))
-                    or "n/a",
-                },
-                {
-                    "relationship": "Views",
-                    "objects": ", ".join(selected.get("view_references", [])) or "n/a",
-                },
-                {
-                    "relationship": "Equipment",
-                    "objects": ", ".join(selected["referenced_equipment"]) or "n/a",
-                },
-                {
-                    "relationship": "Specifications",
-                    "objects": ", ".join(selected["referenced_specifications"])
-                    or "n/a",
-                },
-                {
-                    "relationship": "Systems",
-                    "objects": ", ".join(selected["referenced_systems"]) or "n/a",
-                },
-                {
-                    "relationship": "RFIs",
-                    "objects": ", ".join(selected["referenced_rfis"]) or "n/a",
-                },
-                {
-                    "relationship": "Evidence",
-                    "objects": ", ".join(selected["referenced_evidence"]) or "n/a",
-                },
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        source_file = _safe_text(selected.get("source_file"), "")
-        if source_file.lower().endswith(".pdf"):
-            st.markdown("#### PDF Preview")
-            st.caption(
-                "Embedded preview available when the source PDF is available locally."
-            )
-            st.code(source_file)
-        else:
-            st.markdown("#### Preview")
-            st.info(
-                "Preview placeholder: drawing metadata available, source preview not embedded."
-            )
-
-        st.markdown("#### Deterministic Sheet Navigation")
-        ordered_rows = sorted(
-            rows,
-            key=lambda item: (
-                (
-                    10**6
-                    if not isinstance(item.get("sheet_sequence"), int)
-                    else int(item.get("sheet_sequence", 0))
-                ),
-                _safe_text(item.get("drawing_number"), ""),
-            ),
-        )
-        selected_index = next(
-            (
-                index
-                for index, item in enumerate(ordered_rows)
-                if _safe_text(item.get("drawing_number"), "")
-                == _safe_text(selected.get("drawing_number"), "")
-            ),
-            0,
-        )
-        previous_sheet = (
-            ordered_rows[selected_index - 1] if selected_index > 0 else None
-        )
-        next_sheet = (
-            ordered_rows[selected_index + 1]
-            if selected_index + 1 < len(ordered_rows)
-            else None
-        )
-        nav_rows = [
-            {
-                "target": "Previous",
-                "drawing": _safe_text(
-                    previous_sheet.get("drawing_number") if previous_sheet else None,
-                    "n/a",
-                ),
-            },
-            {
-                "target": "Next",
-                "drawing": _safe_text(
-                    next_sheet.get("drawing_number") if next_sheet else None,
-                    "n/a",
-                ),
-            },
-            {
-                "target": "Referenced Sheets",
-                "drawing": ", ".join(selected.get("referenced_drawings", [])) or "n/a",
-            },
-            {
-                "target": "Referenced Details",
-                "drawing": ", ".join(selected.get("detail_references", [])) or "n/a",
-            },
-            {
-                "target": "Referenced Views",
-                "drawing": ", ".join(selected.get("view_references", [])) or "n/a",
-            },
+    st.markdown("### Related Objects")
+    related_tabs = st.tabs(
+        [
+            "Related Equipment",
+            "Related Specifications",
+            "Related Systems",
+            "Evidence and Warnings",
+            "Quick Navigation",
         ]
-        st.dataframe(nav_rows, use_container_width=True, hide_index=True)
+    )
 
-    with nav_col:
-        st.markdown("#### Quick Navigation")
-        if st.button("Open Drawing Explorer", use_container_width=True):
+    with related_tabs[0]:
+        equipment_rows = [
+            {"Equipment": value}
+            for value in list(selected.get("referenced_equipment") or [])
+        ]
+        if equipment_rows:
+            st.dataframe(equipment_rows, use_container_width=True, hide_index=True)
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No related equipment is linked to this drawing.",
+                action_to_populate="Verify equipment-to-drawing references in project files.",
+                next_location="Review Equipment and Drawing Explorer links.",
+            )
+
+    with related_tabs[1]:
+        specification_rows = [
+            {"Specification": value}
+            for value in list(selected.get("referenced_specifications") or [])
+        ]
+        if specification_rows:
+            st.dataframe(specification_rows, use_container_width=True, hide_index=True)
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No related specifications are linked to this drawing.",
+                action_to_populate="Verify cross references between drawing callouts and specs.",
+                next_location="Review Specifications and cross-reference warnings.",
+            )
+
+    with related_tabs[2]:
+        system_rows = [
+            {"System": value}
+            for value in list(selected.get("referenced_systems") or [])
+        ]
+        if system_rows:
+            st.dataframe(system_rows, use_container_width=True, hide_index=True)
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No related systems are linked to this drawing.",
+                action_to_populate="Run analysis after drawing/spec imports to resolve system links.",
+                next_location="Review Systems workspace.",
+            )
+
+    with related_tabs[3]:
+        evidence_rows = [
+            {"Evidence": value}
+            for value in list(selected.get("referenced_evidence") or [])
+        ]
+        warning_rows = [
+            {"Warning": value} for value in list(selected.get("warnings") or [])
+        ]
+        st.markdown("#### Evidence")
+        if evidence_rows:
+            st.dataframe(evidence_rows, use_container_width=True, hide_index=True)
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No evidence is currently linked to this drawing.",
+                action_to_populate="Confirm source references during document intake.",
+                next_location="Open Evidence workspace for additional traceability.",
+            )
+        st.markdown("#### Warnings")
+        if warning_rows:
+            st.dataframe(warning_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No warnings are currently associated with this drawing.")
+
+    with related_tabs[4]:
+        nav_cols = st.columns(5)
+        if nav_cols[0].button("Drawing Explorer", use_container_width=True):
             st.session_state["atlas_active_page"] = "Drawing Explorer"
             st.rerun()
-        if st.button("Open Equipment", use_container_width=True):
+        if nav_cols[1].button("Equipment", use_container_width=True):
             st.session_state["atlas_active_page"] = "Equipment"
             st.rerun()
-        if st.button("Open Specifications", use_container_width=True):
+        if nav_cols[2].button("Specifications", use_container_width=True):
             st.session_state["atlas_active_page"] = "Specifications"
             st.rerun()
-        if st.button("Open Systems", use_container_width=True):
+        if nav_cols[3].button("Systems", use_container_width=True):
             st.session_state["atlas_active_page"] = "Systems"
             st.rerun()
-        if st.button("Open Evidence", use_container_width=True):
+        if nav_cols[4].button("Evidence", use_container_width=True):
             st.session_state["atlas_active_page"] = "Evidence"
             st.rerun()
 
@@ -10640,21 +11268,76 @@ def _render_drawing_explorer_page(st: Any, context: dict[str, Any] | None) -> No
 
 
 def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None:
-    st.subheader("Specification Workspace")
+    _render_page_header(
+        st,
+        "Specification Workspace",
+        "Search, inspect, and validate specification relationships with deterministic traceability.",
+    )
     objects = _workspace_objects(context)
     rows = list(objects.get("specifications", []))
     if not rows:
-        st.info("No specification objects available.")
+        _render_guided_empty_state(
+            st,
+            why_empty="No specification objects are available.",
+            action_to_populate="Upload specification files and run project analysis.",
+            next_location="Go to Documents and run project analysis.",
+        )
         return
 
-    head_cols = st.columns([2.5, 1.5, 1.5])
-    head_cols[0].caption(
-        "Each specification section is a first-class object with linked relationships."
+    st.markdown("### Search and Filters")
+    filter_cols = st.columns([2.5, 1.4, 1.4, 1.4])
+    query = filter_cols[0].text_input(
+        "Search specifications",
+        value=st.session_state.get("atlas_spec_search", ""),
+        key="atlas_spec_search",
+        placeholder="section, title, standards, manufacturers",
     )
-    head_cols[1].caption(
-        f"Spec intelligence confidence: {_safe_text(objects.get('specification_intelligence_confidence'), 'n/a')}"
+    discipline_filter = filter_cols[1].selectbox(
+        "Discipline",
+        options=["All"]
+        + sorted({_safe_text(item.get("discipline"), "other") for item in rows}),
     )
-    head_cols[2].caption(
+    status_filter = filter_cols[2].selectbox(
+        "Status",
+        options=["All"]
+        + sorted({_safe_text(item.get("status"), "indexed") for item in rows}),
+    )
+    system_filter = filter_cols[3].selectbox(
+        "System",
+        options=["All"]
+        + sorted(
+            {
+                _safe_text(system, "")
+                for item in rows
+                for system in list(item.get("referenced_systems") or [])
+                if _safe_text(system, "")
+            }
+        ),
+    )
+
+    filtered = [
+        item
+        for item in rows
+        if (
+            (not query.strip() or _contains_any(str(item), [query]))
+            and (
+                discipline_filter == "All"
+                or _safe_text(item.get("discipline"), "other") == discipline_filter
+            )
+            and (
+                status_filter == "All"
+                or _safe_text(item.get("status"), "indexed") == status_filter
+            )
+            and (
+                system_filter == "All"
+                or system_filter in list(item.get("referenced_systems") or [])
+            )
+        )
+    ]
+
+    st.markdown("### Specification List")
+    st.caption(
+        f"Spec intelligence confidence: {_safe_text(objects.get('specification_intelligence_confidence'), 'n/a')} · "
         f"Cross-reference warnings: {len(list(objects.get('specification_cross_reference_warnings') or []))}"
     )
 
@@ -10677,18 +11360,29 @@ def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None
                 "cross refs": len(item["cross_references"]),
                 "extraction confidence": item["extraction_confidence"],
             }
-            for item in rows
+            for item in filtered
         ],
         use_container_width=True,
         hide_index=True,
     )
 
-    labels = [f"{item['section']} · {item['title']}" for item in rows]
+    if not filtered:
+        _render_guided_empty_state(
+            st,
+            why_empty="No specifications match the current filters.",
+            action_to_populate="Clear filters or broaden your search.",
+            next_location="Use Search and Filters above.",
+        )
+        return
+
+    labels = [f"{item['section']} · {item['title']}" for item in filtered]
     selected_label = st.selectbox("Select Specification Object", options=labels)
-    selected = rows[labels.index(selected_label)]
+    selected = filtered[labels.index(selected_label)]
     _set_context_selection(st, "specification", selected)
 
-    st.markdown("#### Specification Detail")
+    st.markdown(
+        f"### Selected Specification Detail\n\n**{selected['section']} - {selected['title']}**"
+    )
     st.dataframe(
         [
             {"property": "Division", "value": selected["division"]},
@@ -10723,81 +11417,93 @@ def _render_specifications_page(st: Any, context: dict[str, Any] | None) -> None
         hide_index=True,
     )
 
-    st.markdown("Relationships")
-    st.dataframe(
+    relationship_tabs = st.tabs(
         [
-            {
-                "relationship": "Drawings",
-                "objects": ", ".join(selected["referenced_drawings"]) or "n/a",
-            },
-            {
-                "relationship": "Equipment",
-                "objects": ", ".join(selected["referenced_equipment"]) or "n/a",
-            },
-            {
-                "relationship": "Systems",
-                "objects": ", ".join(selected["referenced_systems"]) or "n/a",
-            },
-            {
-                "relationship": "RFIs",
-                "objects": ", ".join(selected["referenced_rfis"]) or "n/a",
-            },
-            {
-                "relationship": "Evidence",
-                "objects": ", ".join(selected["referenced_evidence"]) or "n/a",
-            },
-            {
-                "relationship": "Standards",
-                "objects": ", ".join(selected.get("referenced_standards", [])) or "n/a",
-            },
-            {
-                "relationship": "Manufacturers",
-                "objects": ", ".join(selected.get("referenced_manufacturers", []))
-                or "n/a",
-            },
-            {
-                "relationship": "Products",
-                "objects": ", ".join(selected.get("referenced_products", [])) or "n/a",
-            },
-            {
-                "relationship": "Addenda",
-                "objects": ", ".join(selected.get("addendum_references", [])) or "n/a",
-            },
-        ],
-        use_container_width=True,
-        hide_index=True,
+            "Requirement Candidates",
+            "Related Drawings",
+            "Related Equipment",
+            "Related Systems",
+            "Evidence and Warnings",
+            "Quick Navigation",
+        ]
     )
 
-    requirement_rows = list(selected.get("requirement_candidates") or [])
-    st.markdown("Requirement Candidates")
-    if requirement_rows:
-        st.dataframe(requirement_rows, use_container_width=True, hide_index=True)
-    else:
-        st.info("No deterministic requirement candidates detected for this section.")
+    with relationship_tabs[0]:
+        requirement_rows = list(selected.get("requirement_candidates") or [])
+        if requirement_rows:
+            st.dataframe(requirement_rows, use_container_width=True, hide_index=True)
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No requirement candidates were detected for this section.",
+                action_to_populate="Validate specification extraction and section indexing.",
+                next_location="Review Specification Explorer and source files.",
+            )
 
-    warning_rows = list(objects.get("specification_cross_reference_warnings") or [])
-    st.markdown("Cross-Reference Warnings")
-    if warning_rows:
-        st.dataframe(warning_rows[:12], use_container_width=True, hide_index=True)
-    else:
-        st.info("No cross-reference warnings currently detected.")
+    with relationship_tabs[1]:
+        drawing_rows = [
+            {"Drawing": value}
+            for value in list(selected.get("referenced_drawings") or [])
+        ]
+        if drawing_rows:
+            st.dataframe(drawing_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No related drawings were detected for this specification section.")
 
-    nav_cols = st.columns(5)
-    if nav_cols[0].button("Open Specification Explorer", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Specification Explorer"
-        st.rerun()
-    if nav_cols[1].button("Go to Drawings", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Drawing Explorer"
-        st.rerun()
-    if nav_cols[2].button("Go to Equipment", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Equipment"
-        st.rerun()
-    if nav_cols[3].button("Go to Systems", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Systems"
-        st.rerun()
-    if nav_cols[4].button("Go to Evidence", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Evidence"
-        st.rerun()
+    with relationship_tabs[2]:
+        equipment_rows = [
+            {"Equipment": value}
+            for value in list(selected.get("referenced_equipment") or [])
+        ]
+        if equipment_rows:
+            st.dataframe(equipment_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No related equipment was detected for this specification section.")
+
+    with relationship_tabs[3]:
+        system_rows = [
+            {"System": value}
+            for value in list(selected.get("referenced_systems") or [])
+        ]
+        if system_rows:
+            st.dataframe(system_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No related systems were detected for this specification section.")
+
+    with relationship_tabs[4]:
+        evidence_rows = [
+            {"Evidence": value}
+            for value in list(selected.get("referenced_evidence") or [])
+        ]
+        warning_rows = list(objects.get("specification_cross_reference_warnings") or [])
+        st.markdown("#### Evidence")
+        if evidence_rows:
+            st.dataframe(evidence_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No evidence references are linked to this specification section.")
+        st.markdown("#### Cross-Reference Warnings")
+        if warning_rows:
+            st.dataframe(warning_rows[:12], use_container_width=True, hide_index=True)
+        else:
+            st.info("No cross-reference warnings are currently detected.")
+
+    with relationship_tabs[5]:
+        nav_cols = st.columns(5)
+        if nav_cols[0].button("Specification Explorer", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Specification Explorer"
+            st.rerun()
+        if nav_cols[1].button("Drawings", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Drawing Explorer"
+            st.rerun()
+        if nav_cols[2].button("Equipment", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Equipment"
+            st.rerun()
+        if nav_cols[3].button("Systems", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Systems"
+            st.rerun()
+        if nav_cols[4].button("Evidence", use_container_width=True):
+            st.session_state["atlas_active_page"] = "Evidence"
+            st.rerun()
 
 
 def _render_specification_explorer_page(
@@ -13265,54 +13971,20 @@ def _render_shell(
     layout_mode = st.session_state.get("atlas_layout_mode", "Desktop")
 
     if layout_mode == "Desktop":
-        if current_page == "Mission Control":
-            nav_col, main_col = st.columns([2.4, 7.6])
-            with nav_col:
-                _nav_buttons(st, st, "desktop", record)
-            with main_col:
-                _render_main_content(
-                    st,
-                    workspace_service,
-                    record,
-                    context,
-                    mission_control_payload,
-                )
-        else:
-            selected = dict(st.session_state.get("atlas_context_selection") or {})
-            selection_kind = _safe_text(selected.get("kind"), "project")
-            show_context_column = bool(
-                record is not None and selection_kind not in {"", "project"}
+        nav_col, main_col = st.columns([2.3, 7.7])
+        with nav_col:
+            _nav_buttons(st, st, "desktop", record)
+        with main_col:
+            _render_main_content(
+                st,
+                workspace_service,
+                record,
+                context,
+                mission_control_payload,
             )
 
-            if show_context_column:
-                nav_col, main_col, context_col = st.columns([2.2, 6.6, 2.2])
-                with nav_col:
-                    _nav_buttons(st, st, "desktop", record)
-                with main_col:
-                    _render_main_content(
-                        st,
-                        workspace_service,
-                        record,
-                        context,
-                        mission_control_payload,
-                    )
-                with context_col:
-                    _render_context_panel(st, context)
-            else:
-                nav_col, main_col = st.columns([2.4, 7.6])
-                with nav_col:
-                    _nav_buttons(st, st, "desktop", record)
-                with main_col:
-                    _render_main_content(
-                        st,
-                        workspace_service,
-                        record,
-                        context,
-                        mission_control_payload,
-                    )
-
     elif layout_mode == "Tablet":
-        nav_popover = st.popover("Navigation")
+        nav_popover = st.popover("Open Navigation")
         _nav_buttons(st, nav_popover, "tablet", record)
         _render_main_content(
             st,
@@ -13321,9 +13993,6 @@ def _render_shell(
             context,
             mission_control_payload,
         )
-        if current_page != "Mission Control" and record is not None:
-            st.markdown("---")
-            _render_context_panel(st, context)
 
     else:
         nav_drawer = st.popover("Open Navigation")
@@ -13335,9 +14004,6 @@ def _render_shell(
             context,
             mission_control_payload,
         )
-        if current_page != "Mission Control" and record is not None:
-            st.markdown("---")
-            _render_context_panel(st, context)
 
     _render_status_bar(st, record, context)
 

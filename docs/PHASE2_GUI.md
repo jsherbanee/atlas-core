@@ -9,6 +9,8 @@ This interface is local-only:
 
 Atlas Workspace v1 (Sprint 8) launches into a persistent interactive engineering shell.
 
+Atlas Workspace UI Sprint 4 adds repository-first project access, a scoped application-wide Knowledge workspace, a compact active-project identity header, and a strict two-column Project Workspace layout.
+
 - Status bar
 
 The shell remains visible while page content changes.
@@ -23,6 +25,68 @@ Project Workspace is entered only after opening a specific project.
 
 Mission Control remains application-level.
 Opening a project switches Atlas into project-specific navigation.
+
+## Repository-Backed Open Existing Project
+Open Existing Project now defaults to repository-backed project selection.
+
+Primary behavior:
+- searchable/sortable/filterable imported project list
+- includes customer, lifecycle stage, status, last opened, last modified, document count, and review status
+- supports archived visibility and pinning
+- opens selected project directly into Project Workspace
+
+Advanced behavior:
+- an advanced expander provides Open from local path for development/recovery use only
+- manual path entry is no longer the default workflow
+
+## Projects Library
+Projects is the primary project library.
+
+Primary actions:
+- Open Project
+- Create New Project
+- Import Project Package
+- Archive/Unarchive Project
+- Duplicate Project
+- Delete Project with explicit confirmation
+
+Project persistence remains repository-backed through ProjectWorkspaceService.
+
+## Knowledge Workspace Scope
+Knowledge is application-wide and cross-project.
+
+Knowledge landing sections:
+- Summary
+- Manufacturers
+- Vendors
+- Customers
+- Products
+- Price Lists
+- Imports
+
+Knowledge page excludes project-specific BOM/drawing/risk views.
+
+## Active Project Identity Pattern
+Project Workspace uses a compact identity header instead of a wide metadata table.
+
+Primary identity:
+- project name
+- customer
+- lifecycle and status badges
+
+Secondary identity:
+- last analysis timestamp
+- confidence
+- recommended next action control
+
+## Breadcrumb Rules
+Breadcrumbs are concise and do not repeat workspace labels.
+
+Examples:
+- Atlas / Projects
+- Atlas / Knowledge
+- Atlas / Projects / MAW Music Education Center / Overview
+- Atlas / Projects / MAW Music Education Center / Drawings
 
 
 System metadata (version/commit/stage/status) remains available in the status bar.
@@ -125,16 +189,17 @@ Project Settings:
 
 The current page, selected project, and breadcrumb remain visible in all modes.
 
-Context panel behavior:
+Context behavior:
 - Primary workflow pages emphasize summary conclusions first.
-- Evidence and traceability remain available through drill-down pages instead of appearing by default.
-- Advanced pages continue to expose lower-level context and diagnostics when needed.
-- Desktop now uses a conditional context column: it appears only when a specific object/evidence selection is active.
-- Workflow pages default to two-column emphasis (navigation + main work area) unless context drill-down is requested.
+- Evidence and traceability remain available through drill-down pages.
+- Desktop Project Workspace uses two columns only: navigation + main content.
+- No persistent third context column is reserved.
+- Object detail is surfaced inline with tabs/expanders/sectioned detail areas.
 
 Responsive behavior:
-- Desktop: persistent navigation with summary-first workflow pages.
-- Tablet and mobile: navigation collapses to popover/hamburger.
+- Desktop: persistent left navigation and full-width working content.
+- Tablet: collapsible navigation popover and inline detail sections.
+- Mobile: drawer-style navigation and stacked list/detail flow.
 
 ## Upload Flow
 1. Open `Documents`.
@@ -206,6 +271,13 @@ Each empty state explicitly answers:
 - where to go next
 
 This pattern is used in Overview activity, Documents filters, BOM Review, Scope & Risk, and Engineering Review.
+
+Sprint 4 extends guided empty states to:
+- no projects imported
+- no knowledge records
+- no price lists
+- no manufacturer/vendor/customer data
+- no selected drawing/specification relationships
 
 ## Workflow Page Density
 Primary workflow pages now default to summary views first and keep deep detail in optional drill-down sections.

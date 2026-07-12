@@ -151,7 +151,20 @@ Guided steps should use explicit statuses: not started, ready, needs review, blo
 
 Recommended next action should target the next incomplete review step, explain why it matters, and provide direct navigation.
 
-Desktop should only show a dedicated context column when a concrete object/evidence selection is active. Otherwise, the workspace should prioritize a larger main decision area.
+Desktop Project Workspace should use a consistent two-column layout:
+- left navigation
+- main working content
+
+Object/evidence detail should be shown inline in the main content through tabs, expanders, drawers, slide-over patterns, or modal detail surfaces.
+
+Do not reserve a persistent third column for context.
+
+Breadcrumbs should remain concise and non-repetitive.
+
+Preferred patterns:
+- Atlas / Projects
+- Atlas / Knowledge
+- Atlas / Projects / <Project Name> / <Page>
 
 ## 13. Data Visualization
 
@@ -187,7 +200,7 @@ Atlas components should be optimized for engineering clarity.
 - Status indicators should be explicit and color-independent where possible.
 - Navigation should remain persistent and predictable.
 - Search should help users move from object discovery to decision context.
-- The context panel should expose canonical values, supporting evidence, and uncertainty.
+- Contextual object detail should expose canonical values, supporting evidence, and uncertainty through inline or on-demand detail surfaces.
 - Empty states should explain why data is empty, how to populate it, and what the next step is.
 - Detailed diagnostics should be discoverable through drill-down, not forced into the default page view.
 - Checklist-driven review summaries should make completion state understandable at a glance.

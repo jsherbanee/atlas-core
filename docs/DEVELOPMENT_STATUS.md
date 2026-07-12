@@ -16,7 +16,8 @@ It represents the current implementation state of Atlas Core.
 
 ## Current State
 Atlas Core is in active Phase 2 Bid Intelligence development with a stabilization baseline candidate prepared and a project-specific Atlas workspace shell implemented.
-Sprint 3 UX delivery adds guided project review progression, explicit review status modeling, checklist visibility, and a concise project summary report center with deterministic exports.
+Sprint 3 UX delivery added guided project review progression, explicit review status modeling, checklist visibility, and a concise project summary report center with deterministic exports.
+Sprint 4 UI refinement adds repository-backed Open Existing Project, a stronger Projects library workflow, application-wide Knowledge scope, compact active-project identity, concise breadcrumbs, and a two-column Project Workspace layout (no persistent third context column).
 
 ## Quality Status (Latest Full Run)
 - black .: passing
@@ -49,6 +50,11 @@ Current workspace behavior:
 - Overview and Reports expose a deterministic project review checklist and specific next-step navigation.
 - Reports now provide Project Summary, Estimator Brief, BOM Export, Scope and Risk Export, and Engineering Review Export views.
 - Project Summary report exports are deterministic Markdown/JSON/HTML for internal review use.
+- Open Existing Project defaults to repository-backed project selection with search/sort/filter and archived visibility.
+- Manual path entry remains available only as an advanced development/recovery option.
+- Knowledge workspace is application-wide and excludes project-specific review pages.
+- Active project identity is surfaced through a compact project header with lifecycle/status badges and recommended next action.
+- Project Workspace desktop layout is two-column (navigation + working content), with inline/on-demand object detail.
 
 ## Latest Completed Feature
 - Estimator Brief Enhancements (deterministic executive summary, prioritized reviewer actions, and evidence traceability)
