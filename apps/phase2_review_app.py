@@ -4351,7 +4351,7 @@ def _selection_route(kind: str) -> str:
         "room": "Equipment",
         "rfi": "RFI Candidates",
         "evidence": "Evidence",
-        "manufacturer": "Master Library Explorer",
+        "manufacturer": "Knowledge",
         "vendor": "Knowledge",
         "customer": "Knowledge",
         "service": "Knowledge",
@@ -4359,9 +4359,119 @@ def _selection_route(kind: str) -> str:
         "price_list": "Knowledge",
         "project_record": "Overview",
         "notebook_entry": "Notebook",
-        "master_product": "Master Library Explorer",
+        "master_product": "Knowledge",
     }
     return mapping.get(kind, "Overview")
+
+
+def _render_knowledge_entity_import_export_controls(
+    st: Any,
+    product_service: CommercialProductService,
+    *,
+    entity_type: str,
+    key_prefix: str,
+) -> None:
+    template = product_service.knowledge_entity_csv_template(entity_type=entity_type)
+    export_filter = st.text_input(
+        "Export Filter",
+        key=f"{key_prefix}_export_filter",
+        placeholder="optional contains filter",
+    )
+    csv_export = product_service.export_knowledge_entities_csv(
+        entity_type=entity_type,
+        include_inactive=True,
+        query=export_filter,
+    )
+    json_export = product_service.export_knowledge_entities_json(
+        entity_type=entity_type,
+        include_inactive=True,
+        query=export_filter,
+    )
+
+    export_cols = st.columns(3)
+    export_cols[0].download_button(
+        "Download CSV Template",
+        data=template,
+        file_name=f"{entity_type}_template.csv",
+        mime="text/csv",
+        key=f"{key_prefix}_template_download",
+        width="stretch",
+    )
+    export_cols[1].download_button(
+        "Export Filtered CSV",
+        data=csv_export,
+        file_name=f"{entity_type}_export.csv",
+        mime="text/csv",
+        key=f"{key_prefix}_csv_export",
+        width="stretch",
+    )
+    export_cols[2].download_button(
+        "Export JSON",
+        data=json_export,
+        file_name=f"{entity_type}_export.json",
+        mime="application/json",
+        key=f"{key_prefix}_json_export",
+        width="stretch",
+    )
+
+    uploaded = st.file_uploader(
+        f"Import {entity_type.title()} CSV",
+        type=["csv"],
+        key=f"{key_prefix}_import_file",
+    )
+    if uploaded is None:
+        return
+
+    file_bytes = uploaded.getvalue()
+    preview = product_service.preview_knowledge_entity_import_csv(
+        entity_type=entity_type,
+        file_bytes=file_bytes,
+    )
+    st.caption(
+        f"Preview: records={preview.get('record_count', 0)} accepted={preview.get('accepted_count', 0)} rejected={preview.get('rejected_count', 0)}"
+    )
+    st.dataframe(
+        [
+            {
+                "Row": int(item.get("row_number") or 0),
+                "Status": _safe_text(item.get("status"), ""),
+                "Errors": " | ".join(list(item.get("errors") or [])),
+                "Warnings": " | ".join(list(item.get("warnings") or [])),
+            }
+            for item in list(preview.get("preview_rows") or [])
+        ],
+        width="stretch",
+        hide_index=True,
+    )
+
+    import_key = f"{key_prefix}_import_result"
+    if st.button(
+        "Import CSV (Partial Success)",
+        key=f"{key_prefix}_import_apply",
+        width="stretch",
+    ):
+        result = product_service.import_knowledge_entities_from_csv(
+            entity_type=entity_type,
+            file_bytes=file_bytes,
+            allow_partial_success=True,
+        )
+        st.session_state[import_key] = result
+        _save_commercial_product_state(st, product_service)
+        st.success(
+            f"Imported {int(result.get('imported_rows', 0) or 0)} rows with {int(result.get('rejected_rows', 0) or 0)} rejected rows."
+        )
+        st.rerun()
+
+    result = dict(st.session_state.get(import_key) or {})
+    if int(result.get("rejected_rows", 0) or 0) > 0:
+        st.download_button(
+            "Download Rejected Rows CSV",
+            data=_safe_text(result.get("rejected_rows_csv"), ""),
+            file_name=f"{entity_type}_rejected_rows.csv",
+            mime="text/csv",
+            key=f"{key_prefix}_rejected_export",
+            width="stretch",
+        )
 
 
 def _build_object_reference(
@@ -5236,9 +5346,14 @@ def _render_application_knowledge_page(
     product_service = _ensure_commercial_seed_data(st)
     manufacturer_rows = product_service.list_manufacturers()
     vendor_rows = product_service.list_vendors()
-    customers = sorted(
+    project_customers = sorted(
         {_safe_text(item.get("customer"), "n/a") for item in project_rows}
     )
+    customer_entities = product_service.list_knowledge_entities(
+        entity_type="customer",
+        include_inactive=True,
+    )
+    service_entities = product_service.list_service_entities(include_inactive=True)
 
     product_rows: list[dict[str, Any]] = []
     for item in project_rows:
@@ -5343,6 +5458,7 @@ def _render_application_knowledge_page(
             "Manufacturers",
             "Vendors",
             "Customers",
+            "Services",
             "Products",
             "Price Lists",
             "Imports",
@@ -5371,9 +5487,21 @@ def _render_application_knowledge_page(
                 },
                 {
                     "Knowledge Area": "Customers",
-                    "State": "Available" if customers else "Foundation in progress",
+                    "State": (
+                        "Available"
+                        if customer_entities or project_customers
+                        else "Foundation in progress"
+                    ),
                     "Why It Matters": "Customer history supports portfolio-level context and repeatability.",
                     "Next Action": "Import or create projects to populate customer records.",
+                },
+                {
+                    "Knowledge Area": "Services",
+                    "State": (
+                        "Available" if service_entities else "Foundation in progress"
+                    ),
+                    "Why It Matters": "Service entities model operational capabilities linked to customers and products.",
+                    "Next Action": "Create reusable service definitions and connect them via Relationships.",
                 },
                 {
                     "Knowledge Area": "Products (Master Library)",
@@ -5493,6 +5621,123 @@ def _render_application_knowledge_page(
                 next_location="Use Knowledge Imports to initialize manufacturer data.",
             )
         else:
+            manufacturer_search = st.text_input(
+                "Manufacturer Search",
+                key="atlas_ck_mfr_search",
+                placeholder="name, code, alias",
+            )
+            manufacturer_active_filter = st.selectbox(
+                "Manufacturer Active Filter",
+                options=["All", "Active", "Inactive"],
+                key="atlas_ck_mfr_active_filter",
+            )
+            filtered_manufacturers = product_service.search_manufacturers(
+                manufacturer_search
+            )
+            if manufacturer_active_filter == "Active":
+                filtered_manufacturers = [
+                    item
+                    for item in filtered_manufacturers
+                    if bool(item.get("active", True))
+                ]
+            if manufacturer_active_filter == "Inactive":
+                filtered_manufacturers = [
+                    item
+                    for item in filtered_manufacturers
+                    if not bool(item.get("active", True))
+                ]
+
+            workflow_ids = [
+                _safe_text(item.get("manufacturer_id"), "")
+                for item in filtered_manufacturers
+                if _safe_text(item.get("manufacturer_id"), "")
+            ]
+            if workflow_ids:
+                selected_manufacturer_id = st.selectbox(
+                    "Manufacturer Workflow",
+                    options=workflow_ids,
+                    key="atlas_ck_mfr_workflow",
+                )
+                selected_manufacturer = (
+                    product_service.get_manufacturer(selected_manufacturer_id) or {}
+                )
+                edit_cols = st.columns(3)
+                edit_display = edit_cols[0].text_input(
+                    "Edit Display",
+                    value=_safe_text(selected_manufacturer.get("display_name"), ""),
+                    key="atlas_ck_mfr_edit_display",
+                )
+                edit_code = edit_cols[1].text_input(
+                    "Edit Code",
+                    value=_safe_text(
+                        selected_manufacturer.get("manufacturer_code"), ""
+                    ),
+                    key="atlas_ck_mfr_edit_code",
+                )
+                edit_aliases = edit_cols[2].text_input(
+                    "Edit Aliases",
+                    value=";".join(list(selected_manufacturer.get("aliases") or [])),
+                    key="atlas_ck_mfr_edit_aliases",
+                )
+                edit_notes = st.text_input(
+                    "Edit Notes",
+                    value=_safe_text(selected_manufacturer.get("notes"), ""),
+                    key="atlas_ck_mfr_edit_notes",
+                )
+                action_cols = st.columns(3)
+                if action_cols[0].button(
+                    "Save Manufacturer Edits",
+                    key="atlas_ck_mfr_edit_save",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.update_manufacturer(
+                            selected_manufacturer_id,
+                            updates={
+                                "display_name": edit_display,
+                                "manufacturer_code": edit_code,
+                                "aliases": [
+                                    _safe_text(item)
+                                    for item in re.split(r"[;,|]", edit_aliases)
+                                    if _safe_text(item)
+                                ],
+                                "notes": edit_notes,
+                            },
+                        )
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Manufacturer updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to update manufacturer: {exc}")
+                if action_cols[1].button(
+                    "Archive Manufacturer",
+                    key="atlas_ck_mfr_archive",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.set_manufacturer_active(
+                            selected_manufacturer_id, False
+                        )
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Manufacturer archived.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to archive manufacturer: {exc}")
+                if action_cols[2].button(
+                    "Restore Manufacturer",
+                    key="atlas_ck_mfr_restore",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.set_manufacturer_active(
+                            selected_manufacturer_id, True
+                        )
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Manufacturer restored.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to restore manufacturer: {exc}")
+
             st.dataframe(
                 [
                     {
@@ -5507,12 +5752,25 @@ def _render_application_knowledge_page(
                         "Website": _safe_text(item.get("website"), ""),
                         "Active": bool(item.get("active", True)),
                         "Aliases": len(list(item.get("aliases") or [])),
+                        "Relationships": len(
+                            product_service.list_knowledge_relationships(
+                                source_entity_id=f"manufacturer:{_safe_text(item.get('manufacturer_id'), '')}"
+                            )
+                        ),
+                        "Updated": _safe_text(item.get("updated_at"), ""),
                     }
-                    for item in manufacturer_rows
+                    for item in filtered_manufacturers
                 ],
                 width="stretch",
                 hide_index=True,
             )
+            with st.expander("Manufacturer CSV/JSON Import Export", expanded=False):
+                _render_knowledge_entity_import_export_controls(
+                    st,
+                    product_service,
+                    entity_type="manufacturer",
+                    key_prefix="atlas_ck_mfr_io",
+                )
 
     with tabs[3]:
         _render_section_title(st, "Vendors")
@@ -5560,6 +5818,111 @@ def _render_application_knowledge_page(
                 next_location="Use Knowledge Imports to initialize vendor data.",
             )
         else:
+            vendor_search = st.text_input(
+                "Vendor Search",
+                key="atlas_ck_vendor_search",
+                placeholder="name, code, alias",
+            )
+            vendor_active_filter = st.selectbox(
+                "Vendor Active Filter",
+                options=["All", "Active", "Inactive"],
+                key="atlas_ck_vendor_active_filter",
+            )
+            filtered_vendors = product_service.search_vendors(vendor_search)
+            if vendor_active_filter == "Active":
+                filtered_vendors = [
+                    item for item in filtered_vendors if bool(item.get("active", True))
+                ]
+            if vendor_active_filter == "Inactive":
+                filtered_vendors = [
+                    item
+                    for item in filtered_vendors
+                    if not bool(item.get("active", True))
+                ]
+
+            workflow_ids = [
+                _safe_text(item.get("vendor_id"), "")
+                for item in filtered_vendors
+                if _safe_text(item.get("vendor_id"), "")
+            ]
+            if workflow_ids:
+                selected_vendor_id = st.selectbox(
+                    "Vendor Workflow",
+                    options=workflow_ids,
+                    key="atlas_ck_vendor_workflow",
+                )
+                selected_vendor = product_service.get_vendor(selected_vendor_id) or {}
+                edit_cols = st.columns(3)
+                edit_display = edit_cols[0].text_input(
+                    "Edit Display",
+                    value=_safe_text(selected_vendor.get("display_name"), ""),
+                    key="atlas_ck_vendor_edit_display",
+                )
+                edit_code = edit_cols[1].text_input(
+                    "Edit Code",
+                    value=_safe_text(selected_vendor.get("vendor_code"), ""),
+                    key="atlas_ck_vendor_edit_code",
+                )
+                edit_aliases = edit_cols[2].text_input(
+                    "Edit Aliases",
+                    value=";".join(list(selected_vendor.get("aliases") or [])),
+                    key="atlas_ck_vendor_edit_aliases",
+                )
+                edit_notes = st.text_input(
+                    "Edit Notes",
+                    value=_safe_text(selected_vendor.get("notes"), ""),
+                    key="atlas_ck_vendor_edit_notes",
+                )
+                action_cols = st.columns(3)
+                if action_cols[0].button(
+                    "Save Vendor Edits",
+                    key="atlas_ck_vendor_edit_save",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.update_vendor(
+                            selected_vendor_id,
+                            updates={
+                                "display_name": edit_display,
+                                "vendor_code": edit_code,
+                                "aliases": [
+                                    _safe_text(item)
+                                    for item in re.split(r"[;,|]", edit_aliases)
+                                    if _safe_text(item)
+                                ],
+                                "notes": edit_notes,
+                            },
+                        )
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Vendor updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to update vendor: {exc}")
+                if action_cols[1].button(
+                    "Archive Vendor",
+                    key="atlas_ck_vendor_archive",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.set_vendor_active(selected_vendor_id, False)
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Vendor archived.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to archive vendor: {exc}")
+                if action_cols[2].button(
+                    "Restore Vendor",
+                    key="atlas_ck_vendor_restore",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.set_vendor_active(selected_vendor_id, True)
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Vendor restored.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to restore vendor: {exc}")
+
             st.dataframe(
                 [
                     {
@@ -5573,16 +5936,65 @@ def _render_application_knowledge_page(
                         ),
                         "Website": _safe_text(item.get("website"), ""),
                         "Active": bool(item.get("active", True)),
+                        "Aliases": len(list(item.get("aliases") or [])),
+                        "Relationships": len(
+                            product_service.list_knowledge_relationships(
+                                source_entity_id=f"vendor:{_safe_text(item.get('vendor_id'), '')}"
+                            )
+                        ),
+                        "Updated": _safe_text(item.get("updated_at"), ""),
                     }
-                    for item in vendor_rows
+                    for item in filtered_vendors
                 ],
                 width="stretch",
                 hide_index=True,
             )
+            with st.expander("Vendor CSV/JSON Import Export", expanded=False):
+                _render_knowledge_entity_import_export_controls(
+                    st,
+                    product_service,
+                    entity_type="vendor",
+                    key_prefix="atlas_ck_vendor_io",
+                )
 
     with tabs[4]:
         _render_section_title(st, "Customers")
-        if not customers:
+        with st.expander("Add Customer", expanded=False):
+            c_cols = st.columns(2)
+            c_id = c_cols[0].text_input("Customer ID", key="atlas_ck_customer_id")
+            c_name = c_cols[1].text_input(
+                "Canonical Name", key="atlas_ck_customer_name"
+            )
+            c_display = c_cols[0].text_input(
+                "Display Name", key="atlas_ck_customer_display"
+            )
+            c_notes = c_cols[1].text_input("Notes", key="atlas_ck_customer_notes")
+            duplicates = product_service.detect_duplicate_knowledge_entities(
+                entity_type="customer",
+                canonical_name=c_name,
+                normalized_name=product_service.normalize_name(c_name),
+            )
+            if duplicates:
+                st.warning("Potential duplicate customer names detected.")
+            if st.button(
+                "Create Customer",
+                key="atlas_ck_create_customer",
+                width="stretch",
+            ):
+                try:
+                    product_service.create_customer(
+                        customer_id=c_id,
+                        canonical_name=c_name,
+                        display_name=c_display,
+                        notes=c_notes,
+                    )
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Customer created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create customer: {exc}")
+
+        if not customer_entities and not project_customers:
             _render_guided_empty_state(
                 st,
                 why_empty="No customer records are currently available.",
@@ -5590,24 +6002,423 @@ def _render_application_knowledge_page(
                 next_location="Go to Projects and create/import a project.",
             )
         else:
-            st.dataframe(
-                [
+            project_customer_counts = {
+                customer: sum(
+                    1
+                    for item in project_rows
+                    if _safe_text(item.get("customer"), "") == customer
+                )
+                for customer in project_customers
+            }
+            if customer_entities:
+                action_customer_id = st.selectbox(
+                    "Customer Workflow",
+                    options=[
+                        _safe_text(
+                            item.get("attributes", {}).get("customer_id"),
+                            _safe_text(item.get("entity_id"), ""),
+                        )
+                        for item in customer_entities
+                    ],
+                    key="atlas_ck_customer_workflow_select",
+                )
+                selected_customer = (
+                    product_service.get_customer(action_customer_id) or {}
+                )
+                edit_cols = st.columns(2)
+                edit_display = edit_cols[0].text_input(
+                    "Edit Customer Display",
+                    value=_safe_text(selected_customer.get("display_name"), ""),
+                    key="atlas_ck_customer_edit_display",
+                )
+                edit_aliases = edit_cols[1].text_input(
+                    "Edit Customer Aliases",
+                    value=";".join(list(selected_customer.get("aliases") or [])),
+                    key="atlas_ck_customer_edit_aliases",
+                )
+                edit_notes = st.text_input(
+                    "Edit Customer Notes",
+                    value=_safe_text(selected_customer.get("notes"), ""),
+                    key="atlas_ck_customer_edit_notes",
+                )
+                action_cols = st.columns(3)
+                if action_cols[0].button(
+                    "Save Customer Edits",
+                    key="atlas_ck_customer_edit_save",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.update_customer(
+                            action_customer_id,
+                            updates={
+                                "display_name": edit_display,
+                                "aliases": [
+                                    _safe_text(item)
+                                    for item in re.split(r"[;,|]", edit_aliases)
+                                    if _safe_text(item)
+                                ],
+                                "notes": edit_notes,
+                            },
+                        )
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Customer updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to update customer: {exc}")
+                if action_cols[1].button(
+                    "Archive Customer",
+                    key="atlas_ck_customer_archive",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.set_customer_active(action_customer_id, False)
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Customer archived.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to archive customer: {exc}")
+                if action_cols[2].button(
+                    "Restore Customer",
+                    key="atlas_ck_customer_restore",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.set_customer_active(action_customer_id, True)
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Customer restored.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to restore customer: {exc}")
+
+            customer_search = st.text_input(
+                "Customer Table Search",
+                key="atlas_ck_customer_table_search",
+                placeholder="customer name",
+            )
+            customer_rows = []
+            for item in customer_entities:
+                display_name = _safe_text(
+                    item.get("display_name"),
+                    _safe_text(item.get("canonical_name"), "Customer"),
+                )
+                customer_rows.append(
+                    {
+                        "Customer": display_name,
+                        "Customer ID": _safe_text(
+                            item.get("attributes", {}).get("customer_id"),
+                            _safe_text(item.get("entity_id"), ""),
+                        ),
+                        "Projects": project_customer_counts.get(display_name, 0),
+                        "Active": bool(item.get("active", True)),
+                        "Relationships": len(
+                            product_service.list_knowledge_relationships(
+                                source_entity_id=_safe_text(item.get("entity_id"), "")
+                            )
+                        ),
+                        "Updated": _safe_text(item.get("updated_at"), ""),
+                    }
+                )
+
+            for customer in project_customers:
+                if customer in {
+                    _safe_text(item.get("Customer"), "") for item in customer_rows
+                }:
+                    continue
+                customer_rows.append(
                     {
                         "Customer": customer,
-                        "Projects": sum(
-                            1
-                            for item in project_rows
-                            if item.get("customer") == customer
-                        ),
+                        "Customer ID": "project-derived",
+                        "Projects": project_customer_counts.get(customer, 0),
+                        "Active": True,
+                        "Relationships": 0,
+                        "Updated": "",
                     }
-                    for customer in customers
+                )
+
+            if customer_search.strip():
+                query_value = customer_search.strip().lower()
+                customer_rows = [
+                    item
+                    for item in customer_rows
+                    if query_value in _safe_text(item.get("Customer"), "").lower()
+                ]
+            st.dataframe(customer_rows, width="stretch", hide_index=True)
+            with st.expander("Customer CSV/JSON Import Export", expanded=False):
+                _render_knowledge_entity_import_export_controls(
+                    st,
+                    product_service,
+                    entity_type="customer",
+                    key_prefix="atlas_ck_customer_io",
+                )
+
+    with tabs[5]:
+        _render_section_title(st, "Services")
+        with st.expander("Add Service", expanded=False):
+            svc_cols = st.columns(2)
+            svc_id = svc_cols[0].text_input("Service ID", key="atlas_ck_service_id")
+            svc_name = svc_cols[1].text_input(
+                "Canonical Name", key="atlas_ck_service_name"
+            )
+            svc_display = svc_cols[0].text_input(
+                "Display Name", key="atlas_ck_service_display"
+            )
+            svc_notes = svc_cols[1].text_input("Notes", key="atlas_ck_service_notes")
+            duplicates = product_service.detect_duplicate_knowledge_entities(
+                entity_type="service",
+                canonical_name=svc_name,
+                normalized_name=product_service.normalize_name(svc_name),
+            )
+            if duplicates:
+                st.warning("Potential duplicate service names detected.")
+            if st.button(
+                "Create Service",
+                key="atlas_ck_create_service",
+                width="stretch",
+            ):
+                try:
+                    product_service.create_service_entity(
+                        service_id=svc_id,
+                        canonical_name=svc_name,
+                        display_name=svc_display,
+                        notes=svc_notes,
+                    )
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Service created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create service: {exc}")
+
+        if not service_entities:
+            _render_guided_empty_state(
+                st,
+                why_empty="No service records are currently available.",
+                action_to_populate="Create reusable service entities for customer and product workflows.",
+                next_location="Use Add Service to seed baseline operational services.",
+            )
+        else:
+            action_service_id = st.selectbox(
+                "Service Workflow",
+                options=[
+                    _safe_text(
+                        item.get("attributes", {}).get("service_id"),
+                        _safe_text(item.get("entity_id"), ""),
+                    )
+                    for item in service_entities
                 ],
+                key="atlas_ck_service_workflow_select",
+            )
+            selected_service = (
+                product_service.get_service_entity(action_service_id) or {}
+            )
+            edit_cols = st.columns(2)
+            edit_display = edit_cols[0].text_input(
+                "Edit Service Display",
+                value=_safe_text(selected_service.get("display_name"), ""),
+                key="atlas_ck_service_edit_display",
+            )
+            edit_aliases = edit_cols[1].text_input(
+                "Edit Service Aliases",
+                value=";".join(list(selected_service.get("aliases") or [])),
+                key="atlas_ck_service_edit_aliases",
+            )
+            edit_notes = st.text_input(
+                "Edit Service Notes",
+                value=_safe_text(selected_service.get("notes"), ""),
+                key="atlas_ck_service_edit_notes",
+            )
+            service_action_cols = st.columns(3)
+            if service_action_cols[0].button(
+                "Save Service Edits",
+                key="atlas_ck_service_edit_save",
+                width="stretch",
+            ):
+                try:
+                    product_service.update_service_entity(
+                        action_service_id,
+                        updates={
+                            "display_name": edit_display,
+                            "aliases": [
+                                _safe_text(item)
+                                for item in re.split(r"[;,|]", edit_aliases)
+                                if _safe_text(item)
+                            ],
+                            "notes": edit_notes,
+                        },
+                    )
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Service updated.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to update service: {exc}")
+            if service_action_cols[1].button(
+                "Archive Service",
+                key="atlas_ck_service_archive",
+                width="stretch",
+            ):
+                try:
+                    product_service.set_service_entity_active(action_service_id, False)
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Service archived.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to archive service: {exc}")
+            if service_action_cols[2].button(
+                "Restore Service",
+                key="atlas_ck_service_restore",
+                width="stretch",
+            ):
+                try:
+                    product_service.set_service_entity_active(action_service_id, True)
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Service restored.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to restore service: {exc}")
+
+            service_search = st.text_input(
+                "Service Table Search",
+                key="atlas_ck_service_table_search",
+                placeholder="service name",
+            )
+            service_table_rows = [
+                {
+                    "Service": _safe_text(
+                        item.get("display_name"),
+                        _safe_text(item.get("canonical_name"), "Service"),
+                    ),
+                    "Service ID": _safe_text(
+                        item.get("attributes", {}).get("service_id"),
+                        _safe_text(item.get("entity_id"), ""),
+                    ),
+                    "Relationships": len(
+                        product_service.list_knowledge_relationships(
+                            source_entity_id=_safe_text(item.get("entity_id"), "")
+                        )
+                    ),
+                    "Active": bool(item.get("active", True)),
+                    "Updated": _safe_text(item.get("updated_at"), ""),
+                }
+                for item in service_entities
+            ]
+            if service_search.strip():
+                query_value = service_search.strip().lower()
+                service_table_rows = [
+                    item
+                    for item in service_table_rows
+                    if query_value in _safe_text(item.get("Service"), "").lower()
+                ]
+
+            st.dataframe(
+                service_table_rows,
                 width="stretch",
                 hide_index=True,
             )
+            with st.expander("Service CSV/JSON Import Export", expanded=False):
+                _render_knowledge_entity_import_export_controls(
+                    st,
+                    product_service,
+                    entity_type="service",
+                    key_prefix="atlas_ck_service_io",
+                )
 
-    with tabs[5]:
+    with tabs[6]:
         _render_section_title(st, "Products (Master Library)")
+        managed_products = product_service.list_products(include_inactive=True)
+        if managed_products:
+            selected_product_uuid = st.selectbox(
+                "Product Workflow",
+                options=[
+                    _safe_text(item.get("atlas_product_uuid"), "")
+                    for item in managed_products
+                    if _safe_text(item.get("atlas_product_uuid"), "")
+                ],
+                key="atlas_ck_product_workflow",
+            )
+            selected_product = product_service.get_product(selected_product_uuid) or {}
+            edit_cols = st.columns(3)
+            edit_name = edit_cols[0].text_input(
+                "Edit Product Name",
+                value=_safe_text(selected_product.get("product_name"), ""),
+                key="atlas_ck_product_edit_name",
+            )
+            edit_category = edit_cols[1].text_input(
+                "Edit Product Category",
+                value=_safe_text(selected_product.get("category"), "other"),
+                key="atlas_ck_product_edit_category",
+            )
+            edit_lifecycle = edit_cols[2].text_input(
+                "Edit Lifecycle",
+                value=_safe_text(
+                    selected_product.get("lifecycle_status"),
+                    "pending_verification",
+                ),
+                key="atlas_ck_product_edit_lifecycle",
+            )
+            edit_desc = st.text_input(
+                "Edit Product Description",
+                value=_safe_text(selected_product.get("product_description"), ""),
+                key="atlas_ck_product_edit_description",
+            )
+            edit_notes = st.text_input(
+                "Edit Product Notes",
+                value=_safe_text(selected_product.get("notes"), ""),
+                key="atlas_ck_product_edit_notes",
+            )
+            action_cols = st.columns(3)
+            if action_cols[0].button(
+                "Save Product Edits",
+                key="atlas_ck_product_edit_save",
+                width="stretch",
+            ):
+                try:
+                    product_service.update_product(
+                        selected_product_uuid,
+                        updates={
+                            "product_name": edit_name,
+                            "category": edit_category,
+                            "lifecycle_status": edit_lifecycle,
+                            "product_description": edit_desc,
+                            "notes": edit_notes,
+                        },
+                    )
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Product updated.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to update product: {exc}")
+            if action_cols[1].button(
+                "Archive Product",
+                key="atlas_ck_product_archive",
+                width="stretch",
+            ):
+                try:
+                    product_service.mark_product_discontinued(selected_product_uuid)
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Product archived.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to archive product: {exc}")
+            if action_cols[2].button(
+                "Restore Product",
+                key="atlas_ck_product_restore",
+                width="stretch",
+            ):
+                try:
+                    product_service.reactivate_product(selected_product_uuid)
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Product restored.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to restore product: {exc}")
+
+        with st.expander("Product CSV/JSON Import Export", expanded=False):
+            _render_knowledge_entity_import_export_controls(
+                st,
+                product_service,
+                entity_type="product",
+                key_prefix="atlas_ck_product_io",
+            )
+
         with st.expander("Manual Single-SKU Workflow", expanded=False):
             st.caption(
                 "Add one isolated SKU without requiring full catalog or price-sheet import."
@@ -5679,10 +6490,13 @@ def _render_application_knowledge_page(
                 key="atlas_ck_offering_pack_qty",
             )
 
-            selected_manufacturer = _record_by_id(
-                manufacturer_rows,
-                id_field="manufacturer_id",
-                selected_id=selected_mfr,
+            selected_manufacturer_record = (
+                _record_by_id(
+                    manufacturer_rows,
+                    id_field="manufacturer_id",
+                    selected_id=selected_mfr,
+                )
+                or {}
             )
             selected_vendor_record = _record_by_id(
                 vendor_rows,
@@ -5692,7 +6506,7 @@ def _render_application_knowledge_page(
 
             existing_duplicate = product_service.find_product_by_identity(
                 manufacturer=_safe_text(
-                    dict(selected_manufacturer or {}).get("canonical_name"),
+                    selected_manufacturer_record.get("canonical_name"),
                     "",
                 ),
                 normalized_part_number=product_service.normalize_part_number(
@@ -5710,7 +6524,7 @@ def _render_application_knowledge_page(
                 width="stretch",
             ):
                 try:
-                    mfr_record = selected_manufacturer
+                    mfr_record = selected_manufacturer_record
                     vendor_record = selected_vendor_record
                     if not isinstance(mfr_record, dict) or not isinstance(
                         vendor_record, dict
@@ -5915,7 +6729,7 @@ def _render_application_knowledge_page(
                 hide_index=True,
             )
 
-    with tabs[6]:
+    with tabs[7]:
         st.markdown("### Price Lists")
         st.caption(
             "Price list uploads are discoverable here and managed in Project Workspace Price List Library."
@@ -5944,7 +6758,7 @@ def _render_application_knowledge_page(
                 else:
                     st.info("No vendor price lists are indexed yet.")
 
-    with tabs[7]:
+    with tabs[8]:
         st.markdown("### Knowledge Imports")
         if not import_history:
             _render_guided_empty_state(
@@ -5956,7 +6770,7 @@ def _render_application_knowledge_page(
         else:
             st.dataframe(import_history[:100], width="stretch", hide_index=True)
 
-    with tabs[8]:
+    with tabs[9]:
         st.markdown("### Commercial Import History")
         if not commercial_import_history:
             st.info("No commercial import history available.")
@@ -5979,7 +6793,7 @@ def _render_application_knowledge_page(
                 hide_index=True,
             )
 
-    with tabs[9]:
+    with tabs[10]:
         st.markdown("### Assembly Library")
         engine = _estimate_engine_service(st)
         assembly_service = AssemblyExpansionService(
@@ -12718,12 +13532,16 @@ def _application_search_entries(
         ]
         references.append(reference)
 
-    manufacturer_rows = [item.to_dict() for item in build_manufacturer_seed_data()]
+    manufacturer_rows = product_service.list_manufacturers(include_inactive=True)
     for item in manufacturer_rows:
         data = {
-            "manufacturer": _safe_text(item.get("name"), "Manufacturer"),
+            "manufacturer": _safe_text(
+                item.get("canonical_name"),
+                _safe_text(item.get("display_name"), "Manufacturer"),
+            ),
             "status": "active" if bool(item.get("active", True)) else "inactive",
-            "discipline": _safe_text(item.get("discipline"), "n/a"),
+            "discipline": _safe_text(item.get("manufacturer_code"), "n/a"),
+            "manufacturer_id": _safe_text(item.get("manufacturer_id"), ""),
         }
         reference = _build_object_reference(
             kind="manufacturer",
@@ -12736,17 +13554,24 @@ def _application_search_entries(
         reference["project_name"] = "Knowledge"
         reference["scope"] = "application"
         reference["match_fields"] = [
-            _safe_text(item.get("name"), ""),
-            _safe_text(item.get("discipline"), ""),
+            _safe_text(item.get("manufacturer_id"), ""),
+            _safe_text(item.get("canonical_name"), ""),
+            _safe_text(item.get("display_name"), ""),
+            _safe_text(item.get("manufacturer_code"), ""),
+            " ".join(list(item.get("aliases") or [])),
         ]
         references.append(reference)
 
-    vendor_rows = [item.to_dict() for item in build_vendor_seed_data()]
+    vendor_rows = product_service.list_vendors(include_inactive=True)
     for item in vendor_rows:
         data = {
-            "vendor": _safe_text(item.get("name"), "Vendor"),
-            "vendor_type": _safe_text(item.get("vendor_type"), "n/a"),
-            "status": _safe_text(item.get("status"), "n/a"),
+            "vendor": _safe_text(
+                item.get("canonical_name"),
+                _safe_text(item.get("display_name"), "Vendor"),
+            ),
+            "vendor_type": _safe_text(item.get("vendor_code"), "n/a"),
+            "status": "active" if bool(item.get("active", True)) else "inactive",
+            "vendor_id": _safe_text(item.get("vendor_id"), ""),
         }
         reference = _build_object_reference(
             kind="vendor",
@@ -12759,8 +13584,11 @@ def _application_search_entries(
         reference["project_name"] = "Knowledge"
         reference["scope"] = "application"
         reference["match_fields"] = [
-            _safe_text(item.get("name"), ""),
-            _safe_text(item.get("vendor_type"), ""),
+            _safe_text(item.get("vendor_id"), ""),
+            _safe_text(item.get("canonical_name"), ""),
+            _safe_text(item.get("display_name"), ""),
+            _safe_text(item.get("vendor_code"), ""),
+            " ".join(list(item.get("aliases") or [])),
         ]
         references.append(reference)
 
@@ -12789,20 +13617,58 @@ def _application_search_entries(
     knowledge_entities = product_service.list_knowledge_entities(include_inactive=True)
     for item in knowledge_entities:
         entity_type = _safe_text(item.get("entity_type"), "")
-        if entity_type not in {"service", "customer"}:
+        if entity_type not in {
+            "service",
+            "customer",
+            "manufacturer",
+            "vendor",
+            "product",
+        }:
             continue
-        kind = "service" if entity_type == "service" else "customer"
+        kind_map = {
+            "service": "service",
+            "customer": "customer",
+            "manufacturer": "manufacturer",
+            "vendor": "vendor",
+            "product": "master_product",
+        }
+        kind = _safe_text(kind_map.get(entity_type), "")
+        attributes = dict(item.get("attributes") or {})
         data = {
             "entity_id": _safe_text(item.get("entity_id"), ""),
-            "service_id": _safe_text(item.get("attributes", {}).get("service_id"), ""),
+            "service_id": _safe_text(attributes.get("service_id"), ""),
             "service": _safe_text(
                 item.get("display_name"),
                 _safe_text(item.get("canonical_name"), "Service"),
             ),
+            "manufacturer": _safe_text(
+                item.get("display_name"),
+                _safe_text(item.get("canonical_name"), "Manufacturer"),
+            ),
+            "vendor": _safe_text(
+                item.get("display_name"),
+                _safe_text(item.get("canonical_name"), "Vendor"),
+            ),
+            "manufacturer_id": _safe_text(attributes.get("manufacturer_id"), ""),
+            "vendor_id": _safe_text(attributes.get("vendor_id"), ""),
             "customer": _safe_text(
                 item.get("display_name"),
                 _safe_text(item.get("canonical_name"), "Customer"),
             ),
+            "product_id": _safe_text(attributes.get("atlas_product_uuid"), ""),
+            "atlas_product_uuid": _safe_text(attributes.get("atlas_product_uuid"), ""),
+            "model": _safe_text(
+                attributes.get("manufacturer_part_number"),
+                _safe_text(item.get("canonical_name"), ""),
+            ),
+            "canonical_sku": _safe_text(item.get("canonical_name"), ""),
+            "manufacturer_sku": _safe_text(
+                attributes.get("manufacturer_part_number"),
+                "",
+            ),
+            "category": _safe_text(attributes.get("category"), ""),
+            "discipline": "",
+            "lifecycle_status": _safe_text(attributes.get("lifecycle_status"), ""),
             "status": "active" if bool(item.get("active", True)) else "inactive",
             "notes": _safe_text(item.get("notes"), ""),
         }

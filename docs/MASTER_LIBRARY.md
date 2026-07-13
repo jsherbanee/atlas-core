@@ -24,6 +24,9 @@ Atlas Preview 0.6 implements the Master Library foundation:
 - Deterministic product-resolution candidate generation (engineering to estimate bridge)
 - Workspace explorer integration for engineering review
 
+K-02 operational alignment:
+- Product lifecycle and state updates now synchronize with framework-backed knowledge entities so Master Library product behavior remains consistent with application-wide Knowledge workflows.
+
 Excluded from scope:
 
 - Purchasing workflows

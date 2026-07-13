@@ -263,6 +263,7 @@ Status: Active
 Status: Active
 
 - K-01 Knowledge Entity Framework
+- K-02 Core Knowledge Entities and Operational Workflows
 
 ### K-01 Scope Boundaries
 
@@ -278,6 +279,20 @@ Implemented in K-01:
 Explicitly out of scope:
 - Non-deterministic matching heuristics.
 - Procurement execution, quote generation, and ERP/accounting workflows.
+
+### K-02 Scope Boundaries
+
+Implemented in K-02:
+- Public operational workflows for framework entities (`create`, `update`, `archive`, `restore`) with deterministic behavior.
+- Customer and service entity API surface expansion (`get`, `list`, `search`, `update`, activation controls).
+- Framework-level summary metrics (entity counts, active/inactive split, relationship totals, per-type rollups).
+- Product lifecycle synchronization into framework-backed product entities across update/discontinue/reactivate flows.
+- Knowledge workspace controls for customer/service create/list/archive/restore operations.
+
+Explicitly out of scope:
+- Epic E implementation start.
+- Procurement, purchase orders, service tickets, installed assets, sell pricing, and ERP workflows.
+- Non-deterministic AI enrichment, cloud persistence, and authentication scope expansion.
 
 - F-01 PDF Ingestion Robustness and Parsing Reliability
 - F-02 Performance and Scalability for Large Project Sets

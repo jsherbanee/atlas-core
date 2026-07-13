@@ -91,3 +91,10 @@ Sprint 15 coordination outputs are exposed in:
 - Advisory only. No automatic resolution or workflow mutation.
 - No customer-facing report language.
 - No lifecycle or procurement execution behavior.
+
+## Related Documents
+- [OBJECT_GRAPH.md](OBJECT_GRAPH.md)
+- [RULE_ENGINE.md](RULE_ENGINE.md)
+- [ENGINEERING_INTELLIGENCE.md](ENGINEERING_INTELLIGENCE.md)
+- [DRAWING_INTELLIGENCE.md](DRAWING_INTELLIGENCE.md)
+- [SPECIFICATION_INTELLIGENCE.md](SPECIFICATION_INTELLIGENCE.md)

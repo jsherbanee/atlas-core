@@ -65,7 +65,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1177 tests)
+- pytest: full suite passing (1182 tests)
 
 ## Manual UI Validation (X-11)
 - viewport checks passed at widths 820, 980, 1180, 1366, and large desktop
@@ -79,7 +79,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
   - .pre-commit-config.yaml
 
 ## Active Focus
-Sprint K-01 implementation and validation for the Knowledge Entity Framework.
+Sprint K-02 implementation and validation for Core Knowledge Entities and Operational Workflows.
 
 Broader product direction remains aligned to the lifecycle-platform roadmap, while current implementation priority is deterministic knowledge-entity foundation hardening within Phase 2 boundaries.
 
@@ -88,6 +88,7 @@ Secondary active focus:
 - explicit identifier discoverability across project creation, listing, open flows, global search, and project settings.
 - Epic E readiness assessment only (architecture review and sprint approval required; Epic E not started).
 - K-01 follow-through validation for entity relationships, import/export compatibility, and search behavior.
+- K-02 workflow completion for customer, service, manufacturer, vendor, and product entity operations.
 
 Current implementation scope note:
 - no Epic E implementation has started in this refinement pass
@@ -138,6 +139,7 @@ Current workspace behavior:
 - Estimate workspace now consumes deterministic Product Resolution outputs and blocks pricing on unresolved/generic/low-confidence resolution states.
 - Price List Library now imports into immutable Price Sheet Versions and Price Records through Commercial Knowledge services.
 - Price List Library now supports C-02 structured commercial price-sheet ingestion for CSV, XLSX, and PDF through deterministic draft/validate/finalize controls with lifecycle diagnostics, unresolved-count visibility, and completeness metrics while preserving legacy fallback parsing for non-tabular imports.
+- Knowledge workspace now supports K-02 operational customer/service entity workflows (create, list, archive, restore) and framework-backed summary metrics.
 - Import History page now exposes deterministic version-level change summaries and historical replay of previous commercial versions.
 - Knowledge workspace now includes Commercial Health metrics for coverage, freshness, missing pricing, stale pricing, and commercial confidence.
 - Deterministic pricing lines now include selected price record/vendor offering/version traceability, freshness/status/warnings, confidence rationale, and manual override provenance.

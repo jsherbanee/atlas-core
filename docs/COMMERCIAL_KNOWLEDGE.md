@@ -1,7 +1,7 @@
 # Commercial Knowledge
 
 ## Purpose
-Commercial Knowledge is Atlas Core's immutable commercial reference layer for deterministic estimating readiness, historical bid recreation, and future procurement integrations.
+Commercial Knowledge is Atlas's immutable commercial reference layer for deterministic estimating readiness, historical bid recreation, and future procurement integrations.
 
 This layer is intentionally:
 
@@ -9,6 +9,9 @@ This layer is intentionally:
 - not quote generation
 - not purchase ordering
 - not estimate calculation
+
+K-02 integration note:
+- Core commercial identities (manufacturer, vendor, product) are synchronized with the shared Knowledge Entity Framework so operational knowledge workflows and commercial state remain deterministic and aligned.
 
 ## Architectural Rule
 Products do not own prices.

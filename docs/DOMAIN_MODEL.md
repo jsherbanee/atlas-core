@@ -3,7 +3,11 @@
 ## Related Documents
 - [README.md](README.md)
 - [PRODUCT_VISION.md](PRODUCT_VISION.md)
+- [AV_LIFECYCLE.md](AV_LIFECYCLE.md)
 - [ARCHITECTURE.md](ARCHITECTURE.md)
+- [MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md)
+- [USER_MANAGEMENT.md](USER_MANAGEMENT.md)
+- [INTEGRATIONS.md](INTEGRATIONS.md)
 - [ROADMAP.md](ROADMAP.md)
 
 ## 1. Purpose
@@ -86,7 +90,14 @@ Status legend:
 - In Progress: partially represented in current architecture or workspace prototype.
 - Future: intentionally deferred to later phases.
 
+See [AV_LIFECYCLE.md](AV_LIFECYCLE.md) for the authoritative lifecycle framework.
+
+The status labels in this document describe architecture coverage and current repository representation, not end-to-end business maturity.
+
 ## 4. Business Objects
+
+K-02 implementation note:
+- The Knowledge Entity Framework now operationalizes core shared-object records for customer, service, manufacturer, vendor, and product through deterministic create/update/archive/restore workflows while preserving existing Phase 2 boundaries.
 
 ### Organization
 - Purpose: Business party container for owners, integrators, vendors, and manufacturers.
@@ -97,6 +108,56 @@ X-03 implementation note:
 - Atlas now uses shared Organization records for project stakeholder linkage in bid-workspace flows.
 - Organization role classification supports Owner/Client, General Contractor, Electrical Contractor, Architect, Consultant, Engineer, and Other.
 - Lookup uses normalized canonical names plus alias matching with deterministic duplicate checks.
+
+### User
+- Purpose: Human account that interacts with Atlas on behalf of one or more organizations.
+- Relationships: belongs to Membership records and may own Contact references where appropriate.
+- Lifecycle Role: Access-bearing actor for operational workflows.
+
+### Membership
+- Purpose: Link between a User and an Organization.
+- Relationships: belongs to User and Organization; may carry Role, Seat, and status fields.
+- Lifecycle Role: Future tenant-access control boundary.
+
+### Role
+- Purpose: Named permission bundle within an Organization.
+- Relationships: assigned through Membership or team policy.
+- Lifecycle Role: Future access model for organization-aware permissions.
+
+### Permission
+- Purpose: Specific allowed action or resource access.
+- Relationships: evaluated against User, Membership, Organization, and resource context.
+- Lifecycle Role: Future fine-grained authorization primitive.
+
+### Team
+- Purpose: Operational grouping inside an Organization.
+- Relationships: can contain Users and be assigned to Projects.
+- Lifecycle Role: Coordination and reporting abstraction.
+
+### Subscription
+- Purpose: Commercial entitlement relationship for an Organization.
+- Relationships: owns Seats and plan state.
+- Lifecycle Role: Commercial access and billing boundary.
+
+### Seat
+- Purpose: Licensed entitlement tied to an active user or service account.
+- Relationships: belongs to Subscription and Membership.
+- Lifecycle Role: Access capacity control.
+
+### Integration Credential
+- Purpose: Authorized connection to an external system.
+- Relationships: belongs to Organization and Integration scope.
+- Lifecycle Role: Tenant-scoped integration authority.
+
+### Audit Event
+- Purpose: Immutable record of user, system, or AI action.
+- Relationships: belongs to Organization and may reference Projects, Users, or Integrations.
+- Lifecycle Role: Governance and traceability boundary.
+
+### Organization Settings
+- Purpose: Tenant-level configuration and policy state.
+- Relationships: belongs to Organization.
+- Lifecycle Role: Controls defaults, integrations, and access policy.
 
 ### ProjectStakeholder
 - Purpose: Explicit relationship model linking Project to Organization with role semantics.

@@ -6,11 +6,14 @@
 - [MASTER_LIBRARY.md](MASTER_LIBRARY.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)
 - [ROADMAP.md](ROADMAP.md)
+- [AWS_ARCHITECTURE.md](AWS_ARCHITECTURE.md)
 
 ## Overview
 Sprint 9 introduced the Atlas Project Repository as the persistence layer for Atlas Workspace.
 
 Sprint 10 hardens the repository interfaces to prepare for cloud-ready storage adapters without implementing cloud services.
+
+Atlas's long-term hosting direction is AWS-backed multi-tenant SaaS storage, but the current repository layer remains local and deterministic for development.
 
 Goals:
 - Persist projects independently of the running session.
@@ -21,10 +24,16 @@ Goals:
 - Keep create-with-upload onboarding deterministic with explicit diagnostics and recovery-safe partial success.
 
 Out of scope:
-- AWS/S3
 - Databases
 - Authentication
 - Collaboration
+
+Future cloud-adapter targets may include:
+- Amazon S3 for object/document storage
+- CloudFront for delivery
+- Amazon RDS or Aurora for relational persistence
+- Amazon Cognito for identity
+- ECS/Fargate or Lambda where appropriate
 
 ## Repository Architecture
 Atlas uses adapter contracts in atlas_core/repository/contracts.py and local filesystem adapters in atlas_core/repository/local.py.
@@ -53,6 +62,8 @@ Current adapter implementation:
 - LocalReviewRepository
 - LocalKnowledgeRepository
 - LocalHistoryRepository
+
+The local adapters are the development-time stand-in for future cloud-hosted tenant-scoped storage adapters.
 
 The service layer consumes an orchestrator (AtlasProjectManager in atlas_core/repository/project_manager.py) that composes all adapters.
 

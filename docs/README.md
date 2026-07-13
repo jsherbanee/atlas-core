@@ -1,12 +1,11 @@
 # Atlas Documentation
 
-Atlas documentation defines the platform vision, architecture, engineering-intelligence surfaces, and implementation status for Atlas Core.
+Atlas documentation defines the product vision, architecture, lifecycle roadmap, UX posture, and implementation status for Atlas, the Intelligent Lifecycle Solutions Management Platform for AV and lighting systems integrators.
 
-Current implementation sprint focus: Sprint X-03 Onboarding and Stakeholder Workflow Hardening (active).
-Deferred in current sprint scope: Epic E and post-D feature-epic implementation (not started).
+Current implementation focus remains Phase 2 Bid Intelligence and the associated hardening/documentation workstream. Epic X remains open for further product-hardening work, and Epic E has not started.
 
-Current UX stream: Epic X Product Hardening continuation (A-05 and X-01/X-02 completed; X-03 active).
-Scope: controlled hardening for onboarding, stakeholder linkage, and project identity workflows in already-implemented capabilities only.
+Current UX stream: Epic X Product Hardening continuation (X-01 through X-08 closed; the next Epic X sprint has not yet been formally started).
+Scope: controlled hardening for onboarding, stakeholder linkage, identity workflows, navigation, search, and visual consistency in already-implemented capabilities only.
 
 These documents are intended to be used as a cohesive reference library, not isolated notes.
 
@@ -16,6 +15,8 @@ These documents are intended to be used as a cohesive reference library, not iso
 - Use Architecture documents to understand system structure and persistence patterns.
 - Use Engineering Intelligence documents to understand deterministic review capabilities.
 - Use Development documents to understand current state, milestones, and release history.
+
+The documentation set is intended for product, design, engineering, operations, and implementation stakeholders.
 
 ## Documentation Conventions
 
@@ -64,13 +65,68 @@ Future releases should follow this structure.
 
 ### [PRODUCT_VISION.md](PRODUCT_VISION.md)
 - Purpose: Defines Atlas product position, problem framing, and scope intent.
-- Audience: Product leadership, architecture, engineering stakeholders.
+- Audience: Product leadership, architecture, engineering, operations, and implementation stakeholders.
 - When to reference: When validating product direction or scope decisions.
+
+### [TRUST_CHARTER.md](TRUST_CHARTER.md)
+- Purpose: Defines the top-level trust philosophy, ownership commitments, transparency expectations, and permanent architectural invariants.
+- Audience: Product, architecture, security, AI, legal, and platform contributors.
+- When to reference: When making high-level trust, sovereignty, or customer-exit decisions.
+
+### [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+- Purpose: Defines customer-facing capability horizons and commercial evolution.
+- Audience: Product, leadership, customer-success, and implementation stakeholders.
+- When to reference: When discussing roadmap value, packaging, or launch readiness.
 
 ### [DOMAIN_MODEL.md](DOMAIN_MODEL.md)
 - Purpose: Defines enduring business entities, lifecycle relationships, and boundaries.
 - Audience: Architects, domain owners, engine developers.
 - When to reference: When introducing new lifecycle objects or cross-phase relationships.
+
+### [AV_LIFECYCLE.md](AV_LIFECYCLE.md)
+- Purpose: Defines the end-to-end AV, lighting, and control lifecycle from lead through replacement.
+- Audience: Product, operations, lifecycle-planning, and implementation stakeholders.
+- When to reference: When planning roadmap sequencing or lifecycle-stage coverage.
+
+### [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md)
+- Purpose: Defines engineering execution sequencing, technical milestones, and production-readiness gates.
+- Audience: Engineering, platform, architecture, and release stakeholders.
+- When to reference: When planning implementation dependencies or readiness work.
+
+### [AI_FOUNDATIONAL_KNOWLEDGE.md](AI_FOUNDATIONAL_KNOWLEDGE.md)
+- Purpose: Defines the permitted industry-knowledge foundation, source hierarchy, versioning, neutrality, and human-authority limits for future AI features.
+- Audience: Product, AI, data, security, and platform contributors.
+- When to reference: When planning AI grounding, content licensing, source hierarchy, or assistant behavior.
+
+### [AI_ASSISTANT.md](AI_ASSISTANT.md)
+- Purpose: Defines assistant behavior, context assembly, retrieval grounding, permissions, response classification, and future interaction architecture.
+- Audience: Product, AI, data, security, and platform contributors.
+- When to reference: When designing assistant UX, retrieval, or write-action boundaries.
+
+### [PRIVACY_AND_DATA_OWNERSHIP.md](PRIVACY_AND_DATA_OWNERSHIP.md)
+- Purpose: Defines customer ownership, privacy, portability, and the high-level trust commitment for customer knowledge.
+- Audience: Product, legal, security, platform, and AI contributors.
+- When to reference: When validating ownership, retention, portability, or customer trust language.
+
+### [TRUST_CHARTER.md](TRUST_CHARTER.md)
+- Purpose: Defines the system-level trust charter that sits above privacy and security detail.
+- Audience: Product, architecture, security, AI, legal, and platform contributors.
+- When to reference: When validating sovereignty, transparency, and customer-exit language.
+
+### [AI_PRIVACY_POLICY.md](AI_PRIVACY_POLICY.md)
+- Purpose: Defines AI-specific privacy protections, provider expectations, conversation isolation, and audit requirements.
+- Audience: Product, AI, security, platform, and operations contributors.
+- When to reference: When designing AI data handling, provider selection, or AI retention controls.
+
+### [STANDARDS_LIBRARY.md](STANDARDS_LIBRARY.md)
+- Purpose: Defines standards-oriented knowledge governance and edition handling.
+- Audience: Product, AI, standards, security, and platform contributors.
+- When to reference: When managing standards sources or citations.
+
+### [MANUFACTURER_KNOWLEDGE.md](MANUFACTURER_KNOWLEDGE.md)
+- Purpose: Defines manufacturer-specific technical knowledge governance and sourcing.
+- Audience: Product, AI, commercial, and platform contributors.
+- When to reference: When managing product-specific documentation or compatibility guidance.
 
 ### [DESIGN_LANGUAGE.md](DESIGN_LANGUAGE.md)
 - Purpose: Defines UX philosophy and long-term visual/interaction posture.
@@ -84,6 +140,71 @@ Future releases should follow this structure.
 - Purpose: Defines engine-first layering, contracts, and module responsibilities.
 - Audience: Engineers and architects.
 - When to reference: When adding services, rules, contracts, or orchestration patterns.
+
+### [AWS_ARCHITECTURE.md](AWS_ARCHITECTURE.md)
+- Purpose: Defines staged AWS hosting, workload, tenant-isolation, deployment, and migration direction.
+- Audience: Platform, architecture, operations, and security contributors.
+- When to reference: When planning cloud migration, hosting, or environment isolation.
+
+### [OBJECT_GRAPH.md](OBJECT_GRAPH.md)
+- Purpose: Defines the authoritative object relationship and knowledge-graph architecture.
+- Audience: Engineering intelligence, search, AI, and architecture contributors.
+- When to reference: When introducing graph traversal or cross-project relationship logic.
+
+### [RULE_ENGINE.md](RULE_ENGINE.md)
+- Purpose: Defines deterministic rule evaluation, registries, versions, and diagnostics.
+- Audience: Engineering intelligence, estimating, and platform contributors.
+- When to reference: When adding or changing deterministic business rules.
+
+### [SEARCH_ARCHITECTURE.md](SEARCH_ARCHITECTURE.md)
+- Purpose: Defines deterministic search and future retrieval architecture.
+- Audience: Search, workspace, AI, and platform contributors.
+- When to reference: When changing object discovery or retrieval behavior.
+
+### [IMPORT_PIPELINE.md](IMPORT_PIPELINE.md)
+- Purpose: Defines the common ingestion and validation architecture for documents and data.
+- Audience: Platform, repository, ingestion, and AI contributors.
+- When to reference: When changing upload, extraction, or finalization flows.
+
+### [REPORTING.md](REPORTING.md)
+- Purpose: Defines operational and executive reporting architecture.
+- Audience: Product, engineering, reporting, and platform contributors.
+- When to reference: When changing export, templates, or reporting behavior.
+
+### [PERFORMANCE.md](PERFORMANCE.md)
+- Purpose: Defines performance principles and future targets.
+- Audience: Engineering, platform, and architecture contributors.
+- When to reference: When evaluating large-project behavior or load characteristics.
+
+### [OBSERVABILITY.md](OBSERVABILITY.md)
+- Purpose: Defines future production logging, metrics, traces, and alerting.
+- Audience: Platform, security, and operations contributors.
+- When to reference: When designing telemetry or incident response support.
+
+### [BACKUP_RECOVERY.md](BACKUP_RECOVERY.md)
+- Purpose: Defines backup, recovery, and disaster-recovery architecture.
+- Audience: Platform, operations, security, and architecture contributors.
+- When to reference: When planning restoreability or retention posture.
+
+### [SERVICE_AND_ASSET_LIFECYCLE.md](SERVICE_AND_ASSET_LIFECYCLE.md)
+- Purpose: Defines the future installed-system lifecycle and service continuity model.
+- Audience: Product, service, operations, and platform contributors.
+- When to reference: When planning service or asset-history capabilities.
+
+### [MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md)
+- Purpose: Defines tenant isolation, organization-scoped records, roles, memberships, and permission boundaries.
+- Audience: Architecture, security, platform, and AI contributors.
+- When to reference: When designing tenant-aware behavior or shared platform services.
+
+### [USER_MANAGEMENT.md](USER_MANAGEMENT.md)
+- Purpose: Defines future account, invitation, seat, and organization administration workflows.
+- Audience: Product, platform, security, and identity contributors.
+- When to reference: When planning administration or future SSO behavior.
+
+### [INTEGRATIONS.md](INTEGRATIONS.md)
+- Purpose: Defines synchronization boundaries for QuickBooks, Stripe, and future external systems.
+- Audience: Platform, integration, product, and data contributors.
+- When to reference: When designing sync, reconciliation, webhooks, or API behavior.
 
 ### [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)
 - Purpose: Defines project storage architecture, repository contracts, and persistence behavior.
@@ -132,6 +253,31 @@ Future releases should follow this structure.
 - Audience: Workspace and engineering-review contributors.
 - When to reference: When changing notebook entries, decision logs, or linked-object behavior.
 
+### [SECURITY.md](SECURITY.md)
+- Purpose: Defines baseline security posture, access-control expectations, and operational security boundaries.
+- Audience: Platform, security, and implementation contributors.
+- When to reference: When changing authentication, authorization, secrets, logging, or trust boundaries.
+
+### [TRUST_CHARTER.md](TRUST_CHARTER.md)
+- Purpose: Defines the permanent trust commitments that security and architecture should uphold.
+- Audience: Product, security, architecture, AI, and platform contributors.
+- When to reference: When validating customer trust, confidentiality, or tenant-isolation commitments.
+
+### [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md)
+- Purpose: Defines data ownership, retention, tenant isolation, AI grounding, and source-authority expectations.
+- Audience: Product, data, security, and AI contributors.
+- When to reference: When changing data policies, AI context boundaries, or record stewardship rules.
+
+### [PRIVACY_AND_DATA_OWNERSHIP.md](PRIVACY_AND_DATA_OWNERSHIP.md)
+- Purpose: Defines customer ownership and portability commitments for operational knowledge.
+- Audience: Product, security, legal, and platform contributors.
+- When to reference: When making customer-data trust or ownership statements.
+
+### [AI_PRIVACY_POLICY.md](AI_PRIVACY_POLICY.md)
+- Purpose: Defines privacy expectations for AI providers, AI conversations, and auditability.
+- Audience: Product, security, operations, and AI contributors.
+- When to reference: When making AI privacy or retention decisions.
+
 ## Development
 
 ### [EPICS.md](EPICS.md)
@@ -144,6 +290,16 @@ Future releases should follow this structure.
 - Audience: Product and engineering planning stakeholders.
 - When to reference: During milestone planning and sequencing decisions.
 
+### [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md)
+- Purpose: Defines engineering execution sequencing, gates, and dependencies.
+- Audience: Engineering, platform, architecture, and release stakeholders.
+- When to reference: During implementation planning or readiness reviews.
+
+### [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+- Purpose: Defines customer-facing capability horizons and commercial progression.
+- Audience: Product, leadership, customer-success, and implementation stakeholders.
+- When to reference: During product planning, launch readiness, or customer messaging.
+
 ### [ASSEMBLIES_AND_LABOR.md](ASSEMBLIES_AND_LABOR.md)
 - Purpose: Defines D-03 architecture and implementation boundaries for deterministic assemblies, accessories, and labor rollups.
 - Audience: Estimating architecture, service, and workspace contributors.
@@ -151,7 +307,7 @@ Future releases should follow this structure.
 
 ### [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)
 - Purpose: Captures the current implementation state and active focus.
-- Audience: Internal engineering and product stakeholders.
+- Audience: Product, engineering, design, and operations stakeholders.
 - When to reference: To answer where Atlas is today.
 
 ### [RELEASE_NOTES.md](RELEASE_NOTES.md)

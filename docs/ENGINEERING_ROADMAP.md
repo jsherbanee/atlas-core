@@ -43,9 +43,9 @@ X-01 through X-10 are closed.
 
 No Epic X sprint is active.
 
-Current engineering focus is Phase 2 roadmap reassessment after Epic X closeout.
+Current engineering focus is Epic K Sprint K-02 implementation for core knowledge-entity operational workflows.
 
-Epic E is the next candidate epic only after architecture review and explicit sprint approval.
+Epic E remains the next candidate epic only after architecture review and explicit sprint approval.
 
 Epic E must not be started from this roadmap.
 

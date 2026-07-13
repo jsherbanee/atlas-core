@@ -123,3 +123,211 @@ def test_existing_commercial_methods_sync_knowledge_entities() -> None:
     assert "manufacturer:mfr-qsc" in entity_ids
     assert "vendor:vendor-avp" in entity_ids
     assert f"product:{product['atlas_product_uuid']}" in entity_ids
+
+
+def test_customer_and_service_operational_workflows() -> None:
+    service = CommercialProductService()
+    service.create_customer(customer_id="cust-1", canonical_name="Client A")
+    service.create_service_entity(service_id="svc-1", canonical_name="Maintenance")
+
+    updated_customer = service.update_customer(
+        "cust-1",
+        updates={
+            "display_name": "Client A (Updated)",
+            "aliases": ["client-a"],
+            "attributes": {"segment": "education"},
+        },
+    )
+    assert updated_customer["display_name"] == "Client A (Updated)"
+    assert updated_customer["attributes"]["segment"] == "education"
+
+    service.set_customer_active("cust-1", False)
+    assert service.get_customer("cust-1") is not None
+    assert bool(dict(service.get_customer("cust-1") or {}).get("active")) is False
+    assert service.search_customers("client", include_inactive=False) == []
+    assert len(service.search_customers("client", include_inactive=True)) == 1
+
+    updated_service = service.update_service_entity(
+        "svc-1",
+        updates={"notes": "Standard support", "attributes": {"tier": "gold"}},
+    )
+    assert updated_service["notes"] == "Standard support"
+    assert updated_service["attributes"]["tier"] == "gold"
+
+    service.set_service_entity_active("svc-1", False)
+    assert bool(dict(service.get_service_entity("svc-1") or {}).get("active")) is False
+    service.set_service_entity_active("svc-1", True)
+    assert bool(dict(service.get_service_entity("svc-1") or {}).get("active")) is True
+
+
+def test_knowledge_entity_summary_and_product_lifecycle_sync() -> None:
+    service = _seed_service()
+    customer = service.create_customer(customer_id="cust-1", canonical_name="Client A")
+    support = service.create_service_entity(
+        service_id="svc-1", canonical_name="Support"
+    )
+    service.create_knowledge_relationship(
+        source_entity_id=customer["entity_id"],
+        target_entity_id=support["entity_id"],
+        relationship_type="consumes",
+    )
+
+    product = service.create_product(
+        manufacturer_id="mfr-qsc",
+        manufacturer="QSC",
+        manufacturer_part_number="CORE-8",
+        product_name="Core 8",
+        product_description="DSP",
+        category="dsp",
+    )
+    product_entity_id = f"product:{product['atlas_product_uuid']}"
+
+    service.mark_product_discontinued(product["atlas_product_uuid"])
+    inactive_product_entity = service.get_knowledge_entity(product_entity_id)
+    assert inactive_product_entity is not None
+    assert bool(dict(inactive_product_entity).get("active")) is False
+    assert (
+        dict(inactive_product_entity).get("attributes", {}).get("lifecycle_status")
+        == "discontinued"
+    )
+
+    service.reactivate_product(product["atlas_product_uuid"])
+    active_product_entity = service.get_knowledge_entity(product_entity_id)
+    assert active_product_entity is not None
+    assert bool(dict(active_product_entity).get("active")) is True
+    assert (
+        dict(active_product_entity).get("attributes", {}).get("lifecycle_status")
+        == "active"
+    )
+
+    summary = service.knowledge_entity_summary()
+    assert summary["total_entities"] >= 5
+    assert summary["total_relationships"] == 1
+    assert summary["by_type"]["customer"]["total"] == 1
+    assert summary["by_type"]["service"]["total"] == 1
+
+
+@pytest.mark.parametrize(
+    ("entity_type", "id_header", "id_value", "canonical_name"),
+    [
+        ("customer", "customer_id", "cust-100", "Customer 100"),
+        ("service", "service_id", "svc-100", "Service 100"),
+        ("manufacturer", "manufacturer_id", "mfr-100", "Manufacturer 100"),
+        ("vendor", "vendor_id", "vendor-100", "Vendor 100"),
+    ],
+)
+def test_csv_template_and_partial_success_import_for_core_entities(
+    entity_type: str,
+    id_header: str,
+    id_value: str,
+    canonical_name: str,
+) -> None:
+    service = CommercialProductService()
+    template = service.knowledge_entity_csv_template(entity_type=entity_type)
+    assert id_header in template
+
+    csv_text = (
+        f"{id_header},canonical_name,display_name,aliases,notes,active\n"
+        f"{id_value},{canonical_name},{canonical_name},alias-one,ok,true\n"
+        f",Broken Row,,alias-two,missing id,true\n"
+    ).encode("utf-8")
+    preview = service.preview_knowledge_entity_import_csv(
+        entity_type=entity_type,
+        file_bytes=csv_text,
+    )
+    assert preview["record_count"] == 2
+    assert preview["accepted_count"] == 1
+    assert preview["rejected_count"] == 1
+
+    imported = service.import_knowledge_entities_from_csv(
+        entity_type=entity_type,
+        file_bytes=csv_text,
+        allow_partial_success=True,
+    )
+    assert imported["imported_rows"] == 1
+    assert imported["rejected_rows"] == 1
+    assert "row_number" in imported["rejected_rows_csv"]
+
+    exported_csv = service.export_knowledge_entities_csv(entity_type=entity_type)
+    assert canonical_name in exported_csv
+    exported_json = service.export_knowledge_entities_json(entity_type=entity_type)
+    assert canonical_name in exported_json
+
+
+def test_product_csv_import_requires_manufacturer_identity_and_part_number() -> None:
+    service = CommercialProductService()
+    service.create_manufacturer(
+        manufacturer_id="mfr-200",
+        canonical_name="Manufacturer 200",
+    )
+    template = service.knowledge_entity_csv_template(entity_type="product")
+    assert "manufacturer_id" in template
+    assert "manufacturer_part_number" in template
+
+    csv_text = (
+        "manufacturer_id,manufacturer_part_number,product_name,product_description,category,lifecycle_status,active,notes\n"
+        "mfr-200,PART-200,Product 200,Description,dsp,active,true,ok\n"
+        "mfr-unknown,PART-201,Product 201,Description,dsp,active,true,bad-manufacturer\n"
+        "mfr-200,,Product 202,Description,dsp,active,true,missing-part\n"
+    ).encode("utf-8")
+
+    preview = service.preview_knowledge_entity_import_csv(
+        entity_type="product",
+        file_bytes=csv_text,
+    )
+    assert preview["record_count"] == 3
+    assert preview["accepted_count"] == 1
+    assert preview["rejected_count"] == 2
+
+    imported = service.import_knowledge_entities_from_csv(
+        entity_type="product",
+        file_bytes=csv_text,
+        allow_partial_success=True,
+    )
+    assert imported["imported_rows"] == 1
+    assert imported["rejected_rows"] == 2
+
+    entities = service.list_knowledge_entities(entity_type="product")
+    assert len(entities) == 1
+    assert entities[0]["attributes"]["manufacturer_part_number"] == "PART-200"
+
+
+def test_knowledge_import_duplicate_diagnostics_and_audit_history() -> None:
+    service = CommercialProductService()
+    csv_text = (
+        "customer_id,canonical_name,display_name,aliases,notes,active\n"
+        "cust-dup,Duplicate Name,Duplicate Name,,ok,true\n"
+        "cust-dup,Duplicate Name,Duplicate Name,,duplicate,true\n"
+    ).encode("utf-8")
+    preview = service.preview_knowledge_entity_import_csv(
+        entity_type="customer",
+        file_bytes=csv_text,
+    )
+    assert preview["accepted_count"] == 0
+    assert preview["rejected_count"] == 2
+    assert any(
+        item.get("code") == "duplicate_row_identity"
+        for item in list(preview.get("diagnostics") or [])
+    )
+
+    with pytest.raises(ValueError, match="partial success not allowed"):
+        service.import_knowledge_entities_from_csv(
+            entity_type="customer",
+            file_bytes=csv_text,
+            allow_partial_success=False,
+        )
+
+    events = service.list_knowledge_audit_events(event_type="knowledge_csv_imported")
+    assert events == []
+
+    ok_csv = (
+        "customer_id,canonical_name,display_name,aliases,notes,active\n"
+        "cust-ok,Customer OK,Customer OK,,ok,true\n"
+    ).encode("utf-8")
+    service.import_knowledge_entities_from_csv(
+        entity_type="customer",
+        file_bytes=ok_csv,
+        allow_partial_success=True,
+    )
+    events = service.list_knowledge_audit_events(event_type="knowledge_csv_imported")
+    assert len(events) == 1

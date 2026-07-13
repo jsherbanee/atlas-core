@@ -41,9 +41,9 @@ X-01 through X-11 are closed.
 
 No Epic X sprint is active.
 
-Current focus is Architecture review and planning for Epic E.
+Current focus is Epic K Sprint K-02 implementation (Core Knowledge Entities and Operational Workflows).
 
-Epic E is the next candidate epic pending architecture review and sprint approval.
+Epic E remains the next candidate epic pending architecture review and sprint approval.
 
 Epic E has not started.
 

@@ -44,3 +44,6 @@ Registry identity supports deterministic grouping for:
 - `atlas_core/registry/manufacturer_registry.py`
 - `atlas_core/sample_data/manufacturer_seed.py`
 - `atlas_core/services/product_resolution_service.py`
+
+K-02 implementation note:
+- Manufacturer records continue to synchronize into the shared Knowledge Entity Framework, and now participate in the same operational lifecycle semantics (active/archive/restore) used across core knowledge entities.

@@ -605,6 +605,707 @@ class CommercialProductService:
             fail_on_duplicate=True,
         )
 
+    def get_knowledge_entity(self, entity_id: str) -> dict[str, Any] | None:
+        normalized_id = self._safe(entity_id)
+        return (
+            dict(self.state.get("knowledge_entities", {}).get(normalized_id, {}))
+            or None
+        )
+
+    def update_knowledge_entity(
+        self,
+        *,
+        entity_id: str,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        current = self.get_knowledge_entity(entity_id)
+        if current is None:
+            raise ValueError("Knowledge entity not found")
+
+        canonical_name = self._safe(
+            updates.get("canonical_name"),
+            self._safe(current.get("canonical_name"), ""),
+        )
+        display_name = self._safe(
+            updates.get("display_name"),
+            self._safe(current.get("display_name"), canonical_name),
+        )
+        aliases = (
+            [
+                self._safe(item)
+                for item in list(updates.get("aliases") or [])
+                if self._safe(item)
+            ]
+            if "aliases" in updates
+            else list(current.get("aliases") or [])
+        )
+        notes = self._safe(
+            updates.get("notes"),
+            self._safe(current.get("notes"), ""),
+        )
+        active = bool(updates.get("active", current.get("active", True)))
+        attributes = dict(current.get("attributes") or {})
+        if "attributes" in updates:
+            attributes.update(dict(updates.get("attributes") or {}))
+
+        return self._upsert_knowledge_entity(
+            entity_id=self._safe(current.get("entity_id"), ""),
+            entity_type=self._safe(current.get("entity_type"), ""),
+            canonical_name=canonical_name,
+            display_name=display_name,
+            aliases=aliases,
+            notes=notes,
+            active=active,
+            attributes=attributes,
+            fail_on_duplicate=True,
+        )
+
+    def set_knowledge_entity_active(self, *, entity_id: str, active: bool) -> None:
+        if self.get_knowledge_entity(entity_id) is None:
+            raise ValueError("Knowledge entity not found")
+        self._set_knowledge_entity_active(entity_id=entity_id, active=active)
+
+    def get_customer(self, customer_id: str) -> dict[str, Any] | None:
+        return self.get_knowledge_entity(f"customer:{self._safe(customer_id)}")
+
+    def list_customers(self, *, include_inactive: bool = True) -> list[dict[str, Any]]:
+        return self.list_knowledge_entities(
+            entity_type="customer",
+            include_inactive=include_inactive,
+        )
+
+    def search_customers(
+        self,
+        query: str,
+        *,
+        include_inactive: bool = True,
+    ) -> list[dict[str, Any]]:
+        return self.search_knowledge_entities(
+            query,
+            entity_type="customer",
+            include_inactive=include_inactive,
+        )
+
+    def update_customer(
+        self,
+        customer_id: str,
+        *,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self.update_knowledge_entity(
+            entity_id=f"customer:{self._safe(customer_id)}",
+            updates=updates,
+        )
+
+    def set_customer_active(self, customer_id: str, active: bool) -> None:
+        self.set_knowledge_entity_active(
+            entity_id=f"customer:{self._safe(customer_id)}",
+            active=active,
+        )
+
+    def get_service_entity(self, service_id: str) -> dict[str, Any] | None:
+        return self.get_knowledge_entity(f"service:{self._safe(service_id)}")
+
+    def list_service_entities(
+        self,
+        *,
+        include_inactive: bool = True,
+    ) -> list[dict[str, Any]]:
+        return self.list_knowledge_entities(
+            entity_type="service",
+            include_inactive=include_inactive,
+        )
+
+    def search_service_entities(
+        self,
+        query: str,
+        *,
+        include_inactive: bool = True,
+    ) -> list[dict[str, Any]]:
+        return self.search_knowledge_entities(
+            query,
+            entity_type="service",
+            include_inactive=include_inactive,
+        )
+
+    def update_service_entity(
+        self,
+        service_id: str,
+        *,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self.update_knowledge_entity(
+            entity_id=f"service:{self._safe(service_id)}",
+            updates=updates,
+        )
+
+    def set_service_entity_active(self, service_id: str, active: bool) -> None:
+        self.set_knowledge_entity_active(
+            entity_id=f"service:{self._safe(service_id)}",
+            active=active,
+        )
+
+    def knowledge_entity_summary(self) -> dict[str, Any]:
+        rows = self.list_knowledge_entities(include_inactive=True)
+        relationships = self.list_knowledge_relationships()
+        by_type: dict[str, dict[str, int]] = {}
+        for item in rows:
+            entity_type = self._safe(item.get("entity_type"), "unknown")
+            bucket = by_type.setdefault(
+                entity_type,
+                {"total": 0, "active": 0, "inactive": 0},
+            )
+            bucket["total"] += 1
+            if bool(item.get("active", True)):
+                bucket["active"] += 1
+            else:
+                bucket["inactive"] += 1
+
+        return {
+            "total_entities": len(rows),
+            "active_entities": sum(
+                1 for item in rows if bool(item.get("active", True))
+            ),
+            "inactive_entities": sum(
+                1 for item in rows if not bool(item.get("active", True))
+            ),
+            "total_relationships": len(relationships),
+            "by_type": dict(sorted(by_type.items())),
+        }
+
+    def list_knowledge_audit_events(
+        self,
+        *,
+        entity_id: str = "",
+        event_type: str = "",
+        limit: int = 1000,
+    ) -> list[dict[str, Any]]:
+        entity_filter = self._safe(entity_id)
+        event_filter = self._safe(event_type)
+        rows = list(self.state.get("knowledge_audit_log") or [])
+        if entity_filter:
+            rows = [
+                item
+                for item in rows
+                if self._safe(dict(item).get("entity_id"), "") == entity_filter
+            ]
+        if event_filter:
+            rows = [
+                item
+                for item in rows
+                if self._safe(dict(item).get("event_type"), "") == event_filter
+            ]
+        rows.sort(key=lambda item: self._safe(dict(item).get("timestamp"), ""))
+        return [dict(item) for item in rows[-max(1, int(limit)) :]]
+
+    def knowledge_entity_csv_template(self, *, entity_type: str) -> str:
+        normalized_type = self._safe(entity_type).lower()
+        if normalized_type == "customer":
+            fieldnames = [
+                "customer_id",
+                "canonical_name",
+                "display_name",
+                "aliases",
+                "notes",
+                "active",
+            ]
+            sample = {
+                "customer_id": "cust-001",
+                "canonical_name": "Example Customer",
+                "display_name": "Example Customer",
+                "aliases": "Example Cust;EC",
+                "notes": "",
+                "active": "true",
+            }
+        elif normalized_type == "service":
+            fieldnames = [
+                "service_id",
+                "canonical_name",
+                "display_name",
+                "aliases",
+                "notes",
+                "active",
+            ]
+            sample = {
+                "service_id": "svc-001",
+                "canonical_name": "Example Service",
+                "display_name": "Example Service",
+                "aliases": "Ops;Support",
+                "notes": "",
+                "active": "true",
+            }
+        elif normalized_type == "manufacturer":
+            fieldnames = [
+                "manufacturer_id",
+                "canonical_name",
+                "display_name",
+                "manufacturer_code",
+                "website",
+                "aliases",
+                "notes",
+                "active",
+            ]
+            sample = {
+                "manufacturer_id": "mfr-001",
+                "canonical_name": "Example Manufacturer",
+                "display_name": "Example Manufacturer",
+                "manufacturer_code": "EXM",
+                "website": "https://example.com",
+                "aliases": "EXMFG",
+                "notes": "",
+                "active": "true",
+            }
+        elif normalized_type == "vendor":
+            fieldnames = [
+                "vendor_id",
+                "canonical_name",
+                "display_name",
+                "vendor_code",
+                "website",
+                "aliases",
+                "notes",
+                "active",
+            ]
+            sample = {
+                "vendor_id": "vendor-001",
+                "canonical_name": "Example Vendor",
+                "display_name": "Example Vendor",
+                "vendor_code": "EXV",
+                "website": "https://example.com",
+                "aliases": "EXVEND",
+                "notes": "",
+                "active": "true",
+            }
+        elif normalized_type == "product":
+            fieldnames = [
+                "manufacturer_id",
+                "manufacturer_part_number",
+                "product_name",
+                "product_description",
+                "category",
+                "lifecycle_status",
+                "active",
+                "notes",
+            ]
+            sample = {
+                "manufacturer_id": "mfr-001",
+                "manufacturer_part_number": "EX-100",
+                "product_name": "Example Product",
+                "product_description": "Example description",
+                "category": "other",
+                "lifecycle_status": "pending_verification",
+                "active": "true",
+                "notes": "",
+            }
+        else:
+            raise ValueError("Unsupported knowledge entity type")
+
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow(sample)
+        return buffer.getvalue()
+
+    def preview_knowledge_entity_import_csv(
+        self,
+        *,
+        entity_type: str,
+        file_bytes: bytes,
+    ) -> dict[str, Any]:
+        normalized_type = self._safe(entity_type).lower()
+        if normalized_type not in {
+            "customer",
+            "service",
+            "manufacturer",
+            "vendor",
+            "product",
+        }:
+            raise ValueError("Unsupported knowledge entity type")
+
+        text = file_bytes.decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(text))
+        rows = [dict(item) for item in list(reader)]
+
+        diagnostics: list[dict[str, Any]] = []
+        preview_rows: list[dict[str, Any]] = []
+        seen_keys: dict[str, int] = {}
+
+        for index, row in enumerate(rows, start=1):
+            parsed = self._normalize_knowledge_import_row(
+                entity_type=normalized_type,
+                row=row,
+            )
+            key = self._knowledge_import_row_key(
+                entity_type=normalized_type,
+                normalized_row=parsed,
+            )
+            seen_keys[key] = seen_keys.get(key, 0) + 1
+            preview: dict[str, Any] = {
+                "row_number": index,
+                "status": "accepted",
+                "operation": "upsert",
+                "errors": [],
+                "warnings": [],
+                "normalized_row": parsed,
+                "raw_row": dict(row),
+            }
+            validation_errors = self._validate_knowledge_import_row(
+                entity_type=normalized_type,
+                normalized_row=parsed,
+            )
+            if validation_errors:
+                preview["status"] = "rejected"
+                preview["errors"] = list(validation_errors)
+                for message in validation_errors:
+                    diagnostics.append(
+                        {
+                            "severity": "error",
+                            "row_number": index,
+                            "code": "invalid_row",
+                            "message": message,
+                        }
+                    )
+            preview_rows.append(preview)
+
+        for preview in preview_rows:
+            row_number = int(preview.get("row_number") or 0)
+            normalized_preview_row = dict(preview.get("normalized_row") or {})
+            key = self._knowledge_import_row_key(
+                entity_type=normalized_type,
+                normalized_row=normalized_preview_row,
+            )
+            if seen_keys.get(key, 0) > 1:
+                preview["status"] = "rejected"
+                message = "Duplicate row identity detected in import file"
+                preview.setdefault("errors", []).append(message)
+                diagnostics.append(
+                    {
+                        "severity": "error",
+                        "row_number": row_number,
+                        "code": "duplicate_row_identity",
+                        "message": message,
+                    }
+                )
+
+        accepted_count = sum(
+            1
+            for item in preview_rows
+            if self._safe(item.get("status"), "") == "accepted"
+        )
+        rejected_count = len(preview_rows) - accepted_count
+        return {
+            "entity_type": normalized_type,
+            "record_count": len(preview_rows),
+            "accepted_count": accepted_count,
+            "rejected_count": rejected_count,
+            "preview_rows": preview_rows,
+            "diagnostics": diagnostics,
+        }
+
+    def import_knowledge_entities_from_csv(
+        self,
+        *,
+        entity_type: str,
+        file_bytes: bytes,
+        allow_partial_success: bool = True,
+    ) -> dict[str, Any]:
+        preview = self.preview_knowledge_entity_import_csv(
+            entity_type=entity_type,
+            file_bytes=file_bytes,
+        )
+        rejected_rows = [
+            dict(item)
+            for item in list(preview.get("preview_rows") or [])
+            if self._safe(item.get("status"), "") == "rejected"
+        ]
+        accepted_rows = [
+            dict(item)
+            for item in list(preview.get("preview_rows") or [])
+            if self._safe(item.get("status"), "") == "accepted"
+        ]
+        if rejected_rows and not allow_partial_success:
+            raise ValueError(
+                "Import contains rejected rows; partial success not allowed"
+            )
+
+        imported = 0
+        for item in accepted_rows:
+            normalized_type = self._safe(preview.get("entity_type"), "")
+            normalized_row = dict(item.get("normalized_row") or {})
+            if normalized_type == "customer":
+                customer_id = self._safe(normalized_row.get("customer_id"), "")
+                existing = self.get_customer(customer_id)
+                if existing:
+                    self.update_customer(customer_id, updates=normalized_row)
+                else:
+                    self.create_customer(
+                        customer_id=customer_id,
+                        canonical_name=self._safe(
+                            normalized_row.get("canonical_name"), ""
+                        ),
+                        display_name=self._safe(normalized_row.get("display_name"), ""),
+                        aliases=list(normalized_row.get("aliases") or []),
+                        notes=self._safe(normalized_row.get("notes"), ""),
+                        active=bool(normalized_row.get("active", True)),
+                    )
+                imported += 1
+                continue
+
+            if normalized_type == "service":
+                service_id = self._safe(normalized_row.get("service_id"), "")
+                existing = self.get_service_entity(service_id)
+                if existing:
+                    self.update_service_entity(service_id, updates=normalized_row)
+                else:
+                    self.create_service_entity(
+                        service_id=service_id,
+                        canonical_name=self._safe(
+                            normalized_row.get("canonical_name"), ""
+                        ),
+                        display_name=self._safe(normalized_row.get("display_name"), ""),
+                        aliases=list(normalized_row.get("aliases") or []),
+                        notes=self._safe(normalized_row.get("notes"), ""),
+                        active=bool(normalized_row.get("active", True)),
+                    )
+                imported += 1
+                continue
+
+            if normalized_type == "manufacturer":
+                manufacturer_id = self._safe(normalized_row.get("manufacturer_id"), "")
+                if self.get_manufacturer(manufacturer_id):
+                    self.update_manufacturer(manufacturer_id, updates=normalized_row)
+                else:
+                    self.create_manufacturer(
+                        manufacturer_id=manufacturer_id,
+                        canonical_name=self._safe(
+                            normalized_row.get("canonical_name"), ""
+                        ),
+                        display_name=self._safe(normalized_row.get("display_name"), ""),
+                        manufacturer_code=self._safe(
+                            normalized_row.get("manufacturer_code"), ""
+                        ),
+                        website=self._safe(normalized_row.get("website"), ""),
+                        aliases=list(normalized_row.get("aliases") or []),
+                        notes=self._safe(normalized_row.get("notes"), ""),
+                        active=bool(normalized_row.get("active", True)),
+                    )
+                imported += 1
+                continue
+
+            if normalized_type == "vendor":
+                vendor_id = self._safe(normalized_row.get("vendor_id"), "")
+                if self.get_vendor(vendor_id):
+                    self.update_vendor(vendor_id, updates=normalized_row)
+                else:
+                    self.create_vendor(
+                        vendor_id=vendor_id,
+                        canonical_name=self._safe(
+                            normalized_row.get("canonical_name"), ""
+                        ),
+                        display_name=self._safe(normalized_row.get("display_name"), ""),
+                        vendor_code=self._safe(normalized_row.get("vendor_code"), ""),
+                        website=self._safe(normalized_row.get("website"), ""),
+                        aliases=list(normalized_row.get("aliases") or []),
+                        notes=self._safe(normalized_row.get("notes"), ""),
+                        active=bool(normalized_row.get("active", True)),
+                    )
+                imported += 1
+                continue
+
+            manufacturer_id = self._safe(normalized_row.get("manufacturer_id"), "")
+            manufacturer_record = self.get_manufacturer(manufacturer_id)
+            if not manufacturer_record:
+                continue
+            manufacturer_name = self._safe(
+                dict(manufacturer_record).get("canonical_name"),
+                "",
+            )
+            existing_product = self.find_product_by_identity(
+                manufacturer=manufacturer_name,
+                normalized_part_number=self.normalize_part_number(
+                    normalized_row.get("manufacturer_part_number", "")
+                ),
+            )
+            if existing_product:
+                self.update_product(
+                    self._safe(existing_product.get("atlas_product_uuid"), ""),
+                    updates={
+                        "product_name": self._safe(
+                            normalized_row.get("product_name"), ""
+                        ),
+                        "product_description": self._safe(
+                            normalized_row.get("product_description"),
+                            "",
+                        ),
+                        "category": self._safe(normalized_row.get("category"), "other"),
+                        "lifecycle_status": self._safe(
+                            normalized_row.get("lifecycle_status"),
+                            ProductLifecycleStatus.PENDING_VERIFICATION.value,
+                        ),
+                        "active": bool(normalized_row.get("active", True)),
+                        "notes": self._safe(normalized_row.get("notes"), ""),
+                    },
+                )
+            else:
+                self.create_product(
+                    manufacturer_id=manufacturer_id,
+                    manufacturer=manufacturer_name,
+                    manufacturer_part_number=self._safe(
+                        normalized_row.get("manufacturer_part_number"),
+                        "",
+                    ),
+                    product_name=self._safe(normalized_row.get("product_name"), ""),
+                    product_description=self._safe(
+                        normalized_row.get("product_description"),
+                        "",
+                    ),
+                    category=self._safe(normalized_row.get("category"), "other"),
+                    lifecycle_status=self._safe(
+                        normalized_row.get("lifecycle_status"),
+                        ProductLifecycleStatus.PENDING_VERIFICATION.value,
+                    ),
+                    active=bool(normalized_row.get("active", True)),
+                    notes=self._safe(normalized_row.get("notes"), ""),
+                )
+            imported += 1
+
+        rejected_csv = self.export_rejected_knowledge_import_rows_csv(
+            preview_rows=rejected_rows
+        )
+        self._append_knowledge_audit(
+            event_type="knowledge_csv_imported",
+            payload={
+                "entity_type": self._safe(preview.get("entity_type"), ""),
+                "imported_rows": imported,
+                "rejected_rows": len(rejected_rows),
+                "allow_partial_success": bool(allow_partial_success),
+            },
+        )
+        return {
+            "entity_type": self._safe(preview.get("entity_type"), ""),
+            "record_count": int(preview.get("record_count", 0) or 0),
+            "imported_rows": imported,
+            "rejected_rows": len(rejected_rows),
+            "diagnostics": list(preview.get("diagnostics") or []),
+            "preview_rows": list(preview.get("preview_rows") or []),
+            "rejected_rows_csv": rejected_csv,
+        }
+
+    def export_rejected_knowledge_import_rows_csv(
+        self,
+        *,
+        preview_rows: list[dict[str, Any]],
+    ) -> str:
+        rows = [
+            {
+                "row_number": int(item.get("row_number") or 0),
+                "status": self._safe(item.get("status"), ""),
+                "errors": " | ".join(list(item.get("errors") or [])),
+                "warnings": " | ".join(list(item.get("warnings") or [])),
+                "raw_row": json.dumps(dict(item.get("raw_row") or {}), sort_keys=True),
+            }
+            for item in list(preview_rows or [])
+            if self._safe(item.get("status"), "") == "rejected"
+        ]
+        headers = ["row_number", "status", "errors", "warnings", "raw_row"]
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=headers)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+        return buffer.getvalue()
+
+    def export_knowledge_entities_csv(
+        self,
+        *,
+        entity_type: str = "",
+        include_inactive: bool = True,
+        query: str = "",
+    ) -> str:
+        rows = self.list_knowledge_entities(
+            entity_type=entity_type,
+            include_inactive=include_inactive,
+        )
+        q = self.normalize_name(query)
+        if q:
+            rows = [
+                item
+                for item in rows
+                if q in self.normalize_name(item.get("canonical_name", ""))
+                or q in self.normalize_name(item.get("display_name", ""))
+                or any(
+                    q in self.normalize_name(alias)
+                    for alias in list(item.get("aliases") or [])
+                )
+            ]
+        export_rows = [
+            {
+                "entity_id": self._safe(item.get("entity_id"), ""),
+                "entity_type": self._safe(item.get("entity_type"), ""),
+                "canonical_name": self._safe(item.get("canonical_name"), ""),
+                "display_name": self._safe(item.get("display_name"), ""),
+                "aliases": ";".join(list(item.get("aliases") or [])),
+                "active": bool(item.get("active", True)),
+                "notes": self._safe(item.get("notes"), ""),
+                "attributes": json.dumps(
+                    dict(item.get("attributes") or {}), sort_keys=True
+                ),
+                "created_at": self._safe(item.get("created_at"), ""),
+                "updated_at": self._safe(item.get("updated_at"), ""),
+            }
+            for item in rows
+        ]
+        headers = [
+            "entity_id",
+            "entity_type",
+            "canonical_name",
+            "display_name",
+            "aliases",
+            "active",
+            "notes",
+            "attributes",
+            "created_at",
+            "updated_at",
+        ]
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=headers)
+        writer.writeheader()
+        for row in export_rows:
+            writer.writerow(row)
+        return buffer.getvalue()
+
+    def export_knowledge_entities_json(
+        self,
+        *,
+        entity_type: str = "",
+        include_inactive: bool = True,
+        query: str = "",
+    ) -> str:
+        rows = self.list_knowledge_entities(
+            entity_type=entity_type,
+            include_inactive=include_inactive,
+        )
+        q = self.normalize_name(query)
+        if q:
+            rows = [
+                item
+                for item in rows
+                if q in self.normalize_name(item.get("canonical_name", ""))
+                or q in self.normalize_name(item.get("display_name", ""))
+                or any(
+                    q in self.normalize_name(alias)
+                    for alias in list(item.get("aliases") or [])
+                )
+            ]
+        payload = {
+            "entities": [dict(item) for item in rows],
+            "entity_type": self._safe(entity_type).lower(),
+            "include_inactive": bool(include_inactive),
+            "query": self._safe(query),
+            "exported_at": self._now_iso(),
+        }
+        return json.dumps(payload, indent=2, sort_keys=True)
+
     def list_knowledge_entities(
         self,
         *,
@@ -3149,6 +3850,7 @@ class CommercialProductService:
 
     def dashboard_summary(self) -> dict[str, Any]:
         rows = self.product_rows(include_project_only=True)
+        knowledge_summary = self.knowledge_entity_summary()
         active_products = sum(1 for item in rows if bool(item.get("active", True)))
         missing_pricing = sum(
             1
@@ -3226,6 +3928,11 @@ class CommercialProductService:
             "end_of_life_products": end_of_life,
             "replacement_candidates": replacement_candidates,
             "average_confidence": average_confidence,
+            "knowledge_entities": int(knowledge_summary.get("total_entities", 0)),
+            "knowledge_relationships": int(
+                knowledge_summary.get("total_relationships", 0)
+            ),
+            "knowledge_entity_summary": knowledge_summary,
         }
 
     def _upsert_product_from_row(
@@ -3699,6 +4406,34 @@ class CommercialProductService:
             manufacturer_sku=self._safe(product.get("manufacturer_sku"), ""),
         )
         self.state.setdefault("products", {})[product_key] = dict(product)
+        self._upsert_knowledge_entity(
+            entity_id=f"product:{self._safe(product.get('atlas_product_uuid'), '')}",
+            entity_type="product",
+            canonical_name=self._safe(product.get("canonical_sku"), "Unknown Product"),
+            display_name=self._safe(
+                product.get("product_name"),
+                self._safe(product.get("canonical_sku"), "Unknown Product"),
+            ),
+            aliases=[
+                self._safe(product.get("manufacturer_part_number"), ""),
+                self._safe(product.get("manufacturer_sku"), ""),
+            ],
+            notes=self._safe(product.get("notes"), ""),
+            active=bool(product.get("active", True)),
+            attributes={
+                "atlas_product_uuid": product.get("atlas_product_uuid"),
+                "manufacturer_id": product.get("manufacturer_id"),
+                "manufacturer": product.get("manufacturer"),
+                "manufacturer_part_number": product.get("manufacturer_part_number"),
+                "normalized_manufacturer_part_number": product.get(
+                    "normalized_manufacturer_part_number"
+                ),
+                "category": product.get("category"),
+                "lifecycle_status": product.get("lifecycle_status"),
+                "replacement_product_uuid": product.get("replacement_product_uuid"),
+            },
+            fail_on_duplicate=False,
+        )
 
     def _replacement_cycle_exists(self, product_id: str, replacement_id: str) -> bool:
         next_id = self._safe(replacement_id)
@@ -3905,6 +4640,142 @@ class CommercialProductService:
         rows = list(self.state.get("knowledge_audit_log") or [])
         rows.append(entry)
         self.state["knowledge_audit_log"] = rows[-1000:]
+
+    def _normalize_knowledge_import_row(
+        self,
+        *,
+        entity_type: str,
+        row: dict[str, Any],
+    ) -> dict[str, Any]:
+        aliases = [
+            self._safe(item)
+            for item in re.split(r"[;,|]", self._safe(row.get("aliases"), ""))
+            if self._safe(item)
+        ]
+        active_text = self._safe(row.get("active"), "true").strip().lower()
+        active = active_text not in {"false", "0", "no", "n", "off"}
+        if entity_type == "customer":
+            return {
+                "customer_id": self._safe(row.get("customer_id"), ""),
+                "canonical_name": self._safe(row.get("canonical_name"), ""),
+                "display_name": self._safe(row.get("display_name"), ""),
+                "aliases": aliases,
+                "notes": self._safe(row.get("notes"), ""),
+                "active": active,
+            }
+        if entity_type == "service":
+            return {
+                "service_id": self._safe(row.get("service_id"), ""),
+                "canonical_name": self._safe(row.get("canonical_name"), ""),
+                "display_name": self._safe(row.get("display_name"), ""),
+                "aliases": aliases,
+                "notes": self._safe(row.get("notes"), ""),
+                "active": active,
+            }
+        if entity_type == "manufacturer":
+            return {
+                "manufacturer_id": self._safe(row.get("manufacturer_id"), ""),
+                "canonical_name": self._safe(row.get("canonical_name"), ""),
+                "display_name": self._safe(row.get("display_name"), ""),
+                "manufacturer_code": self._safe(row.get("manufacturer_code"), ""),
+                "website": self._safe(row.get("website"), ""),
+                "aliases": aliases,
+                "notes": self._safe(row.get("notes"), ""),
+                "active": active,
+            }
+        if entity_type == "vendor":
+            return {
+                "vendor_id": self._safe(row.get("vendor_id"), ""),
+                "canonical_name": self._safe(row.get("canonical_name"), ""),
+                "display_name": self._safe(row.get("display_name"), ""),
+                "vendor_code": self._safe(row.get("vendor_code"), ""),
+                "website": self._safe(row.get("website"), ""),
+                "aliases": aliases,
+                "notes": self._safe(row.get("notes"), ""),
+                "active": active,
+            }
+        return {
+            "manufacturer_id": self._safe(row.get("manufacturer_id"), ""),
+            "manufacturer_part_number": self._safe(
+                row.get("manufacturer_part_number"),
+                "",
+            ),
+            "product_name": self._safe(row.get("product_name"), ""),
+            "product_description": self._safe(row.get("product_description"), ""),
+            "category": self._safe(row.get("category"), "other"),
+            "lifecycle_status": self._safe(
+                row.get("lifecycle_status"),
+                ProductLifecycleStatus.PENDING_VERIFICATION.value,
+            ),
+            "notes": self._safe(row.get("notes"), ""),
+            "active": active,
+        }
+
+    def _knowledge_import_row_key(
+        self,
+        *,
+        entity_type: str,
+        normalized_row: dict[str, Any],
+    ) -> str:
+        if entity_type == "customer":
+            return self._safe(normalized_row.get("customer_id"), "")
+        if entity_type == "service":
+            return self._safe(normalized_row.get("service_id"), "")
+        if entity_type == "manufacturer":
+            return self._safe(normalized_row.get("manufacturer_id"), "")
+        if entity_type == "vendor":
+            return self._safe(normalized_row.get("vendor_id"), "")
+        return "|".join(
+            [
+                self._safe(normalized_row.get("manufacturer_id"), ""),
+                self.normalize_part_number(
+                    self._safe(normalized_row.get("manufacturer_part_number"), "")
+                ),
+            ]
+        )
+
+    def _validate_knowledge_import_row(
+        self,
+        *,
+        entity_type: str,
+        normalized_row: dict[str, Any],
+    ) -> list[str]:
+        errors: list[str] = []
+        if entity_type == "customer":
+            if not self._safe(normalized_row.get("customer_id"), ""):
+                errors.append("customer_id is required")
+            if not self._safe(normalized_row.get("canonical_name"), ""):
+                errors.append("canonical_name is required")
+            return errors
+        if entity_type == "service":
+            if not self._safe(normalized_row.get("service_id"), ""):
+                errors.append("service_id is required")
+            if not self._safe(normalized_row.get("canonical_name"), ""):
+                errors.append("canonical_name is required")
+            return errors
+        if entity_type == "manufacturer":
+            if not self._safe(normalized_row.get("manufacturer_id"), ""):
+                errors.append("manufacturer_id is required")
+            if not self._safe(normalized_row.get("canonical_name"), ""):
+                errors.append("canonical_name is required")
+            return errors
+        if entity_type == "vendor":
+            if not self._safe(normalized_row.get("vendor_id"), ""):
+                errors.append("vendor_id is required")
+            if not self._safe(normalized_row.get("canonical_name"), ""):
+                errors.append("canonical_name is required")
+            return errors
+
+        manufacturer_id = self._safe(normalized_row.get("manufacturer_id"), "")
+        if not manufacturer_id:
+            errors.append("manufacturer_id is required")
+        if not self.get_manufacturer(manufacturer_id):
+            errors.append("manufacturer_id does not exist")
+        if not self._safe(normalized_row.get("manufacturer_part_number"), ""):
+            errors.append("manufacturer_part_number is required")
+        if not self._safe(normalized_row.get("product_name"), ""):
+            errors.append("product_name is required")
+        return errors
 
     @staticmethod
     def _file_extension(filename: str) -> str:

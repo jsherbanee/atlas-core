@@ -1,4 +1,4 @@
-# AKJ Atlas Repository Initialization
+# Atlas Repository Initialization
 
 You are joining an existing long-lived software project.
 
@@ -16,6 +16,12 @@ Your first responsibility is to understand the existing system.
 
 The `/docs` directory is the authoritative architectural source of truth.
 
+Atlas is a commercial SaaS platform for AV and lighting systems integrators. It is a multi-tenant Intelligent Lifecycle Solutions Management Platform.
+
+Atlas manages operational truth. QuickBooks Online manages financial truth.
+
+Atlas should remain vendor-neutral, company-agnostic, and backward compatible.
+
 Read the following documentation before making implementation decisions.
 
 ## Product
@@ -23,8 +29,19 @@ Read the following documentation before making implementation decisions.
 ```
 docs/README.md
 docs/PRODUCT_VISION.md
+docs/TRUST_CHARTER.md
+docs/PRODUCT_ROADMAP.md
+docs/AV_LIFECYCLE.md
 docs/ROADMAP.md
 docs/EPICS.md
+docs/AI_FOUNDATIONAL_KNOWLEDGE.md
+docs/AI_ASSISTANT.md
+docs/PRIVACY_AND_DATA_OWNERSHIP.md
+docs/AI_PRIVACY_POLICY.md
+docs/STANDARDS_LIBRARY.md
+docs/MANUFACTURER_KNOWLEDGE.md
+docs/SECURITY.md
+docs/DATA_GOVERNANCE.md
 ```
 
 ## Architecture
@@ -32,6 +49,15 @@ docs/EPICS.md
 ```
 docs/ARCHITECTURE.md
 docs/DOMAIN_MODEL.md
+docs/ENGINEERING_ROADMAP.md
+docs/AWS_ARCHITECTURE.md
+docs/MULTI_TENANT_ARCHITECTURE.md
+docs/USER_MANAGEMENT.md
+docs/INTEGRATIONS.md
+docs/IMPORT_PIPELINE.md
+docs/SEARCH_ARCHITECTURE.md
+docs/OBJECT_GRAPH.md
+docs/RULE_ENGINE.md
 docs/CODEX_WORKFLOW.md
 docs/DEVELOPMENT_STATUS.md
 ```
@@ -42,6 +68,26 @@ docs/DEVELOPMENT_STATUS.md
 docs/DESIGN_LANGUAGE.md
 docs/ENGINEERING_WORKBENCH.md
 docs/PHASE2_GUI.md
+```
+
+## Platform Operations
+
+```
+docs/OBSERVABILITY.md
+docs/BACKUP_RECOVERY.md
+docs/PERFORMANCE.md
+docs/REPORTING.md
+docs/SERVICE_AND_ASSET_LIFECYCLE.md
+```
+
+## Engineering Intelligence
+
+```
+docs/ENGINEERING_INTELLIGENCE.md
+docs/ENGINEERING_RESOLVER.md
+docs/DRAWING_INTELLIGENCE.md
+docs/SPECIFICATION_INTELLIGENCE.md
+docs/COORDINATION_INTELLIGENCE.md
 ```
 
 ## Commercial Domain
@@ -83,11 +129,32 @@ docs/PREVIEW_0_5_CHECKLIST.md
 docs/RELEASE_NOTES.md
 ```
 
+## Governance
+
+```
+docs/SECURITY.md
+docs/DATA_GOVERNANCE.md
+docs/TRUST_CHARTER.md
+docs/PRIVACY_AND_DATA_OWNERSHIP.md
+docs/AI_PRIVACY_POLICY.md
+```
+
+## Conditional Reading Guidance
+
+Use the smallest relevant reading set for the sprint type.
+
+- Product and roadmap prompts: read Product, Architecture, and Governance first.
+- Engineering execution prompts: read Architecture, Engineering Intelligence, and Platform Operations as needed.
+- AI, retrieval, standards, manufacturer knowledge, assistant UX, or AI governance prompts: read [AI_ASSISTANT.md](AI_ASSISTANT.md) along with the AI and knowledge docs.
+- Cloud, persistence, authentication, deployment, infrastructure, integration hosting, observability, or backup prompts: read [AWS_ARCHITECTURE.md](AWS_ARCHITECTURE.md) along with the relevant platform docs.
+- Import, search, or reporting prompts: read the relevant architecture doc plus the shared platform-operations docs.
+- Lifecycle or service prompts: read [AV_LIFECYCLE.md](AV_LIFECYCLE.md) and [SERVICE_AND_ASSET_LIFECYCLE.md](SERVICE_AND_ASSET_LIFECYCLE.md) first.
+
 ---
 
 # Architectural Rules
 
-Atlas is an engineering workstation.
+Atlas is an operational workspace for integration businesses.
 
 It is **not** an ERP.
 
@@ -95,9 +162,9 @@ It is **not** a procurement platform.
 
 It is **not** an accounting system.
 
-It is **not** a project management application.
+It is **not** a generic project management application.
 
-Atlas exists to become the engineering and estimating intelligence platform for commercial systems integration.
+Atlas exists to become the lifecycle intelligence platform for commercial and residential AV and lighting systems integration.
 
 Every architectural decision should reinforce this direction.
 

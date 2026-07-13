@@ -19,6 +19,26 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Epic K Sprint K-02 Core Knowledge Entities and Operational Workflows)
+
+### Improved
+
+- Knowledge Entity Framework now exposes operational workflows for customer and service entities (create, update, archive, restore, list/search/get).
+- Product lifecycle updates now synchronize framework-backed product entities so activation/lifecycle state remains consistent across commercial and knowledge views.
+- Knowledge workspace now includes customer and service operational controls for deterministic create/list/archive/restore workflows.
+- Dashboard and service summaries now include framework-level metrics for entity totals, activity state, and relationship counts.
+
+### Scope Notes
+
+- deterministic framework/workflow hardening only
+- no Epic E start
+- no procurement, service-ticket, installed-asset, or sell-pricing workflow start
+
+### Validation
+
+- Focused validation passed for `tests/test_knowledge_entity_framework.py` and `tests/test_phase2_global_search_working_set.py`.
+- Full quality gate baseline remains passing (`black`, `ruff`, `mypy`, `pytest`) with current full-suite count at 1182 tests.
+
 ## Unreleased (Epic X Sprint X-11 Typography System and Visual Polish) (Closed)
 
 ### Improved

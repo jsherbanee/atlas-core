@@ -35,6 +35,7 @@ Completion status:
 Atlas Workspace Sprint A-04 consolidates workstation UX: shared workspace section headers, recommendation deduplication/grouping, filter reset consistency in dense tables, object-link continuity from estimate snapshot context, and terminology normalization for Products (Master Library).
 Atlas Workspace Sprint X-02 refines project creation and identity workflows with deterministic Atlas Bid ID preview/allocation and explicit project identifier surfaces.
 Sprint X-03 hardens onboarding and stakeholder workflows with a strict two-step create-then-upload path, shared organization directory linking, and deterministic pending-upload behavior.
+Sprint K-02 extends Knowledge workspace operations with framework-backed Customer and Service workflows (create/list/archive/restore) aligned to deterministic knowledge-entity state.
 
 - Status bar
 

@@ -1,12 +1,60 @@
-# Atlas Core Architecture
+# Atlas Architecture
 
 ## Related Documents
 - [README.md](README.md)
+- [PRODUCT_VISION.md](PRODUCT_VISION.md)
+- [AV_LIFECYCLE.md](AV_LIFECYCLE.md)
+- [AI_ASSISTANT.md](AI_ASSISTANT.md)
+- [MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md)
+- [USER_MANAGEMENT.md](USER_MANAGEMENT.md)
+- [INTEGRATIONS.md](INTEGRATIONS.md)
+- [AWS_ARCHITECTURE.md](AWS_ARCHITECTURE.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)
 - [DESIGN_LANGUAGE.md](DESIGN_LANGUAGE.md)
 - [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)
 - [MASTER_LIBRARY.md](MASTER_LIBRARY.md)
 - [ROADMAP.md](ROADMAP.md)
+- [TRUST_CHARTER.md](TRUST_CHARTER.md)
+- [AI_FOUNDATIONAL_KNOWLEDGE.md](AI_FOUNDATIONAL_KNOWLEDGE.md)
+- [SECURITY.md](SECURITY.md)
+- [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md)
+
+Future assistant behavior is documented in [AI_ASSISTANT.md](AI_ASSISTANT.md), and staged AWS hosting direction is documented in [AWS_ARCHITECTURE.md](AWS_ARCHITECTURE.md).
+
+## Source-of-Truth Hierarchy
+Atlas documentation should be interpreted in this order when there is overlap:
+
+1. [PRODUCT_VISION.md](PRODUCT_VISION.md) and [AV_LIFECYCLE.md](AV_LIFECYCLE.md) define what Atlas is and how the lifecycle should evolve.
+2. [MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md), [DOMAIN_MODEL.md](DOMAIN_MODEL.md), and this document define durable platform structure.
+3. [USER_MANAGEMENT.md](USER_MANAGEMENT.md), [INTEGRATIONS.md](INTEGRATIONS.md), [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md), [SECURITY.md](SECURITY.md), and [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) define operational boundaries, access, storage, and integrations.
+4. [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md), [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md), and [RELEASE_NOTES.md](RELEASE_NOTES.md) define sequencing and history.
+5. [DESIGN_LANGUAGE.md](DESIGN_LANGUAGE.md) and [AI_FOUNDATIONAL_KNOWLEDGE.md](AI_FOUNDATIONAL_KNOWLEDGE.md) define the long-term experience and AI guidance posture.
+
+6. [TRUST_CHARTER.md](TRUST_CHARTER.md) defines the permanent trust commitments that span all other documents.
+
+## Platform Boundaries
+Atlas is a multi-tenant SaaS platform for AV and lighting systems integrators.
+
+Each customer organization is isolated.
+Users belong to organizations.
+Permissions are organization-aware.
+Projects, documents, settings, workflows, and reporting are tenant-scoped.
+
+Atlas manages operational truth.
+QuickBooks Online remains the Financial System of Record.
+
+Atlas must synchronize customers, vendors, purchase orders, and invoices where appropriate rather than duplicating accounting functionality.
+
+Long-term hosting direction is AWS, with target services such as Amazon S3, CloudFront, Amazon RDS or Aurora, Amazon Cognito, and ECS/Fargate or Lambda where appropriate.
+
+Future subscription operations are expected to use Stripe for plan, seat, and billing management.
+
+## AI Architecture Direction
+Atlas will eventually include a read-only-by-default AI assistant as an advisory layer.
+
+Assistant behavior, context architecture, response model, permissions, and user interaction boundaries are defined in [AI_ASSISTANT.md](AI_ASSISTANT.md).
+
+This document retains only the high-level platform boundary: the assistant must remain tenant-aware, permission-aware, and grounded in authorized organizational context.
 
 ## Domain Alignment
 Atlas lifecycle object definitions and cross-phase continuity rules are defined in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).
@@ -15,7 +63,11 @@ Architecture and module design should align to that domain model so Phase 2 arti
 Atlas's visual and UX philosophy is defined in [DESIGN_LANGUAGE.md](DESIGN_LANGUAGE.md), which should be treated as a foundational architecture document alongside the domain model.
 
 ## Engine-First Architecture
-Atlas Core is the engine. Future web and API layers should call Atlas Core services and contracts rather than duplicating business logic in separate code paths.
+Atlas is the deterministic engine layer for the platform.
+
+Application surfaces, future API layers, and cloud adapters should call Atlas services and contracts rather than duplicating business logic in separate code paths.
+
+Platform behavior should remain deterministic, tenant-scoped, and backward compatible.
 
 ## Layers
 - domain
@@ -34,7 +86,7 @@ Atlas Core is the engine. Future web and API layers should call Atlas Core servi
   - Local execution entry point for running workflows against project inputs.
 
 ## Core Principle
-Business logic should live once in the Atlas Core engine and be reused by all callers:
+Business logic should live once in the Atlas engine and be reused by all callers:
 - CLI
 - future API services
 - future UI/web applications
@@ -180,7 +232,7 @@ X-07 focus is focused search rendering and navigation polish:
 
 ## Sprint X-08 Visual System and Safe Search-Clear Constraints (Closed)
 
-X-08 continues product hardening without architecture expansion:
+X-08 completed product hardening without architecture expansion:
 
 - no new domain capability
 - no Epic E implementation start
