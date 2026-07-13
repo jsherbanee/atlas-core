@@ -49,17 +49,41 @@ ATLAS_TOKENS: dict[str, dict[str, str]] = {
         "control_height": "34px",
     },
     "typography": {
-        "title_size": "1.26rem",
-        "subtitle_size": "0.88rem",
+        "font_interface": "'Fira Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+        "font_display": "'Inria Serif', Georgia, 'Times New Roman', serif",
+        "font_mono": "'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+        "display_xl": "1.68rem",
+        "display_l": "1.44rem",
+        "heading_1": "1.26rem",
+        "heading_2": "1.08rem",
+        "heading_3": "0.98rem",
+        "body_lg": "0.96rem",
+        "body": "0.9rem",
         "body_small": "0.84rem",
+        "caption": "0.78rem",
         "label": "0.72rem",
         "value": "0.95rem",
+        "line_height_tight": "1.2",
+        "line_height_body": "1.45",
+        "line_height_relaxed": "1.6",
+        "letter_spacing_display": "-0.01em",
+        "letter_spacing_heading": "-0.005em",
+        "letter_spacing_body": "0",
+        "letter_spacing_label": "0.02em",
+        "title_size": "1.26rem",
+        "subtitle_size": "0.88rem",
     },
 }
 
 
 def atlas_stylesheet() -> str:
-    """Return the canonical stylesheet for Atlas app shell components."""
+    """Return the canonical stylesheet for Atlas app shell components.
+
+    Font loading is centralized here so typography remains deterministic across
+    all pages that call _inject_styles. If enterprise deployments require no
+    external font fetches, replace the Google Fonts import below with
+    self-hosted equivalents and keep token names unchanged.
+    """
 
     c = ATLAS_TOKENS["color"]
     r = ATLAS_TOKENS["radius"]
@@ -69,6 +93,7 @@ def atlas_stylesheet() -> str:
     t = ATLAS_TOKENS["typography"]
     return f"""
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600&family=Inria+Serif:wght@500;600;700&display=swap');
         :root {{
             --atlas-gray: {c['gray']};
             --atlas-primary: {c['primary']};
@@ -98,24 +123,90 @@ def atlas_stylesheet() -> str:
             --atlas-max-content-width: {layout['max_content_width']};
             --atlas-control-height: {layout['control_height']};
             --atlas-input-height: {layout['input_height']};
+            --atlas-font-interface: {t['font_interface']};
+            --atlas-font-display: {t['font_display']};
+            --atlas-font-mono: {t['font_mono']};
+            --atlas-display-xl-size: {t['display_xl']};
+            --atlas-display-l-size: {t['display_l']};
+            --atlas-heading-1-size: {t['heading_1']};
+            --atlas-heading-2-size: {t['heading_2']};
+            --atlas-heading-3-size: {t['heading_3']};
+            --atlas-body-lg-size: {t['body_lg']};
+            --atlas-body-size: {t['body']};
+            --atlas-caption-size: {t['caption']};
             --atlas-title-size: {t['title_size']};
             --atlas-subtitle-size: {t['subtitle_size']};
             --atlas-label-size: {t['label']};
             --atlas-value-size: {t['value']};
             --atlas-body-small-size: {t['body_small']};
+            --atlas-line-height-tight: {t['line_height_tight']};
+            --atlas-line-height-body: {t['line_height_body']};
+            --atlas-line-height-relaxed: {t['line_height_relaxed']};
+            --atlas-letter-spacing-display: {t['letter_spacing_display']};
+            --atlas-letter-spacing-heading: {t['letter_spacing_heading']};
+            --atlas-letter-spacing-body: {t['letter_spacing_body']};
+            --atlas-letter-spacing-label: {t['letter_spacing_label']};
         }}
         .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {{
             background: var(--atlas-page-bg) !important;
+            font-family: var(--atlas-font-interface) !important;
+            font-size: var(--atlas-body-size);
+            line-height: var(--atlas-line-height-body);
+            letter-spacing: var(--atlas-letter-spacing-body);
+        }}
+        [data-testid="stAppViewContainer"] p,
+        [data-testid="stAppViewContainer"] li,
+        [data-testid="stAppViewContainer"] label,
+        [data-testid="stAppViewContainer"] span,
+        [data-testid="stAppViewContainer"] div,
+        [data-testid="stAppViewContainer"] input,
+        [data-testid="stAppViewContainer"] textarea,
+        [data-testid="stAppViewContainer"] button,
+        [data-testid="stAppViewContainer"] select {{
+            font-family: var(--atlas-font-interface);
+        }}
+        code,
+        pre,
+        kbd,
+        samp,
+        .stCode,
+        .stMarkdown code {{
+            font-family: var(--atlas-font-mono) !important;
+        }}
+        [data-testid="stMarkdownContainer"] h1,
+        [data-testid="stMarkdownContainer"] h2,
+        [data-testid="stMarkdownContainer"] h3,
+        [data-testid="stMarkdownContainer"] h4 {{
+            font-family: var(--atlas-font-display) !important;
+            font-weight: 600;
+            line-height: var(--atlas-line-height-tight);
+            letter-spacing: var(--atlas-letter-spacing-heading);
+            color: #0f172a;
+            margin-top: 0;
+            margin-bottom: 0.35rem;
+        }}
+        [data-testid="stMarkdownContainer"] h1 {{
+            font-size: var(--atlas-heading-1-size);
+        }}
+        [data-testid="stMarkdownContainer"] h2 {{
+            font-size: var(--atlas-heading-2-size);
+        }}
+        [data-testid="stMarkdownContainer"] h3,
+        [data-testid="stMarkdownContainer"] h4 {{
+            font-size: var(--atlas-heading-3-size);
         }}
         .atlas-title {{
-            font-size: var(--atlas-title-size);
-            font-weight: 680;
-            letter-spacing: 0.01rem;
+            font-family: var(--atlas-font-display);
+            font-size: var(--atlas-heading-1-size);
+            font-weight: 600;
+            letter-spacing: var(--atlas-letter-spacing-display);
+            line-height: var(--atlas-line-height-tight);
             margin-bottom: 0.1rem;
         }}
         .atlas-muted {{
             color: var(--atlas-gray);
-            font-size: 0.86rem;
+            font-size: var(--atlas-caption-size);
+            line-height: var(--atlas-line-height-body);
         }}
         .atlas-page-header {{
             margin: 0.15rem 0 0.9rem 0;
@@ -125,6 +216,7 @@ def atlas_stylesheet() -> str:
         .atlas-page-subtitle {{
             color: #4b5563;
             font-size: var(--atlas-subtitle-size);
+            line-height: var(--atlas-line-height-relaxed);
             margin: 0;
         }}
         .atlas-card {{
@@ -138,11 +230,14 @@ def atlas_stylesheet() -> str:
         .atlas-card-title {{
             color: #4b5563;
             font-size: var(--atlas-label-size);
+            letter-spacing: var(--atlas-letter-spacing-label);
+            text-transform: uppercase;
             margin-bottom: 0.15rem;
         }}
         .atlas-card-value {{
-            font-size: var(--atlas-value-size);
+            font-size: var(--atlas-body-lg-size);
             font-weight: 600;
+            line-height: var(--atlas-line-height-tight);
         }}
         .atlas-action-row,
         .atlas-toolbar,
@@ -162,6 +257,7 @@ def atlas_stylesheet() -> str:
         .atlas-content-section h3,
         .atlas-content-section h4 {{
             margin-top: 0;
+            margin-bottom: 0.3rem;
         }}
         .main .block-container {{
             max-width: 1440px;
@@ -180,7 +276,7 @@ def atlas_stylesheet() -> str:
             border-radius: var(--atlas-radius-pill);
             padding: 2px 8px;
             border: 1px solid var(--atlas-border);
-            font-size: 0.75rem;
+            font-size: var(--atlas-caption-size);
             display: inline-block;
             margin-right: 4px;
             margin-top: 2px;
@@ -189,8 +285,9 @@ def atlas_stylesheet() -> str:
         .atlas-status-badge {{
             border-radius: var(--atlas-radius-pill);
             display: inline-block;
-            font-size: 0.74rem;
-            font-weight: 650;
+            font-size: var(--atlas-caption-size);
+            font-weight: 600;
+            letter-spacing: var(--atlas-letter-spacing-label);
             line-height: 1;
             padding: 0.3rem 0.5rem;
             border: 1px solid transparent;
@@ -223,7 +320,8 @@ def atlas_stylesheet() -> str:
             padding: 0.55rem 0.75rem;
             margin: 0.35rem 0 0.65rem 0;
             color: #0f172a;
-            font-size: var(--atlas-body-small-size);
+            font-size: var(--atlas-body-size);
+            line-height: var(--atlas-line-height-relaxed);
         }}
         .atlas-notice-panel strong {{
             color: #0b3f2a;
@@ -247,9 +345,11 @@ def atlas_stylesheet() -> str:
             box-shadow: var(--atlas-elevation-hover);
         }}
         .atlas-object-header {{
-            font-size: 0.82rem;
+            font-size: var(--atlas-body-small-size);
             color: #334155;
             font-weight: 600;
+            letter-spacing: var(--atlas-letter-spacing-label);
+            text-transform: uppercase;
             margin-bottom: 0.15rem;
         }}
         .atlas-project-header {{
@@ -263,19 +363,22 @@ def atlas_stylesheet() -> str:
             margin: 0.35rem 0 0.55rem 0;
         }}
         .atlas-project-name {{
-            font-size: 1.2rem;
-            font-weight: 700;
+            font-family: var(--atlas-font-display);
+            font-size: var(--atlas-display-l-size);
+            font-weight: 600;
+            line-height: var(--atlas-line-height-tight);
+            letter-spacing: var(--atlas-letter-spacing-display);
             color: #0f172a;
             margin-bottom: 0.05rem;
         }}
         .atlas-project-customer {{
             color: #334155;
-            font-size: 0.88rem;
+            font-size: var(--atlas-body-size);
             margin-bottom: 0.3rem;
         }}
         .atlas-project-meta {{
             color: #475569;
-            font-size: 0.8rem;
+            font-size: var(--atlas-caption-size);
             margin-top: 0.25rem;
         }}
         .atlas-workspace-context {{
@@ -285,17 +388,21 @@ def atlas_stylesheet() -> str:
             padding: 0.45rem 0.65rem;
             margin: 0.2rem 0 0.75rem 0;
             color: #475569;
-            font-size: 0.82rem;
+            font-size: var(--atlas-body-small-size);
+            line-height: var(--atlas-line-height-relaxed);
         }}
         .atlas-empty-title {{
-            font-size: 0.95rem;
-            font-weight: 650;
+            font-family: var(--atlas-font-display);
+            font-size: var(--atlas-heading-2-size);
+            font-weight: 600;
+            letter-spacing: var(--atlas-letter-spacing-heading);
             color: #0f172a;
             margin-bottom: 0.2rem;
         }}
         .atlas-empty-copy {{
             color: #475569;
-            font-size: var(--atlas-body-small-size);
+            font-size: var(--atlas-body-size);
+            line-height: var(--atlas-line-height-relaxed);
             margin: 0;
         }}
         .stTabs [data-baseweb="tab-list"] {{
@@ -309,7 +416,8 @@ def atlas_stylesheet() -> str:
             color: #1f2937;
             height: var(--atlas-control-height);
             padding: 0 0.7rem;
-            font-weight: 550;
+            font-weight: 500;
+            font-size: var(--atlas-body-small-size);
         }}
         .stTabs [data-baseweb="tab"][aria-selected="true"] {{
             border-color: var(--atlas-primary);
@@ -321,7 +429,8 @@ def atlas_stylesheet() -> str:
             border-color: var(--atlas-primary) !important;
             color: #ffffff !important;
             border-radius: var(--atlas-radius-sm) !important;
-            font-weight: 650 !important;
+            font-weight: 600 !important;
+            font-size: var(--atlas-body-small-size) !important;
         }}
         .stButton > button[kind="primary"]:hover {{
             background: #00351e !important;
@@ -332,6 +441,8 @@ def atlas_stylesheet() -> str:
             border-color: var(--atlas-border) !important;
             background: var(--atlas-surface) !important;
             color: #111827 !important;
+            font-size: var(--atlas-body-small-size) !important;
+            font-weight: 500 !important;
         }}
         .stButton > button[kind="secondary"]:hover {{
             background: var(--atlas-hover) !important;
@@ -363,6 +474,16 @@ def atlas_stylesheet() -> str:
             overflow: hidden;
             background: var(--atlas-surface);
         }}
+        [data-testid="stDataFrame"] [role="columnheader"] {{
+            font-size: var(--atlas-label-size);
+            font-weight: 600;
+            letter-spacing: var(--atlas-letter-spacing-label);
+            text-transform: uppercase;
+        }}
+        [data-testid="stDataFrame"] [role="gridcell"] {{
+            font-size: var(--atlas-body-small-size);
+            line-height: var(--atlas-line-height-body);
+        }}
         .st-key-atlas_header_nav_Atlas button,
         .st-key-atlas_header_nav_Projects button,
         .st-key-atlas_header_nav_Knowledge button,
@@ -373,9 +494,10 @@ def atlas_stylesheet() -> str:
             color: #111827 !important;
             min-width: max-content !important;
             padding: 0.15rem 0.35rem !important;
-            font-weight: 700 !important;
+            font-weight: 600 !important;
             line-height: 1.1 !important;
             border-radius: var(--atlas-radius-sm) !important;
+            font-size: var(--atlas-body-small-size) !important;
         }}
         .st-key-atlas_header_nav_Atlas button[kind="primary"],
         .st-key-atlas_header_nav_Projects button[kind="primary"],
@@ -391,6 +513,13 @@ def atlas_stylesheet() -> str:
             white-space: nowrap !important;
             overflow: visible !important;
             text-overflow: clip !important;
+        }}
+        .st-key-atlas_header_nav_Atlas button p {{
+            font-family: var(--atlas-font-display) !important;
+            font-size: var(--atlas-display-l-size) !important;
+            font-weight: 600 !important;
+            letter-spacing: var(--atlas-letter-spacing-display) !important;
+            line-height: var(--atlas-line-height-tight) !important;
         }}
         .st-key-atlas_header_nav_Atlas button:hover,
         .st-key-atlas_header_nav_Projects button:hover,

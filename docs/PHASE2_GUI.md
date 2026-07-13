@@ -117,6 +117,32 @@ Remaining UX debt after X-10:
 - lower-priority advanced/object-detail pages still need full shared-wrapper migration
 - notebook entry-point discoverability should be further improved from primary workflow pages
 
+## Typography System and Visual Polish (X-11)
+
+X-11 completes official typography and hierarchy hardening across shared shell surfaces while preserving behavior.
+
+Completed X-11 typography implementation:
+
+- official font families are centralized in shared design-system tokens:
+   - Display: Inria Serif (500/600/700)
+   - Interface: Fira Sans (400/500/600)
+   - Mono: existing mono stack for IDs/hashes/code surfaces
+- shared typography scale now defines explicit tokens for Display XL/L, Heading 1/2/3, Body Large/Body/Small, Caption, Label, and Value
+- line-height and letter-spacing tokens are centralized to keep heading/body rhythm deterministic across pages
+- single authoritative font loading path is centralized in `atlas_core/ui/design_system.py`
+
+Visual polish refinements in X-11 (behavior-preserving):
+
+- stronger heading and section hierarchy consistency
+- improved label, badge, and table-header readability in dense review surfaces
+- refined control/button/tab type sizing and weights for visual clarity
+- no workflow, routing, data, or business-logic changes
+
+Enterprise font-hosting guidance:
+
+- replace centralized Google Fonts import with self-hosted equivalents in the same stylesheet location
+- keep token names unchanged so all consuming surfaces remain behaviorally stable
+
 ## Epic X Closeout Validation
 
 Validation-only closeout pass completed for Epic X.

@@ -234,6 +234,38 @@ Remaining UX debt after X-10:
 - some advanced and object-detail pages still use older inline layout/table rendering patterns and should migrate in future hardening passes
 - notebook discoverability still depends on project navigation patterns and can benefit from additional direct-entry affordances from core workflow pages
 
+## 8.7 Sprint X-11 Typography System and Visual Polish
+
+Completion status:
+
+- X-11 typography system and visual polish: completed
+
+X-11 continues product hardening without architecture expansion:
+
+- no new product capabilities
+- no Epic E implementation start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
+X-11 establishes the official Atlas typography system through centralized design-system tokens:
+
+- Display family: Inria Serif (500/600/700)
+- Interface family: Fira Sans (400/500/600)
+- Monospace family: existing deterministic mono stack for IDs, hashes, and code-like metadata
+- centralized type scale tokens for Display XL/L, Heading 1/2/3, Body Large/Body/Small, Caption, Label, and Value
+- centralized letter-spacing and line-height tokens for display, heading, and body readability rhythm
+
+Font loading posture:
+
+- single authoritative font-load path is centralized in `atlas_core/ui/design_system.py`
+- enterprise self-hosting is explicitly supported by replacing the centralized import with local-hosted equivalents while preserving token names
+
+Visual polish posture in X-11:
+
+- behavior-preserving hierarchy and spacing refinements only
+- normalized heading and section rhythm across workspace shells and report/project surfaces
+- improved table/header/label consistency and dense-content readability without changing workflow logic
+- preserved strong focus visibility and contrast semantics
+
 
 ## 8. Things Atlas Will Never Become
 

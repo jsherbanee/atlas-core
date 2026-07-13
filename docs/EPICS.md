@@ -139,7 +139,7 @@ Status: Implemented and Closed for current roadmap baseline
 
 ## Epic X: Product Hardening
 
-Status: Completed and Closed (X-01 through X-10 closed; no active Epic X sprint)
+Status: Completed and Closed (X-01 through X-11 closed; no active Epic X sprint)
 
 - X-01 Pilot Readiness and Application Walkthrough (Implemented, Closed)
 - X-02 Project Creation and Bid Identity Refinement (Implemented, Closed)
@@ -151,6 +151,7 @@ Status: Completed and Closed (X-01 through X-10 closed; no active Epic X sprint)
 - X-08 Search Clear-State Runtime Fix and Visual-System Closeout (Implemented, Closed)
 - X-09 Design System Foundation and Reusable UI Components (Implemented, Closed)
 - X-10 Workspace Consistency and Information Density (Implemented, Closed)
+- X-11 Typography System and Visual Polish (Implemented, Closed)
 
 No Epic X sprint is currently active.
 
@@ -162,7 +163,19 @@ Epic X closeout notes:
 
 Post-closeout planning note:
 
-- Epic E remains Not Started and is the next candidate epic pending architecture review and explicit sprint approval
+- Epic E remains Not Started and is the next candidate epic after architecture review and explicit sprint approval
+
+### X-11 Scope (Completed)
+
+- implement official typography families and centralized scale tokens in shared design-system authority
+- centralize typography rhythm tokens (line heights and letter spacing) for deterministic hierarchy
+- apply behavior-preserving visual polish to heading, table, badge, and control typography
+- keep workflow logic, routing contracts, persistence, and domain behavior unchanged
+
+Explicitly out of scope:
+
+- Epic E implementation start
+- new domain capability implementation
 
 ### X-04 Scope (Completed)
 

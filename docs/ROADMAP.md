@@ -35,13 +35,13 @@ Atlas milestones describe customer-visible capability horizons rather than sprin
 
 Phase 2 Bid Intelligence remains the active implementation target.
 
-Epic X is complete and formally closed.
+Epic X is completed and formally closed.
 
-X-01 through X-10 are closed.
+X-01 through X-11 are closed.
 
 No Epic X sprint is active.
 
-Current focus is Phase 2 roadmap reassessment.
+Current focus is Architecture review and planning for Epic E.
 
 Epic E is the next candidate epic pending architecture review and sprint approval.
 

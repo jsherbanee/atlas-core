@@ -19,6 +19,27 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Epic X Sprint X-11 Typography System and Visual Polish) (Closed)
+
+### Improved
+
+- Atlas now uses an official centralized typography system with Inria Serif for display hierarchy and Fira Sans for interface/content hierarchy.
+- Shared typography scale tokens now govern Display, Heading, Body, Caption, Label, and Value sizes from a single design-system source.
+- Heading rhythm, table/header readability, status/label hierarchy, and control typography are polished across shared shell surfaces while preserving behavior.
+- Font loading is now centralized through a single authoritative stylesheet path, with explicit guidance for enterprise self-hosting replacement.
+
+### Scope Notes
+
+- behavior-preserving visual hardening only
+- no workflow, routing, business-logic, or persistence changes
+- no Epic E start
+
+### Validation
+
+- Manual validation confirmed typography hierarchy and shell readability across Atlas, Projects, Knowledge, Reports, project workspaces, focused search mode, and Settings access.
+- Responsive checks at 820, 980, 1180, 1366, and large desktop widths showed no horizontal overflow regressions.
+- Full quality gates passed (`black`, `ruff`, `mypy`, `pytest`) with full-suite regression count unchanged at 1177 tests.
+
 ## Unreleased (Epic X Closeout Validation and Closure) (Closed)
 
 ### Improved
