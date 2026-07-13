@@ -78,9 +78,12 @@ class _HomeContractStreamlit:
         label: str,
         type: str = "secondary",
         use_container_width: bool = False,
+        width: str | None = None,
         key: str | None = None,
         disabled: bool = False,
     ) -> bool:
+        if width is not None:
+            use_container_width = width == "stretch"
         self.button_calls.append(
             {
                 "label": label,
@@ -88,9 +91,10 @@ class _HomeContractStreamlit:
                 "key": key,
                 "disabled": disabled,
                 "use_container_width": use_container_width,
+                "width": width,
             }
         )
-        _ = (type, use_container_width, key, disabled)
+        _ = (type, use_container_width, width, key, disabled)
         return label in self._pressed
 
     def markdown(self, text: str, **kwargs: Any) -> None:
@@ -201,8 +205,11 @@ class _CreatePageStreamlit:
         label: str,
         disabled: bool = False,
         use_container_width: bool = False,
+        width: str | None = None,
     ) -> bool:
-        _ = (disabled, use_container_width)
+        if width is not None:
+            use_container_width = width == "stretch"
+        _ = (disabled, use_container_width, width)
         return bool(self.button_presses.get(label, False))
 
     def form(self, _key: str, clear_on_submit: bool = False) -> _NullContext:

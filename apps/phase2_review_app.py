@@ -2096,18 +2096,18 @@ def _render_review_transition(
                 + _safe_text(next_action.get("detail"), ""),
             },
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
     action_cols = st.columns(2)
-    if action_cols[0].button(mark_label, use_container_width=True):
+    if action_cols[0].button(mark_label, width="stretch"):
         _set_review_flag(st, f"{step_key}_reviewed", True)
         st.rerun()
 
     if action_cols[1].button(
         f"Continue to {_safe_text(next_action.get('step'), 'Next Step')}",
-        use_container_width=True,
+        width="stretch",
     ):
         st.session_state["atlas_active_page"] = _safe_text(
             next_action.get("page"),
@@ -4166,7 +4166,7 @@ def _render_navigation_menu(
             key=f"atlas_top_nav_{menu_label}_{label}_{page}",
             type="primary" if active_page == page else "secondary",
             disabled=is_future_disabled,
-            use_container_width=True,
+            width="stretch",
         ):
             _open_page(st, page)
         if is_future_disabled:
@@ -4199,7 +4199,7 @@ def _render_top_navigation(
             label,
             key=f"atlas_header_nav_{label}",
             type="primary" if is_active else "secondary",
-            use_container_width=False,
+            width="content",
         ):
             _open_page(st, page)
 
@@ -4210,7 +4210,7 @@ def _render_header_menu(st: Any, host: Any) -> None:
         "Settings",
         key="atlas_header_settings",
         type="secondary",
-        use_container_width=True,
+        width="stretch",
     ):
         _open_page(st, "Administration")
 
@@ -4227,7 +4227,7 @@ def _render_header(
     if header_cols[0].button(
         "Atlas",
         key="atlas_header_nav_Atlas",
-        use_container_width=False,
+        width="content",
         type="primary" if current_page == "Mission Control" else "secondary",
     ):
         _open_page(st, "Mission Control")
@@ -4272,7 +4272,7 @@ def _nav_buttons(
                     key=f"atlas_nav_{mode}_{group_name}_{label}_{page}",
                     type="primary" if active_page == page else "secondary",
                     disabled=is_future_disabled,
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     st.session_state["atlas_active_page"] = page
                     st.rerun()
@@ -4286,7 +4286,7 @@ def _render_object_metadata_table(
     rows: list[dict[str, Any]],
 ) -> None:
     st.markdown(f"### {title}")
-    st.dataframe(rows, use_container_width=True, hide_index=True)
+    st.dataframe(rows, width="stretch", hide_index=True)
 
 
 def _render_object_reference_sections(
@@ -4814,7 +4814,7 @@ def _render_object_card(
     if cols[0].button(
         f"Open {_safe_text(reference.get('display_name'), 'Object')}",
         key=f"{key_prefix}_open_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
-        use_container_width=True,
+        width="stretch",
     ):
         st.session_state["atlas_active_page"] = _safe_text(
             reference.get("route"), "Overview"
@@ -4832,7 +4832,7 @@ def _render_object_card(
     if cols[1].button(
         "Remove" if pinned else "Add to Working Set",
         key=f"{key_prefix}_pin_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
-        use_container_width=True,
+        width="stretch",
     ):
         _toggle_pin_reference(st, reference, should_pin=not pinned)
         st.rerun()
@@ -4860,7 +4860,7 @@ def _render_object_header(
     if header_cols[1].button(
         "Open Estimate Workspace",
         key=f"atlas_object_header_open_estimate_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
-        use_container_width=True,
+        width="stretch",
     ):
         st.session_state["atlas_active_page"] = "Estimate"
         st.rerun()
@@ -4868,7 +4868,7 @@ def _render_object_header(
     if header_cols[2].button(
         "Remove from Working Set" if pinned else "Add to Working Set",
         key=f"atlas_object_header_pin_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
-        use_container_width=True,
+        width="stretch",
     ):
         _toggle_pin_reference(st, reference, should_pin=not pinned)
         st.rerun()
@@ -5422,14 +5422,14 @@ def _render_home_page(
     if action_cols[0].button(
         "Create New Project",
         type="primary",
-        use_container_width=True,
+        width="stretch",
     ):
         st.session_state["atlas_active_page"] = "Create New Project"
         st.rerun()
-    if action_cols[1].button("Open Existing Project", use_container_width=True):
+    if action_cols[1].button("Open Existing Project", width="stretch"):
         st.session_state["atlas_active_page"] = "Open Existing Project"
         st.rerun()
-    if action_cols[2].button("Manage Projects", use_container_width=True):
+    if action_cols[2].button("Manage Projects", width="stretch"):
         st.session_state["atlas_active_page"] = "Projects"
         st.rerun()
 
@@ -5626,7 +5626,7 @@ def _render_application_knowledge_page(
                     "Next Action": "Import project packages or document sets to create import events.",
                 },
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -5674,7 +5674,7 @@ def _render_application_knowledge_page(
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -5697,7 +5697,7 @@ def _render_application_knowledge_page(
             if st.button(
                 "Create Manufacturer",
                 key="atlas_ck_create_manufacturer",
-                use_container_width=True,
+                width="stretch",
             ):
                 try:
                     product_service.create_manufacturer(
@@ -5739,7 +5739,7 @@ def _render_application_knowledge_page(
                     }
                     for item in manufacturer_rows
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -5764,7 +5764,7 @@ def _render_application_knowledge_page(
             if st.button(
                 "Create Vendor",
                 key="atlas_ck_create_vendor",
-                use_container_width=True,
+                width="stretch",
             ):
                 try:
                     product_service.create_vendor(
@@ -5805,7 +5805,7 @@ def _render_application_knowledge_page(
                     }
                     for item in vendor_rows
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -5831,7 +5831,7 @@ def _render_application_knowledge_page(
                     }
                     for customer in customers
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -5936,7 +5936,7 @@ def _render_application_knowledge_page(
             if st.button(
                 "Create Product and Vendor Offering",
                 key="atlas_ck_create_product_and_offering",
-                use_container_width=True,
+                width="stretch",
             ):
                 try:
                     mfr_record = selected_manufacturer
@@ -6043,7 +6043,7 @@ def _render_application_knowledge_page(
             if st.button(
                 "Clear Product Filters",
                 key="atlas_ck_product_filters_reset",
-                use_container_width=True,
+                width="stretch",
             ):
                 st.session_state["atlas_ck_product_search"] = ""
                 st.session_state["atlas_ck_product_mfr_filter"] = []
@@ -6140,7 +6140,7 @@ def _render_application_knowledge_page(
                     }
                     for item in visible
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -6157,23 +6157,19 @@ def _render_application_knowledge_page(
                 next_location="Open a project and go to Price List Library.",
             )
         else:
-            st.dataframe(
-                uploaded_price_lists, use_container_width=True, hide_index=True
-            )
+            st.dataframe(uploaded_price_lists, width="stretch", hide_index=True)
             with st.expander("Manufacturer Price Sheets", expanded=False):
                 if manufacturer_products:
                     st.dataframe(
                         manufacturer_products[:300],
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
                 else:
                     st.info("No manufacturer price sheets are indexed yet.")
             with st.expander("Vendor Price Lists", expanded=False):
                 if vendor_offers:
-                    st.dataframe(
-                        vendor_offers[:300], use_container_width=True, hide_index=True
-                    )
+                    st.dataframe(vendor_offers[:300], width="stretch", hide_index=True)
                 else:
                     st.info("No vendor price lists are indexed yet.")
 
@@ -6187,9 +6183,7 @@ def _render_application_knowledge_page(
                 next_location="Use Projects to import project bundles.",
             )
         else:
-            st.dataframe(
-                import_history[:100], use_container_width=True, hide_index=True
-            )
+            st.dataframe(import_history[:100], width="stretch", hide_index=True)
 
     with tabs[8]:
         st.markdown("### Commercial Import History")
@@ -6210,7 +6204,7 @@ def _render_application_knowledge_page(
                     }
                     for item in commercial_import_history
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -6245,7 +6239,7 @@ def _render_application_knowledge_page(
         if st.button(
             "Create Assembly",
             key="atlas_assembly_library_create",
-            use_container_width=True,
+            width="stretch",
         ):
             try:
                 assembly_service.create_assembly(
@@ -6290,7 +6284,7 @@ def _render_application_knowledge_page(
                     }
                     for item in assemblies
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -6309,7 +6303,7 @@ def _render_application_knowledge_page(
             version_rows.sort(
                 key=lambda item: _safe_text(item.get("version_label"), "")
             )
-            st.dataframe(version_rows, use_container_width=True, hide_index=True)
+            st.dataframe(version_rows, width="stretch", hide_index=True)
             selected_version = st.selectbox(
                 "Assembly Version",
                 options=[
@@ -6323,7 +6317,7 @@ def _render_application_knowledge_page(
                 assembly_service.state.get("components", {}).get(selected_version) or []
             )
             st.markdown("#### Component Editor")
-            st.dataframe(component_rows, use_container_width=True, hide_index=True)
+            st.dataframe(component_rows, width="stretch", hide_index=True)
             add_component_cols = st.columns(4)
             component_type = add_component_cols[0].selectbox(
                 "Component Type",
@@ -6358,7 +6352,7 @@ def _render_application_knowledge_page(
             if st.button(
                 "Add Component",
                 key="atlas_assembly_library_add_component",
-                use_container_width=True,
+                width="stretch",
             ):
                 try:
                     is_valid, validation_message = (
@@ -6404,7 +6398,7 @@ def _render_application_knowledge_page(
             if lifecycle_cols[0].button(
                 "Validate Version",
                 key="atlas_assembly_library_validate",
-                use_container_width=True,
+                width="stretch",
             ):
                 result = assembly_service.validate_assembly(
                     assembly_version_id=selected_version,
@@ -6415,7 +6409,7 @@ def _render_application_knowledge_page(
             if lifecycle_cols[1].button(
                 "Activate",
                 key="atlas_assembly_library_activate",
-                use_container_width=True,
+                width="stretch",
             ):
                 try:
                     assembly_service.activate_assembly_version(
@@ -6428,7 +6422,7 @@ def _render_application_knowledge_page(
             if lifecycle_cols[2].button(
                 "Supersede",
                 key="atlas_assembly_library_supersede",
-                use_container_width=True,
+                width="stretch",
             ):
                 try:
                     assembly_service.supersede_assembly_version(
@@ -6441,7 +6435,7 @@ def _render_application_knowledge_page(
             if lifecycle_cols[3].button(
                 "Archive",
                 key="atlas_assembly_library_archive",
-                use_container_width=True,
+                width="stretch",
             ):
                 try:
                     assembly_service.archive_assembly_version(
@@ -6463,7 +6457,7 @@ def _render_application_knowledge_page(
                 st.markdown("#### Validation Result")
                 st.dataframe(
                     [validation_result],
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
 
@@ -6480,18 +6474,18 @@ def _render_application_knowledge_page(
                     )
                     st.dataframe(
                         list(preview.get("contributions") or []),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
                     st.dataframe(
                         [dict(preview.get("labor_rollup") or {})],
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
                     if list(preview.get("diagnostics") or []):
                         st.dataframe(
                             list(preview.get("diagnostics") or []),
-                            use_container_width=True,
+                            width="stretch",
                             hide_index=True,
                         )
                 except Exception as exc:
@@ -6528,7 +6522,7 @@ def _render_application_reports_page(
             }
             for item in rows
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -6558,7 +6552,7 @@ def _render_application_administration_page(
                 "Value": "Top header navigation",
             },
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -6586,9 +6580,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         return
 
     action_cols = st.columns([1.2, 1.2, 1.2, 2.4])
-    if action_cols[0].button(
-        "Create New Project", type="primary", use_container_width=True
-    ):
+    if action_cols[0].button("Create New Project", type="primary", width="stretch"):
         st.session_state["atlas_active_page"] = "Create New Project"
         st.rerun()
 
@@ -6605,7 +6597,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         imported = workspace_service.import_project_bundle(str(temp_path))
         _open_project_record(st, imported, workspace_service)
 
-    if action_cols[2].button("Open Existing Project", use_container_width=True):
+    if action_cols[2].button("Open Existing Project", width="stretch"):
         st.session_state["atlas_active_page"] = "Open Existing Project"
         st.rerun()
 
@@ -6699,7 +6691,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
             }
             for item in filtered
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -6710,19 +6702,17 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         selected = selected_item["record"]
 
         action_cols = st.columns(5)
-        if action_cols[0].button(
-            "Open Project", type="primary", use_container_width=True
-        ):
+        if action_cols[0].button("Open Project", type="primary", width="stretch"):
             _open_project_record(st, selected, workspace_service)
 
         pin_label = "Unpin" if selected.pinned else "Pin"
-        if action_cols[1].button(pin_label, use_container_width=True):
+        if action_cols[1].button(pin_label, width="stretch"):
             workspace_service.pin_project(
                 selected.workspace_id, pinned=not selected.pinned
             )
             st.rerun()
 
-        if action_cols[2].button("Duplicate Project", use_container_width=True):
+        if action_cols[2].button("Duplicate Project", width="stretch"):
             workspace_service.duplicate_project(
                 selected.workspace_id,
                 new_workspace_id=f"{selected.workspace_id}-copy",
@@ -6731,7 +6721,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
             st.rerun()
 
         archive_label = "Unarchive Project" if selected.archived else "Archive Project"
-        if action_cols[3].button(archive_label, use_container_width=True):
+        if action_cols[3].button(archive_label, width="stretch"):
             workspace_service.archive_project(
                 selected.workspace_id,
                 archived=not selected.archived,
@@ -6747,7 +6737,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
             "Confirm Delete",
             key=f"atlas_confirm_delete_{selected.workspace_id}",
         )
-        if action_cols[4].button("Delete Project", use_container_width=True):
+        if action_cols[4].button("Delete Project", width="stretch"):
             if not delete_confirm:
                 st.warning("Enable Confirm Delete before deleting a project.")
             else:
@@ -6811,7 +6801,7 @@ def _render_project_folder_page(
     if not rows:
         st.info(f"No files are currently classified under {folder_name}.")
         return
-    st.dataframe(rows, use_container_width=True, hide_index=True)
+    st.dataframe(rows, width="stretch", hide_index=True)
     file_labels = [item.get("filename") for item in rows]
     selected_file = st.selectbox("Select file", options=file_labels)
     selected = next(item for item in rows if item.get("filename") == selected_file)
@@ -7002,7 +6992,7 @@ def _render_estimate_revision_engine(
                 "State": _safe_text(selected_revision.get("state"), ""),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -7010,7 +7000,7 @@ def _render_estimate_revision_engine(
     if action_cols[0].button(
         "Validate Revision",
         key="atlas_estimate_engine_validate",
-        use_container_width=True,
+        width="stretch",
     ):
         service.validate_revision(revision_id=selected_revision_id)
         _save_estimate_engine_service(st, service)
@@ -7019,7 +7009,7 @@ def _render_estimate_revision_engine(
         "Lock Revision",
         key="atlas_estimate_engine_lock",
         disabled=not mutable,
-        use_container_width=True,
+        width="stretch",
     ):
         try:
             service.lock_revision(revision_id=selected_revision_id, actor="atlas-ui")
@@ -7028,7 +7018,7 @@ def _render_estimate_revision_engine(
         except ValueError as exc:
             st.warning(str(exc))
     if action_cols[2].button(
-        "Clone Revision", key="atlas_estimate_engine_clone", use_container_width=True
+        "Clone Revision", key="atlas_estimate_engine_clone", width="stretch"
     ):
         service.clone_revision(
             source_revision_id=selected_revision_id, created_by="atlas-ui"
@@ -7038,7 +7028,7 @@ def _render_estimate_revision_engine(
     if action_cols[3].button(
         "Refresh All Costs",
         key="atlas_estimate_engine_refresh_all",
-        use_container_width=True,
+        width="stretch",
     ):
         service.refresh_revision_costs(
             revision_id=selected_revision_id,
@@ -7096,7 +7086,7 @@ def _render_estimate_revision_engine(
             if preview_cols[0].button(
                 "Preview Assembly Insertion",
                 key="atlas_estimate_d03_preview_assembly",
-                use_container_width=True,
+                width="stretch",
             ):
                 preview = service.preview_assembly_insertion(
                     revision_id=selected_revision_id,
@@ -7110,7 +7100,7 @@ def _render_estimate_revision_engine(
             if preview_cols[1].button(
                 "Accept Assembly Insertion",
                 key="atlas_estimate_d03_add_assembly",
-                use_container_width=True,
+                width="stretch",
             ):
                 try:
                     result = service.add_assembly_to_revision(
@@ -7133,18 +7123,18 @@ def _render_estimate_revision_engine(
                 st.markdown("##### Expansion Preview")
                 st.dataframe(
                     list(preview.get("contributions") or []),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
                 st.dataframe(
                     [dict(preview.get("labor_rollup") or {})],
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
                 if list(preview.get("diagnostics") or []):
                     st.dataframe(
                         list(preview.get("diagnostics") or []),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
 
@@ -7168,7 +7158,7 @@ def _render_estimate_revision_engine(
                     }
                     for item in expansion_rows
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             expansion_ids = [
@@ -7185,7 +7175,7 @@ def _render_estimate_revision_engine(
             if inspect_cols[0].button(
                 "Preview Labor Rate Refresh",
                 key="atlas_estimate_d03_refresh_labor_preview",
-                use_container_width=True,
+                width="stretch",
             ):
                 preview = service.refresh_assembly_labor_rates(
                     revision_id=selected_revision_id,
@@ -7200,7 +7190,7 @@ def _render_estimate_revision_engine(
             if inspect_cols[1].button(
                 "Preview Product Cost Refresh",
                 key="atlas_estimate_d03_refresh_product_preview",
-                use_container_width=True,
+                width="stretch",
             ):
                 preview = service.refresh_assembly_product_costs(
                     revision_id=selected_revision_id,
@@ -7212,7 +7202,7 @@ def _render_estimate_revision_engine(
             if inspect_cols[2].button(
                 "Inspect Provenance",
                 key="atlas_estimate_d03_inspect_provenance",
-                use_container_width=True,
+                width="stretch",
             ):
                 expansion = dict(
                     service.state.get("assembly_expansions", {}).get(selected_run) or {}
@@ -7231,14 +7221,12 @@ def _render_estimate_revision_engine(
             )
             if refresh_preview:
                 st.markdown("##### Refresh Comparison")
-                st.dataframe(
-                    [refresh_preview], use_container_width=True, hide_index=True
-                )
+                st.dataframe([refresh_preview], width="stretch", hide_index=True)
                 refresh_actions = st.columns(2)
                 if refresh_actions[0].button(
                     "Apply Refresh",
                     key="atlas_estimate_d03_apply_refresh",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     try:
                         service.apply_assembly_refresh(
@@ -7256,7 +7244,7 @@ def _render_estimate_revision_engine(
                 if refresh_actions[1].button(
                     "Dismiss Preview",
                     key="atlas_estimate_d03_dismiss_refresh_preview",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     st.session_state.pop("atlas_estimate_d03_refresh_preview", None)
                     st.rerun()
@@ -7268,13 +7256,13 @@ def _render_estimate_revision_engine(
                 st.markdown("##### Provenance")
                 st.dataframe(
                     list(provenance.get("lines") or []),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
                 if list(provenance.get("labor_snapshots") or []):
                     st.dataframe(
                         list(provenance.get("labor_snapshots") or []),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
 
@@ -7293,7 +7281,7 @@ def _render_estimate_revision_engine(
             }
             for item in line_items
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -7323,13 +7311,13 @@ def _render_estimate_revision_engine(
             )
             or {}
         )
-        st.dataframe([snapshot], use_container_width=True, hide_index=True)
+        st.dataframe([snapshot], width="stretch", hide_index=True)
         source_object_id = _safe_text(selected_line.get("source_object_id"), "")
         if st.button(
             "Open Source Object",
             key="atlas_estimate_engine_open_source_object",
             disabled=not source_object_id,
-            use_container_width=True,
+            width="stretch",
         ):
             _open_estimate_navigation_target(
                 st,
@@ -7345,7 +7333,7 @@ def _render_estimate_revision_engine(
         if refresh_cols[1].button(
             "Refresh Selected Line",
             key="atlas_estimate_engine_refresh_line",
-            use_container_width=True,
+            width="stretch",
         ):
             service.refresh_line_cost(
                 revision_id=selected_revision_id,
@@ -7368,7 +7356,7 @@ def _render_estimate_revision_engine(
         if st.button(
             "Compare Revisions",
             key="atlas_estimate_engine_compare",
-            use_container_width=True,
+            width="stretch",
         ):
             comparison = service.compare_revisions(
                 baseline_revision_id=baseline_revision,
@@ -7379,19 +7367,19 @@ def _render_estimate_revision_engine(
         st.session_state.get("atlas_estimate_engine_last_comparison") or {}
     )
     if comparison_payload:
-        st.dataframe([comparison_payload], use_container_width=True, hide_index=True)
+        st.dataframe([comparison_payload], width="stretch", hide_index=True)
 
     st.markdown("#### Diagnostics")
     st.dataframe(
         list(selected_revision.get("diagnostics") or []),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
     st.markdown("#### Totals")
     st.dataframe(
         [dict(selected_revision.get("totals") or {})],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -7399,7 +7387,7 @@ def _render_estimate_revision_engine(
         estimate_id=_safe_text(estimate.get("estimate_id"), "")
     )
     st.markdown("#### Readiness")
-    st.dataframe([readiness], use_container_width=True, hide_index=True)
+    st.dataframe([readiness], width="stretch", hide_index=True)
     st.markdown("#### Mission Control Estimate Recommendations")
     for recommendation in list(readiness.get("recommendations") or []):
         st.markdown(f"- {recommendation}")
@@ -7502,7 +7490,7 @@ def _render_estimate_page(
                     "Overall Estimate Confidence": f"{dashboard['overall_estimate_confidence']}%",
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.caption(
@@ -7524,7 +7512,7 @@ def _render_estimate_page(
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.caption(
@@ -7577,7 +7565,7 @@ def _render_estimate_page(
                         "Line Total": line.line_total(),
                     }
                 )
-            st.dataframe(display_rows, use_container_width=True, hide_index=True)
+            st.dataframe(display_rows, width="stretch", hide_index=True)
 
             selected_line_id = st.selectbox(
                 "Select estimate line",
@@ -7622,7 +7610,7 @@ def _render_estimate_page(
                     or "n/a",
                 }
             ]
-            st.dataframe(trace_rows, use_container_width=True, hide_index=True)
+            st.dataframe(trace_rows, width="stretch", hide_index=True)
 
             nav_cols = st.columns(5)
             target_map = {
@@ -7642,7 +7630,7 @@ def _render_estimate_page(
                     label,
                     key=f"atlas_estimate_nav_{selected_line.line_id}_{kind}",
                     disabled=not value,
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     _open_estimate_navigation_target(
                         st,
@@ -7653,7 +7641,7 @@ def _render_estimate_page(
     with tabs[2]:
         st.dataframe(
             service.labor_architecture_rows(estimate),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.caption(
@@ -7670,7 +7658,7 @@ def _render_estimate_page(
                 }
                 for category in service.ACCESSORY_PLACEHOLDER_CATEGORIES
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -7684,7 +7672,7 @@ def _render_estimate_page(
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -7699,14 +7687,14 @@ def _render_estimate_page(
                     "Contingency Amount": estimate.contingency_amount(),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
     with tabs[6]:
         allowance_rows = [item.to_dict() for item in estimate.allowances]
         if allowance_rows:
-            st.dataframe(allowance_rows, use_container_width=True, hide_index=True)
+            st.dataframe(allowance_rows, width="stretch", hide_index=True)
         else:
             st.info(
                 "No engineering allowances were created from current reviewed objects."
@@ -7724,7 +7712,7 @@ def _render_estimate_page(
                     "Unresolved Products": dashboard["unresolved_products"],
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -7741,7 +7729,7 @@ def _render_estimate_page(
                     "Generic Allowance": f"{int(float(confidence.get('generic_allowance_ratio', 0.0)) * 100)}%",
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.markdown("#### Confidence Explanations")
@@ -7774,7 +7762,7 @@ def _render_estimate_page(
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -7818,7 +7806,7 @@ def _render_estimate_page(
             if st.button(
                 "Create Quick Add Product",
                 key="atlas_quick_add_create",
-                use_container_width=True,
+                width="stretch",
             ):
                 if not qa_mfr.strip() or not qa_model.strip() or not qa_vendor.strip():
                     st.warning("Manufacturer, model, and vendor are required.")
@@ -7872,7 +7860,7 @@ def _render_estimate_page(
             ),
             file_name=f"{record.project.project_id}_cost_summary.json",
             mime="application/json",
-            use_container_width=True,
+            width="stretch",
         )
         export_cols[1].download_button(
             "Download Cost Lines CSV",
@@ -7881,7 +7869,7 @@ def _render_estimate_page(
             ),
             file_name=f"{record.project.project_id}_cost_lines.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
         )
 
     with tabs[10]:
@@ -7910,7 +7898,7 @@ def _render_estimate_page(
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.download_button(
@@ -7920,7 +7908,7 @@ def _render_estimate_page(
             ),
             file_name=f"{record.project.project_id}_commercial_coverage.json",
             mime="application/json",
-            use_container_width=True,
+            width="stretch",
         )
 
     with tabs[11]:
@@ -7931,7 +7919,7 @@ def _render_estimate_page(
                 if _safe_text(item.get("pricing_status"), "")
                 not in {"missing", "unavailable"}
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -7946,7 +7934,7 @@ def _render_estimate_page(
                     "unavailable",
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -7961,7 +7949,7 @@ def _render_estimate_page(
                 "historical",
             }
         ]
-        st.dataframe(stale_rows, use_container_width=True, hide_index=True)
+        st.dataframe(stale_rows, width="stretch", hide_index=True)
 
     with tabs[14]:
         st.dataframe(
@@ -7970,7 +7958,7 @@ def _render_estimate_page(
                 for item in priced_lines
                 if _safe_text(item.get("pricing_status"), "") in {"allowance"}
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -8001,7 +7989,7 @@ def _render_estimate_page(
             )
             st.dataframe(
                 list(selection.get("candidates") or []),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -8018,7 +8006,7 @@ def _render_estimate_page(
                         "Severity": warning.get("severity"),
                     }
                 )
-        st.dataframe(warning_rows, use_container_width=True, hide_index=True)
+        st.dataframe(warning_rows, width="stretch", hide_index=True)
         st.download_button(
             "Download Cost Exceptions CSV",
             data=DeterministicCostEngine().export_cost_exceptions_csv(
@@ -8026,7 +8014,7 @@ def _render_estimate_page(
             ),
             file_name=f"{record.project.project_id}_cost_exceptions.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
         )
 
     with tabs[17]:
@@ -8048,7 +8036,7 @@ def _render_estimate_page(
             )
             st.dataframe(
                 commercial_service.price_history_for_product(selected_product),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -8149,7 +8137,7 @@ def _render_product_resolution_page(
         )
 
     if display_rows:
-        st.dataframe(display_rows, use_container_width=True, hide_index=True)
+        st.dataframe(display_rows, width="stretch", hide_index=True)
     else:
         st.info("No rows match the active filter set.")
 
@@ -8182,7 +8170,7 @@ def _render_product_resolution_page(
 
     st.markdown("### Candidate Matches")
     if candidate_rows:
-        st.dataframe(candidate_rows, use_container_width=True, hide_index=True)
+        st.dataframe(candidate_rows, width="stretch", hide_index=True)
     else:
         st.info("No deterministic candidates were found for this row.")
 
@@ -8223,7 +8211,7 @@ def _render_product_resolution_page(
     action_cols = st.columns(2)
     if action_cols[0].button(
         "Apply Manual Override",
-        use_container_width=True,
+        width="stretch",
         disabled=not selected_product_option,
         key=f"atlas_product_resolution_manual_apply_{selected_source}",
     ):
@@ -8243,7 +8231,7 @@ def _render_product_resolution_page(
 
     if action_cols[1].button(
         "Clear Manual Override",
-        use_container_width=True,
+        width="stretch",
         key=f"atlas_product_resolution_manual_clear_{selected_source}",
     ):
         if selected_source in override_state:
@@ -8278,7 +8266,7 @@ def _render_product_resolution_page(
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -8326,7 +8314,7 @@ def _render_product_resolution_page(
                 ),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -8351,7 +8339,7 @@ def _render_pinned_projects_page(
             }
             for record in records
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -8387,7 +8375,7 @@ def _render_reference_projects_page(
                 }
                 for record in references
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         labels = [
@@ -8435,7 +8423,7 @@ def _render_recent_projects_page(
             if st.button(
                 "Open",
                 key=f"atlas_recent_open_{record.workspace_id}",
-                use_container_width=True,
+                width="stretch",
             ):
                 st.session_state["atlas_active_workspace_id"] = record.workspace_id
                 st.session_state["atlas_active_page"] = "Overview"
@@ -8593,7 +8581,7 @@ def _render_create_project_page(
                 "Next Action": "Upload Bid Documents",
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     _navigate_to_project_page(
@@ -8696,7 +8684,7 @@ def _render_open_existing_page(
                 }
                 for item in filtered
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -8709,12 +8697,10 @@ def _render_open_existing_page(
             selected = selected_item["record"]
 
             actions = st.columns(2)
-            if actions[0].button(
-                "Open Project", type="primary", use_container_width=True
-            ):
+            if actions[0].button("Open Project", type="primary", width="stretch"):
                 _open_project_record(st, selected, workspace_service)
             pin_label = "Unpin" if selected.pinned else "Pin"
-            if actions[1].button(pin_label, use_container_width=True):
+            if actions[1].button(pin_label, width="stretch"):
                 workspace_service.pin_project(
                     selected.workspace_id,
                     pinned=not selected.pinned,
@@ -8727,7 +8713,7 @@ def _render_open_existing_page(
             key="atlas_pending_open_path",
             placeholder="AtlasProjects/example-project/project.json",
         )
-        if st.button("Open from local path", use_container_width=True):
+        if st.button("Open from local path", width="stretch"):
             _open_project_from_local_path(st, workspace_service, path_text)
 
 
@@ -8760,11 +8746,11 @@ def _render_project_summary_page(
                 "Recommended Next Action": summary["recommended_next_action"],
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
-    if st.button("Run Project Analysis", type="primary", use_container_width=True):
+    if st.button("Run Project Analysis", type="primary", width="stretch"):
         st.session_state["atlas_active_page"] = "Documents"
         st.rerun()
 
@@ -8789,7 +8775,7 @@ def _render_project_summary_page(
                 ],
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -8888,7 +8874,7 @@ def _render_bom_review_page(
                 "Items Requiring Review": needing_review,
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -8956,7 +8942,7 @@ def _render_bom_review_page(
     if st.button(
         "Clear BOM Filters",
         key="atlas_bom_filters_reset",
-        use_container_width=True,
+        width="stretch",
     ):
         st.session_state["atlas_bom_search"] = ""
         st.session_state["atlas_bom_filter_system"] = []
@@ -9048,7 +9034,7 @@ def _render_bom_review_page(
                 }
                 for row in filtered_rows
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -9089,7 +9075,7 @@ def _render_bom_review_page(
                 }
                 for name, rows in sorted(grouped.items())
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -9174,7 +9160,7 @@ def _render_bom_review_page(
                         or "None",
                     }
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -9195,7 +9181,7 @@ def _render_bom_review_page(
                     )
                     for page in list(selected_row.get("source_pages") or ["n/a"])
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -9206,7 +9192,7 @@ def _render_bom_review_page(
             if equipment_target_id and st.button(
                 "Open Equipment Detail",
                 key=f"atlas_bom_open_equipment_{equipment_target_id}",
-                use_container_width=True,
+                width="stretch",
             ):
                 _open_equipment_detail(
                     st,
@@ -9309,7 +9295,7 @@ def _render_bom_review_page(
         if st.button(
             "Run Cost Selection Inspector",
             key="atlas_cost_selection_inspector_run",
-            use_container_width=True,
+            width="stretch",
         ):
             request_payload = {
                 "product_id": selected_product.get("product_id"),
@@ -9349,7 +9335,7 @@ def _render_bom_review_page(
                         ),
                     }
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -9358,7 +9344,7 @@ def _render_bom_review_page(
                 st.markdown("Selected Candidate")
                 st.dataframe(
                     [selected_candidate],
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
 
@@ -9374,31 +9360,31 @@ def _render_bom_review_page(
                 st.markdown("Quantity Normalization Preview")
                 st.dataframe(
                     [normalization],
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
 
             rejected = list(inspector_payload.get("rejected_candidates") or [])
             if rejected:
                 st.markdown("Rejected Candidates")
-                st.dataframe(rejected, use_container_width=True, hide_index=True)
+                st.dataframe(rejected, width="stretch", hide_index=True)
 
             diagnostics = list(inspector_payload.get("diagnostics") or [])
             if diagnostics:
                 st.markdown("Diagnostics")
-                st.dataframe(diagnostics, use_container_width=True, hide_index=True)
+                st.dataframe(diagnostics, width="stretch", hide_index=True)
 
             provenance = dict(
                 inspector_engine.get_selection_provenance(inspector_result)
             )
             st.markdown("Selection Provenance")
-            st.dataframe([provenance], use_container_width=True, hide_index=True)
+            st.dataframe([provenance], width="stretch", hide_index=True)
 
             confidence = dict(
                 inspector_engine.get_confidence_breakdown(inspector_result)
             )
             st.markdown("Confidence Breakdown")
-            st.dataframe([confidence], use_container_width=True, hide_index=True)
+            st.dataframe([confidence], width="stretch", hide_index=True)
 
     st.markdown("### Export")
     export_csv, export_json = _canonical_bom_export_payload(filtered_rows)
@@ -9408,14 +9394,14 @@ def _render_bom_review_page(
         data=export_csv,
         file_name=f"{record.project.project_id}_candidate_bom.csv",
         mime="text/csv",
-        use_container_width=True,
+        width="stretch",
     )
     export_cols[1].download_button(
         "Download Candidate BOM JSON",
         data=export_json,
         file_name=f"{record.project.project_id}_candidate_bom.json",
         mime="application/json",
-        use_container_width=True,
+        width="stretch",
     )
 
     _render_review_transition(
@@ -9475,7 +9461,7 @@ def _render_scope_risk_page(
                 }
                 for item in priority_rows[:15]
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -9506,7 +9492,7 @@ def _render_scope_risk_page(
                 }
                 for item in rows[:12]
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -9528,7 +9514,7 @@ def _render_scope_risk_page(
                     }
                     for item in rows[:12]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -9537,7 +9523,7 @@ def _render_scope_risk_page(
     if recommended_rfis:
         st.dataframe(
             recommended_rfis[:12],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -9577,7 +9563,7 @@ def _render_scope_risk_page(
                         ),
                     }
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -9602,7 +9588,7 @@ def _render_scope_risk_page(
                         or "None",
                     }
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -9684,7 +9670,7 @@ def _render_price_list_library_page(
         if st.button(
             "Inspect PDF Source",
             key="atlas_pdf_inspect_source",
-            use_container_width=True,
+            width="stretch",
         ):
             st.session_state[pdf_inspection_key] = (
                 pdf_service.inspect_pdf_import_source(
@@ -9709,7 +9695,7 @@ def _render_price_list_library_page(
                     }
                     for item in page_rows
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             selectable_pages = [
@@ -9773,7 +9759,7 @@ def _render_price_list_library_page(
                 )
                 editable_candidate = st.data_editor(
                     candidate_preview_rows,
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                     key="atlas_pdf_candidate_editor",
                 )
@@ -9879,7 +9865,7 @@ def _render_price_list_library_page(
                 if st.button(
                     "Create PDF Draft",
                     key="atlas_pdf_create_draft",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     draft = pdf_service.create_pdf_import_draft(
                         price_sheet_id=_safe_text(pdf_sheet.get("price_sheet_id"), ""),
@@ -9918,7 +9904,7 @@ def _render_price_list_library_page(
                     preview_rows = list(current_draft.get("preview_rows") or [])
                     editable_preview = st.data_editor(
                         preview_rows,
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                         key=f"atlas_pdf_preview_editor::{selected_pdf_source}",
                     )
@@ -9926,7 +9912,7 @@ def _render_price_list_library_page(
                     if correction_cols[0].button(
                         "Apply Draft Corrections",
                         key="atlas_pdf_apply_draft_corrections",
-                        use_container_width=True,
+                        width="stretch",
                     ):
                         updated = pdf_service.update_price_sheet_draft_preview_rows(
                             current_draft_id,
@@ -9944,7 +9930,7 @@ def _render_price_list_library_page(
                     if correction_cols[1].button(
                         "Validate Draft",
                         key="atlas_pdf_validate_draft",
-                        use_container_width=True,
+                        width="stretch",
                     ):
                         try:
                             validated = pdf_service.validate_price_sheet_draft(
@@ -9961,7 +9947,7 @@ def _render_price_list_library_page(
                     if correction_cols[2].button(
                         "Finalize PDF Draft",
                         key="atlas_pdf_finalize_draft",
-                        use_container_width=True,
+                        width="stretch",
                     ):
                         try:
                             pdf_service.finalize_price_sheet_draft(
@@ -9978,7 +9964,7 @@ def _render_price_list_library_page(
 
                     st.dataframe(
                         list(current_draft.get("diagnostics") or []),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
             else:
@@ -9990,7 +9976,7 @@ def _render_price_list_library_page(
         "Import Price Lists",
         type="primary",
         disabled=not non_pdf_uploaded_files,
-        use_container_width=True,
+        width="stretch",
     ):
         with st.spinner("Importing and normalizing price lists..."):
             existing_library = _price_list_library_state(st)
@@ -10314,13 +10300,13 @@ def _render_price_list_library_page(
                 ),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
     if c02_completeness:
         st.markdown("### C-02 Completeness")
-        st.dataframe([c02_completeness], use_container_width=True, hide_index=True)
+        st.dataframe([c02_completeness], width="stretch", hide_index=True)
 
     if c02_results:
         st.markdown("### C-02 Import Lifecycle")
@@ -10342,7 +10328,7 @@ def _render_price_list_library_page(
                 }
                 for item in c02_results
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -10363,7 +10349,7 @@ def _render_price_list_library_page(
                 }
                 for item in summaries
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -10374,21 +10360,19 @@ def _render_price_list_library_page(
         st.markdown("### Import Warnings")
         st.dataframe(
             [{"warning": warning} for warning in import_warnings],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
     with st.expander("Manufacturer Product Records", expanded=False):
         if manufacturer_products:
-            st.dataframe(
-                manufacturer_products[:500], use_container_width=True, hide_index=True
-            )
+            st.dataframe(manufacturer_products[:500], width="stretch", hide_index=True)
         else:
             st.info("No manufacturer products imported.")
 
     with st.expander("Vendor Product Offers", expanded=False):
         if vendor_offers:
-            st.dataframe(vendor_offers[:500], use_container_width=True, hide_index=True)
+            st.dataframe(vendor_offers[:500], width="stretch", hide_index=True)
         else:
             st.info("No vendor offers imported.")
 
@@ -10435,7 +10419,7 @@ def _render_engineering_review_page(
                 ),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -10449,13 +10433,13 @@ def _render_engineering_review_page(
         unsafe_allow_html=True,
     )
     action_cols = st.columns(3)
-    if action_cols[0].button("Open Scope & Risk", use_container_width=True):
+    if action_cols[0].button("Open Scope & Risk", width="stretch"):
         st.session_state["atlas_active_page"] = "Scope & Risk"
         st.rerun()
-    if action_cols[1].button("Open BOM Review", use_container_width=True):
+    if action_cols[1].button("Open BOM Review", width="stretch"):
         st.session_state["atlas_active_page"] = "BOM Review"
         st.rerun()
-    if action_cols[2].button("Open Estimate", use_container_width=True):
+    if action_cols[2].button("Open Estimate", width="stretch"):
         st.session_state["atlas_active_page"] = "Estimate"
         st.rerun()
 
@@ -10480,7 +10464,7 @@ def _render_engineering_review_page(
                 ),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -10496,7 +10480,7 @@ def _render_engineering_review_page(
                 "Labor Confidence": _safe_text(review.get("labor_confidence"), "n/a"),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -10511,7 +10495,7 @@ def _render_engineering_review_page(
                 "Products Requiring Review": resolution_summary["requires_review"],
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -10524,7 +10508,7 @@ def _render_engineering_review_page(
         )
     ]
     if missing_rows:
-        st.dataframe(missing_rows[:20], use_container_width=True, hide_index=True)
+        st.dataframe(missing_rows[:20], width="stretch", hide_index=True)
     else:
         st.info("No major missing scope or BOM details detected.")
 
@@ -10537,7 +10521,7 @@ def _render_engineering_review_page(
         )
     ]
     if risky_rows:
-        st.dataframe(risky_rows[:20], use_container_width=True, hide_index=True)
+        st.dataframe(risky_rows[:20], width="stretch", hide_index=True)
     else:
         st.info("No major risk areas detected from available evidence.")
 
@@ -10559,7 +10543,7 @@ def _render_engineering_review_page(
         )
     ]
     if clarification_rows:
-        st.dataframe(clarification_rows[:20], use_container_width=True, hide_index=True)
+        st.dataframe(clarification_rows[:20], width="stretch", hide_index=True)
     else:
         st.info("No major clarification items detected.")
 
@@ -10569,7 +10553,7 @@ def _render_engineering_review_page(
         for item in list(review.get("recommended_next_actions") or [])
     ]
     if next_action_rows:
-        st.dataframe(next_action_rows[:12], use_container_width=True, hide_index=True)
+        st.dataframe(next_action_rows[:12], width="stretch", hide_index=True)
     else:
         st.info("No recommended next actions generated.")
 
@@ -10579,14 +10563,14 @@ def _render_engineering_review_page(
         for item in list(review.get("recommended_rfis") or [])
     ]
     if rfi_rows:
-        st.dataframe(rfi_rows[:12], use_container_width=True, hide_index=True)
+        st.dataframe(rfi_rows[:12], width="stretch", hide_index=True)
     else:
         st.info("No recommended RFIs generated.")
 
     st.markdown("### Limitations")
     st.dataframe(
         [{"Limitation": item} for item in list(review.get("limitations") or [])],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -10603,21 +10587,21 @@ def _render_engineering_review_page(
         data=SalesDesignReviewService().to_markdown(review_obj),
         file_name=f"{project_id}_sales_design_review.md",
         mime="text/markdown",
-        use_container_width=True,
+        width="stretch",
     )
     export_cols[1].download_button(
         "Download Review JSON",
         data=SalesDesignReviewService().to_json(review_obj),
         file_name=f"{project_id}_sales_design_review.json",
         mime="application/json",
-        use_container_width=True,
+        width="stretch",
     )
     export_cols[2].download_button(
         "Download Review HTML",
         data=SalesDesignReviewService().to_html(review_obj),
         file_name=f"{project_id}_sales_design_review.html",
         mime="text/html",
-        use_container_width=True,
+        width="stretch",
     )
 
     _render_review_transition(
@@ -10678,7 +10662,7 @@ def _render_import_history_page(
             }
             for row in history_rows
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -10712,7 +10696,7 @@ def _render_import_history_page(
                 ),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -10750,7 +10734,7 @@ def _render_workflow_reports_page(
             }
             for row in step_rows
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -10767,7 +10751,7 @@ def _render_workflow_reports_page(
     action_cols = st.columns(2)
     if action_cols[0].button(
         f"Open {_safe_text(next_action.get('page'), 'Overview')}",
-        use_container_width=True,
+        width="stretch",
         type="primary",
     ):
         st.session_state["atlas_active_page"] = _safe_text(
@@ -10787,7 +10771,7 @@ def _render_workflow_reports_page(
             }
             for row in checklist_rows
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -10814,21 +10798,21 @@ def _render_workflow_reports_page(
         st.markdown("### Project Overview")
         st.dataframe(
             [dict(payload.get("project_overview") or {})],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
         st.markdown("### Documents Reviewed")
         st.dataframe(
             [dict(payload.get("documents_reviewed") or {})],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
         st.markdown("### BOM Summary")
         st.dataframe(
             [dict(payload.get("bom_summary") or {})],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -10846,7 +10830,7 @@ def _render_workflow_reports_page(
                     }
                     for item in missing_bom[:12]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -10864,7 +10848,7 @@ def _render_workflow_reports_page(
                     }
                     for item in scope_gaps[:10]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -10882,7 +10866,7 @@ def _render_workflow_reports_page(
                     }
                     for item in responsibility[:10]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -10900,7 +10884,7 @@ def _render_workflow_reports_page(
                     }
                     for item in engineering_risks[:10]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -10918,7 +10902,7 @@ def _render_workflow_reports_page(
                     }
                     for item in rfis[:10]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -10927,14 +10911,14 @@ def _render_workflow_reports_page(
         st.markdown("### Estimate Coverage")
         st.dataframe(
             [dict(payload.get("estimate_coverage") or {})],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
         st.markdown("### Recommended Next Actions")
         st.dataframe(
             list(payload.get("recommended_next_actions") or [])[:12],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -10943,7 +10927,7 @@ def _render_workflow_reports_page(
         if limitations:
             st.dataframe(
                 [{"limitation": item} for item in limitations],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -10953,19 +10937,19 @@ def _render_workflow_reports_page(
             st.markdown("#### Guided Review Steps")
             st.dataframe(
                 list(payload.get("guided_review_steps") or []),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             st.markdown("#### Full Checklist")
             st.dataframe(
                 list(payload.get("review_checklist") or []),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             st.markdown("#### BOM Exception Detail")
             st.dataframe(
                 list(payload.get("missing_or_incomplete_bom_detail") or [])[:100],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             st.markdown("#### Confidence Calculations")
@@ -10982,7 +10966,7 @@ def _render_workflow_reports_page(
                         ),
                     }
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -10993,21 +10977,21 @@ def _render_workflow_reports_page(
             data=markdown_report,
             file_name=f"{record.project.project_id}_project_summary_report.md",
             mime="text/markdown",
-            use_container_width=True,
+            width="stretch",
         )
         exported_json = export_cols[1].download_button(
             "Download Project Summary JSON",
             data=json_report,
             file_name=f"{record.project.project_id}_project_summary_report.json",
             mime="application/json",
-            use_container_width=True,
+            width="stretch",
         )
         exported_html = export_cols[2].download_button(
             "Download Project Summary HTML",
             data=html_report,
             file_name=f"{record.project.project_id}_project_summary_report.html",
             mime="text/html",
-            use_container_width=True,
+            width="stretch",
         )
         if exported_md or exported_json or exported_html:
             _set_review_flag(st, "summary_report_generated", True)
@@ -11032,7 +11016,7 @@ def _render_workflow_reports_page(
             )
         else:
             brief_dict = brief.to_dict() if hasattr(brief, "to_dict") else {}
-            st.dataframe([brief_dict], use_container_width=True, hide_index=True)
+            st.dataframe([brief_dict], width="stretch", hide_index=True)
             brief_json = json.dumps(brief_dict, indent=2, sort_keys=True)
             brief_markdown = "# Estimator Brief\n\n```json\n" + brief_json + "\n```\n"
             export_cols = st.columns(2)
@@ -11041,14 +11025,14 @@ def _render_workflow_reports_page(
                 data=brief_markdown,
                 file_name=f"{record.project.project_id}_estimator_brief.md",
                 mime="text/markdown",
-                use_container_width=True,
+                width="stretch",
             )
             export_cols[1].download_button(
                 "Download Estimator Brief JSON",
                 data=brief_json,
                 file_name=f"{record.project.project_id}_estimator_brief.json",
                 mime="application/json",
-                use_container_width=True,
+                width="stretch",
             )
 
     elif report_view == "BOM Export":
@@ -11063,7 +11047,7 @@ def _render_workflow_reports_page(
         else:
             st.dataframe(
                 [dict(_canonical_bom_metrics(bom_rows))],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             export_csv, export_json = _canonical_bom_export_payload(bom_rows)
@@ -11073,14 +11057,14 @@ def _render_workflow_reports_page(
                 data=export_csv,
                 file_name=f"{record.project.project_id}_candidate_bom.csv",
                 mime="text/csv",
-                use_container_width=True,
+                width="stretch",
             )
             export_cols[1].download_button(
                 "Download Candidate BOM JSON",
                 data=export_json,
                 file_name=f"{record.project.project_id}_candidate_bom.json",
                 mime="application/json",
-                use_container_width=True,
+                width="stretch",
             )
 
     elif report_view == "Scope and Risk Export":
@@ -11118,21 +11102,21 @@ def _render_workflow_reports_page(
                     + _safe_text(item.get("title"), "n/a")
                 )
             markdown_payload = "\n".join(markdown_lines) + "\n"
-            st.dataframe(findings[:20], use_container_width=True, hide_index=True)
+            st.dataframe(findings[:20], width="stretch", hide_index=True)
             export_cols = st.columns(2)
             export_cols[0].download_button(
                 "Download Scope and Risk Markdown",
                 data=markdown_payload,
                 file_name=f"{record.project.project_id}_scope_risk.md",
                 mime="text/markdown",
-                use_container_width=True,
+                width="stretch",
             )
             export_cols[1].download_button(
                 "Download Scope and Risk JSON",
                 data=json_payload,
                 file_name=f"{record.project.project_id}_scope_risk.json",
                 mime="application/json",
-                use_container_width=True,
+                width="stretch",
             )
 
     else:
@@ -11143,7 +11127,7 @@ def _render_workflow_reports_page(
         )
         st.dataframe(
             [review_obj.to_dict() if hasattr(review_obj, "to_dict") else {}],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         export_cols = st.columns(3)
@@ -11153,21 +11137,21 @@ def _render_workflow_reports_page(
             data=SalesDesignReviewService().to_markdown(review_obj),
             file_name=f"{project_id}_sales_design_review.md",
             mime="text/markdown",
-            use_container_width=True,
+            width="stretch",
         )
         export_cols[1].download_button(
             "Download Engineering Review JSON",
             data=SalesDesignReviewService().to_json(review_obj),
             file_name=f"{project_id}_sales_design_review.json",
             mime="application/json",
-            use_container_width=True,
+            width="stretch",
         )
         export_cols[2].download_button(
             "Download Engineering Review HTML",
             data=SalesDesignReviewService().to_html(review_obj),
             file_name=f"{project_id}_sales_design_review.html",
             mime="text/html",
-            use_container_width=True,
+            width="stretch",
         )
 
 
@@ -11293,7 +11277,7 @@ def _render_overview_page(
     link_cols = st.columns(2)
     if link_cols[0].button(
         f"Open {_safe_text(next_action.get('page'), 'Documents')}",
-        use_container_width=True,
+        width="stretch",
         type="primary",
     ):
         st.session_state["atlas_active_page"] = _safe_text(
@@ -11316,21 +11300,21 @@ def _render_overview_page(
             }
             for row in step_rows
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
     primary_actions = st.columns(4)
-    if primary_actions[0].button("Open Documents", use_container_width=True):
+    if primary_actions[0].button("Open Documents", width="stretch"):
         st.session_state["atlas_active_page"] = "Documents"
         st.rerun()
-    if primary_actions[1].button("Open BOM Review", use_container_width=True):
+    if primary_actions[1].button("Open BOM Review", width="stretch"):
         st.session_state["atlas_active_page"] = "BOM Review"
         st.rerun()
-    if primary_actions[2].button("Open Scope & Risk", use_container_width=True):
+    if primary_actions[2].button("Open Scope & Risk", width="stretch"):
         st.session_state["atlas_active_page"] = "Scope & Risk"
         st.rerun()
-    if primary_actions[3].button("Open Engineering Review", use_container_width=True):
+    if primary_actions[3].button("Open Engineering Review", width="stretch"):
         st.session_state["atlas_active_page"] = "Engineering Review"
         st.rerun()
 
@@ -11352,7 +11336,7 @@ def _render_overview_page(
                     }
                     for item in recent[:10]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             target = st.selectbox(
@@ -11372,7 +11356,7 @@ def _render_overview_page(
             if st.button(
                 "Open Recently Viewed",
                 key="atlas_overview_open_recent",
-                use_container_width=True,
+                width="stretch",
             ):
                 st.session_state["atlas_active_page"] = _safe_text(
                     selected.get("route"),
@@ -11406,7 +11390,7 @@ def _render_overview_page(
                     }
                     for item in working_set[:10]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             target = st.selectbox(
@@ -11427,7 +11411,7 @@ def _render_overview_page(
             if open_col.button(
                 "Open",
                 key="atlas_overview_open_pinned",
-                use_container_width=True,
+                width="stretch",
             ):
                 st.session_state["atlas_active_page"] = _safe_text(
                     selected.get("route"),
@@ -11442,14 +11426,14 @@ def _render_overview_page(
             if remove_col.button(
                 "Remove",
                 key="atlas_overview_unpin_selected",
-                use_container_width=True,
+                width="stretch",
             ):
                 _toggle_pin_reference(st, selected, should_pin=False)
                 st.rerun()
             if down_col.button(
                 "Move Down",
                 key="atlas_overview_working_set_down",
-                use_container_width=True,
+                width="stretch",
             ):
                 _move_working_set_item(
                     st,
@@ -11462,7 +11446,7 @@ def _render_overview_page(
             if st.button(
                 "Clear Working Set",
                 key="atlas_overview_clear_working_set",
-                use_container_width=True,
+                width="stretch",
             ):
                 st.session_state["atlas_pinned_objects"] = []
                 st.rerun()
@@ -11484,7 +11468,7 @@ def _render_overview_page(
             }
             for row in checklist_rows
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -11505,7 +11489,7 @@ def _render_overview_page(
                 }
                 for item in critical_scope[:10]
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -11522,7 +11506,7 @@ def _render_overview_page(
                 "Recommended Next Action": summary["recommended_next_action"],
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -11550,13 +11534,13 @@ def _render_overview_page(
                 "Advisory Mode": "Enabled",
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
     st.markdown("### Project Timeline")
     if timeline:
-        st.dataframe(timeline[:10], use_container_width=True, hide_index=True)
+        st.dataframe(timeline[:10], width="stretch", hide_index=True)
     else:
         _render_guided_empty_state(
             st,
@@ -11630,14 +11614,14 @@ def _render_executive_summary_page(st: Any, context: dict[str, Any] | None) -> N
     st.markdown("Critical Risks")
     risk_rows = _to_rows(list(getattr(review, "estimator_risks", []) or []))[:8]
     if risk_rows:
-        st.dataframe(risk_rows, use_container_width=True, hide_index=True)
+        st.dataframe(risk_rows, width="stretch", hide_index=True)
     else:
         st.info("No critical risks detected.")
 
     st.markdown("Recommended Next Actions")
     actions = list(getattr(brief, "prioritized_reviewer_actions", []) or [])
     if actions:
-        st.dataframe(actions, use_container_width=True, hide_index=True)
+        st.dataframe(actions, width="stretch", hide_index=True)
     else:
         _render_empty_state(st, "No prioritized reviewer actions available.")
 
@@ -11659,7 +11643,7 @@ def _render_executive_summary_page(st: Any, context: dict[str, Any] | None) -> N
                 }
                 for item in high_priority[:8]
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -12805,7 +12789,7 @@ def _render_search_result_row(
         if st.button(
             primary,
             key=f"{key_prefix}_{object_type}_{object_id}",
-            use_container_width=True,
+            width="stretch",
             type="secondary",
         ):
             _open_search_result(st, workspace_service, reference)
@@ -12830,9 +12814,7 @@ def _render_global_search_results(
         "Focused object search across application and project scopes.",
     )
     st.caption(f"Query: {query}")
-    if st.button(
-        "Clear Search", key="atlas_clear_global_search", use_container_width=False
-    ):
+    if st.button("Clear Search", key="atlas_clear_global_search", width="content"):
         _clear_global_search_state(st)
         st.rerun()
         return
@@ -15537,7 +15519,7 @@ def _render_engineering_trace_panel(
                 "related objects": ", ".join(support_ids[:8]) or "n/a",
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     st.dataframe(
@@ -15579,14 +15561,14 @@ def _render_engineering_trace_panel(
                 ),
             },
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     if related_conflicts:
         st.markdown("Trace Conflicts")
         st.dataframe(
             [item.to_dict() for item in related_conflicts],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -15708,7 +15690,7 @@ def _render_engineering_workbench_page(
     with row_a[0]:
         st.markdown("#### Active Engineering Insights")
         if insight_rows:
-            st.dataframe(insight_rows[:12], use_container_width=True, hide_index=True)
+            st.dataframe(insight_rows[:12], width="stretch", hide_index=True)
             insight_labels = [
                 _safe_text(item.get("title"), f"Insight {index + 1}")
                 for index, item in enumerate(insight_rows[:12])
@@ -15739,7 +15721,7 @@ def _render_engineering_workbench_page(
     with row_a[1]:
         st.markdown("#### Resolver Conflicts")
         if conflict_rows:
-            st.dataframe(conflict_rows[:12], use_container_width=True, hide_index=True)
+            st.dataframe(conflict_rows[:12], width="stretch", hide_index=True)
             labels = [
                 f"{_safe_text(item.get('field'), 'field')} · {_safe_text(item.get('target_id'), 'target')}"
                 for item in conflict_rows[:12]
@@ -15753,7 +15735,7 @@ def _render_engineering_workbench_page(
             if st.button(
                 "Investigate Conflict",
                 key="atlas_investigate_conflict",
-                use_container_width=True,
+                width="stretch",
             ):
                 _set_context_selection(st, "resolver_conflict", selected)
                 st.rerun()
@@ -15763,7 +15745,7 @@ def _render_engineering_workbench_page(
     with row_a[2]:
         st.markdown("#### Open RFI Candidates")
         if rfi_rows:
-            st.dataframe(rfi_rows[:12], use_container_width=True, hide_index=True)
+            st.dataframe(rfi_rows[:12], width="stretch", hide_index=True)
             labels = [
                 _safe_text(item.get("title"), _safe_text(item.get("rfi_id"), "RFI"))
                 for item in rfi_rows[:12]
@@ -15775,7 +15757,7 @@ def _render_engineering_workbench_page(
             )
             selected = rfi_rows[labels.index(selected_label)]
             if st.button(
-                "Investigate RFI", key="atlas_investigate_rfi", use_container_width=True
+                "Investigate RFI", key="atlas_investigate_rfi", width="stretch"
             ):
                 _set_context_selection(st, "rfi", selected)
                 st.rerun()
@@ -15786,18 +15768,14 @@ def _render_engineering_workbench_page(
     with row_b[0]:
         st.markdown("#### High-Risk Systems")
         if high_risk_system_rows:
-            st.dataframe(
-                high_risk_system_rows, use_container_width=True, hide_index=True
-            )
+            st.dataframe(high_risk_system_rows, width="stretch", hide_index=True)
         else:
             st.info("No high-risk systems match the current scope.")
 
     with row_b[1]:
         st.markdown("#### Recommended Actions")
         if recommended_rows:
-            st.dataframe(
-                recommended_rows[:12], use_container_width=True, hide_index=True
-            )
+            st.dataframe(recommended_rows[:12], width="stretch", hide_index=True)
         else:
             st.info("No recommended actions match the current scope.")
 
@@ -15825,7 +15803,7 @@ def _render_engineering_workbench_page(
                         "value": selected_node_id or "n/a",
                     },
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -15844,7 +15822,7 @@ def _render_engineering_workbench_page(
                 }
                 for item in coordination_rows[:12]
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -15852,7 +15830,7 @@ def _render_engineering_workbench_page(
 
     st.markdown("#### Evidence Panel")
     if evidence_rows:
-        st.dataframe(evidence_rows[:20], use_container_width=True, hide_index=True)
+        st.dataframe(evidence_rows[:20], width="stretch", hide_index=True)
     else:
         st.info("No evidence rows match the current scope.")
 
@@ -15863,7 +15841,7 @@ def _render_engineering_workbench_page(
         if st.button(
             "Create Investigation Note",
             key="atlas_create_investigation_note",
-            use_container_width=True,
+            width="stretch",
         ):
             st.session_state["atlas_notebook_draft"] = {
                 "title": f"Investigation Note · {_safe_text(selected_node.get('label'), 'Object')}",
@@ -15880,7 +15858,7 @@ def _render_engineering_workbench_page(
         st.markdown("#### Object Summary")
         st.dataframe(
             [dict(selected_node.get("data") or {})],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -15913,7 +15891,7 @@ def _render_engineering_workbench_page(
             if _safe_text(edge.get("source_evidence"), "n/a") != "n/a"
         ]
         if supporting_evidence:
-            st.dataframe(supporting_evidence, use_container_width=True, hide_index=True)
+            st.dataframe(supporting_evidence, width="stretch", hide_index=True)
         else:
             st.info("No explicit supporting evidence references were found.")
 
@@ -15925,13 +15903,13 @@ def _render_engineering_workbench_page(
             and selected_node_id in _safe_text(row.get("target_id"), "")
         ]
         if conflicting_rows:
-            st.dataframe(conflicting_rows, use_container_width=True, hide_index=True)
+            st.dataframe(conflicting_rows, width="stretch", hide_index=True)
         else:
             st.info("No conflicting evidence detected for this selection.")
 
         st.markdown("#### Engineering Insights")
         if insight_rows:
-            st.dataframe(insight_rows[:10], use_container_width=True, hide_index=True)
+            st.dataframe(insight_rows[:10], width="stretch", hide_index=True)
         else:
             st.info("No engineering insights linked to this selection.")
 
@@ -15942,7 +15920,7 @@ def _render_engineering_workbench_page(
                 if selected_node_id and selected_node_id in str(item.to_dict()):
                     resolver_rows.append(item.to_dict())
         if resolver_rows:
-            st.dataframe(resolver_rows, use_container_width=True, hide_index=True)
+            st.dataframe(resolver_rows, width="stretch", hide_index=True)
         else:
             st.info("No resolver decisions mapped to this selection.")
 
@@ -15957,7 +15935,7 @@ def _render_engineering_workbench_page(
         if related_docs:
             st.dataframe(
                 [{"document": item} for item in related_docs],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -15979,7 +15957,7 @@ def _render_engineering_workbench_page(
         if related_drawings:
             st.dataframe(
                 [{"drawing": item} for item in related_drawings],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -16001,7 +15979,7 @@ def _render_engineering_workbench_page(
         if related_specs:
             st.dataframe(
                 [{"specification": item} for item in related_specs],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -16009,16 +15987,14 @@ def _render_engineering_workbench_page(
 
         st.markdown("#### Recommended Actions")
         if recommended_rows:
-            st.dataframe(
-                recommended_rows[:10], use_container_width=True, hide_index=True
-            )
+            st.dataframe(recommended_rows[:10], width="stretch", hide_index=True)
         else:
             st.info("No recommended actions linked to this selection.")
 
         st.markdown("#### History")
         st.dataframe(
             _timeline_events(record, context),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -16093,7 +16069,7 @@ def _render_resolver_conflict_center_page(
                 "Labor Confidence": _safe_text(review.get("labor_confidence"), "n/a"),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -16111,7 +16087,7 @@ def _render_resolver_conflict_center_page(
                 "Labor Confidence": _safe_text(review.get("labor_confidence"), "n/a"),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -16124,7 +16100,7 @@ def _render_resolver_conflict_center_page(
         )
     ]
     if missing_rows:
-        st.dataframe(missing_rows[:20], use_container_width=True, hide_index=True)
+        st.dataframe(missing_rows[:20], width="stretch", hide_index=True)
     else:
         st.info("No major missing scope or BOM detail detected.")
 
@@ -16137,7 +16113,7 @@ def _render_resolver_conflict_center_page(
         )
     ]
     if risk_rows:
-        st.dataframe(risk_rows[:20], use_container_width=True, hide_index=True)
+        st.dataframe(risk_rows[:20], width="stretch", hide_index=True)
     else:
         st.info("No major risk areas detected from current evidence.")
 
@@ -16161,7 +16137,7 @@ def _render_resolver_conflict_center_page(
     if clarification_rows:
         st.dataframe(
             clarification_rows[:24],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -16172,7 +16148,7 @@ def _render_resolver_conflict_center_page(
         {"Action": item} for item in list(review.get("recommended_next_actions") or [])
     ]
     if next_action_rows:
-        st.dataframe(next_action_rows[:12], use_container_width=True, hide_index=True)
+        st.dataframe(next_action_rows[:12], width="stretch", hide_index=True)
     else:
         st.info("No next actions generated yet.")
 
@@ -16182,7 +16158,7 @@ def _render_resolver_conflict_center_page(
         for item in list(review.get("recommended_rfis") or [])
     ]
     if rfi_rows:
-        st.dataframe(rfi_rows[:12], use_container_width=True, hide_index=True)
+        st.dataframe(rfi_rows[:12], width="stretch", hide_index=True)
     else:
         st.info("No recommended RFIs generated.")
 
@@ -16190,7 +16166,7 @@ def _render_resolver_conflict_center_page(
     limitation_rows = [
         {"Limitation": item} for item in list(review.get("limitations") or [])
     ]
-    st.dataframe(limitation_rows, use_container_width=True, hide_index=True)
+    st.dataframe(limitation_rows, width="stretch", hide_index=True)
 
     st.markdown("### Export")
     review_obj = SalesDesignReviewService().build_review(
@@ -16209,21 +16185,21 @@ def _render_resolver_conflict_center_page(
         data=markdown_payload,
         file_name=f"{project_id}_sales_design_review.md",
         mime="text/markdown",
-        use_container_width=True,
+        width="stretch",
     )
     export_cols[1].download_button(
         "Download Review JSON",
         data=json_payload,
         file_name=f"{project_id}_sales_design_review.json",
         mime="application/json",
-        use_container_width=True,
+        width="stretch",
     )
     export_cols[2].download_button(
         "Download Review HTML",
         data=html_payload,
         file_name=f"{project_id}_sales_design_review.html",
         mime="text/html",
-        use_container_width=True,
+        width="stretch",
     )
 
     with st.expander("Appendix: Detailed Evidence", expanded=False):
@@ -16232,7 +16208,7 @@ def _render_resolver_conflict_center_page(
             for item in list(review.get("traceability_notes") or [])
         ]
         if traceability:
-            st.dataframe(traceability, use_container_width=True, hide_index=True)
+            st.dataframe(traceability, width="stretch", hide_index=True)
 
         bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
         if bom_rows:
@@ -16250,7 +16226,7 @@ def _render_resolver_conflict_center_page(
                     }
                     for row in bom_rows[:30]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -16268,7 +16244,7 @@ def _render_resolver_conflict_center_page(
                     }
                     for row in findings[:30]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         return
@@ -16431,7 +16407,7 @@ def _render_engineering_notebook_page(
                 }
                 for item in filtered
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -16495,7 +16471,7 @@ def _render_engineering_notebook_page(
                             or "n/a",
                         },
                     ],
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
 
@@ -16601,7 +16577,7 @@ def _render_engineering_notebook_page(
                         if st.button(
                             f"Open {_safe_text(ref, 'object')}",
                             key=f"atlas_note_open_{_safe_text(selected_entry.get('entry_id'), 'entry')}_{_safe_text(ref, 'ref')}",
-                            use_container_width=True,
+                            width="stretch",
                         ):
                             _open_linked_object(st, ref)
                 else:
@@ -16612,7 +16588,7 @@ def _render_engineering_notebook_page(
                 if evidence_refs:
                     st.dataframe(
                         [{"evidence_ref": item} for item in evidence_refs],
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
                 else:
@@ -16697,9 +16673,7 @@ def _render_engineering_notebook_page(
             )
 
         create_actions = st.columns(3)
-        if create_actions[0].button(
-            "Create Note", type="primary", use_container_width=True
-        ):
+        if create_actions[0].button("Create Note", type="primary", width="stretch"):
             entry_id = f"note:{record.workspace_id}:{hashlib.sha1(f'{title}|{_now_iso()}'.encode('utf-8')).hexdigest()[:10]}"
             new_entry = {
                 "entry_id": entry_id,
@@ -16721,10 +16695,10 @@ def _render_engineering_notebook_page(
             st.session_state["atlas_notebook_draft"] = {}
             st.success("Notebook entry created.")
             st.rerun()
-        if create_actions[1].button("Clear Draft", use_container_width=True):
+        if create_actions[1].button("Clear Draft", width="stretch"):
             st.session_state["atlas_notebook_draft"] = {}
             st.rerun()
-        if create_actions[2].button("Open History", use_container_width=True):
+        if create_actions[2].button("Open History", width="stretch"):
             st.session_state["atlas_active_page"] = "History"
             st.rerun()
 
@@ -16742,7 +16716,7 @@ def _render_engineering_notebook_page(
                 }
                 for item in decision_rows
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         if not decision_rows:
@@ -16856,7 +16830,7 @@ def _render_coordination_review_page(
             }
             for item in filtered
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -16905,14 +16879,14 @@ def _render_coordination_review_page(
                         ),
                     },
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
             evidence_rows = list(selected.get("evidence") or [])
             st.markdown("#### Supporting Evidence")
             if evidence_rows:
-                st.dataframe(evidence_rows, use_container_width=True, hide_index=True)
+                st.dataframe(evidence_rows, width="stretch", hide_index=True)
             else:
                 st.info("No explicit evidence rows were attached to this finding.")
 
@@ -16925,7 +16899,7 @@ def _render_coordination_review_page(
                 in list(item.get("finding_ids") or [])
             ]
             if related_issues:
-                st.dataframe(related_issues, use_container_width=True, hide_index=True)
+                st.dataframe(related_issues, width="stretch", hide_index=True)
             else:
                 st.info("No grouped issue currently references this finding.")
 
@@ -16949,7 +16923,7 @@ def _render_coordination_review_page(
                         "value": summary.get("gap_count", 0),
                     },
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -16988,12 +16962,12 @@ def _render_engineering_intelligence_page(
                 "rationale": " | ".join(intelligence.project_health.rationale[:3]),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     st.dataframe(
         [item.to_dict() for item in intelligence.project_health.categories],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -17095,9 +17069,9 @@ def _render_engineering_intelligence_page(
 
             for key in sorted(grouped.keys()):
                 st.markdown(f"##### {group_by}: {key}")
-                st.dataframe(grouped[key], use_container_width=True, hide_index=True)
+                st.dataframe(grouped[key], width="stretch", hide_index=True)
         else:
-            st.dataframe(rows, use_container_width=True, hide_index=True)
+            st.dataframe(rows, width="stretch", hide_index=True)
 
     st.markdown("#### Critical Risks")
     critical = [item for item in insights if item.priority == "Critical"][:8]
@@ -17111,7 +17085,7 @@ def _render_engineering_intelligence_page(
             }
             for item in critical
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -17128,7 +17102,7 @@ def _render_engineering_intelligence_page(
             }
             for item in coordination
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -17148,7 +17122,7 @@ def _render_engineering_intelligence_page(
                 ),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     st.dataframe(
@@ -17161,7 +17135,7 @@ def _render_engineering_intelligence_page(
             }
             for item in coordination_findings[:10]
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -17179,17 +17153,17 @@ def _render_engineering_intelligence_page(
             }
             for item in risk_systems
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
     st.markdown("#### Most Referenced Drawings")
     drawing_refs = _top_reference_counts(graph, "drawing:", "Drawing")
-    st.dataframe(drawing_refs, use_container_width=True, hide_index=True)
+    st.dataframe(drawing_refs, width="stretch", hide_index=True)
 
     st.markdown("#### Most Referenced Specifications")
     spec_refs = _top_reference_counts(graph, "spec:", "Specification")
-    st.dataframe(spec_refs, use_container_width=True, hide_index=True)
+    st.dataframe(spec_refs, width="stretch", hide_index=True)
 
     st.markdown("#### Top Equipment Risks")
     equipment_risk = [
@@ -17207,7 +17181,7 @@ def _render_engineering_intelligence_page(
             }
             for item in equipment_risk
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -17223,7 +17197,7 @@ def _render_engineering_intelligence_page(
             }
             for item in best
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -17251,28 +17225,28 @@ def _render_engineering_resolver_page(
                 "confidence": round(float(summary.get("confidence", 0.0) or 0.0), 2),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
     st.markdown("#### Resolved Objects")
     st.dataframe(
         [item.to_dict() for item in resolver_result.resolved_objects],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
     st.markdown("#### Conflicts")
     conflict_rows = [item.to_dict() for item in resolver_result.conflicts]
     if conflict_rows:
-        st.dataframe(conflict_rows, use_container_width=True, hide_index=True)
+        st.dataframe(conflict_rows, width="stretch", hide_index=True)
     else:
         st.info("No deterministic conflicts were detected.")
 
     st.markdown("#### Resolution Rules")
     st.dataframe(
         [item.to_dict() for item in resolver_result.rules_applied],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -17283,7 +17257,7 @@ def _render_engineering_resolver_page(
     ]
     st.markdown("#### Manual Review Required")
     if manual_review_rows:
-        st.dataframe(manual_review_rows, use_container_width=True, hide_index=True)
+        st.dataframe(manual_review_rows, width="stretch", hide_index=True)
     else:
         st.info("No resolved objects currently require manual review.")
 
@@ -17370,7 +17344,7 @@ def _render_upload_panel(
         remove_cols = st.columns(2)
         if remove_cols[0].button(
             "Remove Selected Pending Files",
-            use_container_width=True,
+            width="stretch",
             disabled=not bool(selected_remove),
             key=(
                 f"atlas_documents_remove_pending_button_{record.workspace_id}_{picker_key}"
@@ -17386,7 +17360,7 @@ def _render_upload_panel(
             st.rerun()
         if remove_cols[1].button(
             "Clear Pending Files",
-            use_container_width=True,
+            width="stretch",
             key=f"atlas_documents_clear_pending_button_{record.workspace_id}_{picker_key}",
         ):
             _clear_pending_uploads(st, record.workspace_id)
@@ -17401,7 +17375,7 @@ def _render_upload_panel(
                 }
                 for item in pending
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -17419,7 +17393,7 @@ def _render_upload_panel(
             for item in list(inspection.diagnostics)
         ]
         if diagnostics_rows:
-            st.dataframe(diagnostics_rows, use_container_width=True, hide_index=True)
+            st.dataframe(diagnostics_rows, width="stretch", hide_index=True)
         if inspection.warnings:
             st.info("Archive diagnostics: " + " | ".join(list(inspection.warnings)))
 
@@ -17494,7 +17468,7 @@ def _render_project_files_page(
                 "Other Documents": folder_counts.get("Other Documents", 0),
             }
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -17550,7 +17524,7 @@ def _render_project_files_page(
         )
         return
 
-    st.dataframe(display_rows, use_container_width=True, hide_index=True)
+    st.dataframe(display_rows, width="stretch", hide_index=True)
 
     file_labels = [item["filename"] for item in filtered]
     selected_file = st.selectbox("Select file", options=file_labels)
@@ -17659,7 +17633,7 @@ def _render_drawings_page(
             next_location="Use Search and Filters above.",
         )
         return
-    st.dataframe(summary_rows, use_container_width=True, hide_index=True)
+    st.dataframe(summary_rows, width="stretch", hide_index=True)
 
     labels = [f"{item['drawing_number']} · {item['title']}" for item in filtered]
     selected_label = st.selectbox("Select Drawing Object", options=labels)
@@ -17742,7 +17716,7 @@ def _render_drawings_page(
                     }
                     for ref in equipment_refs
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             for ref in equipment_refs[:12]:
@@ -17750,7 +17724,7 @@ def _render_drawings_page(
                 if st.button(
                     f"Open {label}",
                     key=f"atlas_drawing_open_equipment_{_safe_text(selected.get('drawing_number'), 'drawing')}_{ref}",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     _open_equipment_detail(
                         st,
@@ -17772,7 +17746,7 @@ def _render_drawings_page(
             for value in list(selected.get("referenced_specifications") or [])
         ]
         if specification_rows:
-            st.dataframe(specification_rows, use_container_width=True, hide_index=True)
+            st.dataframe(specification_rows, width="stretch", hide_index=True)
         else:
             _render_guided_empty_state(
                 st,
@@ -17787,7 +17761,7 @@ def _render_drawings_page(
             for value in list(selected.get("referenced_systems") or [])
         ]
         if system_rows:
-            st.dataframe(system_rows, use_container_width=True, hide_index=True)
+            st.dataframe(system_rows, width="stretch", hide_index=True)
         else:
             _render_guided_empty_state(
                 st,
@@ -17806,7 +17780,7 @@ def _render_drawings_page(
         ]
         st.markdown("#### Evidence")
         if evidence_rows:
-            st.dataframe(evidence_rows, use_container_width=True, hide_index=True)
+            st.dataframe(evidence_rows, width="stretch", hide_index=True)
         else:
             _render_guided_empty_state(
                 st,
@@ -17816,31 +17790,31 @@ def _render_drawings_page(
             )
         st.markdown("#### Warnings")
         if warning_rows:
-            st.dataframe(warning_rows, use_container_width=True, hide_index=True)
+            st.dataframe(warning_rows, width="stretch", hide_index=True)
         else:
             st.info("No warnings are currently associated with this drawing.")
 
     with related_tabs[4]:
         nav_cols = st.columns(5)
-        if nav_cols[0].button("Drawing Explorer", use_container_width=True):
+        if nav_cols[0].button("Drawing Explorer", width="stretch"):
             st.session_state["atlas_active_page"] = "Drawing Explorer"
             st.rerun()
-        if nav_cols[1].button("Equipment", use_container_width=True):
+        if nav_cols[1].button("Equipment", width="stretch"):
             st.session_state["atlas_active_page"] = "Equipment"
             st.rerun()
-        if nav_cols[2].button("Specifications", use_container_width=True):
+        if nav_cols[2].button("Specifications", width="stretch"):
             st.session_state["atlas_active_page"] = "Specifications"
             st.rerun()
-        if nav_cols[3].button("Systems", use_container_width=True):
+        if nav_cols[3].button("Systems", width="stretch"):
             st.session_state["atlas_active_page"] = "Systems"
             st.rerun()
-        if nav_cols[4].button("Evidence", use_container_width=True):
+        if nav_cols[4].button("Evidence", width="stretch"):
             st.session_state["atlas_active_page"] = "Evidence"
             st.rerun()
 
     st.markdown("### Recommended Actions")
     drawing_actions = _object_recommended_actions("drawing", selected)
-    st.dataframe(drawing_actions, use_container_width=True, hide_index=True)
+    st.dataframe(drawing_actions, width="stretch", hide_index=True)
 
 
 def _render_drawing_explorer_page(st: Any, context: dict[str, Any] | None) -> None:
@@ -17947,7 +17921,7 @@ def _render_drawing_explorer_page(st: Any, context: dict[str, Any] | None) -> No
             }
             for item in filtered
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -18006,7 +17980,7 @@ def _render_drawing_explorer_page(st: Any, context: dict[str, Any] | None) -> No
                 "sheet": ", ".join(selected.get("referenced_drawings", [])) or "n/a",
             },
         ]
-        st.dataframe(nav_rows, use_container_width=True, hide_index=True)
+        st.dataframe(nav_rows, width="stretch", hide_index=True)
 
         st.markdown("#### Detail / View / Schedule Links")
         st.dataframe(
@@ -18030,7 +18004,7 @@ def _render_drawing_explorer_page(st: Any, context: dict[str, Any] | None) -> No
                     or "n/a",
                 },
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -18047,7 +18021,7 @@ def _render_drawing_explorer_page(st: Any, context: dict[str, Any] | None) -> No
             for drawing_set, sheets in dict(sets or {}).items()
         ]
         if hierarchy_rows:
-            st.dataframe(hierarchy_rows, use_container_width=True, hide_index=True)
+            st.dataframe(hierarchy_rows, width="stretch", hide_index=True)
         else:
             st.info("No hierarchy groups available yet.")
 
@@ -18151,7 +18125,7 @@ def _render_specifications_page(
             }
             for item in filtered
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -18245,7 +18219,7 @@ def _render_specifications_page(
     with relationship_tabs[0]:
         requirement_rows = list(selected.get("requirement_candidates") or [])
         if requirement_rows:
-            st.dataframe(requirement_rows, use_container_width=True, hide_index=True)
+            st.dataframe(requirement_rows, width="stretch", hide_index=True)
         else:
             _render_guided_empty_state(
                 st,
@@ -18260,7 +18234,7 @@ def _render_specifications_page(
             for value in list(selected.get("referenced_drawings") or [])
         ]
         if drawing_rows:
-            st.dataframe(drawing_rows, use_container_width=True, hide_index=True)
+            st.dataframe(drawing_rows, width="stretch", hide_index=True)
         else:
             st.info("No related drawings were detected for this specification section.")
 
@@ -18275,7 +18249,7 @@ def _render_specifications_page(
                     }
                     for ref in equipment_refs
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             for ref in equipment_refs[:12]:
@@ -18283,7 +18257,7 @@ def _render_specifications_page(
                 if st.button(
                     f"Open {label}",
                     key=f"atlas_spec_open_equipment_{_safe_text(selected.get('section'), 'section')}_{ref}",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     _open_equipment_detail(
                         st,
@@ -18300,7 +18274,7 @@ def _render_specifications_page(
             for value in list(selected.get("referenced_systems") or [])
         ]
         if system_rows:
-            st.dataframe(system_rows, use_container_width=True, hide_index=True)
+            st.dataframe(system_rows, width="stretch", hide_index=True)
         else:
             st.info("No related systems were detected for this specification section.")
 
@@ -18312,36 +18286,36 @@ def _render_specifications_page(
         warning_rows = list(objects.get("specification_cross_reference_warnings") or [])
         st.markdown("#### Evidence")
         if evidence_rows:
-            st.dataframe(evidence_rows, use_container_width=True, hide_index=True)
+            st.dataframe(evidence_rows, width="stretch", hide_index=True)
         else:
             st.info("No evidence references are linked to this specification section.")
         st.markdown("#### Cross-Reference Warnings")
         if warning_rows:
-            st.dataframe(warning_rows[:12], use_container_width=True, hide_index=True)
+            st.dataframe(warning_rows[:12], width="stretch", hide_index=True)
         else:
             st.info("No cross-reference warnings are currently detected.")
 
     with relationship_tabs[5]:
         nav_cols = st.columns(5)
-        if nav_cols[0].button("Specification Explorer", use_container_width=True):
+        if nav_cols[0].button("Specification Explorer", width="stretch"):
             st.session_state["atlas_active_page"] = "Specification Explorer"
             st.rerun()
-        if nav_cols[1].button("Drawings", use_container_width=True):
+        if nav_cols[1].button("Drawings", width="stretch"):
             st.session_state["atlas_active_page"] = "Drawing Explorer"
             st.rerun()
-        if nav_cols[2].button("Equipment", use_container_width=True):
+        if nav_cols[2].button("Equipment", width="stretch"):
             st.session_state["atlas_active_page"] = "Equipment"
             st.rerun()
-        if nav_cols[3].button("Systems", use_container_width=True):
+        if nav_cols[3].button("Systems", width="stretch"):
             st.session_state["atlas_active_page"] = "Systems"
             st.rerun()
-        if nav_cols[4].button("Evidence", use_container_width=True):
+        if nav_cols[4].button("Evidence", width="stretch"):
             st.session_state["atlas_active_page"] = "Evidence"
             st.rerun()
 
     st.markdown("### Recommended Actions")
     spec_actions = _object_recommended_actions("specification", selected)
-    st.dataframe(spec_actions, use_container_width=True, hide_index=True)
+    st.dataframe(spec_actions, width="stretch", hide_index=True)
 
 
 def _render_specification_explorer_page(
@@ -18489,7 +18463,7 @@ def _render_specification_explorer_page(
             }
             for item in filtered
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -18537,7 +18511,7 @@ def _render_specification_explorer_page(
                     "value": _safe_text(selected.get("extraction_confidence"), "n/a"),
                 },
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -18545,18 +18519,18 @@ def _render_specification_explorer_page(
         part_rows = list(selected.get("parts") or [])
         article_rows = list(selected.get("articles") or [])
         if part_rows:
-            st.dataframe(part_rows, use_container_width=True, hide_index=True)
+            st.dataframe(part_rows, width="stretch", hide_index=True)
         else:
             st.info("No Part sections were detected.")
         if article_rows:
-            st.dataframe(article_rows, use_container_width=True, hide_index=True)
+            st.dataframe(article_rows, width="stretch", hide_index=True)
         else:
             st.info("No article headings were detected.")
 
         st.markdown("#### Requirement Candidates")
         requirement_rows = list(selected.get("requirement_candidates") or [])
         if requirement_rows:
-            st.dataframe(requirement_rows, use_container_width=True, hide_index=True)
+            st.dataframe(requirement_rows, width="stretch", hide_index=True)
         else:
             st.info("No deterministic requirement candidates detected.")
 
@@ -18598,7 +18572,7 @@ def _render_specification_explorer_page(
                     or "n/a",
                 },
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -18617,9 +18591,7 @@ def _render_specification_explorer_page(
                 if _contains_any(str(item), [_safe_text(selected.get("section"), "")])
             ]
             if insight_rows:
-                st.dataframe(
-                    insight_rows[:8], use_container_width=True, hide_index=True
-                )
+                st.dataframe(insight_rows[:8], width="stretch", hide_index=True)
             else:
                 st.info("No engineering insights currently reference this section.")
 
@@ -18694,26 +18666,26 @@ def _render_specification_explorer_page(
                     or "n/a",
                 },
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
-        if st.button("Open Drawings", use_container_width=True):
+        if st.button("Open Drawings", width="stretch"):
             st.session_state["atlas_active_page"] = "Drawing Explorer"
             st.rerun()
-        if st.button("Open Equipment", use_container_width=True):
+        if st.button("Open Equipment", width="stretch"):
             st.session_state["atlas_active_page"] = "Equipment"
             st.rerun()
-        if st.button("Open Systems", use_container_width=True):
+        if st.button("Open Systems", width="stretch"):
             st.session_state["atlas_active_page"] = "Systems"
             st.rerun()
-        if st.button("Open Evidence", use_container_width=True):
+        if st.button("Open Evidence", width="stretch"):
             st.session_state["atlas_active_page"] = "Evidence"
             st.rerun()
 
     st.markdown("#### Cross-Reference Warnings")
     if warnings:
-        st.dataframe(warnings, use_container_width=True, hide_index=True)
+        st.dataframe(warnings, width="stretch", hide_index=True)
     else:
         st.info("No cross-reference warnings currently detected.")
 
@@ -18902,7 +18874,7 @@ def _render_equipment_page(
             1 for item in filtered if bool(item.get("requires_review"))
         ),
     }
-    st.dataframe([summary_row], use_container_width=True, hide_index=True)
+    st.dataframe([summary_row], width="stretch", hide_index=True)
 
     st.markdown("### Equipment List")
     list_rows = [
@@ -18922,7 +18894,7 @@ def _render_equipment_page(
         }
         for item in filtered
     ]
-    st.dataframe(list_rows, use_container_width=True, hide_index=True)
+    st.dataframe(list_rows, width="stretch", hide_index=True)
 
     selection_labels = [
         f"{_safe_text(item.get('equipment_id'), '')} - {_safe_text(item.get('manufacturer'), '')} {_safe_text(item.get('model'), '')}".strip()
@@ -18964,7 +18936,7 @@ def _render_equipment_page(
         if origin_cols[1].button(
             f"Back to {origin_page}",
             key="atlas_equipment_back_to_origin",
-            use_container_width=True,
+            width="stretch",
         ):
             st.session_state["atlas_active_page"] = origin_page
             st.rerun()
@@ -19019,7 +18991,7 @@ def _render_equipment_page(
                     "responsibility": selected.get("responsibility"),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -19037,7 +19009,7 @@ def _render_equipment_page(
                 or "n/a",
             }
         ]
-        st.dataframe(engineering_rows, use_container_width=True, hide_index=True)
+        st.dataframe(engineering_rows, width="stretch", hide_index=True)
 
     with detail_tabs[2]:
         refs = {
@@ -19056,7 +19028,7 @@ def _render_equipment_page(
                         "addenda": ", ".join(refs["addenda"]) or "n/a",
                     }
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -19094,7 +19066,7 @@ def _render_equipment_page(
                     or "none",
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -19119,7 +19091,7 @@ def _render_equipment_page(
                     or "none",
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -19133,7 +19105,7 @@ def _render_equipment_page(
                     }
                     for ref in evidence_refs[:25]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -19163,7 +19135,7 @@ def _render_equipment_page(
                 if st.button(
                     f"Open {drawing_ref}",
                     key=f"atlas_equipment_open_drawing_{_safe_text(selected.get('equipment_id'), 'eq')}_{drawing_ref}",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     st.session_state["atlas_active_page"] = "Drawings"
                     _set_context_selection(
@@ -19180,7 +19152,7 @@ def _render_equipment_page(
                 if st.button(
                     f"Open {spec_ref}",
                     key=f"atlas_equipment_open_spec_{_safe_text(selected.get('equipment_id'), 'eq')}_{spec_ref}",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     st.session_state["atlas_active_page"] = "Specifications"
                     _set_context_selection(st, "specification", {"section": spec_ref})
@@ -19194,7 +19166,7 @@ def _render_equipment_page(
         if st.button(
             f"Open {system_name}",
             key=f"atlas_equipment_open_system_{_safe_text(selected.get('equipment_id'), 'eq')}",
-            use_container_width=True,
+            width="stretch",
         ):
             st.session_state["atlas_active_page"] = "Systems"
             _set_context_selection(st, "system", {"system": system_name})
@@ -19209,7 +19181,7 @@ def _render_equipment_page(
         if related_risks:
             st.dataframe(
                 [{"risk": value} for value in related_risks[:12]],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -19220,7 +19192,7 @@ def _render_equipment_page(
         if related_rfis:
             st.dataframe(
                 [{"rfi": value} for value in related_rfis[:12]],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -19233,7 +19205,7 @@ def _render_equipment_page(
         if warnings:
             st.dataframe(
                 [{"warning": value} for value in warnings[:20]],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -19244,17 +19216,17 @@ def _render_equipment_page(
                 {"evidence": value}
                 for value in list(selected.get("evidence_refs") or [])[:20]
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
     st.markdown("### Recommended Actions")
     actions = _equipment_recommended_actions(selected)
-    st.dataframe(actions, use_container_width=True, hide_index=True)
+    st.dataframe(actions, width="stretch", hide_index=True)
     if st.button(
         "Open Relationship Explorer",
         key=f"atlas_equipment_open_relationships_{_safe_text(selected.get('equipment_id'), 'eq')}",
-        use_container_width=True,
+        width="stretch",
     ):
         st.session_state["atlas_active_page"] = "Relationships"
         st.rerun()
@@ -19271,7 +19243,7 @@ def _render_equipment_page(
             options=action_destinations,
             key="atlas_equipment_action_destination",
         )
-        if st.button("Open Action Destination", use_container_width=True):
+        if st.button("Open Action Destination", width="stretch"):
             st.session_state["atlas_active_page"] = selected_destination
             st.rerun()
 
@@ -19326,7 +19298,7 @@ def _render_systems_page(
 
     st.dataframe(
         [_system_row(item) for item in rows],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -19455,7 +19427,7 @@ def _render_master_library_explorer_page(
                 {"category": key, "products": value}
                 for key, value in sorted(category_counts.items())
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     with summary_cols[1]:
@@ -19468,7 +19440,7 @@ def _render_master_library_explorer_page(
                 {"manufacturer": key, "products": value}
                 for key, value in sorted(manufacturer_counts.items())
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     with summary_cols[2]:
@@ -19487,7 +19459,7 @@ def _render_master_library_explorer_page(
                 {"status": key, "products": value}
                 for key, value in sorted(status_counts.items())
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -19512,7 +19484,7 @@ def _render_master_library_explorer_page(
             }
             for item in filtered
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -19587,45 +19559,45 @@ def _render_master_library_explorer_page(
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.markdown("#### Aliases")
         st.dataframe(
             [{"alias": str(item)} for item in aliases],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
     with tabs[1]:
         st.dataframe(
             [commercial_metadata or {"status": "No commercial metadata"}],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.markdown("#### Commercial Health")
         st.dataframe(
             [commercial_health or {"status": "No health metrics"}],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
     with tabs[2]:
         if vendor_offerings:
-            st.dataframe(vendor_offerings, use_container_width=True, hide_index=True)
+            st.dataframe(vendor_offerings, width="stretch", hide_index=True)
         else:
             st.info("No vendor offerings recorded for this product.")
 
     with tabs[3]:
         if price_history:
-            st.dataframe(price_history, use_container_width=True, hide_index=True)
+            st.dataframe(price_history, width="stretch", hide_index=True)
         else:
             st.info("No price history available.")
 
     with tabs[4]:
         st.dataframe(
             [engineering_metadata or {"status": "No engineering metadata"}],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -19647,7 +19619,7 @@ def _render_master_library_explorer_page(
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -19659,7 +19631,7 @@ def _render_master_library_explorer_page(
                     "datasheet": _safe_text(selected.get("datasheet"), ""),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -19681,7 +19653,7 @@ def _render_master_library_explorer_page(
                     "updated_at": _safe_text(selected.get("updated_at"), "n/a"),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.markdown("#### Confidence Breakdown")
@@ -19690,7 +19662,7 @@ def _render_master_library_explorer_page(
                 confidence_summary
                 or {"overall_confidence": _safe_text(selected.get("confidence"), "n/a")}
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -19707,7 +19679,7 @@ def _render_master_library_explorer_page(
                     }
                     for item in relationships
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             for item in relationships[:8]:
@@ -19715,7 +19687,7 @@ def _render_master_library_explorer_page(
                 if st.button(
                     f"Open {target}",
                     key=f"atlas_master_library_target_{_safe_text(selected.get('product_id'), 'product')}_{target}",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     _open_linked_object(st, target)
         else:
@@ -19725,7 +19697,7 @@ def _render_master_library_explorer_page(
         if project_refs:
             st.dataframe(
                 [{"project_reference": item} for item in project_refs],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -19733,7 +19705,7 @@ def _render_master_library_explorer_page(
 
     with tabs[10]:
         if import_history:
-            st.dataframe(import_history, use_container_width=True, hide_index=True)
+            st.dataframe(import_history, width="stretch", hide_index=True)
         else:
             st.caption("No import history available.")
 
@@ -19778,7 +19750,7 @@ def _render_master_library_explorer_page(
                     "trace": " | ".join(list(resolution.get("trace") or [])),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -19862,7 +19834,7 @@ def _render_relationship_explorer_page(
                 }
                 for edge in incoming
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -19880,7 +19852,7 @@ def _render_relationship_explorer_page(
                 }
                 for edge in outgoing
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -19988,7 +19960,7 @@ def _render_relationship_explorer_page(
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.markdown("Connected Objects")
@@ -20011,7 +19983,7 @@ def _render_relationship_explorer_page(
                     ),
                 },
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.markdown("Warnings")
@@ -20033,12 +20005,10 @@ def _render_relationship_explorer_page(
                 or "None",
             },
         ]
-        st.dataframe(warning_rows, use_container_width=True, hide_index=True)
+        st.dataframe(warning_rows, width="stretch", hide_index=True)
         st.markdown("Related Engineering Insights")
         if related_insight_rows:
-            st.dataframe(
-                related_insight_rows[:8], use_container_width=True, hide_index=True
-            )
+            st.dataframe(related_insight_rows[:8], width="stretch", hide_index=True)
         else:
             st.info("No engineering insights reference this relationship.")
 
@@ -20057,7 +20027,7 @@ def _render_relationship_explorer_page(
             }
             for edge in subgraph.get("edges", [])
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -20114,7 +20084,7 @@ def _render_relationship_visualization_page(
             }
             for node in connected_nodes
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -20142,7 +20112,7 @@ def _render_timeline_page(
 ) -> None:
     st.subheader("Engineering Activity History")
     events = _timeline_events(record, context)
-    st.dataframe(events, use_container_width=True, hide_index=True)
+    st.dataframe(events, width="stretch", hide_index=True)
 
 
 def _select_first_node(graph: dict[str, Any], node_type: str) -> dict[str, Any] | None:
@@ -20230,7 +20200,7 @@ def _render_object_detail_page(
         for key, value in node_data.items()
         if not isinstance(value, (list, dict))
     ]
-    st.dataframe(props[:20], use_container_width=True, hide_index=True)
+    st.dataframe(props[:20], width="stretch", hide_index=True)
 
     st.markdown("Relationships")
     rel_rows = [
@@ -20253,7 +20223,7 @@ def _render_object_detail_page(
         for edge in outgoing
     ]
     if rel_rows:
-        st.dataframe(rel_rows, use_container_width=True, hide_index=True)
+        st.dataframe(rel_rows, width="stretch", hide_index=True)
     else:
         st.info("No relationships available.")
 
@@ -20262,7 +20232,7 @@ def _render_object_detail_page(
     if warnings:
         st.dataframe(
             [{"warning": str(item)} for item in warnings],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -20278,7 +20248,7 @@ def _render_object_detail_page(
         if _safe_text(edge.get("source evidence"), "n/a") != "n/a"
     ]
     if evidence_rows:
-        st.dataframe(evidence_rows, use_container_width=True, hide_index=True)
+        st.dataframe(evidence_rows, width="stretch", hide_index=True)
     else:
         st.info("No evidence references attached.")
 
@@ -20301,7 +20271,7 @@ def _render_object_detail_page(
                 "value": _safe_text(metadata.get("specification_section"), "n/a"),
             },
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     if st.button("Open Originating Evidence", key=f"atlas_trace_{title}"):
@@ -20310,7 +20280,7 @@ def _render_object_detail_page(
 
     st.markdown("History")
     st.dataframe(
-        _timeline_events(record, context)[:6], use_container_width=True, hide_index=True
+        _timeline_events(record, context)[:6], width="stretch", hide_index=True
     )
 
 
@@ -20371,7 +20341,7 @@ def _render_metadata_inspector_page(
                 "value": _safe_text(metadata.get("evidence_count"), "0"),
             },
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -20405,7 +20375,7 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
                     {"section": key, "score": value}
                     for key, value in sorted(section_scores.items())
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         blockers = list(getattr(readiness, "blocking_issues", []) or [])
@@ -20413,7 +20383,7 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
             st.markdown("Blocking Issues")
             st.dataframe(
                 [{"blocking_issue": item} for item in blockers],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         warnings = list(getattr(readiness, "warnings", []) or [])
@@ -20421,7 +20391,7 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
             st.markdown("Warnings")
             st.dataframe(
                 [{"warning": item} for item in warnings],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         st.markdown("Coordination Summary")
@@ -20438,7 +20408,7 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         return
@@ -20452,11 +20422,11 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
         st.write(brief.executive_summary)
         actions = list(brief.prioritized_reviewer_actions or [])
         if actions:
-            st.dataframe(actions, use_container_width=True, hide_index=True)
+            st.dataframe(actions, width="stretch", hide_index=True)
         evidence_refs = list(getattr(brief, "evidence_refs", []) or [])
         if evidence_refs:
             st.markdown("Traceability References")
-            st.dataframe(evidence_refs, use_container_width=True, hide_index=True)
+            st.dataframe(evidence_refs, width="stretch", hide_index=True)
             if st.button("Open Evidence Workspace", key="atlas_brief_open_evidence"):
                 st.session_state["atlas_active_page"] = "Evidence"
                 st.rerun()
@@ -20477,7 +20447,7 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
                     }
                     for item in high_priority_coordination[:6]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -20491,7 +20461,7 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
             else []
         )
         if rows:
-            st.dataframe(rows, use_container_width=True, hide_index=True)
+            st.dataframe(rows, width="stretch", hide_index=True)
             labels = [
                 _safe_text(item.get("title"), _safe_text(item.get("rfi_id"), "RFI"))
                 for item in rows
@@ -20515,12 +20485,12 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
                 },
                 {"field": "Confidence", "value": getattr(labor, "confidence", None)},
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         categories = _to_rows(list(getattr(labor, "labor_categories", []) or []))
         if categories:
-            st.dataframe(categories, use_container_width=True, hide_index=True)
+            st.dataframe(categories, width="stretch", hide_index=True)
         return
 
     if page == "Revision Comparison":
@@ -20539,12 +20509,12 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
                 },
                 {"field": "Change Count", "value": len(revision.changes)},
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         changes = _to_rows(list(revision.changes or []))
         if changes:
-            st.dataframe(changes, use_container_width=True, hide_index=True)
+            st.dataframe(changes, width="stretch", hide_index=True)
         return
 
     if page == "Engineering Assumptions":
@@ -20554,7 +20524,7 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
             else []
         )
         if rows:
-            st.dataframe(rows, use_container_width=True, hide_index=True)
+            st.dataframe(rows, width="stretch", hide_index=True)
         else:
             st.info("No engineering assumptions available.")
         return
@@ -20598,14 +20568,14 @@ def _render_bid_page(st: Any, page: str, context: dict[str, Any] | None) -> None
                     }
                     for item in rows
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
         brief_refs = list(getattr(brief, "evidence_refs", []) or []) if brief else []
         if brief_refs:
             st.markdown("Brief Evidence")
-            st.dataframe(brief_refs, use_container_width=True, hide_index=True)
+            st.dataframe(brief_refs, width="stretch", hide_index=True)
         return
 
 
@@ -20639,7 +20609,7 @@ def _render_reports_page(
                     ),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.dataframe(
@@ -20655,17 +20625,17 @@ def _render_reports_page(
                 }
                 for item in findings[:12]
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         nav_cols = st.columns(3)
-        if nav_cols[0].button("Open Scope & Risk", use_container_width=True):
+        if nav_cols[0].button("Open Scope & Risk", width="stretch"):
             st.session_state["atlas_active_page"] = "Scope & Risk"
             st.rerun()
-        if nav_cols[1].button("Open Engineering Review", use_container_width=True):
+        if nav_cols[1].button("Open Engineering Review", width="stretch"):
             st.session_state["atlas_active_page"] = "Engineering Review"
             st.rerun()
-        if nav_cols[2].button("Open Estimate", use_container_width=True):
+        if nav_cols[2].button("Open Estimate", width="stretch"):
             st.session_state["atlas_active_page"] = "Estimate"
             st.rerun()
     else:
@@ -20674,13 +20644,13 @@ def _render_reports_page(
             "Exports module scaffolded. Use Reports, Estimator Brief, or Evidence for current review outputs.",
         )
         nav_cols = st.columns(3)
-        if nav_cols[0].button("Open Reports", use_container_width=True):
+        if nav_cols[0].button("Open Reports", width="stretch"):
             st.session_state["atlas_active_page"] = "Reports"
             st.rerun()
-        if nav_cols[1].button("Open Evidence", use_container_width=True):
+        if nav_cols[1].button("Open Evidence", width="stretch"):
             st.session_state["atlas_active_page"] = "Evidence"
             st.rerun()
-        if nav_cols[2].button("Open Project Files", use_container_width=True):
+        if nav_cols[2].button("Open Project Files", width="stretch"):
             st.session_state["atlas_active_page"] = "Documents"
             st.rerun()
 
@@ -20713,7 +20683,7 @@ def _render_settings_page(
                     "Lifecycle Stage": lifecycle_stage,
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         if internal_missing:
@@ -20807,7 +20777,7 @@ def _render_settings_page(
             if st.button(
                 "Save Project Metadata",
                 key=f"atlas_settings_save_metadata_{record.workspace_id}",
-                use_container_width=True,
+                width="stretch",
             ):
                 updated = workspace_service.update_project_identity_metadata(
                     record.workspace_id,
@@ -20859,7 +20829,7 @@ def _render_settings_page(
                     }
                     for item in stakeholder_rows
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -20914,7 +20884,7 @@ def _render_settings_page(
         if st.button(
             "Link Stakeholder",
             key=f"atlas_settings_stakeholder_link_{record.workspace_id}",
-            use_container_width=True,
+            width="stretch",
         ):
             organization_id = ""
             if selected_match != "None":
@@ -20988,7 +20958,7 @@ def _render_settings_page(
                     "value": health.get("validated_at", "n/a"),
                 },
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -21016,7 +20986,7 @@ def _render_settings_page(
                     "history_events": manifest.get("history_event_count", 0),
                 }
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -21048,14 +21018,14 @@ def _render_settings_page(
             st.markdown("Health Errors")
             st.dataframe(
                 [{"error": item} for item in list(health.get("errors") or [])],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         if health.get("warnings"):
             st.markdown("Health Warnings")
             st.dataframe(
                 [{"warning": item} for item in list(health.get("warnings") or [])],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
     else:
@@ -21088,7 +21058,7 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
             {"field": "Current Project", "value": project_name},
             {"field": "Current Page", "value": current_page},
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -21123,7 +21093,7 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
                     {"field": key.replace("_", " "), "value": _safe_text(value, "n/a")}
                     for key, value in resolved_values.items()
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -21135,7 +21105,7 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
         ]
         if property_rows:
             st.markdown("Properties")
-            st.dataframe(property_rows[:12], use_container_width=True, hide_index=True)
+            st.dataframe(property_rows[:12], width="stretch", hide_index=True)
 
         relationship_rows = [
             {
@@ -21150,14 +21120,14 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
         ]
         if relationship_rows:
             st.markdown("Relationships")
-            st.dataframe(relationship_rows, use_container_width=True, hide_index=True)
+            st.dataframe(relationship_rows, width="stretch", hide_index=True)
 
         evidence_values = list(object_data.get("referenced_evidence") or [])
         if evidence_values:
             st.markdown("Evidence")
             st.dataframe(
                 [{"evidence": str(item)} for item in evidence_values[:10]],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -21166,20 +21136,18 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
             st.markdown("Warnings")
             st.dataframe(
                 [{"warning": str(item)} for item in warnings[:10]],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
         related_rows = relationship_rows[:6]
         if related_rows:
             st.markdown("Related Objects")
-            st.dataframe(related_rows, use_container_width=True, hide_index=True)
+            st.dataframe(related_rows, width="stretch", hide_index=True)
 
         st.markdown("Quick Navigation")
         for page, label in nav_targets:
-            if st.button(
-                label, key=f"atlas_ctx_nav_{title}_{page}", use_container_width=True
-            ):
+            if st.button(label, key=f"atlas_ctx_nav_{title}_{page}", width="stretch"):
                 st.session_state["atlas_active_page"] = page
                 st.rerun()
 
@@ -21320,7 +21288,7 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
                     "value": ", ".join(list(data.get("tags") or [])) or "n/a",
                 },
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -21331,15 +21299,15 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
                 if st.button(
                     f"Open {_safe_text(ref, 'object')}",
                     key=f"atlas_ctx_notebook_open_{_safe_text(data.get('entry_id'), 'entry')}_{_safe_text(ref, 'ref')}",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     _open_linked_object(st, ref)
 
         nav_cols = st.columns(2)
-        if nav_cols[0].button("Open Notebook", use_container_width=True):
+        if nav_cols[0].button("Open Notebook", width="stretch"):
             st.session_state["atlas_active_page"] = "Notebook"
             st.rerun()
-        if nav_cols[1].button("Open History", use_container_width=True):
+        if nav_cols[1].button("Open History", width="stretch"):
             st.session_state["atlas_active_page"] = "Timeline"
             st.rerun()
         return
@@ -21376,7 +21344,7 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
                     "value": _safe_text(data.get("confidence"), "n/a"),
                 },
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -21385,7 +21353,7 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
             st.markdown("Aliases")
             st.dataframe(
                 [{"alias": str(item)} for item in aliases],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -21403,15 +21371,15 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
                     }
                     for item in relationships
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
         nav_cols = st.columns(2)
-        if nav_cols[0].button("Open Master Library", use_container_width=True):
+        if nav_cols[0].button("Open Master Library", width="stretch"):
             st.session_state["atlas_active_page"] = "Master Library Explorer"
             st.rerun()
-        if nav_cols[1].button("Open Equipment", use_container_width=True):
+        if nav_cols[1].button("Open Equipment", width="stretch"):
             st.session_state["atlas_active_page"] = "Equipment"
             st.rerun()
         return
@@ -21435,7 +21403,7 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
             },
             {"field": "Warnings", "value": len(list(context.get("warnings") or []))},
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -21497,7 +21465,7 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
                     "value": _safe_text(metadata.get("evidence_count"), "0"),
                 },
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -21655,7 +21623,7 @@ def _render_mission_control_panels(
                 }
                 for item in high_priority_actions[:8]
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         if st.button("View all action items", key="atlas_side_view_actions"):
@@ -21687,7 +21655,7 @@ def _render_mission_control_panels(
                 if st.button(
                     "Open Project",
                     key=f"atlas_recent_open_{record.workspace_id}",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     _open_project_record(st, record, workspace_service)
         if st.button("View All Projects", key="atlas_side_view_recent_projects"):
@@ -21784,7 +21752,7 @@ def _render_shell(
         if st.button(
             f"Recommended Next: {_safe_text(next_action.get('step'), 'Review project overview')}",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         ):
             _open_page(
                 st,
