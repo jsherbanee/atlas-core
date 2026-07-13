@@ -258,6 +258,27 @@ Status: Not Started
 
 Status: Active
 
+## Epic K: Knowledge Entity Framework
+
+Status: Active
+
+- K-01 Knowledge Entity Framework
+
+### K-01 Scope Boundaries
+
+Implemented in K-01:
+- Reusable knowledge-entity framework for `customer`, `vendor`, `manufacturer`, `product`, and `service` entities.
+- Deterministic duplicate detection by entity type and normalized canonical name.
+- Deterministic relationship model with stable relationship IDs derived from source, target, and relationship type.
+- Import/export bundle foundation for entities, relationships, and audit records.
+- Audit log foundation for entity upsert, activation changes, relationship upsert, and bundle import events.
+- Backward-compatible synchronization from existing commercial foundation APIs (`create_manufacturer`, `create_vendor`, `create_product`).
+- Global search integration for framework-managed customer/service entities.
+
+Explicitly out of scope:
+- Non-deterministic matching heuristics.
+- Procurement execution, quote generation, and ERP/accounting workflows.
+
 - F-01 PDF Ingestion Robustness and Parsing Reliability
 - F-02 Performance and Scalability for Large Project Sets
 - F-03 Deterministic Regression Snapshot Expansion

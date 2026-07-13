@@ -4145,6 +4145,7 @@ def _object_type_label(kind: str) -> str:
         "manufacturer": "Manufacturer",
         "vendor": "Vendor",
         "customer": "Customer",
+        "service": "Service",
         "organization": "Organization",
         "price_list": "Price List",
         "project_record": "Project",
@@ -4178,6 +4179,11 @@ def _object_id_for_selection(kind: str, data: dict[str, Any]) -> str:
         return _safe_text(data.get("vendor"), _safe_text(data.get("name"), ""))
     if kind == "customer":
         return _safe_text(data.get("customer"), "")
+    if kind == "service":
+        return _safe_text(
+            data.get("service_id"),
+            _safe_text(data.get("service"), _safe_text(data.get("entity_id"), "")),
+        )
     if kind == "organization":
         return _safe_text(
             data.get("organization_id"), _safe_text(data.get("organization"), "")
@@ -4226,6 +4232,8 @@ def _object_display_name(kind: str, data: dict[str, Any]) -> str:
         return _safe_text(data.get("vendor"), _safe_text(data.get("name"), "Vendor"))
     if kind == "customer":
         return _safe_text(data.get("customer"), "Customer")
+    if kind == "service":
+        return _safe_text(data.get("service"), "Service")
     if kind == "organization":
         return _safe_text(data.get("organization"), "Organization")
     if kind == "price_list":
@@ -4346,6 +4354,7 @@ def _selection_route(kind: str) -> str:
         "manufacturer": "Master Library Explorer",
         "vendor": "Knowledge",
         "customer": "Knowledge",
+        "service": "Knowledge",
         "organization": "Project Settings",
         "price_list": "Knowledge",
         "project_record": "Overview",
@@ -12436,6 +12445,7 @@ def _group_search_results(
         "Organization",
         "Manufacturer",
         "Vendor",
+        "Service",
         "Price List",
         "Estimate",
         "Assembly",
@@ -12453,6 +12463,7 @@ def _group_search_results(
         "Organization": "Organizations",
         "Manufacturer": "Manufacturers",
         "Vendor": "Vendors",
+        "Service": "Services",
         "Price List": "Price Sheets",
         "Estimate": "Estimates",
         "Assembly": "Assemblies",
@@ -12624,6 +12635,7 @@ def _application_search_entries(
     workspace_service: ProjectWorkspaceService,
 ) -> list[dict[str, Any]]:
     references: list[dict[str, Any]] = []
+    product_service = _commercial_product_service(st)
 
     try:
         organizations = list(
@@ -12772,6 +12784,48 @@ def _application_search_entries(
         reference["project_name"] = "Knowledge"
         reference["scope"] = "application"
         reference["match_fields"] = [customer]
+        references.append(reference)
+
+    knowledge_entities = product_service.list_knowledge_entities(include_inactive=True)
+    for item in knowledge_entities:
+        entity_type = _safe_text(item.get("entity_type"), "")
+        if entity_type not in {"service", "customer"}:
+            continue
+        kind = "service" if entity_type == "service" else "customer"
+        data = {
+            "entity_id": _safe_text(item.get("entity_id"), ""),
+            "service_id": _safe_text(item.get("attributes", {}).get("service_id"), ""),
+            "service": _safe_text(
+                item.get("display_name"),
+                _safe_text(item.get("canonical_name"), "Service"),
+            ),
+            "customer": _safe_text(
+                item.get("display_name"),
+                _safe_text(item.get("canonical_name"), "Customer"),
+            ),
+            "status": "active" if bool(item.get("active", True)) else "inactive",
+            "notes": _safe_text(item.get("notes"), ""),
+        }
+        reference = _build_object_reference(
+            kind=kind,
+            data=data,
+            project_id="application",
+            route="Knowledge",
+            relationship_count=len(
+                product_service.list_knowledge_relationships(
+                    source_entity_id=_safe_text(item.get("entity_id"), "")
+                )
+            ),
+            warning_count=0,
+        )
+        reference["project_name"] = "Knowledge"
+        reference["scope"] = "application"
+        reference["match_fields"] = [
+            _safe_text(item.get("entity_id"), ""),
+            _safe_text(item.get("canonical_name"), ""),
+            _safe_text(item.get("display_name"), ""),
+            " ".join(list(item.get("aliases") or [])),
+        ]
         references.append(reference)
 
     product_rows: list[dict[str, Any]] = []

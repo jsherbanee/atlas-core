@@ -79,14 +79,15 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
   - .pre-commit-config.yaml
 
 ## Active Focus
-Architecture review and planning for Epic E.
+Sprint K-01 implementation and validation for the Knowledge Entity Framework.
 
-Broader product direction remains aligned to the lifecycle-platform roadmap, while current implementation priority is architecture review and planning for Epic E within Phase 2 boundaries.
+Broader product direction remains aligned to the lifecycle-platform roadmap, while current implementation priority is deterministic knowledge-entity foundation hardening within Phase 2 boundaries.
 
 Secondary active focus:
 - closeout regression monitoring and remaining page-migration debt triage for lower-priority advanced and object-detail surfaces.
 - explicit identifier discoverability across project creation, listing, open flows, global search, and project settings.
 - Epic E readiness assessment only (architecture review and sprint approval required; Epic E not started).
+- K-01 follow-through validation for entity relationships, import/export compatibility, and search behavior.
 
 Current implementation scope note:
 - no Epic E implementation has started in this refinement pass

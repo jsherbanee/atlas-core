@@ -70,6 +70,9 @@ class CommercialProductService:
             "product_price_history": {},
             "import_index": {},
             "project_only_products": {},
+            "knowledge_entities": {},
+            "knowledge_relationships": {},
+            "knowledge_audit_log": [],
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -117,6 +120,27 @@ class CommercialProductService:
         if not record["manufacturer_id"]:
             raise ValueError("manufacturer_id cannot be blank")
         self.state.setdefault("manufacturers", {})[record["manufacturer_id"]] = record
+        manufacturer_aliases_raw = record.get("aliases")
+        manufacturer_aliases = (
+            list(manufacturer_aliases_raw)
+            if isinstance(manufacturer_aliases_raw, list)
+            else []
+        )
+        self._upsert_knowledge_entity(
+            entity_id=f"manufacturer:{record['manufacturer_id']}",
+            entity_type="manufacturer",
+            canonical_name=self._safe(record.get("canonical_name"), ""),
+            display_name=self._safe(record.get("display_name"), ""),
+            aliases=manufacturer_aliases,
+            notes=self._safe(record.get("notes"), ""),
+            active=bool(record.get("active", True)),
+            attributes={
+                "manufacturer_id": record["manufacturer_id"],
+                "manufacturer_code": record.get("manufacturer_code"),
+                "website": record.get("website"),
+            },
+            fail_on_duplicate=False,
+        )
         return dict(record)
 
     def get_manufacturer(self, manufacturer_id: str) -> dict[str, Any] | None:
@@ -201,6 +225,21 @@ class CommercialProductService:
         self.state.setdefault("manufacturers", {})[
             self._safe(manufacturer_id)
         ] = current
+        self._upsert_knowledge_entity(
+            entity_id=f"manufacturer:{self._safe(manufacturer_id)}",
+            entity_type="manufacturer",
+            canonical_name=current["canonical_name"],
+            display_name=current["display_name"],
+            aliases=list(current.get("aliases") or []),
+            notes=current["notes"],
+            active=bool(current.get("active", True)),
+            attributes={
+                "manufacturer_id": self._safe(manufacturer_id),
+                "manufacturer_code": current.get("manufacturer_code"),
+                "website": current.get("website"),
+            },
+            fail_on_duplicate=False,
+        )
         return dict(current)
 
     def set_manufacturer_active(
@@ -219,6 +258,10 @@ class CommercialProductService:
         self.state.setdefault("manufacturers", {})[
             self._safe(manufacturer_id)
         ] = current
+        self._set_knowledge_entity_active(
+            entity_id=f"manufacturer:{self._safe(manufacturer_id)}",
+            active=bool(active),
+        )
         return dict(current)
 
     def detect_duplicate_manufacturers(
@@ -275,6 +318,25 @@ class CommercialProductService:
         if not record["vendor_id"]:
             raise ValueError("vendor_id cannot be blank")
         self.state.setdefault("vendors", {})[record["vendor_id"]] = record
+        vendor_aliases_raw = record.get("aliases")
+        vendor_aliases = (
+            list(vendor_aliases_raw) if isinstance(vendor_aliases_raw, list) else []
+        )
+        self._upsert_knowledge_entity(
+            entity_id=f"vendor:{record['vendor_id']}",
+            entity_type="vendor",
+            canonical_name=self._safe(record.get("canonical_name"), ""),
+            display_name=self._safe(record.get("display_name"), ""),
+            aliases=vendor_aliases,
+            notes=self._safe(record.get("notes"), ""),
+            active=bool(record.get("active", True)),
+            attributes={
+                "vendor_id": record["vendor_id"],
+                "vendor_code": record.get("vendor_code"),
+                "website": record.get("website"),
+            },
+            fail_on_duplicate=False,
+        )
         return dict(record)
 
     def get_vendor(self, vendor_id: str) -> dict[str, Any] | None:
@@ -349,6 +411,21 @@ class CommercialProductService:
         )
         current["updated_at"] = self._now_iso()
         self.state.setdefault("vendors", {})[self._safe(vendor_id)] = current
+        self._upsert_knowledge_entity(
+            entity_id=f"vendor:{self._safe(vendor_id)}",
+            entity_type="vendor",
+            canonical_name=current["canonical_name"],
+            display_name=current["display_name"],
+            aliases=list(current.get("aliases") or []),
+            notes=current["notes"],
+            active=bool(current.get("active", True)),
+            attributes={
+                "vendor_id": self._safe(vendor_id),
+                "vendor_code": current.get("vendor_code"),
+                "website": current.get("website"),
+            },
+            fail_on_duplicate=False,
+        )
         return dict(current)
 
     def set_vendor_active(self, vendor_id: str, active: bool) -> dict[str, Any]:
@@ -358,6 +435,10 @@ class CommercialProductService:
         current["active"] = bool(active)
         current["updated_at"] = self._now_iso()
         self.state.setdefault("vendors", {})[self._safe(vendor_id)] = current
+        self._set_knowledge_entity_active(
+            entity_id=f"vendor:{self._safe(vendor_id)}",
+            active=bool(active),
+        )
         return dict(current)
 
     def detect_duplicate_vendors(
@@ -441,7 +522,338 @@ class CommercialProductService:
             manufacturer_sku=self._safe(record.get("manufacturer_sku"), ""),
         )
         self.state.setdefault("products", {})[product_key] = record
+        self._upsert_knowledge_entity(
+            entity_id=f"product:{record['atlas_product_uuid']}",
+            entity_type="product",
+            canonical_name=self._safe(record.get("canonical_sku"), "Unknown Product"),
+            display_name=self._safe(
+                record.get("product_name"),
+                self._safe(record.get("canonical_sku"), "Unknown Product"),
+            ),
+            aliases=[
+                self._safe(record.get("manufacturer_part_number"), ""),
+                self._safe(record.get("manufacturer_sku"), ""),
+            ],
+            notes=self._safe(record.get("notes"), ""),
+            active=bool(record.get("active", True)),
+            attributes={
+                "atlas_product_uuid": record.get("atlas_product_uuid"),
+                "manufacturer_id": record.get("manufacturer_id"),
+                "manufacturer": record.get("manufacturer"),
+                "manufacturer_part_number": record.get("manufacturer_part_number"),
+                "normalized_manufacturer_part_number": record.get(
+                    "normalized_manufacturer_part_number"
+                ),
+                "category": record.get("category"),
+                "lifecycle_status": record.get("lifecycle_status"),
+            },
+            fail_on_duplicate=False,
+        )
         return dict(record)
+
+    # Knowledge entity framework
+    def create_customer(
+        self,
+        *,
+        customer_id: str,
+        canonical_name: str,
+        display_name: str | None = None,
+        aliases: list[str] | None = None,
+        notes: str = "",
+        active: bool = True,
+        attributes: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if not self._safe(customer_id):
+            raise ValueError("customer_id cannot be blank")
+        return self._upsert_knowledge_entity(
+            entity_id=f"customer:{self._safe(customer_id)}",
+            entity_type="customer",
+            canonical_name=canonical_name,
+            display_name=display_name,
+            aliases=list(aliases or []),
+            notes=notes,
+            active=active,
+            attributes={
+                "customer_id": self._safe(customer_id),
+                **dict(attributes or {}),
+            },
+            fail_on_duplicate=True,
+        )
+
+    def create_service_entity(
+        self,
+        *,
+        service_id: str,
+        canonical_name: str,
+        display_name: str | None = None,
+        aliases: list[str] | None = None,
+        notes: str = "",
+        active: bool = True,
+        attributes: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if not self._safe(service_id):
+            raise ValueError("service_id cannot be blank")
+        return self._upsert_knowledge_entity(
+            entity_id=f"service:{self._safe(service_id)}",
+            entity_type="service",
+            canonical_name=canonical_name,
+            display_name=display_name,
+            aliases=list(aliases or []),
+            notes=notes,
+            active=active,
+            attributes={"service_id": self._safe(service_id), **dict(attributes or {})},
+            fail_on_duplicate=True,
+        )
+
+    def list_knowledge_entities(
+        self,
+        *,
+        entity_type: str = "",
+        include_inactive: bool = True,
+    ) -> list[dict[str, Any]]:
+        requested_type = self._safe(entity_type).lower()
+        rows = list(self.state.get("knowledge_entities", {}).values())
+        if requested_type:
+            rows = [
+                item
+                for item in rows
+                if self._safe(item.get("entity_type"), "").lower() == requested_type
+            ]
+        if not include_inactive:
+            rows = [item for item in rows if bool(item.get("active", True))]
+        rows.sort(
+            key=lambda item: (
+                self._safe(item.get("entity_type"), "").lower(),
+                self._safe(item.get("canonical_name"), "").lower(),
+            )
+        )
+        return [dict(item) for item in rows]
+
+    def search_knowledge_entities(
+        self,
+        query: str,
+        *,
+        entity_type: str = "",
+        include_inactive: bool = True,
+    ) -> list[dict[str, Any]]:
+        q = self.normalize_name(query)
+        rows = self.list_knowledge_entities(
+            entity_type=entity_type,
+            include_inactive=include_inactive,
+        )
+        if not q:
+            return rows
+        return [
+            item
+            for item in rows
+            if q in self.normalize_name(item.get("canonical_name", ""))
+            or q in self.normalize_name(item.get("display_name", ""))
+            or any(
+                q in self.normalize_name(alias)
+                for alias in list(item.get("aliases") or [])
+            )
+        ]
+
+    def detect_duplicate_knowledge_entities(
+        self,
+        *,
+        entity_type: str,
+        canonical_name: str,
+        normalized_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        normalized_type = self._safe(entity_type).lower()
+        if not normalized_type:
+            return []
+        target_norm = normalized_name or self.normalize_name(canonical_name)
+        rows = self.list_knowledge_entities(entity_type=normalized_type)
+        return [
+            dict(item)
+            for item in rows
+            if self.normalize_name(item.get("canonical_name", "")) == target_norm
+            or self.normalize_name(item.get("normalized_name", "")) == target_norm
+        ]
+
+    def create_knowledge_relationship(
+        self,
+        *,
+        source_entity_id: str,
+        target_entity_id: str,
+        relationship_type: str,
+        confidence: float = 1.0,
+        evidence_refs: list[str] | None = None,
+        notes: str = "",
+    ) -> dict[str, Any]:
+        source_id = self._safe(source_entity_id)
+        target_id = self._safe(target_entity_id)
+        rel_type = self._safe(relationship_type).lower()
+        if not source_id or not target_id:
+            raise ValueError("source_entity_id and target_entity_id are required")
+        if source_id == target_id:
+            raise ValueError("Knowledge relationships must connect distinct entities")
+        if not rel_type:
+            raise ValueError("relationship_type cannot be blank")
+
+        entity_map = self.state.setdefault("knowledge_entities", {})
+        if source_id not in entity_map or target_id not in entity_map:
+            raise ValueError("Both relationship entities must exist")
+
+        try:
+            confidence_value = max(0.0, min(1.0, float(confidence)))
+        except Exception:
+            confidence_value = 1.0
+
+        relationship_id = self._knowledge_relationship_id(
+            source_entity_id=source_id,
+            target_entity_id=target_id,
+            relationship_type=rel_type,
+        )
+        now_text = self._now_iso()
+        existing = dict(
+            self.state.get("knowledge_relationships", {}).get(relationship_id) or {}
+        )
+        record = {
+            "relationship_id": relationship_id,
+            "source_entity_id": source_id,
+            "target_entity_id": target_id,
+            "relationship_type": rel_type,
+            "confidence": confidence_value,
+            "evidence_refs": [
+                self._safe(item)
+                for item in list(evidence_refs or [])
+                if self._safe(item)
+            ],
+            "notes": self._safe(notes),
+            "created_at": self._safe(existing.get("created_at"), now_text),
+            "updated_at": now_text,
+        }
+        self.state.setdefault("knowledge_relationships", {})[relationship_id] = record
+        self._append_knowledge_audit(
+            event_type="knowledge_relationship_upserted",
+            entity_id=relationship_id,
+            payload={
+                "source_entity_id": source_id,
+                "target_entity_id": target_id,
+                "relationship_type": rel_type,
+            },
+        )
+        return dict(record)
+
+    def list_knowledge_relationships(
+        self,
+        *,
+        source_entity_id: str = "",
+        target_entity_id: str = "",
+        relationship_type: str = "",
+    ) -> list[dict[str, Any]]:
+        source_filter = self._safe(source_entity_id)
+        target_filter = self._safe(target_entity_id)
+        type_filter = self._safe(relationship_type).lower()
+        rows = list(self.state.get("knowledge_relationships", {}).values())
+        if source_filter:
+            rows = [
+                item
+                for item in rows
+                if self._safe(item.get("source_entity_id"), "") == source_filter
+            ]
+        if target_filter:
+            rows = [
+                item
+                for item in rows
+                if self._safe(item.get("target_entity_id"), "") == target_filter
+            ]
+        if type_filter:
+            rows = [
+                item
+                for item in rows
+                if self._safe(item.get("relationship_type"), "").lower() == type_filter
+            ]
+        rows.sort(
+            key=lambda item: (
+                self._safe(item.get("relationship_type"), ""),
+                self._safe(item.get("source_entity_id"), ""),
+                self._safe(item.get("target_entity_id"), ""),
+            )
+        )
+        return [dict(item) for item in rows]
+
+    def export_knowledge_entity_bundle(self) -> dict[str, Any]:
+        return {
+            "entities": self.list_knowledge_entities(include_inactive=True),
+            "relationships": self.list_knowledge_relationships(),
+            "audit_log": [
+                dict(item) for item in list(self.state.get("knowledge_audit_log") or [])
+            ],
+            "exported_at": self._now_iso(),
+        }
+
+    def import_knowledge_entity_bundle(
+        self,
+        *,
+        bundle: dict[str, Any],
+    ) -> dict[str, Any]:
+        entities = list(dict(bundle or {}).get("entities") or [])
+        relationships = list(dict(bundle or {}).get("relationships") or [])
+        upserted_entities = 0
+        upserted_relationships = 0
+
+        for item in entities:
+            if not isinstance(item, dict):
+                continue
+            entity_id = self._safe(item.get("entity_id"), "")
+            entity_type = self._safe(item.get("entity_type"), "").lower()
+            canonical_name = self._safe(item.get("canonical_name"), "")
+            if not entity_id or not entity_type or not canonical_name:
+                continue
+            self._upsert_knowledge_entity(
+                entity_id=entity_id,
+                entity_type=entity_type,
+                canonical_name=canonical_name,
+                display_name=self._safe(item.get("display_name"), canonical_name),
+                aliases=[
+                    self._safe(alias)
+                    for alias in list(item.get("aliases") or [])
+                    if self._safe(alias)
+                ],
+                notes=self._safe(item.get("notes"), ""),
+                active=bool(item.get("active", True)),
+                attributes=dict(item.get("attributes") or {}),
+                fail_on_duplicate=False,
+            )
+            upserted_entities += 1
+
+        for item in relationships:
+            if not isinstance(item, dict):
+                continue
+            source_entity_id = self._safe(item.get("source_entity_id"), "")
+            target_entity_id = self._safe(item.get("target_entity_id"), "")
+            relationship_type = self._safe(item.get("relationship_type"), "")
+            if not source_entity_id or not target_entity_id or not relationship_type:
+                continue
+            self.create_knowledge_relationship(
+                source_entity_id=source_entity_id,
+                target_entity_id=target_entity_id,
+                relationship_type=relationship_type,
+                confidence=float(item.get("confidence", 1.0) or 1.0),
+                evidence_refs=[
+                    self._safe(reference)
+                    for reference in list(item.get("evidence_refs") or [])
+                    if self._safe(reference)
+                ],
+                notes=self._safe(item.get("notes"), ""),
+            )
+            upserted_relationships += 1
+
+        self._append_knowledge_audit(
+            event_type="knowledge_bundle_imported",
+            payload={
+                "upserted_entities": upserted_entities,
+                "upserted_relationships": upserted_relationships,
+            },
+        )
+        return {
+            "upserted_entities": upserted_entities,
+            "upserted_relationships": upserted_relationships,
+        }
 
     def update_product(
         self,
@@ -3363,7 +3775,136 @@ class CommercialProductService:
             candidate = state.get(key)
             if isinstance(candidate, dict):
                 normalized[key] = dict(candidate)
+            if key == "knowledge_audit_log" and isinstance(candidate, list):
+                normalized[key] = list(candidate)
         return normalized
+
+    def _upsert_knowledge_entity(
+        self,
+        *,
+        entity_id: str,
+        entity_type: str,
+        canonical_name: str,
+        display_name: str | None = None,
+        aliases: list[str] | None = None,
+        notes: str = "",
+        active: bool = True,
+        attributes: dict[str, Any] | None = None,
+        fail_on_duplicate: bool,
+    ) -> dict[str, Any]:
+        normalized_id = self._safe(entity_id)
+        normalized_type = self._safe(entity_type).lower()
+        canonical = self._safe(canonical_name)
+        if not normalized_id:
+            raise ValueError("entity_id cannot be blank")
+        if not normalized_type:
+            raise ValueError("entity_type cannot be blank")
+        if not canonical:
+            raise ValueError("canonical_name cannot be blank")
+
+        normalized_name = self.normalize_name(canonical)
+        duplicates = [
+            item
+            for item in self.detect_duplicate_knowledge_entities(
+                entity_type=normalized_type,
+                canonical_name=canonical,
+                normalized_name=normalized_name,
+            )
+            if self._safe(item.get("entity_id"), "") != normalized_id
+        ]
+        if duplicates and fail_on_duplicate:
+            raise ValueError(
+                "Duplicate knowledge entity canonical/normalized name detected"
+            )
+
+        now_text = self._now_iso()
+        current = dict(
+            self.state.get("knowledge_entities", {}).get(normalized_id) or {}
+        )
+        record = {
+            "entity_id": normalized_id,
+            "entity_type": normalized_type,
+            "canonical_name": canonical,
+            "display_name": self._safe(display_name, canonical),
+            "normalized_name": normalized_name,
+            "aliases": [
+                self._safe(item) for item in list(aliases or []) if self._safe(item)
+            ],
+            "active": bool(active),
+            "notes": self._safe(notes),
+            "attributes": dict(attributes or {}),
+            "created_at": self._safe(current.get("created_at"), now_text),
+            "updated_at": now_text,
+        }
+        self.state.setdefault("knowledge_entities", {})[normalized_id] = record
+        self._append_knowledge_audit(
+            event_type="knowledge_entity_upserted",
+            entity_id=normalized_id,
+            payload={
+                "entity_type": normalized_type,
+                "canonical_name": canonical,
+            },
+        )
+        return dict(record)
+
+    def _set_knowledge_entity_active(self, *, entity_id: str, active: bool) -> None:
+        normalized_id = self._safe(entity_id)
+        record = dict(self.state.get("knowledge_entities", {}).get(normalized_id) or {})
+        if not record:
+            return
+        record["active"] = bool(active)
+        record["updated_at"] = self._now_iso()
+        self.state.setdefault("knowledge_entities", {})[normalized_id] = record
+        self._append_knowledge_audit(
+            event_type="knowledge_entity_activation_changed",
+            entity_id=normalized_id,
+            payload={"active": bool(active)},
+        )
+
+    def _knowledge_relationship_id(
+        self,
+        *,
+        source_entity_id: str,
+        target_entity_id: str,
+        relationship_type: str,
+    ) -> str:
+        token = "|".join(
+            [
+                self._safe(source_entity_id),
+                self._safe(target_entity_id),
+                self._safe(relationship_type).lower(),
+            ]
+        )
+        digest = hashlib.sha1(token.encode("utf-8")).hexdigest()[:16]
+        return f"rel:{digest}"
+
+    def _append_knowledge_audit(
+        self,
+        *,
+        event_type: str,
+        entity_id: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> None:
+        now_text = self._now_iso()
+        token = "|".join(
+            [
+                now_text,
+                self._safe(event_type),
+                self._safe(entity_id),
+                json.dumps(dict(payload or {}), sort_keys=True),
+            ]
+        )
+        event_id = f"audit:{hashlib.sha1(token.encode('utf-8')).hexdigest()[:16]}"
+        entry = {
+            "event_id": event_id,
+            "event_type": self._safe(event_type),
+            "entity_id": self._safe(entity_id),
+            "timestamp": now_text,
+            "payload": dict(payload or {}),
+        }
+        rows = list(self.state.get("knowledge_audit_log") or [])
+        rows.append(entry)
+        self.state["knowledge_audit_log"] = rows[-1000:]
 
     @staticmethod
     def _file_extension(filename: str) -> str:
