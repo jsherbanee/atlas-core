@@ -19,6 +19,31 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Epic X Sprint X-10 Workspace Consistency and Information Density) (Closed)
+
+### Improved
+
+- Remaining primary project workspaces now use shared design-system wrappers for section hierarchy, notice panels, table presentation, and responsive control groups.
+- Consistency migration now covers Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate, and Notebook surfaces without changing deterministic behavior.
+- Project Summary and related report-facing project surfaces now use the same shared wrappers for reduced visual drift.
+
+### Scope Notes
+
+- UI consistency hardening only
+- no business-logic or persistence changes
+- no Epic E start
+
+### Closeout Validation
+
+- Manual validation confirmed primary workspace routing and rendering for Home, Projects, Knowledge, Reports, Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate, and Settings.
+- Focused global search, clear-search behavior, and existing deterministic project context behavior remained intact.
+- Full quality gates passed (`black`, `ruff`, `mypy`, `pytest`) with full-suite regression count unchanged at 1177 tests.
+
+### Remaining UX Debt
+
+- Some lower-priority advanced/object-detail pages still rely on older inline wrappers and should continue migrating to shared primitives.
+- Notebook discoverability from core guided-review entry points can be improved further in a future hardening pass.
+
 ## Unreleased (Epic X Sprint X-09 Design System Foundation and Reusable UI Components) (Closed)
 
 ### Improved

@@ -211,6 +211,29 @@ Post-X-09 migration debt:
 - project-workspace pages outside Home/Projects/Knowledge/Reports still contain legacy inline layout and table wrappers (for example Documents, BOM Review, Scope & Risk, Engineering Review, Estimate, Notebook, and object-detail pages)
 - table hierarchy and responsive-control wrappers should continue to expand through future hardening sprints
 
+## 8.6 Sprint X-10 Workspace Consistency and Information Density
+
+Completion status:
+
+- X-10 project-workspace consistency migration: completed and closed
+
+X-10 continues product hardening without architecture expansion:
+
+- no new product capabilities
+- no Epic E implementation start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
+X-10 focus is consistency completion across remaining primary project workspaces:
+
+- migrate Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate, and Notebook onto shared section-title, notice-panel, table, and responsive-control wrappers
+- preserve deterministic behavior, routing, and project-state contracts while increasing visual hierarchy and information density consistency
+- standardize empty-state and action-zone presentation across migrated workspaces
+
+Remaining UX debt after X-10:
+
+- some advanced and object-detail pages still use older inline layout/table rendering patterns and should migrate in future hardening passes
+- notebook discoverability still depends on project navigation patterns and can benefit from additional direct-entry affordances from core workflow pages
+
 
 ## 8. Things Atlas Will Never Become
 

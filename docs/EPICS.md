@@ -139,7 +139,7 @@ Status: Implemented and Closed for current roadmap baseline
 
 ## Epic X: Product Hardening
 
-Status: Active (X-01 through X-09 closed; no active Epic X sprint)
+Status: Active (X-01 through X-10 closed; no active Epic X sprint)
 
 - X-01 Pilot Readiness and Application Walkthrough (Implemented, Closed)
 - X-02 Project Creation and Bid Identity Refinement (Implemented, Closed)
@@ -150,6 +150,7 @@ Status: Active (X-01 through X-09 closed; no active Epic X sprint)
 - X-07 Fixed-Width Navigation and Focused Search Results (Implemented, Closed)
 - X-08 Search Clear-State Runtime Fix and Visual-System Closeout (Implemented, Closed)
 - X-09 Design System Foundation and Reusable UI Components (Implemented, Closed)
+- X-10 Workspace Consistency and Information Density (Implemented, Closed)
 
 No Epic X sprint is currently active.
 
@@ -204,6 +205,17 @@ Explicitly out of scope:
 - centralize token authority and shared stylesheet output
 - consolidate reusable page/UI primitives (section headings, notice panels, status badges, metric cards, table wrappers, responsive control groups)
 - migrate representative pages (Home, Projects, Knowledge, Reports) without changing product behavior
+
+Explicitly out of scope:
+
+- Epic E implementation start
+- new domain capability implementation
+
+### X-10 Scope (Completed)
+
+- complete shared-wrapper consistency migration across remaining primary project workspaces (Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate, Notebook)
+- align section hierarchy, notice panels, table wrappers, and responsive control groups with X-09 design-system primitives
+- preserve deterministic behavior, route flow, and project/workspace contracts
 
 Explicitly out of scope:
 

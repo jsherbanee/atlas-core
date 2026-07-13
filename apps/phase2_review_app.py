@@ -7177,6 +7177,11 @@ def _render_estimate_page(
         objective="Maintain deterministic estimate traceability and cost coverage.",
         current_focus="Resolve pricing gaps and snapshot warnings before locking revisions.",
     )
+    _render_notice_panel(
+        st,
+        "Estimate Workspace",
+        "Estimate sections retain deterministic behavior while using shared presentation wrappers for clearer hierarchy.",
+    )
     review = context.get("review") if context else None
     labor_estimate = getattr(review, "labor_estimate", None) if review else None
     bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
@@ -8494,15 +8499,21 @@ def _render_project_summary_page(
         "Project Summary",
         "Project health, analysis status, and the next recommended action.",
     )
+    _render_notice_panel(
+        st,
+        "Project Summary",
+        "Health, readiness, and next-action tables are rendered with shared primitives for consistency.",
+    )
 
-    cards = st.columns(5)
+    cards = _responsive_control_columns(st, 5)
     _metric_card(cards[0], "Document Count", str(summary["document_count"]))
     _metric_card(cards[1], "Analysis Status", summary["analysis_status"])
     _metric_card(cards[2], "BOM Items", str(summary["bom_item_count"]))
     _metric_card(cards[3], "Scope Issues", str(summary["unresolved_scope_issue_count"]))
     _metric_card(cards[4], "High-Risk Issues", str(summary["high_risk_issue_count"]))
 
-    st.dataframe(
+    _render_data_table(
+        st,
         [
             {
                 "Project Name": summary["project_name"],
@@ -8512,8 +8523,6 @@ def _render_project_summary_page(
                 "Recommended Next Action": summary["recommended_next_action"],
             }
         ],
-        width="stretch",
-        hide_index=True,
     )
 
     if st.button("Run Project Analysis", type="primary", width="stretch"):
@@ -8526,8 +8535,9 @@ def _render_project_summary_page(
         )
         return
 
-    st.markdown("### Analysis Result Summary")
-    st.dataframe(
+    _render_section_title(st, "Analysis Result Summary")
+    _render_data_table(
+        st,
         [
             {
                 "Equipment Items Found": summary["equipment_items_found"],
@@ -8541,8 +8551,6 @@ def _render_project_summary_page(
                 ],
             }
         ],
-        width="stretch",
-        hide_index=True,
     )
 
 
@@ -8590,8 +8598,13 @@ def _render_bom_review_page(
         estimate=pricing_estimate,
     )
 
+    _render_notice_panel(
+        st,
+        "BOM Review Workspace",
+        "Metrics, priority summaries, and candidate-table controls now align with shared section and table wrappers.",
+    )
     metrics = _canonical_bom_metrics(bom_rows)
-    cards_top = st.columns(4)
+    cards_top = _responsive_control_columns(st, 4)
     _metric_card(
         cards_top[0],
         "Total Candidate BOM Lines",
@@ -8601,7 +8614,7 @@ def _render_bom_review_page(
     _metric_card(cards_top[2], "Incomplete Lines", str(metrics["incomplete_lines"]))
     _metric_card(cards_top[3], "Conflicting Lines", str(metrics["conflicting_lines"]))
 
-    cards_bottom = st.columns(3)
+    cards_bottom = _responsive_control_columns(st, 3)
     _metric_card(
         cards_bottom[0], "Drawing-only Items", str(metrics["drawing_only_items"])
     )
@@ -8627,8 +8640,9 @@ def _render_bom_review_page(
         not in {"complete", "drawing_only", "specification_only"}
     )
 
-    st.markdown("### Priority Summary")
-    st.dataframe(
+    _render_section_title(st, "Priority Summary")
+    _render_data_table(
+        st,
         [
             {
                 "Complete Items": metrics["complete_lines"],
@@ -8640,18 +8654,16 @@ def _render_bom_review_page(
                 "Items Requiring Review": needing_review,
             }
         ],
-        width="stretch",
-        hide_index=True,
     )
 
-    st.markdown("### Candidate BOM Lines")
+    _render_section_title(st, "Candidate BOM Lines")
     search_text = st.text_input(
         "Search BOM lines",
         key="atlas_bom_search",
         placeholder="equipment id, manufacturer, model, description, system, room",
     ).strip()
 
-    filter_cols = st.columns(5)
+    filter_cols = _responsive_control_columns(st, 5)
     systems = sorted(
         {
             _safe_text(item.get("system"), "Unknown")
@@ -9200,8 +9212,13 @@ def _render_scope_risk_page(
         )
         return
 
+    _render_notice_panel(
+        st,
+        "Scope and Risk Workspace",
+        "Priority findings, sectioned risk tables, and drill-down details now use shared spacing and table wrappers.",
+    )
     metrics = _scope_risk_metrics(finding_rows)
-    cards = st.columns(4)
+    cards = _responsive_control_columns(st, 4)
     _metric_card(cards[0], "Total Findings", str(metrics["total"]))
     _metric_card(cards[1], "Critical Issues", str(metrics["critical"]))
     _metric_card(cards[2], "High Severity", str(metrics["high"]))
@@ -9209,14 +9226,15 @@ def _render_scope_risk_page(
 
     st.caption("Internal draft RFIs should be reviewed before external issue.")
 
-    st.markdown("### Priority Risks")
+    _render_section_title(st, "Priority Risks")
     priority_rows = [
         item
         for item in finding_rows
         if _safe_text(item.get("severity"), "").lower() in {"critical", "high"}
     ]
     if priority_rows:
-        st.dataframe(
+        _render_data_table(
+            st,
             [
                 {
                     "Severity": item.get("severity"),
@@ -9227,8 +9245,6 @@ def _render_scope_risk_page(
                 }
                 for item in priority_rows[:15]
             ],
-            width="stretch",
-            hide_index=True,
         )
     else:
         st.info("No critical or high-priority findings are currently open.")
@@ -9241,12 +9257,13 @@ def _render_scope_risk_page(
         "Responsibility Gaps",
         "Quantity Conflicts",
     ]:
-        st.markdown(f"### {section}")
+        _render_section_title(st, section)
         rows = list(sections.get(section) or [])
         if not rows:
             st.info(f"No findings currently classified under {section}.")
             continue
-        st.dataframe(
+        _render_data_table(
+            st,
             [
                 {
                     "Finding ID": item.get("finding_id"),
@@ -9258,8 +9275,6 @@ def _render_scope_risk_page(
                 }
                 for item in rows[:12]
             ],
-            width="stretch",
-            hide_index=True,
         )
 
     with st.expander("Lower Priority Findings", expanded=False):
@@ -9269,7 +9284,8 @@ def _render_scope_risk_page(
             if not rows:
                 st.caption(f"No findings currently classified under {section}.")
                 continue
-            st.dataframe(
+            _render_data_table(
+                st,
                 [
                     {
                         "Finding ID": item.get("finding_id"),
@@ -9280,18 +9296,12 @@ def _render_scope_risk_page(
                     }
                     for item in rows[:12]
                 ],
-                width="stretch",
-                hide_index=True,
             )
 
-    st.markdown("### Recommended RFIs")
+    _render_section_title(st, "Recommended RFIs")
     recommended_rfis = list(sections.get("Recommended RFIs") or [])
     if recommended_rfis:
-        st.dataframe(
-            recommended_rfis[:12],
-            width="stretch",
-            hide_index=True,
-        )
+        _render_data_table(st, recommended_rfis[:12])
     else:
         st.info("No internal draft RFI language generated yet.")
 
@@ -10173,7 +10183,13 @@ def _render_engineering_review_page(
     )
     resolution_summary = _resolution_summary_rows(product_resolutions)
 
-    st.dataframe(
+    _render_notice_panel(
+        st,
+        "Engineering Review Workspace",
+        "Narrative sections and structured findings are aligned with shared headers, action layout, and table wrappers.",
+    )
+    _render_data_table(
+        st,
         [
             {
                 "Project": _safe_text(summary.get("project_name"), "n/a"),
@@ -10185,12 +10201,10 @@ def _render_engineering_review_page(
                 ),
             }
         ],
-        width="stretch",
-        hide_index=True,
     )
 
     prominent_next_actions = list(review.get("recommended_next_actions") or [])
-    st.markdown("### What Should Happen Next")
+    _render_section_title(st, "What Should Happen Next")
     st.markdown(
         "<div class='atlas-primary-action'>"
         "<strong>Primary Recommended Action</strong>"
@@ -10198,7 +10212,7 @@ def _render_engineering_review_page(
         "</div>",
         unsafe_allow_html=True,
     )
-    action_cols = st.columns(3)
+    action_cols = _responsive_control_columns(st, 3)
     if action_cols[0].button("Open Scope & Risk", width="stretch"):
         st.session_state["atlas_active_page"] = "Scope & Risk"
         st.rerun()
@@ -10209,8 +10223,9 @@ def _render_engineering_review_page(
         st.session_state["atlas_active_page"] = "Estimate"
         st.rerun()
 
-    st.markdown("### 1. What Atlas Found")
-    st.dataframe(
+    _render_section_title(st, "1. What Atlas Found")
+    _render_data_table(
+        st,
         [
             {
                 "Stakeholders (Inferred)": ", ".join(
@@ -10230,12 +10245,11 @@ def _render_engineering_review_page(
                 ),
             }
         ],
-        width="stretch",
-        hide_index=True,
     )
 
-    st.markdown("### 2. What Appears Complete")
-    st.dataframe(
+    _render_section_title(st, "2. What Appears Complete")
+    _render_data_table(
+        st,
         [
             {
                 "Complete BOM Lines": int(bom_summary.get("complete_lines", 0) or 0),
@@ -10246,12 +10260,11 @@ def _render_engineering_review_page(
                 "Labor Confidence": _safe_text(review.get("labor_confidence"), "n/a"),
             }
         ],
-        width="stretch",
-        hide_index=True,
     )
 
-    st.markdown("### Product Resolution Summary")
-    st.dataframe(
+    _render_section_title(st, "Product Resolution Summary")
+    _render_data_table(
+        st,
         [
             {
                 "Resolved Products": resolution_summary["resolved_products"],
@@ -10261,11 +10274,9 @@ def _render_engineering_review_page(
                 "Products Requiring Review": resolution_summary["requires_review"],
             }
         ],
-        width="stretch",
-        hide_index=True,
     )
 
-    st.markdown("### 3. What Is Missing")
+    _render_section_title(st, "3. What Is Missing")
     missing_rows = [
         {"Missing Detail": item}
         for item in (
@@ -10274,11 +10285,11 @@ def _render_engineering_review_page(
         )
     ]
     if missing_rows:
-        st.dataframe(missing_rows[:20], width="stretch", hide_index=True)
+        _render_data_table(st, missing_rows[:20])
     else:
         st.info("No major missing scope or BOM details detected.")
 
-    st.markdown("### 4. What Is Risky")
+    _render_section_title(st, "4. What Is Risky")
     risky_rows = [
         {"Major Risk Area": item}
         for item in (
@@ -10287,11 +10298,11 @@ def _render_engineering_review_page(
         )
     ]
     if risky_rows:
-        st.dataframe(risky_rows[:20], width="stretch", hide_index=True)
+        _render_data_table(st, risky_rows[:20])
     else:
         st.info("No major risk areas detected from available evidence.")
 
-    st.markdown("### 5. What Needs Clarification")
+    _render_section_title(st, "5. What Needs Clarification")
     clarification_rows = [
         {"Clarification Needed": item}
         for item in (
@@ -10309,44 +10320,43 @@ def _render_engineering_review_page(
         )
     ]
     if clarification_rows:
-        st.dataframe(clarification_rows[:20], width="stretch", hide_index=True)
+        _render_data_table(st, clarification_rows[:20])
     else:
         st.info("No major clarification items detected.")
 
-    st.markdown("### 6. What Should Happen Next")
+    _render_section_title(st, "6. What Should Happen Next")
     next_action_rows = [
         {"Recommended Next Action": item}
         for item in list(review.get("recommended_next_actions") or [])
     ]
     if next_action_rows:
-        st.dataframe(next_action_rows[:12], width="stretch", hide_index=True)
+        _render_data_table(st, next_action_rows[:12])
     else:
         st.info("No recommended next actions generated.")
 
-    st.markdown("### Recommended RFIs")
+    _render_section_title(st, "Recommended RFIs")
     rfi_rows = [
         {"RFI (Internal Draft)": item}
         for item in list(review.get("recommended_rfis") or [])
     ]
     if rfi_rows:
-        st.dataframe(rfi_rows[:12], width="stretch", hide_index=True)
+        _render_data_table(st, rfi_rows[:12])
     else:
         st.info("No recommended RFIs generated.")
 
-    st.markdown("### Limitations")
-    st.dataframe(
+    _render_section_title(st, "Limitations")
+    _render_data_table(
+        st,
         [{"Limitation": item} for item in list(review.get("limitations") or [])],
-        width="stretch",
-        hide_index=True,
     )
 
-    st.markdown("### Export")
+    _render_section_title(st, "Export")
     review_obj = SalesDesignReviewService().build_review(
         summary=_build_project_analysis_summary(record, context),
         bom_rows=_enriched_bom_rows(st, _canonical_bom_items(context)),
         scope_findings=_scope_risk_findings(context),
     )
-    export_cols = st.columns(3)
+    export_cols = _responsive_control_columns(st, 3)
     project_id = _safe_text(record.project.project_id, "project")
     export_cols[0].download_button(
         "Download Review Markdown",
@@ -11038,7 +11048,12 @@ def _render_overview_page(
         1 for row in step_rows if _safe_text(row.get("status"), "") == "complete"
     )
 
-    st.markdown("### Recommended Next Action")
+    _render_notice_panel(
+        st,
+        "Overview Workspace",
+        "Guided review sections, navigation actions, and status tables are aligned to shared layout and spacing wrappers.",
+    )
+    _render_section_title(st, "Recommended Next Action")
     st.markdown(
         "<div class='atlas-primary-action'>"
         "<strong>Do This Next</strong>"
@@ -11048,7 +11063,7 @@ def _render_overview_page(
         "</div>",
         unsafe_allow_html=True,
     )
-    link_cols = st.columns(2)
+    link_cols = _responsive_control_columns(st, 2)
     if link_cols[0].button(
         f"Open {_safe_text(next_action.get('page'), 'Documents')}",
         width="stretch",
@@ -11061,10 +11076,11 @@ def _render_overview_page(
         st.rerun()
     link_cols[1].caption(_safe_text(next_action.get("why"), ""))
 
-    st.markdown("### Guided Project Review")
+    _render_section_title(st, "Guided Project Review")
     st.progress(completed_steps / max(len(step_rows), 1))
     st.caption(f"{completed_steps} of {len(step_rows)} steps complete")
-    st.dataframe(
+    _render_data_table(
+        st,
         [
             {
                 "Step": row.get("step"),
@@ -11074,11 +11090,9 @@ def _render_overview_page(
             }
             for row in step_rows
         ],
-        width="stretch",
-        hide_index=True,
     )
 
-    primary_actions = st.columns(4)
+    primary_actions = _responsive_control_columns(st, 4)
     if primary_actions[0].button("Open Documents", width="stretch"):
         st.session_state["atlas_active_page"] = "Documents"
         st.rerun()
@@ -11092,15 +11106,16 @@ def _render_overview_page(
         st.session_state["atlas_active_page"] = "Engineering Review"
         st.rerun()
 
-    st.markdown("### Object Navigation")
-    nav_cols = st.columns(2)
+    _render_section_title(st, "Object Navigation")
+    nav_cols = _responsive_control_columns(st, 2)
     recent = list(st.session_state.get("atlas_recently_viewed_objects") or [])
     working_set = _working_set(st)
 
     with nav_cols[0]:
-        st.markdown("#### Recently Viewed Objects")
+        _render_section_title(st, "Recently Viewed Objects")
         if recent:
-            st.dataframe(
+            _render_data_table(
+                st,
                 [
                     {
                         "Object": _safe_text(item.get("display_name"), "Object"),
@@ -11110,8 +11125,6 @@ def _render_overview_page(
                     }
                     for item in recent[:10]
                 ],
-                width="stretch",
-                hide_index=True,
             )
             target = st.selectbox(
                 "Open recently viewed",
@@ -11151,10 +11164,11 @@ def _render_overview_page(
             )
 
     with nav_cols[1]:
-        st.markdown("#### Working Set")
+        _render_section_title(st, "Working Set")
         st.caption("Keep important project objects close while you review the project.")
         if working_set:
-            st.dataframe(
+            _render_data_table(
+                st,
                 [
                     {
                         "Object": _safe_text(item.get("display_name"), "Object"),
@@ -11164,8 +11178,6 @@ def _render_overview_page(
                     }
                     for item in working_set[:10]
                 ],
-                width="stretch",
-                hide_index=True,
             )
             target = st.selectbox(
                 "Open Working Set object",
@@ -11181,7 +11193,7 @@ def _render_overview_page(
                     for item in working_set[:10]
                 ].index(target)
             ]
-            open_col, remove_col, up_col, down_col = st.columns(4)
+            open_col, remove_col, up_col, down_col = _responsive_control_columns(st, 4)
             if open_col.button(
                 "Open",
                 key="atlas_overview_open_pinned",
@@ -11232,8 +11244,9 @@ def _render_overview_page(
                 next_location="Use Add to Working Set on object cards and detail headers.",
             )
 
-    st.markdown("### Project Review Checklist")
-    st.dataframe(
+    _render_section_title(st, "Project Review Checklist")
+    _render_data_table(
+        st,
         [
             {
                 "Checklist": row.get("Checklist Item"),
@@ -11242,18 +11255,17 @@ def _render_overview_page(
             }
             for row in checklist_rows
         ],
-        width="stretch",
-        hide_index=True,
     )
 
-    st.markdown("### Critical Issues")
+    _render_section_title(st, "Critical Issues")
     critical_scope = [
         item
         for item in scope_rows
         if _safe_text(item.get("severity"), "").lower() in {"critical", "high"}
     ]
     if critical_scope:
-        st.dataframe(
+        _render_data_table(
+            st,
             [
                 {
                     "Severity": item.get("severity"),
@@ -11263,14 +11275,13 @@ def _render_overview_page(
                 }
                 for item in critical_scope[:10]
             ],
-            width="stretch",
-            hide_index=True,
         )
     else:
         st.caption("No critical issues are currently open.")
 
-    st.markdown("### Project Summary")
-    st.dataframe(
+    _render_section_title(st, "Project Summary")
+    _render_data_table(
+        st,
         [
             {
                 "Project": summary["project_name"],
@@ -11280,11 +11291,9 @@ def _render_overview_page(
                 "Recommended Next Action": summary["recommended_next_action"],
             }
         ],
-        width="stretch",
-        hide_index=True,
     )
 
-    cards = st.columns(4)
+    cards = _responsive_control_columns(st, 4)
     _metric_card(cards[0], "BOM Status", str(bom_metrics["total_candidate_bom_lines"]))
     _metric_card(cards[1], "Scope & Risk", str(len(scope_rows)))
     _metric_card(cards[2], "Document Health", str(summary["document_count"]))
@@ -11294,9 +11303,10 @@ def _render_overview_page(
         "Ready" if engineering_review else "Needs Review",
     )
 
-    st.markdown("### Estimate Status")
+    _render_section_title(st, "Estimate Status")
     known_cost_lines = sum(1 for row in bom_rows if row.get("known_cost") is not None)
-    st.dataframe(
+    _render_data_table(
+        st,
         [
             {
                 "Lines With Known Cost": known_cost_lines,
@@ -11308,13 +11318,11 @@ def _render_overview_page(
                 "Advisory Mode": "Enabled",
             }
         ],
-        width="stretch",
-        hide_index=True,
     )
 
-    st.markdown("### Project Timeline")
+    _render_section_title(st, "Project Timeline")
     if timeline:
-        st.dataframe(timeline[:10], width="stretch", hide_index=True)
+        _render_data_table(st, timeline[:10])
     else:
         _render_guided_empty_state(
             st,
@@ -16075,6 +16083,11 @@ def _render_engineering_notebook_page(
         "Engineering Notebook",
         "Record engineering observations, decisions, assumptions, and review history with traceability.",
     )
+    _render_notice_panel(
+        st,
+        "Engineering Notebook",
+        "Notebook filters, entry tables, and actions are aligned to shared workspace spacing and table wrappers.",
+    )
 
     draft = dict(st.session_state.get("atlas_notebook_draft") or {})
     entries = _notebook_entries(st, record, context)
@@ -16103,7 +16116,7 @@ def _render_engineering_notebook_page(
         | set(_notebook_object_reference_options(record, context))
     )
 
-    filter_cols = st.columns([2.0, 1.5, 1.4, 1.4, 1.2, 1.2])
+    filter_cols = _responsive_control_columns(st, [2.0, 1.5, 1.4, 1.4, 1.2, 1.2])
     search_query = filter_cols[0].text_input(
         "Search",
         value=st.session_state.get("atlas_notebook_search", ""),
@@ -16167,7 +16180,8 @@ def _render_engineering_notebook_page(
     tabs = st.tabs(["Notebook Entries", "Engineering Decisions"])
 
     with tabs[0]:
-        st.dataframe(
+        _render_data_table(
+            st,
             [
                 {
                     "created": _safe_text(item.get("created_at"), "n/a"),
@@ -16181,8 +16195,6 @@ def _render_engineering_notebook_page(
                 }
                 for item in filtered
             ],
-            width="stretch",
-            hide_index=True,
         )
 
         if filtered:
@@ -16200,8 +16212,9 @@ def _render_engineering_notebook_page(
 
             detail_col, link_col = st.columns([2.3, 1.7])
             with detail_col:
-                st.markdown("#### Entry Detail")
-                st.dataframe(
+                _render_section_title(st, "Entry Detail")
+                _render_data_table(
+                    st,
                     [
                         {
                             "field": "Entry ID",
@@ -16245,8 +16258,6 @@ def _render_engineering_notebook_page(
                             or "n/a",
                         },
                     ],
-                    width="stretch",
-                    hide_index=True,
                 )
 
                 if not bool(selected_entry.get("read_only", False)):
@@ -16344,7 +16355,7 @@ def _render_engineering_notebook_page(
                     st.caption("Atlas-generated entries are read-only.")
 
             with link_col:
-                st.markdown("#### Linked Objects")
+                _render_section_title(st, "Linked Objects")
                 related_objects = list(selected_entry.get("related_objects") or [])
                 if related_objects:
                     for ref in related_objects[:20]:
@@ -16357,19 +16368,18 @@ def _render_engineering_notebook_page(
                 else:
                     st.info("No linked objects.")
 
-                st.markdown("#### Evidence Refs")
+                _render_section_title(st, "Evidence Refs")
                 evidence_refs = list(selected_entry.get("evidence_refs") or [])
                 if evidence_refs:
-                    st.dataframe(
+                    _render_data_table(
+                        st,
                         [{"evidence_ref": item} for item in evidence_refs],
-                        width="stretch",
-                        hide_index=True,
                     )
                 else:
                     st.info("No evidence references.")
 
-        st.markdown("#### Create Entry")
-        create_col1, create_col2 = st.columns([2.2, 1.8])
+        _render_section_title(st, "Create Entry")
+        create_col1, create_col2 = _responsive_control_columns(st, [2.2, 1.8])
         with create_col1:
             title = st.text_input(
                 "Title",
@@ -16446,7 +16456,7 @@ def _render_engineering_notebook_page(
                 key="atlas_notebook_create_tags",
             )
 
-        create_actions = st.columns(3)
+        create_actions = _responsive_control_columns(st, 3)
         if create_actions[0].button("Create Note", type="primary", width="stretch"):
             entry_id = f"note:{record.workspace_id}:{hashlib.sha1(f'{title}|{_now_iso()}'.encode('utf-8')).hexdigest()[:10]}"
             new_entry = {
@@ -16478,7 +16488,8 @@ def _render_engineering_notebook_page(
 
     with tabs[1]:
         decision_rows = [item for item in filtered if _is_decision_log_entry(item)]
-        st.dataframe(
+        _render_data_table(
+            st,
             [
                 {
                     "created": _safe_text(item.get("created_at"), "n/a"),
@@ -16490,8 +16501,6 @@ def _render_engineering_notebook_page(
                 }
                 for item in decision_rows
             ],
-            width="stretch",
-            hide_index=True,
         )
         if not decision_rows:
             _render_empty_state(
@@ -17226,12 +17235,18 @@ def _render_project_files_page(
         "Documents",
         "Upload project documents, review extraction health, and run project analysis.",
     )
+    _render_notice_panel(
+        st,
+        "Documents Workspace",
+        "Summary, filters, and file tables now use shared section spacing and table wrappers.",
+    )
 
     folder_counts = {
         key: len(value) for key, value in _files_by_folder(context).items()
     }
-    st.markdown("### Summary")
-    st.dataframe(
+    _render_section_title(st, "Summary")
+    _render_data_table(
+        st,
         [
             {
                 "Drawings": folder_counts.get("Drawings", 0),
@@ -17242,11 +17257,9 @@ def _render_project_files_page(
                 "Other Documents": folder_counts.get("Other Documents", 0),
             }
         ],
-        width="stretch",
-        hide_index=True,
     )
 
-    st.markdown("### Primary Action")
+    _render_section_title(st, "Primary Action")
     _render_upload_panel(st, workspace_service, record)
 
     folders = _files_by_folder(context)
@@ -17298,7 +17311,7 @@ def _render_project_files_page(
         )
         return
 
-    st.dataframe(display_rows, width="stretch", hide_index=True)
+    _render_data_table(st, display_rows)
 
     file_labels = [item["filename"] for item in filtered]
     selected_file = st.selectbox("Select file", options=file_labels)
