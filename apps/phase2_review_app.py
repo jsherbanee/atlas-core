@@ -174,6 +174,7 @@ PROJECT_PAGES = (
     ENGINEERING_PAGES
     + KNOWLEDGE_PAGES
     + [
+        "Object Workspace",
         "Executive Summary",
         "Project Detail",
         "Drawing Detail",
@@ -254,6 +255,7 @@ ALL_ACTIVE_PAGES = (
     + REPORT_PAGES
     + SETTINGS_PAGES
     + [
+        "Object Workspace",
         "Knowledge",
         "Administration",
         "Product Resolution",
@@ -270,6 +272,28 @@ ALL_ACTIVE_PAGES = (
 )
 
 _UNIVERSAL_OBJECT_REGISTRY: UniversalObjectRegistry | None = None
+
+OBJECT_WORKSPACE_MIGRATED_KINDS = {
+    "customer",
+    "vendor",
+    "manufacturer",
+    "master_product",
+    "service",
+    "contact",
+    "location",
+    "project",
+    "project_record",
+}
+
+OBJECT_WORKSPACE_READ_ONLY_KINDS = {
+    "drawing",
+    "specification",
+    "equipment",
+}
+
+OBJECT_WORKSPACE_SUPPORTED_KINDS = (
+    OBJECT_WORKSPACE_MIGRATED_KINDS | OBJECT_WORKSPACE_READ_ONLY_KINDS
+)
 
 APPLICATION_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
     (
@@ -4286,6 +4310,8 @@ def _group_for_page(page: str, record: ProjectWorkspaceRecord | None) -> str:
         return "Advanced"
     if page in BID_INTELLIGENCE_PAGES:
         return "Advanced"
+    if page == "Object Workspace":
+        return "Project Workspace"
     if page in REPORT_PAGES:
         return "Reports"
     if page == "Administration":
@@ -4303,6 +4329,7 @@ def _breadcrumb_page_label(page: str) -> str:
         "Workspace Settings": "Workspace Settings",
         "Relationship Visualization": "Relationship Graph",
         "RFI Candidates": "RFI Candidates",
+        "Object Workspace": "Object Workspace",
     }
     return mapping.get(page, page)
 
@@ -6992,6 +7019,8 @@ def _object_secondary_label(kind: str, data: dict[str, Any]) -> str:
 
 
 def _selection_route(kind: str) -> str:
+    if kind in OBJECT_WORKSPACE_SUPPORTED_KINDS:
+        return "Object Workspace"
     mapping = {
         "equipment": "Equipment",
         "drawing": "Drawings",
@@ -7295,6 +7324,67 @@ def _is_reference_pinned(st: Any, reference: dict[str, Any]) -> bool:
 def _set_context_selection(st: Any, kind: str, data: dict[str, Any]) -> None:
     st.session_state["atlas_context_selection"] = {"kind": kind, "data": data}
     _apply_context_selection_state(st, kind, data)
+
+
+def _object_workspace_view_key() -> str:
+    return "atlas_object_workspace_view"
+
+
+def _ensure_object_workspace_view_state(st: Any) -> None:
+    st.session_state.setdefault(_object_workspace_view_key(), "Summary")
+
+
+def _set_object_workspace_view(st: Any, view: str) -> None:
+    st.session_state[_object_workspace_view_key()] = _safe_text(view, "Summary")
+
+
+def _current_selection(st: Any) -> tuple[str, dict[str, Any]]:
+    selection = dict(st.session_state.get("atlas_context_selection") or {})
+    return (
+        _safe_text(selection.get("kind"), "project").lower(),
+        dict(selection.get("data") or {}),
+    )
+
+
+def _selection_for_object_workspace(
+    st: Any,
+) -> tuple[str, dict[str, Any], str, str | None]:
+    kind, data = _current_selection(st)
+    if kind in OBJECT_WORKSPACE_SUPPORTED_KINDS:
+        return (
+            kind,
+            data,
+            _universal_object_adapter_key(kind),
+            _safe_text(st.session_state.get("atlas_active_workspace_id"), ""),
+        )
+
+    if _safe_text(st.session_state.get("atlas_active_workspace_id"), ""):
+        return (
+            "project_record",
+            {
+                "workspace_id": _safe_text(
+                    st.session_state.get("atlas_active_workspace_id"), ""
+                ),
+                "project_name": _safe_text(
+                    st.session_state.get("atlas_active_project_name"),
+                    "Project",
+                ),
+                "status": "active",
+            },
+            "project",
+            _safe_text(st.session_state.get("atlas_active_workspace_id"), ""),
+        )
+
+    return (
+        "project",
+        {
+            "project_id": "application",
+            "project_name": "Atlas",
+            "status": "indexed",
+        },
+        "project",
+        None,
+    )
     if kind not in {
         "equipment",
         "drawing",
@@ -7361,16 +7451,20 @@ def _render_object_card(
         key=f"{key_prefix}_open_{_safe_text(reference.get('object_type'), 'obj')}_{_safe_text(reference.get('object_id'), 'id')}",
         width="stretch",
     ):
-        st.session_state["atlas_active_page"] = _safe_text(
-            reference.get("route"), "Overview"
+        selection_kind = _safe_text(reference.get("selection_kind"), "project")
+        target_page = (
+            "Object Workspace"
+            if selection_kind in OBJECT_WORKSPACE_SUPPORTED_KINDS
+            else _safe_text(reference.get("route"), "Overview")
         )
+        st.session_state["atlas_active_page"] = target_page
         _set_context_selection(
             st,
-            _safe_text(reference.get("selection_kind"), "project")
-            .lower()
-            .replace(" / ", "_"),
+            selection_kind.lower().replace(" / ", "_"),
             dict(reference.get("selection_data") or {}),
         )
+        if target_page == "Object Workspace":
+            _set_object_workspace_view(st, "Summary")
         st.rerun()
 
     pinned = _is_reference_pinned(st, reference)
@@ -7419,6 +7513,559 @@ def _render_object_header(
         st.rerun()
 
 
+def _object_workspace_authoritative_route(kind: str) -> str:
+    mapping = {
+        "customer": "Knowledge",
+        "vendor": "Knowledge",
+        "manufacturer": "Knowledge",
+        "master_product": "Knowledge",
+        "service": "Knowledge",
+        "contact": "Knowledge",
+        "location": "Knowledge",
+        "project": "Overview",
+        "project_record": "Overview",
+        "drawing": "Drawings",
+        "specification": "Specifications",
+        "equipment": "Equipment",
+    }
+    return mapping.get(kind, "Overview")
+
+
+def _object_workspace_supported_views(
+    universal_object: Any,
+    *,
+    kind: str,
+) -> list[str]:
+    presentation = getattr(universal_object, "presentation", None)
+    if presentation is None:
+        return ["Summary", "Details", "Relationships"]
+    supported = [
+        _safe_text(item, "")
+        for item in list(getattr(presentation, "supported_views", []) or [])
+        if _safe_text(item, "")
+    ]
+    if kind in OBJECT_WORKSPACE_READ_ONLY_KINDS:
+        supported = [item for item in supported if item.lower() != "documents"]
+    display_order = [
+        "summary",
+        "details",
+        "relationships",
+        "activity",
+        "documents",
+        "history",
+    ]
+    ordered = [
+        item.title()
+        for item in display_order
+        if item in {entry.lower() for entry in supported}
+    ]
+    if not ordered:
+        ordered = ["Summary", "Details", "Relationships"]
+    return ordered
+
+
+def _object_workspace_activity_rows(
+    universal_object: Any,
+    workspace_service: ProjectWorkspaceService,
+    *,
+    kind: str,
+    data: dict[str, Any],
+    record: ProjectWorkspaceRecord | None,
+    product_service: CommercialProductService,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in list(getattr(universal_object, "activity", []) or []):
+        item_payload = item.to_dict() if hasattr(item, "to_dict") else dict(item)
+        rows.append(
+            {
+                "timestamp": _safe_text(item_payload.get("timestamp"), "n/a"),
+                "activity": _safe_text(item_payload.get("activity_type"), "updated"),
+                "actor": _safe_text(item_payload.get("actor"), "system"),
+                "summary": _safe_text(item_payload.get("summary"), "Activity"),
+                "source": _safe_text(item_payload.get("source"), "atlas"),
+                "before": _safe_text(item_payload.get("before_state_ref"), ""),
+                "after": _safe_text(item_payload.get("after_state_ref"), ""),
+            }
+        )
+
+    if kind in _knowledge_selection_kinds():
+        entity_id = _safe_text(data.get("entity_id"), "")
+        if not entity_id:
+            selected_id = _safe_text(_object_id_for_selection(kind, data), "")
+            prefix = {
+                "customer": "customer",
+                "vendor": "vendor",
+                "manufacturer": "manufacturer",
+                "service": "service",
+                "contact": "contact",
+                "location": "location",
+                "project": "project",
+                "master_product": "product",
+            }.get(kind, kind)
+            if selected_id:
+                entity_id = f"{prefix}:{selected_id}"
+        try:
+            audit_rows = product_service.list_knowledge_audit_events(
+                entity_id=entity_id,
+                limit=50,
+            )
+        except Exception:
+            audit_rows = []
+        for item in audit_rows:
+            rows.append(
+                {
+                    "timestamp": _safe_text(item.get("timestamp"), "n/a"),
+                    "activity": _safe_text(item.get("event_type"), "updated"),
+                    "actor": "system",
+                    "summary": _safe_text(item.get("entity_id"), "Knowledge Event"),
+                    "source": "knowledge_audit",
+                    "before": "",
+                    "after": "",
+                }
+            )
+
+    if kind in {"project", "project_record"} and record is not None:
+        try:
+            history_rows = workspace_service.list_history(record.workspace_id, limit=80)
+        except Exception:
+            history_rows = []
+        for item in history_rows:
+            rows.append(
+                {
+                    "timestamp": _safe_text(item.get("timestamp"), "n/a"),
+                    "activity": _safe_text(item.get("event_type"), "event"),
+                    "actor": _safe_text(item.get("actor"), "system"),
+                    "summary": _safe_text(item.get("event_type"), "project event")
+                    .replace("_", " ")
+                    .title(),
+                    "source": "project_history",
+                    "before": "",
+                    "after": "",
+                }
+            )
+
+    rows.sort(key=lambda item: _safe_text(item.get("timestamp"), ""), reverse=True)
+    return rows[:80]
+
+
+def _object_workspace_relationship_rows(universal_object: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in list(getattr(universal_object, "relationships", []) or []):
+        payload = item.to_dict() if hasattr(item, "to_dict") else dict(item)
+        target = dict(payload.get("target_identity") or {})
+        rows.append(
+            {
+                "relationship": _safe_text(
+                    payload.get("relationship_type"), "related-to"
+                ),
+                "direction": _safe_text(payload.get("direction"), "outgoing"),
+                "target": _safe_text(
+                    target.get("canonical_display_name"),
+                    _safe_text(target.get("object_id"), "n/a"),
+                ),
+                "target_type": _safe_text(target.get("object_type"), "object"),
+                "status": _safe_text(payload.get("status"), ""),
+                "confidence": _safe_text(payload.get("confidence"), ""),
+                "provenance": _safe_text(
+                    dict(payload.get("provenance") or {}).get("source"), ""
+                ),
+            }
+        )
+    return rows
+
+
+def _render_object_workspace_actions(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    *,
+    kind: str,
+    data: dict[str, Any],
+    universal_object: Any,
+    record: ProjectWorkspaceRecord | None,
+) -> None:
+    st.markdown("### Primary Actions")
+    actions = [
+        item.to_dict() if hasattr(item, "to_dict") else dict(item)
+        for item in list(getattr(universal_object, "actions", []) or [])
+        if bool(
+            dict(item.to_dict() if hasattr(item, "to_dict") else item).get(
+                "visible", True
+            )
+        )
+    ]
+    if not actions:
+        st.caption("No actions available.")
+        return
+
+    cols = st.columns(min(4, max(1, len(actions))))
+    for index, action in enumerate(actions[:8]):
+        label = _safe_text(
+            action.get("label"), _safe_text(action.get("action_key"), "Action")
+        )
+        enabled = bool(action.get("enabled", True))
+        clicked = cols[index % len(cols)].button(
+            label,
+            key=f"atlas_object_workspace_action_{_safe_text(action.get('action_key'), 'action')}_{index}",
+            width="stretch",
+            disabled=not enabled,
+        )
+        if not enabled:
+            reason = _safe_text(action.get("disabled_reason"), "Action unavailable")
+            cols[index % len(cols)].caption(reason)
+            continue
+        if not clicked:
+            continue
+
+        action_key = _safe_text(action.get("action_key"), "")
+        if action_key == "return_to_origin":
+            entry = dict(st.session_state.get(_return_context_key()) or {})
+            if entry and _return_context_is_compatible(st, workspace_service, entry):
+                _restore_context_entry(st, workspace_service, entry)
+            return
+        if action_key == "view_activity":
+            _set_object_workspace_view(st, "Activity")
+            st.rerun()
+            return
+        if action_key == "view_documents":
+            _set_object_workspace_view(st, "Documents")
+            st.rerun()
+            return
+        if action_key == "open":
+            route = _object_workspace_authoritative_route(kind)
+            st.session_state["atlas_active_page"] = route
+            st.rerun()
+            return
+        if action_key == "archive":
+            try:
+                if kind in {"project", "project_record"} and record is not None:
+                    workspace_service.archive_project(
+                        record.workspace_id, archived=True
+                    )
+                else:
+                    selected_id = _safe_text(_object_id_for_selection(kind, data), "")
+                    prefix = {
+                        "master_product": "product",
+                        "customer": "customer",
+                        "vendor": "vendor",
+                        "manufacturer": "manufacturer",
+                        "service": "service",
+                        "contact": "contact",
+                        "location": "location",
+                        "project": "project",
+                    }.get(kind, kind)
+                    entity_id = (
+                        _safe_text(data.get("entity_id"), "")
+                        or f"{prefix}:{selected_id}"
+                    )
+                    service = _commercial_product_service(st)
+                    service.set_knowledge_entity_active(
+                        entity_id=entity_id, active=False
+                    )
+                    _save_commercial_product_state(st, service)
+                st.success("Object archived.")
+            except Exception as exc:
+                st.error(f"Unable to archive object: {exc}")
+            return
+        if action_key == "restore":
+            try:
+                if kind in {"project", "project_record"} and record is not None:
+                    workspace_service.archive_project(
+                        record.workspace_id, archived=False
+                    )
+                else:
+                    selected_id = _safe_text(_object_id_for_selection(kind, data), "")
+                    prefix = {
+                        "master_product": "product",
+                        "customer": "customer",
+                        "vendor": "vendor",
+                        "manufacturer": "manufacturer",
+                        "service": "service",
+                        "contact": "contact",
+                        "location": "location",
+                        "project": "project",
+                    }.get(kind, kind)
+                    entity_id = (
+                        _safe_text(data.get("entity_id"), "")
+                        or f"{prefix}:{selected_id}"
+                    )
+                    service = _commercial_product_service(st)
+                    service.set_knowledge_entity_active(
+                        entity_id=entity_id, active=True
+                    )
+                    _save_commercial_product_state(st, service)
+                st.success("Object restored.")
+            except Exception as exc:
+                st.error(f"Unable to restore object: {exc}")
+            return
+        if action_key == "export":
+            st.download_button(
+                "Download Object JSON",
+                data=json.dumps(universal_object.to_dict(), indent=2, sort_keys=True),
+                file_name=f"{_safe_text(getattr(universal_object.identity, 'object_type', 'object'), 'object')}_{_safe_text(getattr(universal_object.identity, 'object_id', 'record'), 'record')}.json",
+                mime="application/json",
+                width="stretch",
+            )
+            return
+        if action_key == "edit":
+            route = _object_workspace_authoritative_route(kind)
+            st.session_state["atlas_active_page"] = route
+            st.info("Use the authoritative workflow controls on the destination page.")
+            st.rerun()
+
+
+def _render_universal_object_workspace_page(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord | None,
+    context: dict[str, Any] | None,
+) -> None:
+    product_service = _commercial_product_service(st)
+    _ensure_object_workspace_view_state(st)
+    kind, data, adapter_key, selected_project_id = _selection_for_object_workspace(st)
+    try:
+        universal_object = _universal_object_registry().adapt(
+            adapter_key,
+            dict(data),
+            tenant_id=_safe_text(st.session_state.get(_tenant_scope_key()), "local"),
+            owning_workspace=(
+                "Knowledge" if kind in _knowledge_selection_kinds() else "Projects"
+            ),
+            owning_project_id=selected_project_id or None,
+        )
+    except Exception:
+        _render_guided_empty_state(
+            st,
+            why_empty="Selected object cannot be resolved through the Universal Object registry.",
+            action_to_populate="Open a supported object from search, Working Set, or Knowledge/Project object lists.",
+            next_location="Use supported object selections: Customer, Vendor, Manufacturer, Product, Service, Contact, Location, Project, Drawing, Specification, Equipment.",
+        )
+        return
+
+    identity = universal_object.identity
+    metadata = universal_object.metadata.to_dict()
+    presentation = (
+        universal_object.presentation.to_dict()
+        if universal_object.presentation is not None
+        else {}
+    )
+    _render_page_header(st, "Object Workspace", "")
+
+    entry = dict(st.session_state.get(_return_context_key()) or {})
+    if entry:
+        origin = " / ".join(
+            [
+                _safe_text(entry.get("source_workspace"), "Atlas"),
+                _safe_text(entry.get("source_route"), ""),
+            ]
+        ).strip(" /")
+        banner_cols = st.columns([4.5, 1.5])
+        banner_cols[0].caption(f"Opened from {origin}")
+        if banner_cols[1].button(
+            _return_context_label(entry),
+            key="atlas_object_workspace_return",
+            width="stretch",
+        ):
+            _restore_context_entry(st, workspace_service, entry)
+            return
+
+    st.markdown("### Object Identity")
+    identity_rows = [
+        {
+            "Name": identity.canonical_display_name,
+            "Type": _object_type_label(_safe_text(identity.object_type, kind)),
+            "Identifier": _safe_text(identity.secondary_identifier, identity.object_id),
+            "Status": _safe_text(identity.status, "n/a"),
+            "Lifecycle": _safe_text(identity.lifecycle_state, "n/a"),
+            "Workspace": _safe_text(identity.owning_workspace, "n/a"),
+            "Project": _safe_text(identity.owning_project_id, "application"),
+            "Tags": ", ".join(list(metadata.get("tags") or [])) or "n/a",
+            "Created": _safe_text(identity.created_at, "n/a"),
+            "Updated": _safe_text(identity.updated_at, "n/a"),
+        }
+    ]
+    st.dataframe(identity_rows, width="stretch", hide_index=True)
+
+    _render_object_workspace_actions(
+        st,
+        workspace_service,
+        kind=kind,
+        data=data,
+        universal_object=universal_object,
+        record=record,
+    )
+
+    supported_views = _object_workspace_supported_views(universal_object, kind=kind)
+    current_view = _safe_text(
+        st.session_state.get(_object_workspace_view_key()), "Summary"
+    )
+    if current_view not in supported_views:
+        current_view = supported_views[0]
+        _set_object_workspace_view(st, current_view)
+    selected_view = st.radio(
+        "Object View",
+        options=supported_views,
+        horizontal=True,
+        key="atlas_object_workspace_view_selector",
+        index=supported_views.index(current_view),
+    )
+    _set_object_workspace_view(st, selected_view)
+
+    if selected_view == "Summary":
+        st.markdown("### Summary")
+        relationships = _object_workspace_relationship_rows(universal_object)
+        st.dataframe(
+            [
+                {
+                    "Primary Label": _safe_text(
+                        presentation.get("primary_label"),
+                        identity.canonical_display_name,
+                    ),
+                    "Secondary Label": _safe_text(
+                        presentation.get("secondary_label"),
+                        _object_secondary_label(kind, data),
+                    )
+                    or "n/a",
+                    "Warnings": len(list(metadata.get("warnings") or [])),
+                    "Related Objects": len(relationships),
+                    "Recommended Next Action": (
+                        "Review relationship links"
+                        if relationships
+                        else "Review details and provenance"
+                    ),
+                }
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+        if metadata.get("warnings"):
+            st.markdown("#### Warnings")
+            st.dataframe(
+                [
+                    {"warning": _safe_text(item, "")}
+                    for item in list(metadata.get("warnings") or [])
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
+    elif selected_view == "Details":
+        st.markdown("### Details")
+        detail_rows = [
+            {
+                "Field": key.replace("_", " ").title(),
+                "Value": (
+                    _safe_text(value, "n/a")
+                    if not isinstance(value, (list, dict))
+                    else json.dumps(value, sort_keys=True)
+                ),
+            }
+            for key, value in dict(data).items()
+        ]
+        _render_data_table(st, detail_rows[:60])
+
+    elif selected_view == "Relationships":
+        st.markdown("### Relationships")
+        relationship_rows = _object_workspace_relationship_rows(universal_object)
+        if relationship_rows:
+            _render_data_table(st, relationship_rows)
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No deterministic relationships are currently available for this object.",
+                action_to_populate="Run existing review/import workflows that provide relationship evidence.",
+                next_location="Use authoritative project and knowledge workflows to build linked evidence.",
+            )
+
+    elif selected_view == "Activity":
+        st.markdown("### Activity")
+        activity_rows = _object_workspace_activity_rows(
+            universal_object,
+            workspace_service,
+            kind=kind,
+            data=data,
+            record=record,
+            product_service=product_service,
+        )
+        if activity_rows:
+            _render_data_table(st, activity_rows)
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No activity events are available for this object.",
+                action_to_populate="Use existing update/import/archive workflows to generate auditable activity.",
+                next_location="Return to authoritative workflow pages for this object.",
+            )
+
+    elif selected_view == "Documents":
+        st.markdown("### Documents")
+        source_refs = list(metadata.get("source_references") or [])
+        if kind in OBJECT_WORKSPACE_READ_ONLY_KINDS:
+            source_refs.extend(
+                [
+                    _safe_text(data.get("source_file"), ""),
+                    _safe_text(data.get("title"), ""),
+                ]
+            )
+        source_refs = [item for item in source_refs if _safe_text(item, "")]
+        if source_refs:
+            _render_data_table(st, [{"document": item} for item in source_refs[:80]])
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No document links are available for this object.",
+                action_to_populate="Open the authoritative workspace to inspect document sources.",
+                next_location="Use Drawings, Specifications, Equipment, or Documents workspace pages.",
+            )
+
+    else:
+        st.markdown("### History")
+        if kind in {"project", "project_record"} and record is not None:
+            history_rows = workspace_service.list_history(
+                record.workspace_id, limit=100
+            )
+            if history_rows:
+                _render_data_table(st, history_rows)
+            else:
+                _render_guided_empty_state(
+                    st,
+                    why_empty="No project history events were found.",
+                    action_to_populate="Perform project operations to generate history events.",
+                    next_location="Use project workflows and retry history view.",
+                )
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="History is not available for this object type in W-03.",
+                action_to_populate="Use Activity view for current auditable events.",
+                next_location="Future sprint will expand object history support.",
+            )
+
+    st.markdown("### Provenance")
+    _render_data_table(
+        st,
+        [
+            {
+                "Source Authority": _safe_text(identity.source_authority, "atlas"),
+                "Universal Object ID": _safe_text(identity.universal_object_id, "n/a"),
+                "Owning Workspace": _safe_text(identity.owning_workspace, "n/a"),
+                "Owning Project": _safe_text(identity.owning_project_id, "application"),
+                "Schema Version": _safe_text(identity.schema_version, "n/a"),
+            }
+        ],
+    )
+
+    authoritative_route = _object_workspace_authoritative_route(kind)
+    if kind in OBJECT_WORKSPACE_READ_ONLY_KINDS:
+        st.caption("Read-only validation mode for this engineering object type.")
+    if st.button(
+        f"Open Authoritative View ({authoritative_route})",
+        key="atlas_object_workspace_open_authoritative",
+        width="stretch",
+    ):
+        st.session_state["atlas_active_page"] = authoritative_route
+        st.rerun()
+
+
 def _open_search_reference(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -7450,6 +8097,39 @@ def _open_search_reference(
                 return
 
     route = _safe_text(reference.get("route"), "Overview")
+    selection_kind = _safe_text(reference.get("selection_kind"), "project")
+    selection_data = dict(reference.get("selection_data") or {})
+    if selection_kind in OBJECT_WORKSPACE_SUPPORTED_KINDS:
+        st.session_state["atlas_active_page"] = "Object Workspace"
+        _set_context_selection(st, selection_kind, selection_data)
+        if selection_kind in _knowledge_selection_kinds() and selection_kind not in {
+            "project",
+            "project_record",
+        }:
+            _knowledge_navigation_defaults(st)
+            _set_knowledge_navigation_selection(st, kind=selection_kind)
+            st.session_state[_navigation_primary_state_key()] = "Knowledge"
+            st.session_state[_navigation_mode_state_key()] = "application"
+            st.session_state[_navigation_secondary_state_key()] = _safe_text(
+                _secondary_key_for_page("Knowledge", "application", "Knowledge"),
+                "overview",
+            )
+            st.session_state[_navigation_tertiary_state_key()] = "browse"
+        elif selection_kind in {"project", "project_record"}:
+            st.session_state[_navigation_primary_state_key()] = "Projects"
+            st.session_state[_navigation_mode_state_key()] = "active"
+            st.session_state[_navigation_secondary_state_key()] = "overview"
+            st.session_state[_navigation_tertiary_state_key()] = "summary"
+        else:
+            st.session_state[_navigation_primary_state_key()] = "Projects"
+            st.session_state[_navigation_mode_state_key()] = "active"
+            st.session_state[_navigation_secondary_state_key()] = "project_details"
+            st.session_state[_navigation_tertiary_state_key()] = "browse"
+        _set_object_workspace_view(st, "Summary")
+        _record_recent_search_open(st, reference)
+        st.rerun()
+        return
+
     st.session_state["atlas_active_page"] = route
     if route == "Knowledge":
         _knowledge_navigation_defaults(st)
@@ -15907,15 +16587,22 @@ def _render_overview_page(
                 key="atlas_overview_open_pinned",
                 width="stretch",
             ):
-                st.session_state["atlas_active_page"] = _safe_text(
-                    selected.get("route"),
-                    "Overview",
+                selected_kind = _safe_text(selected.get("selection_kind"), "project")
+                st.session_state["atlas_active_page"] = (
+                    "Object Workspace"
+                    if selected_kind in OBJECT_WORKSPACE_SUPPORTED_KINDS
+                    else _safe_text(
+                        selected.get("route"),
+                        "Overview",
+                    )
                 )
                 _set_context_selection(
                     st,
-                    _safe_text(selected.get("selection_kind"), "project"),
+                    selected_kind,
                     dict(selected.get("selection_data") or {}),
                 )
+                if selected_kind in OBJECT_WORKSPACE_SUPPORTED_KINDS:
+                    _set_object_workspace_view(st, "Summary")
                 st.rerun()
             if remove_col.button(
                 "Remove",
@@ -26207,6 +26894,15 @@ def _render_main_content(
 
     if page == "Knowledge":
         _render_application_knowledge_page(st, workspace_service)
+        return
+
+    if page == "Object Workspace":
+        _render_universal_object_workspace_page(
+            st,
+            workspace_service,
+            record,
+            context,
+        )
         return
 
     if page == "Administration":

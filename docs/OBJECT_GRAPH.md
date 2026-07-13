@@ -34,6 +34,11 @@ W-02 contract note:
 - universal object identity now provides a shared adapter-layer identity envelope for project, knowledge, and engineering objects without replacing existing domain models
 - universal relationship contracts preserve tenant scope, source/target identity, direction, provenance, and effective timing in a reusable shape for graph traversal and future object rendering
 
+W-03 workspace note:
+- migrated object families now render relationships and activity through one shared object-workspace envelope
+- relationship presentation remains source-backed and deterministic; no inference-only edges are introduced by the shared UI
+- activity presentation is compatibility-first and may be sparse where source audit history is not yet deep
+
 ## Relationship Types
 Representative relationship types include:
 - contains
@@ -90,6 +95,10 @@ The object graph should support:
 - relationship-aware filtering
 - graph visualization
 - connected-object navigation
+
+Connected-object navigation in W-03 is bounded by compatibility contracts:
+- supported object families can be opened in shared Object Workspace
+- unsupported families keep direct authoritative-route navigation
 
 ## Downstream AI Usage
 Future AI features may use the object graph as a grounding and retrieval structure, but AI must not silently override deterministic graph logic.

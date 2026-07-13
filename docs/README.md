@@ -2,7 +2,7 @@
 
 Atlas documentation defines the product vision, architecture, lifecycle roadmap, UX posture, and implementation status for Atlas, the Intelligent Lifecycle Solutions Management Platform for AV and lighting systems integrators.
 
-Current implementation focus remains Phase 2 Bid Intelligence and the associated workspace-continuity/documentation workstream. Epic X is complete through X-13, Epic W has delivered W-01 Workspace Intelligence continuity, and Epic E has not started.
+Current implementation focus remains Phase 2 Bid Intelligence and the associated workspace-continuity/documentation workstream. Epic X is complete through X-13, Epic W has delivered W-01 Workspace Intelligence continuity, W-02 universal object contracts, and W-03 controlled Universal Object Workspace migration, and Epic E has not started.
 
 Current workspace-continuity stream: Epic W Workspace Intelligence.
 Scope: deterministic context persistence, cross-workspace continuity, search handoff, Working Set continuity, and repository-backed return context for already-implemented capabilities only.
@@ -171,6 +171,11 @@ Future releases should follow this structure.
 - Audience: Workspace, search, UI, and platform contributors.
 - When to reference: When changing context persistence, return behavior, search handoff, or project/knowledge continuity flows.
 
+### [OBJECT_WORKSPACE.md](OBJECT_WORKSPACE.md)
+- Purpose: Defines shared Universal Object Workspace ownership, migrated object scope, compatibility boundaries, and deferred migration posture.
+- Audience: Workspace, UI, search, and interoperability contributors.
+- When to reference: When changing shared object identity/actions/views, context banner behavior, or object-workspace routing compatibility.
+
 ### [IMPORT_PIPELINE.md](IMPORT_PIPELINE.md)
 - Purpose: Defines the common ingestion and validation architecture for documents and data.
 - Audience: Platform, repository, ingestion, and AI contributors.
@@ -227,6 +232,11 @@ Future releases should follow this structure.
 - When to reference: When planning reusable knowledge assets and shared references.
 
 ## Engineering Intelligence
+
+### [KNOWLEDGE_ENTITY_FRAMEWORK.md](KNOWLEDGE_ENTITY_FRAMEWORK.md)
+- Purpose: Defines deterministic shared knowledge entity model/service contracts and W-series object-workspace integration boundaries.
+- Audience: Knowledge domain, workspace, and search contributors.
+- When to reference: When modifying customer/vendor/manufacturer/product/service/contact/location/project entity behavior or compatibility handoff rules.
 
 ### [DRAWING_INTELLIGENCE.md](DRAWING_INTELLIGENCE.md)
 - Purpose: Index for drawing intelligence architecture and implementation references.

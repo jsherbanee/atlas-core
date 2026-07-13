@@ -66,6 +66,12 @@ W-01 search note:
 - current workspace and selected Knowledge entity context can influence deterministic ranking without hiding broader results
 - Clear Search continues to restore the prior page context without widget-state mutation exceptions
 
+W-03 search note:
+- supported object families now open in shared Object Workspace rather than object-specific legacy routes
+- search handoff preserves return-context banner metadata so users can one-click return to origin
+- read-only supported families (Drawing, Specification, Equipment) expose compatibility actions to open authoritative engineering pages
+- unsupported object families continue to use compatibility routing to avoid workflow regression
+
 ## Permissions And Tenant Scope
 Search results must respect:
 - tenant boundaries

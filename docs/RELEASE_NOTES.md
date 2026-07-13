@@ -19,6 +19,35 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Epic W Sprint W-03 Universal Object Workspace)
+
+### Improved
+
+- Atlas now includes a reusable Universal Object Workspace UI inside the existing shell, backed by the W-02 universal object contract and registry
+- supported object opens from search and Working Set now route through Object Workspace for migrated object families
+- migrated object scope includes Customer, Vendor, Manufacturer, Product, Service, Contact, Location, and Project
+- Drawing, Specification, and Equipment now support read-only Universal Object Workspace rendering with direct open actions to authoritative engineering pages
+- object workspace renders consistent identity, actions, tertiary view navigation, relationships, activity, provenance, and return-context banner behavior
+
+### Scope Notes
+
+- controlled migration only
+- no redesign of unrelated workflows
+- no new domain entities, AI, semantic retrieval, or Epic E start
+
+### Validation
+
+- focused W-03 tests cover object-workspace composition, search/working-set handoff, context-banner behavior, supported-view selection, disabled action reasons, and compatibility routing behavior
+- full quality gates passed (`black`, `ruff`, `mypy`, `pytest`) with full-suite regression count at 1247 tests
+- manual validation confirmed shared object-workspace behavior for Customer, Vendor, Manufacturer, Product, Service, Contact, Location, Project, Drawing, Specification, and Equipment
+- manual validation confirmed consistent identity/action composition, bounded supported tertiary views, relationship/activity presentation, context banner/return behavior, search and Working Set handoff behavior, and no horizontal overflow at 820/980/1180/1366 widths
+- manual validation observed no Streamlit state exceptions during repeated search handoff and return flows
+
+### Deferred Migration Notes
+
+- broader object-family migration remains intentionally deferred to future W-series planning
+- existing authoritative domain workflows remain the source of truth for create/edit/archive/import/export behavior
+
 ## Unreleased (Epic W Sprint W-02 Universal Object Contract)
 
 ### Improved

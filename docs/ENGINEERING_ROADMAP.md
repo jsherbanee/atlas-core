@@ -46,8 +46,9 @@ No Epic X sprint is active.
 W-01 Workspace Intelligence continuity is implemented and closed.
 
 W-02 Universal Object contract foundation is implemented.
+W-03 Universal Object Workspace shared UI migration is implemented for controlled object scope.
 
-Current engineering focus is post-W-02 validation, broader adapter coverage, and future object-workspace migration planning.
+Current engineering focus is post-W-03 validation, broader adapter coverage, deeper activity/history compatibility, and future object-family migration planning.
 
 Epic E remains the next candidate epic only after architecture review and explicit sprint approval.
 
@@ -74,6 +75,7 @@ Epic E must not be started from this roadmap.
 - prepare for future relationship-aware search and visualization
 - preserve explicit workspace context handoff and deterministic return-context behavior across workspace transitions
 - establish a universal object identity and adapter layer so future workspace, graph, search, and AI surfaces can consume one stable object contract
+- extend shared Object Workspace migration gradually without redesigning unrelated authoritative workflows
 
 ### 4. Rule and Intelligence Infrastructure
 - keep deterministic rule evaluation auditable and reproducible

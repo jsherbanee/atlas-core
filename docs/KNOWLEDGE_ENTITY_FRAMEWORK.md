@@ -90,6 +90,11 @@ The Knowledge workspace now supports:
 X-12 navigation note:
 - Knowledge is the first workspace to use the reusable three-level navigation contract while preserving the existing entity workflows and deterministic state model.
 
+W-03 object-workspace note:
+- framework-managed Customer, Vendor, Manufacturer, Product, Service, Contact, Location, and Project entities now support shared Object Workspace rendering
+- entity create/edit/archive/import/export authority remains in existing Knowledge workflows and services
+- search and Working Set opens for supported entities route through Object Workspace while preserving return-context continuity
+
 ## Validation
 K-03 validation baseline:
 - focused tests: `tests/test_knowledge_entity_framework.py`

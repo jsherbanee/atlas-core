@@ -27,6 +27,12 @@ This document defines the reusable navigation contract used by the shell and wor
 - Knowledge search results restore the active secondary group and tertiary page selection context
 - The framework is intended to be extended to additional workspaces without changing the contract shape
 
+W-03 implementation note:
+- Object Workspace is now a shared route that owns object-level tertiary navigation for migrated object families
+- object tertiary navigation is contract-driven and limited to supported views (Summary, Details, Relationships, Activity, Documents, History)
+- context banner rendering and one-click return behavior in Object Workspace are driven by existing W-01 return-context state
+- unsupported object families continue to route to legacy authoritative pages to preserve behavior compatibility
+
 W-01 implementation note:
 - navigation continuity now carries explicit context state for active workspace, active secondary/tertiary selection, active project, selected project object, selected Knowledge entity, bounded return context, and bounded navigation history
 - return context is deterministic and one-click, not inferred from browser history
@@ -37,4 +43,6 @@ W-01 implementation note:
 
 - Search result opening preserves Knowledge navigation context
 - Knowledge navigation defaults are deterministic
+- migrated object opens preserve object-level navigation context inside Object Workspace
+- context banner and return behavior remain deterministic across search and Working Set handoff paths
 - The implementation is covered by app-level regression tests and full-suite validation

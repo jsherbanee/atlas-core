@@ -1330,8 +1330,9 @@ def test_open_search_reference_routes_to_target_page() -> None:
 
     app._open_search_reference(st, service, reference)
 
-    assert st.session_state["atlas_active_page"] == "Drawings"
+    assert st.session_state["atlas_active_page"] == "Object Workspace"
     assert st.session_state["atlas_context_selection"]["kind"] == "drawing"
+    assert st.session_state["atlas_object_workspace_view"] == "Summary"
     assert st.rerun_called is True
 
 
@@ -1348,7 +1349,7 @@ def test_open_search_reference_sets_knowledge_navigation_state() -> None:
 
     app._open_search_reference(st, service, reference)
 
-    assert st.session_state["atlas_active_page"] == "Knowledge"
+    assert st.session_state["atlas_active_page"] == "Object Workspace"
     assert st.session_state["atlas_knowledge_secondary_group"] == "Reusable Entities"
     assert st.session_state["atlas_knowledge_tertiary_page"] == "Vendors"
     assert st.session_state["atlas_context_selection"]["kind"] == "vendor"
@@ -1369,9 +1370,10 @@ def test_open_search_reference_sets_projects_library_navigation_state() -> None:
 
     app._open_search_reference(st, service, reference)
 
+    assert st.session_state["atlas_active_page"] == "Object Workspace"
     assert st.session_state["atlas_active_primary_workspace"] == "Projects"
-    assert st.session_state["atlas_active_workspace_mode"] == "library"
-    assert st.session_state["atlas_active_secondary_section"] == "all_projects"
+    assert st.session_state["atlas_active_workspace_mode"] == "active"
+    assert st.session_state["atlas_active_secondary_section"] == "overview"
     assert st.rerun_called is True
 
 
@@ -1391,6 +1393,7 @@ def test_open_search_reference_sets_projects_active_navigation_state() -> None:
     assert st.session_state["atlas_active_primary_workspace"] == "Projects"
     assert st.session_state["atlas_active_workspace_mode"] == "active"
     assert st.session_state["atlas_active_secondary_section"] == "project_details"
+    assert st.session_state["atlas_active_page"] == "Object Workspace"
     assert st.rerun_called is True
 
 

@@ -404,6 +404,12 @@ Remove repeated descriptions, duplicated workspace names, and explanatory paragr
 Future universal object surfaces should share the same stable object shell.
 The object type may change, but identity presentation, action location, relationship grouping, activity placement, and context-banner behavior should remain consistent.
 
+W-03 implementation note:
+- Atlas now applies this principle through a shared Object Workspace route for migrated object families
+- supported tertiary views should be contract-driven and intentionally bounded (Summary, Details, Relationships, Activity, Documents, History)
+- compatibility families may remain read-only in the shared shell while exposing direct authoritative open actions
+- deferred migrations should preserve this same shell composition instead of introducing new object-specific layout forks
+
 ## 13. Data Visualization
 
 Charts should exist only when they improve engineering understanding.

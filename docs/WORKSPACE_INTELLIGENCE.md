@@ -23,6 +23,12 @@ Implemented in W-02:
 - compatibility alignment between W-01 context persistence and universal object identity payloads
 - universal identity exposure in search references and Working Set-compatible records
 
+Implemented in W-03:
+- shared Universal Object Workspace rendering inside the existing shell for migrated object types
+- consistent object-level tertiary navigation (Summary, Details, Relationships, Activity, Documents, History) based on supported view contracts
+- reusable context banner and one-click return behavior in the object workspace using existing W-01 return-context state
+- search and Working Set handoff into Universal Object Workspace for supported object types while preserving backward compatibility for unsupported and legacy entries
+
 Out of scope:
 - AI
 - semantic retrieval
@@ -83,6 +89,12 @@ W-01 adds:
 - current workspace and selected Knowledge entity context as deterministic ranking inputs
 - preservation of broad application results even while favoring strong project-context matches
 
+W-03 continuity extension:
+- supported search opens now route into Object Workspace for migrated object families
+- context banner always reflects originating workspace and route label when available
+- one-click return from object workspace restores deterministic prior route context
+- unsupported/legacy object families continue using compatibility routes without breaking continuity
+
 ## Knowledge And Project Continuity
 W-01 supports contextual movement from project workflows into Knowledge using explicit actions on validated surfaces.
 
@@ -121,8 +133,12 @@ Compatibility rules:
 - remove and clear support
 - compatibility with older Working Set records
 
+W-03 Working Set handoff note:
+- opening a supported Working Set entry routes through Object Workspace and preserves the same return-context contract used by search handoff
+- unsupported entries continue to open through authoritative legacy pages
+
 ## Remaining Non-Blocking Debt
 - some continuity actions are still data-dependent and only appear when the underlying project or Knowledge payload proves the relationship
 - deeper coverage for vendor and service project-backlinks depends on stronger deterministic relationship surfacing in existing repository artifacts
 - additional object-detail pages can adopt the same return-context affordance in future W-series hardening
-- the Universal Object Workspace UI itself is still deferred; W-02 defines the contract and adapter layer only
+- broader object-family migration beyond W-03 controlled scope remains deferred

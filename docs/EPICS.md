@@ -31,10 +31,11 @@ Status: Active
 
 ## Epic W: Workspace Intelligence
 
-Status: Active (W-01 and W-02 completed; no active Epic W sprint)
+Status: Active (W-01, W-02, and W-03 completed; no active Epic W sprint)
 
 - W-01 Context Persistence and Cross-Workspace Navigation
 - W-02 Universal Object Contract
+- W-03 Universal Object Workspace
 
 ### W-01 Scope
 
@@ -70,6 +71,26 @@ Explicitly out of scope:
 - AI or semantic retrieval
 - new business workflows or domain entities
 - Epic E implementation start
+
+### W-03 Scope
+
+- implement reusable Universal Object Workspace UI inside existing shell
+- migrate controlled object scope: Customer, Vendor, Manufacturer, Product, Service, Contact, Location, Project
+- provide read-only shared-object-workspace support for Drawing, Specification, Equipment with direct open to authoritative engineering pages
+- preserve existing create/edit/archive/import/export domain workflows and project-workspace behavior
+- route supported search and Working Set opens through Universal Object Workspace while preserving continuity and backward compatibility
+- render shared workspace ownership components: identity, context banner, action panels, bounded tertiary view controls, relationships, activity, and provenance
+- keep object-level action availability registry-driven and compatibility-safe
+
+Explicitly out of scope:
+
+- migration of every object type
+- new business workflows or domain entities
+- AI or semantic retrieval
+- Epic E implementation start
+
+W-03 deferred migration note:
+- broader lifecycle families (for example systems, rooms, risks, RFIs, and evidence) remain deferred and should migrate through the same shared object-workspace shell contract in future W-series planning
 
 ### A-04 Scope (Completed)
 

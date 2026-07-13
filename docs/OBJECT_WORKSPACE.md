@@ -49,6 +49,56 @@ Explicitly not implemented in W-02:
 - new business workflows
 - new domain entities
 
+## W-03 Scope
+Implemented in W-03:
+- reusable Universal Object Workspace page inside existing Atlas shell
+- shared workspace layout with identity header, actions, tertiary object navigation, content, relationships, activity, and provenance
+- context banner using existing W-01 return context model
+- registry-driven rendering for migrated object families
+- controlled migration for Customer, Vendor, Manufacturer, Product, Service, Contact, Location, and Project object routes
+- read-only validation support for Drawing, Specification, and Equipment through the shared object workspace with direct open to authoritative engineering views
+- search and Working Set handoff into Universal Object Workspace for supported object types
+
+Explicitly not implemented in W-03:
+- migration of all object types
+- replacement of existing authoritative domain workflows
+- new business workflows, AI, or semantic retrieval
+
+## Shared Workspace Ownership
+The shared Universal Object Workspace owns only reusable presentation composition:
+- identity framing and provenance presentation
+- object-level action rendering and disabled-action reason presentation
+- supported tertiary view navigation (Summary, Details, Relationships, Activity, Documents, History)
+- context banner and deterministic return behavior
+- compatibility routing into authoritative domain pages where required
+
+The shared workspace does not own domain workflow truth:
+- domain services remain authoritative for create/edit/archive/import/export behavior
+- object adapters and registries expose interoperable shape, not replacement persistence
+- object-specific engineering workflows remain on existing specialized pages
+
+## Migrated Object Types
+Primary migrated object families:
+- Customer
+- Vendor
+- Manufacturer
+- Product
+- Service
+- Contact
+- Location
+- Project
+
+Read-only object-workspace compatibility families:
+- Drawing
+- Specification
+- Equipment
+
+## Compatibility Boundaries
+- unsupported object types must continue to open through legacy authoritative routes
+- read-only object families must expose direct open actions back to authoritative engineering pages
+- search and Working Set compatibility must preserve W-01 return context and existing route safety checks
+- object adapters must remain deterministic and backward compatible with older search and Working Set records
+
 ## Universal Object Workspace Shape
 Future workspace surfaces should be able to render a stable object shell using shared contract data for:
 - breadcrumb
@@ -116,6 +166,8 @@ Initial event classes include:
 - status changed
 
 ## Remaining Non-Blocking Debt
-- representative adapters exist for current project, knowledge, and engineering object families, but broader future lifecycle objects still need adapter definitions as those domains are implemented
-- current UI surfaces still render object detail in page-specific layouts; W-02 does not migrate them yet
+- representative adapters and workspace rendering are in place for migrated object families, but broader lifecycle object migration remains future work
+- some object-detail surfaces still use legacy page-specific layouts outside the W-03 migration scope
 - future permission-aware action gating should reuse the action contract without moving business logic into the registry layer
+- activity/history depth remains source-dependent and should continue expanding through existing deterministic audit/history repositories
+- full migration of additional lifecycle object families (for example systems, rooms, risks, RFIs, and evidence) remains deferred to future W-series hardening

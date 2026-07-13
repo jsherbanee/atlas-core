@@ -77,6 +77,26 @@ W-02 defines the Universal Object contract layer only.
 - future object surfaces can consume shared identity, action, relationship, activity, and presentation contracts
 - existing page layouts remain authoritative until a later workspace-migration sprint adopts the shared object shell
 
+W-03 introduces the first Universal Object Workspace UI migration.
+
+- the shared Object Workspace now renders supported objects through the W-02 contract and registry
+- migrated scope includes Customer, Vendor, Manufacturer, Product, Service, Contact, Location, and Project object routes
+- Drawing, Specification, and Equipment are supported in read-only object-workspace mode with direct open to authoritative engineering pages
+- search and Working Set open supported objects in Object Workspace while preserving existing continuity and return behavior
+- existing authoritative create/edit/archive/import/export workflows remain in their original domain pages
+
+W-03 shared workspace components:
+- object identity block with canonical identity/provenance fields
+- context banner with one-click return behavior
+- contract-driven primary action rendering including disabled-action reasons
+- object-level tertiary view selector limited to supported views only
+- deterministic relationship and activity presentation blocks with compatibility empty states
+
+W-03 compatibility boundaries:
+- no redesign of unrelated project or knowledge workflows
+- unsupported object families continue authoritative legacy routes
+- read-only object families retain authoritative engineering-page open actions
+
 ## Design-System Foundation (X-09)
 
 X-09 introduces shared UI authority for the Streamlit shell:
