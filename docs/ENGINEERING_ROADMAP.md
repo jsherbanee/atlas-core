@@ -39,11 +39,13 @@ Phase 2 Bid Intelligence remains active.
 
 Epic X is complete and formally closed.
 
-X-01 through X-10 are closed.
+X-01 through X-13 are closed.
 
 No Epic X sprint is active.
 
-Current engineering focus is Epic K Sprint K-02 implementation for core knowledge-entity operational workflows.
+W-01 Workspace Intelligence continuity is implemented and in closeout.
+
+Current engineering focus is post-W-01 regression monitoring, knowledge-entity follow-through, and broader continuity adoption on lower-priority object-detail surfaces.
 
 Epic E remains the next candidate epic only after architecture review and explicit sprint approval.
 
@@ -68,6 +70,7 @@ Epic E must not be started from this roadmap.
 - strengthen object graph construction and traversal
 - keep relationship evidence and provenance explicit
 - prepare for future relationship-aware search and visualization
+- preserve explicit workspace context handoff and deterministic return-context behavior across workspace transitions
 
 ### 4. Rule and Intelligence Infrastructure
 - keep deterministic rule evaluation auditable and reproducible

@@ -60,6 +60,12 @@ K-02 search note:
 X-12 search note:
 - Knowledge search handoff now restores reusable secondary and tertiary Knowledge navigation state so opening a result lands in the right workspace branch with deterministic breadcrumb context.
 
+W-01 search note:
+- search handoff now captures explicit return context and selected-record context so cross-workspace opens can return deterministically to the originating route
+- result captions now distinguish project-scoped and application-scoped entries explicitly
+- current workspace and selected Knowledge entity context can influence deterministic ranking without hiding broader results
+- Clear Search continues to restore the prior page context without widget-state mutation exceptions
+
 ## Permissions And Tenant Scope
 Search results must respect:
 - tenant boundaries

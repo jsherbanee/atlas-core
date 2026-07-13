@@ -19,6 +19,27 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Epic W Sprint W-01 Context Persistence and Cross-Workspace Navigation) (Closed)
+
+### Improved
+
+- Atlas now preserves explicit working context across Projects, Knowledge, Search, and related object-detail surfaces through repository-backed workspace state
+- cross-workspace opens now capture deterministic return context, visible breadcrumb context, and a one-click return affordance in the shared shell
+- search results now show explicit project/application scope labels while preserving deterministic ranking and Clear Search return behavior
+- Working Set continuity now supports both project objects and Knowledge entities under the existing compatibility model
+
+### Scope Notes
+
+- deterministic continuity only
+- no AI, semantic retrieval, new business workflows, or Epic E start
+- no parallel persistence system
+
+### Validation
+
+- focused continuity regression coverage increased the full-suite baseline to 1213 passing tests
+- live validation confirmed project reports summary to Knowledge customer continuity, visible return context, readable breadcrumbs, and no horizontal overflow at 820, 980, 1180, 1366, and large desktop widths
+- full quality gates passed (`black`, `ruff`, `mypy`, `pytest`) with full-suite regression count at 1213 tests
+
 ## Unreleased (Epic X Sprint X-13 Navigation Clarity and UX Refinement) (Closed)
 
 ### Improved

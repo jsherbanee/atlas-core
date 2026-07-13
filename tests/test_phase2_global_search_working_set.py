@@ -28,12 +28,18 @@ _SPEC.loader.exec_module(app)
 class _FakeStreamlit:
     session_state: dict[str, Any]
     rerun_called: bool = False
+    captions: list[str] | None = None
 
     def rerun(self) -> None:
         self.rerun_called = True
 
     def markdown(self, _text: str, **kwargs: Any) -> None:
         _ = kwargs
+
+    def caption(self, text: str) -> None:
+        if self.captions is None:
+            self.captions = []
+        self.captions.append(text)
 
 
 class _HomeContractStreamlit:
@@ -709,6 +715,86 @@ def test_knowledge_navigation_selection_maps_entity_kinds() -> None:
     assert st.session_state["atlas_knowledge_tertiary_page"] == "Manufacturers"
 
 
+def test_context_selection_populates_project_object_state() -> None:
+    st = _FakeStreamlit(session_state={})
+
+    app._set_context_selection(
+        st,
+        "drawing",
+        {"drawing_number": "AV-601", "title": "Floor Plan"},
+    )
+
+    assert st.session_state["atlas_selected_project_object_type"] == "drawing"
+    assert st.session_state["atlas_selected_project_object_id"] == "AV-601"
+    assert st.session_state["atlas_selected_knowledge_entity_type"] == ""
+
+
+def test_context_selection_populates_knowledge_entity_state() -> None:
+    st = _FakeStreamlit(session_state={})
+
+    app._set_context_selection(
+        st,
+        "vendor",
+        {"vendor": "ADI", "vendor_id": "vendor-adi"},
+    )
+
+    assert st.session_state["atlas_selected_knowledge_entity_type"] == "vendor"
+    assert st.session_state["atlas_selected_knowledge_entity_id"] == "ADI"
+    assert st.session_state["atlas_selected_project_object_type"] == ""
+
+
+def test_record_return_context_bounds_history_and_dedupes() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_active_primary_workspace": "Projects",
+            "atlas_active_workspace_mode": "active",
+            "atlas_active_page": "BOM Review",
+            "atlas_active_secondary_section": "bom_review",
+            "atlas_active_tertiary_action": "review_items",
+            "atlas_active_workspace_id": "maw-demo",
+            "atlas_active_project_name": "MAW",
+            "atlas_context_selection": {
+                "kind": "equipment",
+                "data": {"equipment_id": "EQ-1", "manufacturer": "QSC"},
+            },
+            "atlas_tenant_scope": "local",
+            "atlas_navigation_history": [],
+        }
+    )
+
+    app._apply_context_selection_state(
+        st,
+        "equipment",
+        {"equipment_id": "EQ-1", "manufacturer": "QSC"},
+    )
+    first = app._record_return_context(st, source_label="Open Product")
+    second = app._record_return_context(st, source_label="Open Product")
+
+    assert first["source_route"] == "BOM Review"
+    assert second["source_object_id"] == "EQ-1"
+    history = st.session_state["atlas_navigation_history"]
+    assert len(history) == 1
+    assert history[0]["tenant_scope"] == "local"
+
+
+def test_return_context_rejects_tenant_mismatch() -> None:
+    st = _FakeStreamlit(session_state={"atlas_tenant_scope": "local"})
+    service = _FakeWorkspaceService([])
+
+    assert (
+        app._return_context_is_compatible(
+            st,
+            service,
+            {
+                "tenant_scope": "other-tenant",
+                "source_route": "BOM Review",
+                "source_workspace": "Projects",
+            },
+        )
+        is False
+    )
+
+
 def test_header_search_control_uses_simple_search_placeholder() -> None:
     st = _HomeContractStreamlit()
 
@@ -851,6 +937,167 @@ def test_breadcrumb_page_label_maps_administration_to_settings() -> None:
 
 def test_breadcrumb_for_mission_control_renders_home_for_users() -> None:
     assert app._breadcrumb(None, "Mission Control") == "Atlas / Home"
+
+
+def test_breadcrumb_includes_selected_knowledge_product_context() -> None:
+    streamlit_stub = SimpleNamespace(
+        session_state={
+            "atlas_context_selection": {
+                "kind": "master_product",
+                "data": {
+                    "manufacturer": "QSC",
+                    "model": "Core 110f",
+                    "canonical_sku": "Core 110f",
+                },
+            }
+        }
+    )
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setitem(sys.modules, "streamlit", streamlit_stub)
+    try:
+        result = app._breadcrumb(_project_record("maw-demo", "MAW"), "Knowledge")
+    finally:
+        monkeypatch.undo()
+
+    assert result == "Atlas / Knowledge / Products / QSC Core 110f"
+
+
+def test_breadcrumb_keeps_project_context_for_active_project_reports() -> None:
+    result = app._breadcrumb(_project_record("maw-demo", "MAW"), "Reports")
+
+    assert result == "Atlas / Projects / MAW / Reports"
+
+
+def test_restore_context_entry_clears_invalid_return_context_and_reruns() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_return_context": {
+                "tenant_scope": "other-tenant",
+                "source_workspace": "Projects",
+                "source_route": "BOM Review",
+            },
+            "atlas_tenant_scope": "local",
+        }
+    )
+
+    app._restore_context_entry(
+        st,
+        _FakeWorkspaceService([]),
+        dict(st.session_state["atlas_return_context"]),
+    )
+
+    assert st.session_state["atlas_return_context"] == {}
+    assert st.rerun_called is True
+
+
+def test_return_context_label_prefers_source_label_over_route() -> None:
+    label = app._return_context_label(
+        {"source_label": "Project Summary", "source_route": "Reports"}
+    )
+
+    assert label == "Return to Project Summary"
+
+
+def test_open_knowledge_selection_preserves_project_return_context() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_active_primary_workspace": "Projects",
+            "atlas_active_workspace_mode": "active",
+            "atlas_active_page": "BOM Review",
+            "atlas_active_secondary_section": "bom_review",
+            "atlas_active_tertiary_action": "review_items",
+            "atlas_active_workspace_id": "maw-demo",
+            "atlas_active_project_name": "MAW",
+            "atlas_context_selection": {
+                "kind": "equipment",
+                "data": {"equipment_id": "EQ-1"},
+            },
+            "atlas_tenant_scope": "local",
+            "atlas_navigation_history": [],
+        }
+    )
+
+    app._apply_context_selection_state(st, "equipment", {"equipment_id": "EQ-1"})
+    app._open_knowledge_selection(
+        st,
+        kind="manufacturer",
+        data={"manufacturer": "QSC", "manufacturer_id": "QSC"},
+        source_label="BOM Review",
+    )
+
+    assert st.session_state["atlas_active_page"] == "Knowledge"
+    assert st.session_state["atlas_selected_knowledge_entity_type"] == "manufacturer"
+    assert st.session_state["atlas_active_secondary_section"] == "manufacturers"
+    assert st.session_state["atlas_active_tertiary_action"] == "browse"
+    assert st.session_state["atlas_return_context"]["source_route"] == "BOM Review"
+    assert st.rerun_called is True
+
+
+def test_restore_context_entry_returns_to_valid_project_route() -> None:
+    record = _project_record("maw-demo", "MAW")
+    st = _FakeStreamlit(session_state={"atlas_tenant_scope": "local"})
+    service = _FakeWorkspaceService([record])
+
+    app._restore_context_entry(
+        st,
+        service,
+        {
+            "tenant_scope": "local",
+            "source_workspace": "Projects",
+            "source_route": "Estimate",
+            "source_project": "maw-demo",
+            "source_secondary": "estimate",
+            "source_tertiary": "equipment",
+            "source_object_kind": "equipment",
+            "source_selection": {"equipment_id": "EQ-1"},
+        },
+    )
+
+    assert st.session_state["atlas_active_workspace_id"] == "maw-demo"
+    assert st.session_state["atlas_active_page"] == "Estimate"
+    assert st.session_state["atlas_active_secondary_section"] == "estimate"
+    assert st.session_state["atlas_context_selection"]["kind"] == "equipment"
+    assert st.rerun_called is True
+
+
+def test_related_projects_for_customer_uses_repository_data() -> None:
+    record = _project_record("maw-demo", "MAW")
+    record.project.client = "Acme"
+    record.metadata["owner"] = "Acme"
+    service = _FakeWorkspaceService([record])
+
+    rows = app._related_projects_for_knowledge_entity(
+        service,
+        entity_kind="customer",
+        data={"customer": "Acme"},
+    )
+
+    assert rows[0]["workspace_id"] == "maw-demo"
+    assert rows[0]["reason"] == "Customer match"
+
+
+def test_working_set_supports_project_and_knowledge_records() -> None:
+    st = _FakeStreamlit(session_state={"atlas_pinned_objects": []})
+    project_object = {
+        "object_id": "EQ-1",
+        "object_type": "Equipment",
+        "display_name": "QSC Core",
+    }
+    knowledge_object = {
+        "object_id": "vendor-adi",
+        "object_type": "Vendor",
+        "display_name": "ADI",
+    }
+
+    app._toggle_pin_reference(st, project_object, should_pin=True)
+    app._toggle_pin_reference(st, knowledge_object, should_pin=True)
+
+    assert [
+        item["object_type"] for item in st.session_state["atlas_pinned_objects"]
+    ] == [
+        "Vendor",
+        "Equipment",
+    ]
 
 
 def test_home_content_contract_headings_and_removed_sections() -> None:
@@ -1105,6 +1352,7 @@ def test_open_search_reference_sets_knowledge_navigation_state() -> None:
     assert st.session_state["atlas_knowledge_secondary_group"] == "Reusable Entities"
     assert st.session_state["atlas_knowledge_tertiary_page"] == "Vendors"
     assert st.session_state["atlas_context_selection"]["kind"] == "vendor"
+    assert st.session_state["atlas_return_context"]["source_route"] == "Mission Control"
     assert st.rerun_called is True
 
 
@@ -1178,6 +1426,38 @@ def test_sync_workspace_navigation_state_resolves_projects_library_secondary() -
     assert st.session_state["atlas_active_secondary_section"] == "pinned_projects"
 
 
+def test_sync_workspace_navigation_state_derives_knowledge_entity_branch() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_active_page": "Knowledge",
+            "atlas_context_selection": {
+                "kind": "vendor",
+                "data": {"vendor": "ADI", "vendor_id": "ADI"},
+            },
+        }
+    )
+
+    app._sync_workspace_navigation_state(st, record=None)
+
+    assert st.session_state["atlas_active_primary_workspace"] == "Knowledge"
+    assert st.session_state["atlas_active_secondary_section"] == "vendors"
+    assert st.session_state["atlas_active_tertiary_action"] == "browse"
+
+
+def test_reports_navigation_contract_routes_project_summary_to_dedicated_page() -> None:
+    contract = app._workspace_navigation_contract("Projects", "active")
+    reports_section = next(
+        item for item in contract if item["secondary_key"] == "reports"
+    )
+    project_summary = next(
+        item
+        for item in reports_section["supported_tertiary_actions"]
+        if item["tertiary_key"] == "project_summary"
+    )
+
+    assert project_summary["route"] == "Project Summary"
+
+
 def test_workspace_state_snapshot_includes_navigation_state() -> None:
     st = _FakeStreamlit(
         session_state={
@@ -1200,6 +1480,15 @@ def test_workspace_state_snapshot_includes_navigation_state() -> None:
             "atlas_active_tertiary_action": "summary",
             "atlas_selected_entity_type": "drawing",
             "atlas_selected_entity_id": "AV-601",
+            "atlas_selected_project_object_type": "drawing",
+            "atlas_selected_project_object_id": "AV-601",
+            "atlas_selected_knowledge_entity_type": "",
+            "atlas_selected_knowledge_entity_id": "",
+            "atlas_return_context": {"source_route": "BOM Review"},
+            "atlas_navigation_history": [{"source_route": "BOM Review"}],
+            "atlas_originating_workspace": "Projects",
+            "atlas_originating_route": "BOM Review",
+            "atlas_tenant_scope": "local",
         }
     )
 
@@ -1212,6 +1501,12 @@ def test_workspace_state_snapshot_includes_navigation_state() -> None:
     assert navigation["tertiary"] == "summary"
     assert navigation["selected_entity_type"] == "drawing"
     assert navigation["selected_entity_id"] == "AV-601"
+    workspace_context = dict(snapshot.get("workspace_context_state") or {})
+    assert workspace_context["selected_project_object_type"] == "drawing"
+    assert workspace_context["selected_project_object_id"] == "AV-601"
+    assert workspace_context["return_context"]["source_route"] == "BOM Review"
+    assert workspace_context["originating_route"] == "BOM Review"
+    assert workspace_context["tenant_scope"] == "local"
 
 
 def test_restore_workspace_state_restores_navigation_state() -> None:
@@ -1230,6 +1525,17 @@ def test_restore_workspace_state_restores_navigation_state() -> None:
                     "selected_entity_type": "drawing",
                     "selected_entity_id": "AV-601",
                 },
+                "workspace_context_state": {
+                    "selected_project_object_type": "drawing",
+                    "selected_project_object_id": "AV-601",
+                    "selected_knowledge_entity_type": "vendor",
+                    "selected_knowledge_entity_id": "ADI",
+                    "return_context": {"source_route": "Estimate"},
+                    "navigation_history": [{"source_route": "Estimate"}],
+                    "originating_workspace": "Projects",
+                    "originating_route": "Estimate",
+                    "tenant_scope": "local",
+                },
             }
 
     st = _FakeStreamlit(session_state={})
@@ -1243,6 +1549,10 @@ def test_restore_workspace_state_restores_navigation_state() -> None:
     assert st.session_state["atlas_active_tertiary_action"] == "drawings"
     assert st.session_state["atlas_selected_entity_type"] == "drawing"
     assert st.session_state["atlas_selected_entity_id"] == "AV-601"
+    assert st.session_state["atlas_selected_project_object_type"] == "drawing"
+    assert st.session_state["atlas_selected_knowledge_entity_type"] == "vendor"
+    assert st.session_state["atlas_return_context"]["source_route"] == "Estimate"
+    assert st.session_state["atlas_tenant_scope"] == "local"
 
 
 def test_open_project_record_updates_recency() -> None:

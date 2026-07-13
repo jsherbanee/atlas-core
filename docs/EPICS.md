@@ -29,6 +29,33 @@ Status: Active
 - A-05 End-to-End GUI Validation and Workflow Refinement
 - A-06 Quality Gates, CI, and Regression Baseline
 
+## Epic W: Workspace Intelligence
+
+Status: Active (W-01 completed; no active Epic W sprint)
+
+- W-01 Context Persistence and Cross-Workspace Navigation
+
+### W-01 Scope
+
+- preserve explicit working context across Projects, Knowledge, Search, and related object-detail views
+- add deterministic return-context behavior and bounded navigation history using existing workspace persistence
+- extend Working Set and breadcrumbs to behave coherently across project and application scopes
+
+Explicitly out of scope:
+
+- AI or semantic retrieval
+- new business workflows or domain entities
+- Epic E implementation start
+
+### W-01 Closeout
+
+- explicit context persistence shipped through existing workspace-state persistence
+- return-context behavior is deterministic and one-click
+- search handoff now carries return context and clearer scope labeling
+- mixed project-object and Knowledge-entity Working Set continuity is supported
+
+No Epic W sprint is currently active.
+
 ### A-04 Scope (Completed)
 
 - standardize shared workspace section-header pattern

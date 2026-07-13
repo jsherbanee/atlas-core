@@ -27,6 +27,12 @@ This document defines the reusable navigation contract used by the shell and wor
 - Knowledge search results restore the active secondary group and tertiary page selection context
 - The framework is intended to be extended to additional workspaces without changing the contract shape
 
+W-01 implementation note:
+- navigation continuity now carries explicit context state for active workspace, active secondary/tertiary selection, active project, selected project object, selected Knowledge entity, bounded return context, and bounded navigation history
+- return context is deterministic and one-click, not inferred from browser history
+- the shared shell now owns visible breadcrumb and return affordances for cross-workspace movement
+- Knowledge handoff now derives the correct secondary entity section and action row from the selected Knowledge entity context rather than falling back to overview
+
 ## Validation
 
 - Search result opening preserves Knowledge navigation context

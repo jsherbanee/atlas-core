@@ -3913,6 +3913,15 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault(_navigation_selected_entity_type_key(), "")
     st.session_state.setdefault(_navigation_selected_entity_id_key(), "")
     st.session_state.setdefault(_navigation_prior_route_key(), {})
+    st.session_state.setdefault(_selected_project_object_type_key(), "")
+    st.session_state.setdefault(_selected_project_object_id_key(), "")
+    st.session_state.setdefault(_selected_knowledge_entity_type_key(), "")
+    st.session_state.setdefault(_selected_knowledge_entity_id_key(), "")
+    st.session_state.setdefault(_return_context_key(), {})
+    st.session_state.setdefault(_navigation_history_key(), [])
+    st.session_state.setdefault(_originating_workspace_key(), "")
+    st.session_state.setdefault(_originating_route_key(), "")
+    st.session_state.setdefault(_tenant_scope_key(), "local")
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -4303,8 +4312,10 @@ def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
         "Open Existing Project",
     }:
         return f"Atlas / Projects / {page_label}"
-    if page in {"Mission Control", "Reports", "Administration"}:
+    if page in {"Mission Control", "Administration"}:
         return f"Atlas / {page_label}"
+    if page == "Reports":
+        return f"Atlas / Projects / {record.project.name} / Reports"
 
     st_module: Any | None = None
     try:
@@ -4331,11 +4342,23 @@ def _breadcrumb(record: ProjectWorkspaceRecord | None, page: str) -> str:
         name = _object_display_name(kind, data)
         return f"Atlas / Projects / {record.project.name} / {page_label} / {name}"
 
+    if record is not None and page in {"BOM Review", "Estimate", "Product Resolution"}:
+        if kind in _knowledge_selection_kinds() | _project_object_selection_kinds():
+            name = _object_display_name(kind, data)
+            if name:
+                return (
+                    f"Atlas / Projects / {record.project.name} / {page_label} / {name}"
+                )
+
     if page == "Knowledge":
         knowledge_segments = {
             "manufacturer": "Manufacturers",
             "vendor": "Vendors",
             "customer": "Customers",
+            "service": "Services",
+            "contact": "Contacts",
+            "location": "Locations",
+            "project": "Projects",
             "master_product": "Products",
             "price_list": "Price Lists",
         }
@@ -4804,6 +4827,485 @@ def _navigation_prior_route_key() -> str:
     return "atlas_prior_route_context"
 
 
+def _selected_project_object_type_key() -> str:
+    return "atlas_selected_project_object_type"
+
+
+def _selected_project_object_id_key() -> str:
+    return "atlas_selected_project_object_id"
+
+
+def _selected_knowledge_entity_type_key() -> str:
+    return "atlas_selected_knowledge_entity_type"
+
+
+def _selected_knowledge_entity_id_key() -> str:
+    return "atlas_selected_knowledge_entity_id"
+
+
+def _return_context_key() -> str:
+    return "atlas_return_context"
+
+
+def _navigation_history_key() -> str:
+    return "atlas_navigation_history"
+
+
+def _originating_workspace_key() -> str:
+    return "atlas_originating_workspace"
+
+
+def _originating_route_key() -> str:
+    return "atlas_originating_route"
+
+
+def _context_history_limit() -> int:
+    return 12
+
+
+def _tenant_scope_key() -> str:
+    return "atlas_tenant_scope"
+
+
+def _knowledge_selection_kinds() -> set[str]:
+    return {
+        "manufacturer",
+        "vendor",
+        "customer",
+        "service",
+        "contact",
+        "location",
+        "project",
+        "master_product",
+        "price_list",
+    }
+
+
+def _project_object_selection_kinds() -> set[str]:
+    return {
+        "equipment",
+        "drawing",
+        "specification",
+        "system",
+        "room",
+        "rfi",
+        "evidence",
+        "resolver_conflict",
+        "resolved",
+        "notebook_entry",
+        "project_record",
+    }
+
+
+def _reset_selected_context_targets(st: Any) -> None:
+    st.session_state[_selected_project_object_type_key()] = ""
+    st.session_state[_selected_project_object_id_key()] = ""
+    st.session_state[_selected_knowledge_entity_type_key()] = ""
+    st.session_state[_selected_knowledge_entity_id_key()] = ""
+
+
+def _apply_context_selection_state(st: Any, kind: str, data: dict[str, Any]) -> None:
+    _reset_selected_context_targets(st)
+    selected_id = _safe_text(_object_id_for_selection(kind, data), "")
+    if kind in _knowledge_selection_kinds():
+        st.session_state[_selected_knowledge_entity_type_key()] = kind
+        st.session_state[_selected_knowledge_entity_id_key()] = selected_id
+    elif kind in _project_object_selection_kinds():
+        st.session_state[_selected_project_object_type_key()] = kind
+        st.session_state[_selected_project_object_id_key()] = selected_id
+
+
+def _current_workspace_context(st: Any) -> dict[str, Any]:
+    selection = dict(st.session_state.get("atlas_context_selection") or {})
+    kind = _safe_text(selection.get("kind"), "")
+    data = dict(selection.get("data") or {})
+    return {
+        "workspace": _safe_text(
+            st.session_state.get(_navigation_primary_state_key()),
+            "Atlas",
+        ),
+        "workspace_mode": _safe_text(
+            st.session_state.get(_navigation_mode_state_key()),
+            "application",
+        ),
+        "route": _safe_text(
+            st.session_state.get("atlas_active_page"), "Mission Control"
+        ),
+        "secondary": _safe_text(
+            st.session_state.get(_navigation_secondary_state_key()),
+            "",
+        ),
+        "tertiary": _safe_text(
+            st.session_state.get(_navigation_tertiary_state_key()),
+            "",
+        ),
+        "project_id": _safe_text(
+            st.session_state.get("atlas_active_workspace_id"),
+            "",
+        ),
+        "project_name": _safe_text(
+            st.session_state.get("atlas_active_project_name"),
+            "",
+        ),
+        "selection_kind": kind,
+        "selection_id": _safe_text(_object_id_for_selection(kind, data), ""),
+        "selection_label": _object_display_name(kind, data) if kind else "",
+        "selection_data": data,
+        "selected_project_object_type": _safe_text(
+            st.session_state.get(_selected_project_object_type_key()),
+            "",
+        ),
+        "selected_project_object_id": _safe_text(
+            st.session_state.get(_selected_project_object_id_key()),
+            "",
+        ),
+        "selected_knowledge_entity_type": _safe_text(
+            st.session_state.get(_selected_knowledge_entity_type_key()),
+            "",
+        ),
+        "selected_knowledge_entity_id": _safe_text(
+            st.session_state.get(_selected_knowledge_entity_id_key()),
+            "",
+        ),
+    }
+
+
+def _record_return_context(
+    st: Any,
+    *,
+    source_label: str | None = None,
+) -> dict[str, Any]:
+    context = _current_workspace_context(st)
+    entry = {
+        "source_workspace": _safe_text(context.get("workspace"), "Atlas"),
+        "source_route": _safe_text(context.get("route"), "Mission Control"),
+        "source_label": _safe_text(
+            source_label,
+            _safe_text(
+                context.get("selection_label"),
+                _safe_text(context.get("route"), "Atlas"),
+            ),
+        ),
+        "source_project": _safe_text(context.get("project_id"), ""),
+        "source_project_name": _safe_text(context.get("project_name"), ""),
+        "source_object_kind": _safe_text(context.get("selection_kind"), ""),
+        "source_object_id": _safe_text(context.get("selection_id"), ""),
+        "source_selection": dict(context.get("selection_data") or {}),
+        "source_secondary": _safe_text(context.get("secondary"), ""),
+        "source_tertiary": _safe_text(context.get("tertiary"), ""),
+        "tenant_scope": _safe_text(
+            st.session_state.get(_tenant_scope_key()),
+            "local",
+        ),
+        "timestamp": _now_iso(),
+    }
+    st.session_state[_return_context_key()] = entry
+    st.session_state[_originating_workspace_key()] = entry["source_workspace"]
+    st.session_state[_originating_route_key()] = entry["source_route"]
+
+    history = [
+        dict(item)
+        for item in list(st.session_state.get(_navigation_history_key()) or [])
+        if isinstance(item, dict)
+    ]
+    deduped = [
+        item
+        for item in history
+        if not (
+            _safe_text(item.get("source_workspace"), "") == entry["source_workspace"]
+            and _safe_text(item.get("source_route"), "") == entry["source_route"]
+            and _safe_text(item.get("source_object_id"), "")
+            == entry["source_object_id"]
+        )
+    ]
+    deduped.insert(0, entry)
+    st.session_state[_navigation_history_key()] = deduped[: _context_history_limit()]
+    return entry
+
+
+def _return_context_label(entry: dict[str, Any]) -> str:
+    source_label = _safe_text(entry.get("source_label"), "")
+    source_route = _safe_text(entry.get("source_route"), "")
+    target = source_label or source_route or "previous workspace"
+    return f"Return to {target}"
+
+
+def _return_context_is_compatible(
+    st: Any,
+    workspace_service: Any,
+    entry: dict[str, Any],
+) -> bool:
+    if not entry:
+        return False
+    current_tenant_scope = _safe_text(
+        st.session_state.get(_tenant_scope_key()), "local"
+    )
+    if (
+        _safe_text(entry.get("tenant_scope"), current_tenant_scope)
+        != current_tenant_scope
+    ):
+        return False
+    source_project = _safe_text(entry.get("source_project"), "")
+    if not source_project:
+        return True
+    try:
+        records = workspace_service.list_workspaces(include_archived=True, limit=1000)
+    except Exception:
+        return False
+    return any(item.workspace_id == source_project for item in records)
+
+
+def _restore_context_entry(
+    st: Any,
+    workspace_service: Any,
+    entry: dict[str, Any],
+) -> None:
+    if not _return_context_is_compatible(st, workspace_service, entry):
+        st.session_state[_return_context_key()] = {}
+        st.rerun()
+        return
+
+    source_project = _safe_text(entry.get("source_project"), "")
+    if source_project:
+        try:
+            records = {
+                item.workspace_id: item
+                for item in workspace_service.list_workspaces(
+                    include_archived=True,
+                    limit=1000,
+                )
+            }
+        except Exception:
+            records = {}
+        selected_record = records.get(source_project)
+        if selected_record is not None:
+            if hasattr(workspace_service, "save_record"):
+                workspace_service.save_record(selected_record)
+            st.session_state["atlas_active_workspace_id"] = selected_record.workspace_id
+
+    st.session_state["atlas_active_page"] = _safe_text(
+        entry.get("source_route"),
+        "Mission Control",
+    )
+    st.session_state[_navigation_primary_state_key()] = _safe_text(
+        entry.get("source_workspace"),
+        "Atlas",
+    )
+    st.session_state[_navigation_secondary_state_key()] = _safe_text(
+        entry.get("source_secondary"),
+        _safe_text(st.session_state.get(_navigation_secondary_state_key()), "overview"),
+    )
+    st.session_state[_navigation_tertiary_state_key()] = _safe_text(
+        entry.get("source_tertiary"),
+        _safe_text(st.session_state.get(_navigation_tertiary_state_key()), "browse"),
+    )
+    selection_kind = _safe_text(entry.get("source_object_kind"), "")
+    selection_data = dict(entry.get("source_selection") or {})
+    if selection_kind and selection_data:
+        _set_context_selection(st, selection_kind, selection_data)
+    st.session_state[_return_context_key()] = {}
+    st.rerun()
+
+
+def _render_return_context_action(st: Any, workspace_service: Any) -> None:
+    entry = dict(st.session_state.get(_return_context_key()) or {})
+    if not entry or not _return_context_is_compatible(st, workspace_service, entry):
+        return
+    action_cols = st.columns([4.8, 1.2])
+    action_cols[0].caption(
+        f"From {_safe_text(entry.get('source_workspace'), 'Atlas')} · {_safe_text(entry.get('source_route'), '')}"
+    )
+    if action_cols[1].button(
+        _return_context_label(entry),
+        key="atlas_return_context_action",
+        width="stretch",
+    ):
+        _restore_context_entry(st, workspace_service, entry)
+
+
+def _open_knowledge_selection(
+    st: Any,
+    *,
+    kind: str,
+    data: dict[str, Any],
+    source_label: str,
+) -> None:
+    _record_return_context(st, source_label=source_label)
+    knowledge_page = _knowledge_tertiary_page_for_kind(kind)
+    st.session_state["atlas_active_page"] = "Knowledge"
+    st.session_state[_navigation_primary_state_key()] = "Knowledge"
+    st.session_state[_navigation_mode_state_key()] = "application"
+    st.session_state[_navigation_secondary_state_key()] = _safe_text(
+        _secondary_key_for_page("Knowledge", "application", knowledge_page),
+        "overview",
+    )
+    st.session_state[_navigation_tertiary_state_key()] = (
+        "summary" if kind == "overview" else "browse"
+    )
+    _knowledge_navigation_defaults(st)
+    _set_knowledge_navigation_selection(st, kind=kind, page=knowledge_page)
+    _set_context_selection(st, kind, dict(data))
+    st.rerun()
+
+
+def _normalized_entity_match(value: Any) -> str:
+    return " ".join(_safe_text(value, "").strip().lower().split())
+
+
+def _related_projects_for_knowledge_entity(
+    workspace_service: ProjectWorkspaceService,
+    *,
+    entity_kind: str,
+    data: dict[str, Any],
+) -> list[dict[str, Any]]:
+    records = workspace_service.list_workspaces(include_archived=True, limit=500)
+    matches: list[dict[str, Any]] = []
+    entity_name = _normalized_entity_match(_object_display_name(entity_kind, data))
+    entity_id = _safe_text(_object_id_for_selection(entity_kind, data), "")
+    target_manufacturer = _normalized_entity_match(data.get("manufacturer"))
+    target_model = _normalized_entity_match(
+        data.get("model") or data.get("canonical_sku") or data.get("manufacturer_sku")
+    )
+
+    for record in records:
+        customer_name = _normalized_entity_match(
+            record.metadata.get("owner") or record.project.client
+        )
+        if entity_kind == "customer" and entity_name and customer_name == entity_name:
+            matches.append(
+                {
+                    "workspace_id": record.workspace_id,
+                    "project_name": record.project.name,
+                    "reason": "Customer match",
+                }
+            )
+            continue
+        if entity_kind == "project" and entity_id and record.workspace_id == entity_id:
+            matches.append(
+                {
+                    "workspace_id": record.workspace_id,
+                    "project_name": record.project.name,
+                    "reason": "Project entity",
+                }
+            )
+            continue
+
+        try:
+            artifact = workspace_service.manager.review_repository.load_artifact(
+                record.workspace_id,
+                "bid_package_review",
+            )
+        except Exception:
+            artifact = None
+        if not isinstance(artifact, dict):
+            continue
+        equipment_rows = list(artifact.get("equipment") or [])
+        if entity_kind == "manufacturer" and target_manufacturer:
+            if any(
+                _normalized_entity_match(item.get("manufacturer"))
+                == target_manufacturer
+                for item in equipment_rows
+            ):
+                matches.append(
+                    {
+                        "workspace_id": record.workspace_id,
+                        "project_name": record.project.name,
+                        "reason": "Manufacturer used in reviewed equipment",
+                    }
+                )
+                continue
+        if entity_kind == "master_product" and target_manufacturer and target_model:
+            if any(
+                _normalized_entity_match(item.get("manufacturer"))
+                == target_manufacturer
+                and (
+                    _normalized_entity_match(item.get("model")) == target_model
+                    or _normalized_entity_match(item.get("manufacturer_part_number"))
+                    == target_model
+                )
+                for item in equipment_rows
+            ):
+                matches.append(
+                    {
+                        "workspace_id": record.workspace_id,
+                        "project_name": record.project.name,
+                        "reason": "Product used in reviewed equipment",
+                    }
+                )
+                continue
+
+    return matches
+
+
+def _render_related_projects_section(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    *,
+    entity_kind: str,
+    data: dict[str, Any],
+    key_prefix: str,
+) -> None:
+    related_projects = _related_projects_for_knowledge_entity(
+        workspace_service,
+        entity_kind=entity_kind,
+        data=data,
+    )
+    if not related_projects:
+        return
+    st.markdown("### Used in Projects")
+    st.dataframe(
+        [
+            {
+                "Project": item.get("project_name"),
+                "Workspace ID": item.get("workspace_id"),
+                "Reason": item.get("reason"),
+            }
+            for item in related_projects
+        ],
+        width="stretch",
+        hide_index=True,
+    )
+    labels = [
+        f"{_safe_text(item.get('project_name'), 'Project')} · {_safe_text(item.get('workspace_id'), '')}"
+        for item in related_projects
+    ]
+    selected_label = st.selectbox(
+        "Related Project",
+        options=labels,
+        key=f"{key_prefix}_related_projects",
+    )
+    selected_project = related_projects[labels.index(selected_label)]
+    if st.button(
+        "Open Related Project",
+        key=f"{key_prefix}_open_related_project",
+        width="stretch",
+    ):
+        _record_return_context(
+            st,
+            source_label=_safe_text(
+                _object_display_name(entity_kind, data),
+                "Knowledge",
+            ),
+        )
+        records = {
+            item.workspace_id: item
+            for item in workspace_service.list_workspaces(
+                include_archived=True,
+                limit=1000,
+            )
+        }
+        target_record = records.get(
+            _safe_text(selected_project.get("workspace_id"), "")
+        )
+        if target_record is not None:
+            _navigate_to_project_page(
+                st,
+                record=target_record,
+                page="Overview",
+                workspace_service=workspace_service,
+            )
+
+
 def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
     return {
         "overview": [
@@ -5264,6 +5766,18 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
         built: list[dict[str, Any]] = []
         for secondary_key, label in sections:
             actions = templates.get(secondary_key, [])
+            default_action = next(
+                (
+                    _safe_text(action.get("tertiary_key"), "browse")
+                    for action in actions
+                    if _safe_text(action.get("tertiary_key"), "") == "browse"
+                ),
+                (
+                    _safe_text(actions[0].get("tertiary_key"), "browse")
+                    if actions
+                    else "browse"
+                ),
+            )
             built.append(
                 {
                     "workspace": "Knowledge",
@@ -5275,11 +5789,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                     "visibility": True,
                     "enabled": True,
                     "required_context": None,
-                    "default_tertiary_action": (
-                        _safe_text(actions[0].get("tertiary_key"), "browse")
-                        if actions
-                        else "browse"
-                    ),
+                    "default_tertiary_action": default_action,
                     "supported_tertiary_actions": [
                         {
                             "tertiary_key": _safe_text(
@@ -5313,27 +5823,39 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
         return PROJECTS_LIBRARY_NAVIGATION_CONTRACT
 
     active_sections: list[
-        tuple[str, str, str, list[tuple[str, str, str, str | None]]]
+        tuple[str, str, str, list[tuple[str, str, str, str | None, str | None]]]
     ] = [
         (
             "overview",
             "Overview",
             "Overview",
-            [("summary", "Summary", "collection_view", None)],
+            [("summary", "Summary", "collection_view", None, None)],
         ),
         (
             "documents",
             "Documents",
             "Documents",
             [
-                ("add_files", "Add Files", "import_action", None),
-                ("browse", "Browse", "collection_view", None),
-                ("drawings", "Drawings", "detail_view", None),
-                ("specifications", "Specifications", "detail_view", None),
-                ("schedules", "Schedules", "detail_view", None),
-                ("addenda", "Addenda", "detail_view", None),
-                ("images", "Images", "detail_view", None),
-                ("import_activity", "Imports", "history_activity_view", None),
+                ("add_files", "Add Files", "import_action", None, None),
+                ("browse", "Browse", "collection_view", None, None),
+                ("drawings", "Drawings", "detail_view", None, "Drawings"),
+                (
+                    "specifications",
+                    "Specifications",
+                    "detail_view",
+                    None,
+                    "Specifications",
+                ),
+                ("schedules", "Schedules", "detail_view", None, "Schedules"),
+                ("addenda", "Addenda", "detail_view", None, "Addenda"),
+                ("images", "Images", "detail_view", None, None),
+                (
+                    "import_activity",
+                    "Imports",
+                    "history_activity_view",
+                    None,
+                    "Import History",
+                ),
             ],
         ),
         (
@@ -5341,11 +5863,17 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             "BOM Review",
             "BOM Review",
             [
-                ("summary", "Summary", "collection_view", None),
-                ("review_items", "Review Items", "detail_view", None),
-                ("product_resolution", "Product Resolution", "operational_view", None),
-                ("cost_selection", "Cost Selection", "operational_view", None),
-                ("export", "Export", "export_action", None),
+                ("summary", "Summary", "collection_view", None, None),
+                ("review_items", "Review Items", "detail_view", None, None),
+                (
+                    "product_resolution",
+                    "Product Resolution",
+                    "operational_view",
+                    None,
+                    "Product Resolution",
+                ),
+                ("cost_selection", "Cost Selection", "operational_view", None, None),
+                ("export", "Export", "export_action", None, None),
             ],
         ),
         (
@@ -5353,11 +5881,11 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             "Scope & Risk",
             "Scope & Risk",
             [
-                ("summary", "Summary", "collection_view", None),
-                ("findings", "Findings", "detail_view", None),
-                ("rfis", "RFIs", "detail_view", None),
-                ("responsibilities", "Responsibilities", "detail_view", None),
-                ("export", "Export", "export_action", None),
+                ("summary", "Summary", "collection_view", None, None),
+                ("findings", "Findings", "detail_view", None, None),
+                ("rfis", "RFIs", "detail_view", None, None),
+                ("responsibilities", "Responsibilities", "detail_view", None, None),
+                ("export", "Export", "export_action", None, None),
             ],
         ),
         (
@@ -5365,11 +5893,11 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             "Engineering Review",
             "Engineering Review",
             [
-                ("summary", "Summary", "collection_view", None),
-                ("insights", "Insights", "detail_view", None),
-                ("coordination", "Coordination", "detail_view", None),
-                ("systems", "Systems", "detail_view", None),
-                ("workbench", "Workbench", "operational_view", None),
+                ("summary", "Summary", "collection_view", None, None),
+                ("insights", "Insights", "detail_view", None, None),
+                ("coordination", "Coordination", "detail_view", None, None),
+                ("systems", "Systems", "detail_view", None, "Systems"),
+                ("workbench", "Workbench", "operational_view", None, None),
             ],
         ),
         (
@@ -5377,15 +5905,21 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             "Estimate",
             "Estimate",
             [
-                ("overview", "Summary", "collection_view", None),
-                ("equipment", "Equipment", "detail_view", None),
-                ("labor", "Labor", "detail_view", None),
-                ("accessories", "Freight", "detail_view", None),
-                ("general_conditions", "General Conditions", "detail_view", None),
-                ("allowances", "Allowances", "detail_view", None),
-                ("revisions", "Revisions", "history_activity_view", None),
-                ("confidence", "Confidence", "detail_view", None),
-                ("export", "Export", "export_action", None),
+                ("overview", "Summary", "collection_view", None, None),
+                ("equipment", "Equipment", "detail_view", None, None),
+                ("labor", "Labor", "detail_view", None, None),
+                ("accessories", "Freight", "detail_view", None, None),
+                (
+                    "general_conditions",
+                    "General Conditions",
+                    "detail_view",
+                    None,
+                    None,
+                ),
+                ("allowances", "Allowances", "detail_view", None, None),
+                ("revisions", "Revisions", "history_activity_view", None, None),
+                ("confidence", "Confidence", "detail_view", None, None),
+                ("export", "Export", "export_action", None, None),
             ],
         ),
         (
@@ -5393,10 +5927,10 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             "Notebook",
             "Notebook",
             [
-                ("browse", "Browse", "collection_view", None),
-                ("add_entry", "Add Entry", "create_action", None),
-                ("decisions", "Decisions", "detail_view", None),
-                ("timeline", "Timeline", "history_activity_view", None),
+                ("browse", "Browse", "collection_view", None, None),
+                ("add_entry", "Add Entry", "create_action", None, None),
+                ("decisions", "Decisions", "detail_view", None, None),
+                ("timeline", "Timeline", "history_activity_view", None, "Timeline"),
             ],
         ),
         (
@@ -5404,20 +5938,34 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             "Reports",
             "Reports",
             [
-                ("project_summary", "Project Summary", "export_action", None),
-                ("estimator_brief", "Estimator Brief", "export_action", None),
-                ("bom_export", "BOM Export", "export_action", None),
+                (
+                    "project_summary",
+                    "Project Summary",
+                    "export_action",
+                    None,
+                    "Project Summary",
+                ),
+                (
+                    "estimator_brief",
+                    "Estimator Brief",
+                    "export_action",
+                    None,
+                    "Estimator Brief",
+                ),
+                ("bom_export", "BOM Export", "export_action", None, "Reports"),
                 (
                     "scope_risk_export",
                     "Scope & Risk Export",
                     "export_action",
                     None,
+                    "Reports",
                 ),
                 (
                     "engineering_review_export",
                     "Engineering Review Export",
                     "export_action",
                     None,
+                    "Reports",
                 ),
             ],
         ),
@@ -5426,14 +5974,26 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             "Details",
             "Overview",
             [
-                ("summary", "Summary", "collection_view", None),
-                ("drawings", "Drawings", "detail_view", None),
-                ("specifications", "Specifications", "detail_view", None),
-                ("equipment", "Equipment", "detail_view", None),
-                ("systems", "Systems", "detail_view", None),
-                ("evidence", "Evidence", "detail_view", None),
-                ("relationships", "Relationships", "relationship_view", None),
-                ("timeline", "Timeline", "history_activity_view", None),
+                ("summary", "Summary", "collection_view", None, "Overview"),
+                ("drawings", "Drawings", "detail_view", None, "Drawings"),
+                (
+                    "specifications",
+                    "Specifications",
+                    "detail_view",
+                    None,
+                    "Specifications",
+                ),
+                ("equipment", "Equipment", "detail_view", None, "Equipment"),
+                ("systems", "Systems", "detail_view", None, "Systems"),
+                ("evidence", "Evidence", "detail_view", None, "Evidence"),
+                (
+                    "relationships",
+                    "Relationships",
+                    "relationship_view",
+                    None,
+                    "Relationships",
+                ),
+                ("timeline", "Timeline", "history_activity_view", None, "Timeline"),
             ],
         ),
         (
@@ -5441,10 +6001,16 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             "Settings",
             "Project Metadata",
             [
-                ("metadata", "Metadata", "settings_view", None),
-                ("stakeholders", "Stakeholders", "settings_view", None),
-                ("repository", "Repository", "settings_view", None),
-                ("workspace", "Workspace", "settings_view", None),
+                ("metadata", "Metadata", "settings_view", None, "Project Metadata"),
+                (
+                    "stakeholders",
+                    "Stakeholders",
+                    "settings_view",
+                    None,
+                    "Project Metadata",
+                ),
+                ("repository", "Repository", "settings_view", None, "Repository"),
+                ("workspace", "Workspace", "settings_view", None, "Workspace Settings"),
             ],
         ),
     ]
@@ -5467,7 +6033,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                     {
                         "tertiary_key": key,
                         "label": action_label,
-                        "route": route,
+                        "route": _safe_text(action_route, route),
                         "action_type": action_type,
                         "visibility": True,
                         "enabled": True,
@@ -5476,7 +6042,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                         "permission_hook": "future_permission_check",
                         "deterministic_fallback": active_actions[0][0],
                     }
-                    for key, action_label, action_type, required_selection in active_actions
+                    for key, action_label, action_type, required_selection, action_route in active_actions
                 ],
                 "selected_record_requirement": False,
                 "selected_project_requirement": True,
@@ -5599,6 +6165,19 @@ def _sync_workspace_navigation_state(
         _safe_text(sections[0].get("secondary_key"), ""),
     )
     derived_secondary = _safe_text(_secondary_key_for_page(primary, mode, page), "")
+    if (
+        primary == "Knowledge"
+        and page == "Knowledge"
+        and selection_kind in _knowledge_selection_kinds()
+    ):
+        derived_secondary = _safe_text(
+            _secondary_key_for_page(
+                "Knowledge",
+                "application",
+                _knowledge_tertiary_page_for_kind(selection_kind),
+            ),
+            derived_secondary,
+        )
     if derived_secondary:
         active_secondary = derived_secondary
 
@@ -6575,6 +7154,7 @@ def _is_reference_pinned(st: Any, reference: dict[str, Any]) -> bool:
 
 def _set_context_selection(st: Any, kind: str, data: dict[str, Any]) -> None:
     st.session_state["atlas_context_selection"] = {"kind": kind, "data": data}
+    _apply_context_selection_state(st, kind, data)
     if kind not in {
         "equipment",
         "drawing",
@@ -6704,6 +7284,13 @@ def _open_search_reference(
     workspace_service: ProjectWorkspaceService,
     reference: dict[str, Any],
 ) -> None:
+    _record_return_context(
+        st,
+        source_label=_safe_text(
+            reference.get("display_name"),
+            _safe_text(reference.get("route"), "Object"),
+        ),
+    )
     selection_kind = _safe_text(reference.get("selection_kind"), "project")
     selection_data = dict(reference.get("selection_data") or {})
     if selection_kind == "project_record":
@@ -6853,6 +7440,42 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
                 "",
             ),
         },
+        "workspace_context_state": {
+            "selected_project_object_type": _safe_text(
+                st.session_state.get(_selected_project_object_type_key()),
+                "",
+            ),
+            "selected_project_object_id": _safe_text(
+                st.session_state.get(_selected_project_object_id_key()),
+                "",
+            ),
+            "selected_knowledge_entity_type": _safe_text(
+                st.session_state.get(_selected_knowledge_entity_type_key()),
+                "",
+            ),
+            "selected_knowledge_entity_id": _safe_text(
+                st.session_state.get(_selected_knowledge_entity_id_key()),
+                "",
+            ),
+            "return_context": dict(st.session_state.get(_return_context_key()) or {}),
+            "navigation_history": [
+                dict(item)
+                for item in list(st.session_state.get(_navigation_history_key()) or [])
+                if isinstance(item, dict)
+            ],
+            "originating_workspace": _safe_text(
+                st.session_state.get(_originating_workspace_key()),
+                "",
+            ),
+            "originating_route": _safe_text(
+                st.session_state.get(_originating_route_key()),
+                "",
+            ),
+            "tenant_scope": _safe_text(
+                st.session_state.get(_tenant_scope_key()),
+                "local",
+            ),
+        },
     }
 
 
@@ -6960,6 +7583,45 @@ def _restore_workspace_state(
         st.session_state[_navigation_selected_entity_id_key()] = _safe_text(
             navigation_state.get("selected_entity_id"),
             "",
+        )
+
+    context_state = state.get("workspace_context_state")
+    if isinstance(context_state, dict):
+        st.session_state[_selected_project_object_type_key()] = _safe_text(
+            context_state.get("selected_project_object_type"),
+            "",
+        )
+        st.session_state[_selected_project_object_id_key()] = _safe_text(
+            context_state.get("selected_project_object_id"),
+            "",
+        )
+        st.session_state[_selected_knowledge_entity_type_key()] = _safe_text(
+            context_state.get("selected_knowledge_entity_type"),
+            "",
+        )
+        st.session_state[_selected_knowledge_entity_id_key()] = _safe_text(
+            context_state.get("selected_knowledge_entity_id"),
+            "",
+        )
+        st.session_state[_return_context_key()] = dict(
+            context_state.get("return_context") or {}
+        )
+        st.session_state[_navigation_history_key()] = [
+            dict(item)
+            for item in list(context_state.get("navigation_history") or [])
+            if isinstance(item, dict)
+        ][: _context_history_limit()]
+        st.session_state[_originating_workspace_key()] = _safe_text(
+            context_state.get("originating_workspace"),
+            "",
+        )
+        st.session_state[_originating_route_key()] = _safe_text(
+            context_state.get("originating_route"),
+            "",
+        )
+        st.session_state[_tenant_scope_key()] = _safe_text(
+            context_state.get("tenant_scope"),
+            "local",
         )
 
     pinned_objects = state.get("pinned_objects")
@@ -7770,6 +8432,14 @@ def _render_application_knowledge_page(
                     except Exception as exc:
                         st.error(f"Unable to restore manufacturer: {exc}")
 
+                _render_related_projects_section(
+                    st,
+                    workspace_service,
+                    entity_kind="manufacturer",
+                    data=selected_manufacturer,
+                    key_prefix="atlas_ck_mfr",
+                )
+
             st.dataframe(
                 [
                     {
@@ -8121,6 +8791,14 @@ def _render_application_knowledge_page(
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Unable to restore customer: {exc}")
+
+                _render_related_projects_section(
+                    st,
+                    workspace_service,
+                    entity_kind="customer",
+                    data=selected_customer,
+                    key_prefix="atlas_ck_customer",
+                )
 
             customer_search = st.text_input(
                 "Customer Table Search",
@@ -8929,6 +9607,14 @@ def _render_application_knowledge_page(
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Unable to restore project: {exc}")
+
+                _render_related_projects_section(
+                    st,
+                    workspace_service,
+                    entity_kind="project",
+                    data=selected_project,
+                    key_prefix="atlas_ck_project",
+                )
             st.dataframe(
                 [
                     {
@@ -9059,6 +9745,14 @@ def _render_application_knowledge_page(
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to restore product: {exc}")
+
+            _render_related_projects_section(
+                st,
+                workspace_service,
+                entity_kind="master_product",
+                data=selected_product,
+                key_prefix="atlas_ck_product",
+            )
 
         with st.expander("Product CSV/JSON Import Export", expanded=False):
             _render_knowledge_entity_import_export_controls(
@@ -11107,6 +11801,47 @@ def _render_estimate_page(
                         target_value=value,
                     )
 
+            knowledge_cols = st.columns(2)
+            if knowledge_cols[0].button(
+                "Open Product in Knowledge",
+                key=f"atlas_estimate_open_product_{selected_line.line_id}",
+                disabled=not bool(selected_line.model),
+                width="stretch",
+            ):
+                _open_knowledge_selection(
+                    st,
+                    kind="master_product",
+                    data={
+                        "manufacturer": _safe_text(selected_line.manufacturer, ""),
+                        "model": _safe_text(selected_line.model, ""),
+                        "canonical_sku": _safe_text(selected_line.model, ""),
+                        "product_id": _safe_text(
+                            selected_priced.get("canonical_product_id"),
+                            "",
+                        ),
+                        "atlas_product_uuid": _safe_text(
+                            selected_priced.get("canonical_product_id"),
+                            "",
+                        ),
+                    },
+                    source_label="Estimate",
+                )
+            if knowledge_cols[1].button(
+                "Open Manufacturer in Knowledge",
+                key=f"atlas_estimate_open_manufacturer_{selected_line.line_id}",
+                disabled=not bool(selected_line.manufacturer),
+                width="stretch",
+            ):
+                _open_knowledge_selection(
+                    st,
+                    kind="manufacturer",
+                    data={
+                        "manufacturer": _safe_text(selected_line.manufacturer, ""),
+                        "manufacturer_id": _safe_text(selected_line.manufacturer, ""),
+                    },
+                    source_label="Estimate",
+                )
+
     with tabs[2]:
         st.dataframe(
             service.labor_architecture_rows(estimate),
@@ -11787,6 +12522,46 @@ def _render_product_resolution_page(
         hide_index=True,
     )
 
+    canonical_manufacturer = _safe_text(
+        canonical.get("manufacturer"),
+        selected_resolution.manufacturer,
+    )
+    canonical_model = _safe_text(canonical.get("model"), selected_resolution.model)
+    knowledge_cols = st.columns(2)
+    if knowledge_cols[0].button(
+        "Open Product",
+        key=f"atlas_product_resolution_open_product_{selected_source}",
+        disabled=not canonical_model,
+        width="stretch",
+    ):
+        _open_knowledge_selection(
+            st,
+            kind="master_product",
+            data={
+                "manufacturer": canonical_manufacturer,
+                "model": canonical_model,
+                "canonical_sku": canonical_model,
+                "atlas_product_uuid": _safe_text(canonical.get("product_id"), ""),
+                "product_id": _safe_text(canonical.get("product_id"), ""),
+            },
+            source_label="Product Resolution",
+        )
+    if knowledge_cols[1].button(
+        "Open Manufacturer",
+        key=f"atlas_product_resolution_open_manufacturer_{selected_source}",
+        disabled=not canonical_manufacturer,
+        width="stretch",
+    ):
+        _open_knowledge_selection(
+            st,
+            kind="manufacturer",
+            data={
+                "manufacturer": canonical_manufacturer,
+                "manufacturer_id": canonical_manufacturer,
+            },
+            source_label="Product Resolution",
+        )
+
 
 def _render_pinned_projects_page(
     st: Any,
@@ -12222,6 +12997,20 @@ def _render_project_summary_page(
             }
         ],
     )
+
+    customer_name = _safe_text(summary.get("customer"), "")
+    if customer_name and customer_name != "Not available":
+        if st.button(
+            "Open Customer in Knowledge",
+            key=f"atlas_project_summary_open_customer_{record.workspace_id}",
+            width="stretch",
+        ):
+            _open_knowledge_selection(
+                st,
+                kind="customer",
+                data={"customer": customer_name},
+                source_label="Project Summary",
+            )
 
     if st.button("Run Project Analysis", type="primary", width="stretch"):
         st.session_state["atlas_active_page"] = "Documents"
@@ -12675,6 +13464,58 @@ def _render_bom_review_page(
                     equipment_id=equipment_target_id,
                     origin_page="BOM Review",
                     origin_key=equipment_target_id,
+                )
+
+            manufacturer_name = _safe_text(selected_row.get("manufacturer"), "")
+            product_id = _safe_text(
+                selected_row.get("matched_manufacturer_product"), ""
+            )
+            vendor_name = _safe_text(selected_row.get("matched_vendor_offer"), "")
+            knowledge_cols = st.columns(3)
+            if knowledge_cols[0].button(
+                "Open Manufacturer",
+                key=f"atlas_bom_open_manufacturer_{equipment_target_id}",
+                disabled=not manufacturer_name,
+                width="stretch",
+            ):
+                _open_knowledge_selection(
+                    st,
+                    kind="manufacturer",
+                    data={
+                        "manufacturer": manufacturer_name,
+                        "manufacturer_id": manufacturer_name,
+                    },
+                    source_label="BOM Review",
+                )
+            if knowledge_cols[1].button(
+                "Open Product",
+                key=f"atlas_bom_open_product_{equipment_target_id}",
+                disabled=not product_id,
+                width="stretch",
+            ):
+                _open_knowledge_selection(
+                    st,
+                    kind="master_product",
+                    data={
+                        "atlas_product_uuid": product_id,
+                        "product_id": product_id,
+                        "manufacturer": manufacturer_name,
+                        "model": _safe_text(selected_row.get("model"), ""),
+                        "canonical_sku": _safe_text(selected_row.get("model"), ""),
+                    },
+                    source_label="BOM Review",
+                )
+            if knowledge_cols[2].button(
+                "Open Vendor",
+                key=f"atlas_bom_open_vendor_{equipment_target_id}",
+                disabled=not vendor_name,
+                width="stretch",
+            ):
+                _open_knowledge_selection(
+                    st,
+                    kind="vendor",
+                    data={"vendor": vendor_name, "vendor_id": vendor_name},
+                    source_label="BOM Review",
                 )
 
     st.markdown("### Cost Selection Inspector")
@@ -14276,13 +15117,27 @@ def _render_workflow_reports_page(
         markdown_report = _summary_report_markdown(payload)
         json_report = json.dumps(payload, indent=2, sort_keys=True)
         html_report = _summary_report_html(payload)
+        project_overview = dict(payload.get("project_overview") or {})
 
         st.markdown("### Project Overview")
         st.dataframe(
-            [dict(payload.get("project_overview") or {})],
+            [project_overview],
             width="stretch",
             hide_index=True,
         )
+        customer_name = _safe_text(project_overview.get("customer"), "")
+        if customer_name:
+            if st.button(
+                "Open Customer in Knowledge",
+                key=f"atlas_reports_project_summary_customer_{record.workspace_id}",
+                width="stretch",
+            ):
+                _open_knowledge_selection(
+                    st,
+                    kind="customer",
+                    data={"customer": customer_name},
+                    source_label="Project Summary",
+                )
 
         st.markdown("### Documents Reviewed")
         st.dataframe(
@@ -16050,7 +16905,9 @@ def _search_rank(
     query: str,
     *,
     project_open: bool,
-) -> tuple[int, int, str, str, str]:
+    current_workspace: str = "Atlas",
+    selected_kind: str = "",
+) -> tuple[int, int, int, str, str, str]:
     normalized_query = query.strip().lower()
     object_id, name, secondary, extra = _search_match_candidates(reference)
     exact_fields = {item for item in [object_id, name] + extra.split(" ") if item}
@@ -16078,9 +16935,16 @@ def _search_rank(
     if project_open and scope != "project" and tier > 2:
         scope_penalty = 1
 
+    context_penalty = 0
+    if current_workspace == "Knowledge" and selected_kind:
+        reference_kind = _safe_text(reference.get("selection_kind"), "")
+        if reference_kind and reference_kind != selected_kind and tier > 2:
+            context_penalty = 1
+
     return (
         tier,
         scope_penalty,
+        context_penalty,
         _safe_text(reference.get("object_type"), "Object"),
         _safe_text(reference.get("display_name"), "Object"),
         _safe_text(reference.get("object_id"), ""),
@@ -16093,6 +16957,8 @@ def _filter_search_results(
     query: str,
     selected_types: list[str],
     project_open: bool,
+    current_workspace: str = "Atlas",
+    selected_kind: str = "",
 ) -> list[dict[str, Any]]:
     filtered = [
         item
@@ -16106,13 +16972,22 @@ def _filter_search_results(
         filtered = [
             item
             for item in filtered
-            if _search_rank(item, query, project_open=project_open)[0] <= 4
+            if _search_rank(
+                item,
+                query,
+                project_open=project_open,
+                current_workspace=current_workspace,
+                selected_kind=selected_kind,
+            )[0]
+            <= 4
         ]
     filtered.sort(
         key=lambda item: _search_rank(
             item,
             query,
             project_open=project_open,
+            current_workspace=current_workspace,
+            selected_kind=selected_kind,
         )
     )
     return filtered
@@ -16274,6 +17149,11 @@ def _render_search_result_row(
     object_type = _safe_text(reference.get("object_type"), "Object")
     object_id = _safe_text(reference.get("object_id"), "")
     project_name = _safe_text(reference.get("project_name"), "")
+    scope_label = (
+        f"Project · {project_name}"
+        if _safe_text(reference.get("scope"), "application") == "project"
+        else f"Application · {project_name or 'Atlas'}"
+    )
     with st.container(border=True):
         if st.button(
             primary,
@@ -16285,8 +17165,7 @@ def _render_search_result_row(
         metadata = [subtitle, object_type]
         if object_id:
             metadata.append(object_id)
-        if project_name:
-            metadata.append(project_name)
+        metadata.append(scope_label)
         st.caption(" · ".join(item for item in metadata if item))
 
 
@@ -20940,6 +21819,14 @@ def _render_global_search_panel(
         query=query,
         selected_types=[],
         project_open=record is not None,
+        current_workspace=_safe_text(
+            st.session_state.get(_navigation_primary_state_key()),
+            "Atlas",
+        ),
+        selected_kind=_safe_text(
+            dict(st.session_state.get("atlas_context_selection") or {}).get("kind"),
+            "",
+        ),
     )
     grouped_refs = _group_search_results(filtered)
     _render_global_search_results(st, workspace_service, filtered, grouped_refs, query)
@@ -25269,6 +26156,7 @@ def _render_shell(
     global_search_query = _active_global_search_query(st)
 
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
+    st.caption(_breadcrumb(record, current_page))
     mission_control_payload = None
     if current_page == "Mission Control":
         if record is not None:
@@ -25355,6 +26243,8 @@ def _render_shell(
                     "Overview",
                 ),
             )
+
+    _render_return_context_action(st, workspace_service)
 
     if global_search_query:
         _render_global_search_panel(

@@ -185,6 +185,14 @@ Atlas persists the following state to workspace.json:
 - window preferences
 - context selection
 
+W-01 persistence extension:
+- selected project object type and ID
+- selected Knowledge entity type and ID
+- bounded return context
+- bounded navigation history
+- last primary/secondary/tertiary workspace context remains persisted through existing workspace state
+- continuity state remains within existing workspace persistence and does not introduce a parallel repository or browser-history store
+
 On load, the workspace restores this state so the user returns to their last working context.
 
 ## Create + Upload Recovery Behavior (X-03)

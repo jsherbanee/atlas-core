@@ -2,10 +2,10 @@
 
 Atlas documentation defines the product vision, architecture, lifecycle roadmap, UX posture, and implementation status for Atlas, the Intelligent Lifecycle Solutions Management Platform for AV and lighting systems integrators.
 
-Current implementation focus remains Phase 2 Bid Intelligence and the associated hardening/documentation workstream. Epic X includes the reusable Knowledge navigation framework delivered in X-12, and Epic E has not started.
+Current implementation focus remains Phase 2 Bid Intelligence and the associated workspace-continuity/documentation workstream. Epic X is complete through X-13, Epic W has delivered W-01 Workspace Intelligence continuity, and Epic E has not started.
 
-Current UX stream: Epic X Product Hardening continuation (X-01 through X-12 closed; no active Epic X sprint).
-Scope: controlled hardening for onboarding, stakeholder linkage, identity workflows, navigation, search, and visual consistency in already-implemented capabilities only.
+Current workspace-continuity stream: Epic W Workspace Intelligence.
+Scope: deterministic context persistence, cross-workspace continuity, search handoff, Working Set continuity, and repository-backed return context for already-implemented capabilities only.
 
 These documents are intended to be used as a cohesive reference library, not isolated notes.
 
@@ -165,6 +165,11 @@ Future releases should follow this structure.
 - Purpose: Defines the reusable primary, secondary, and tertiary navigation contract used by Atlas workspace surfaces.
 - Audience: Workspace, search, UI, and platform contributors.
 - When to reference: When changing navigation state, breadcrumbs, or search-to-workspace handoff behavior.
+
+### [WORKSPACE_INTELLIGENCE.md](WORKSPACE_INTELLIGENCE.md)
+- Purpose: Defines the deterministic continuity layer for context persistence, return context, mixed-scope Working Set behavior, and cross-workspace handoff.
+- Audience: Workspace, search, UI, and platform contributors.
+- When to reference: When changing context persistence, return behavior, search handoff, or project/knowledge continuity flows.
 
 ### [IMPORT_PIPELINE.md](IMPORT_PIPELINE.md)
 - Purpose: Defines the common ingestion and validation architecture for documents and data.

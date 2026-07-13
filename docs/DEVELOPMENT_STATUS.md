@@ -48,6 +48,7 @@ Sprint X-07 continues shell hardening with fixed-width navigation, compact Home 
 Sprint X-08 completed product hardening with visual-system consistency (#FAFAF9 workspace background, #004225 primary accent, neutralized surfaces) and a runtime-safe clear-search state model that separates widget input from submitted query state.
 Sprint X-12 implements a reusable secondary and tertiary navigation framework for Knowledge, including deterministic Knowledge navigation state, search-handoff restoration, and reusable navigation contract modeling for future workspace reuse.
 Sprint X-13 completes navigation clarity and UX refinement, removing architecture-facing UI artifacts, shifting contextual navigation ownership into the shared shell, and tightening Home/Reports information architecture without changing workflows.
+Sprint W-01 completes Workspace Intelligence with deterministic context persistence and cross-workspace navigation continuity across Projects, Knowledge, Search, and object-detail flows.
 
 X-01 through X-13 are closed.
 
@@ -69,7 +70,13 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1203 tests)
+- pytest: full suite passing (1213 tests)
+
+## Manual UI Validation (W-01)
+- validated project-to-Knowledge continuity from project reports summary into Knowledge Customers with visible return context
+- validated shared-shell breadcrumb and return affordance behavior across the project-to-Knowledge continuity path
+- validated focused search mode from an active project, including project/application scope labels and Clear Search return to the prior page
+- validated widths 820, 980, 1180, 1366, and large desktop on the continuity path with no horizontal overflow observed
 
 ## Manual UI Validation (X-13)
 - validated Home, Projects, Knowledge, Reports, and active-project workspace navigation surfaces
@@ -84,7 +91,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
   - .pre-commit-config.yaml
 
 ## Active Focus
-Post-X-13 regression monitoring and lower-priority UX debt triage.
+Post-W-01 regression monitoring and remaining continuity debt triage.
 
 Broader product direction remains aligned to the lifecycle-platform roadmap, while current implementation priority is deterministic knowledge-entity foundation hardening within Phase 2 boundaries.
 
@@ -94,7 +101,7 @@ Secondary active focus:
 - Epic E readiness assessment only (architecture review and sprint approval required; Epic E not started).
 - K-01 follow-through validation for entity relationships, import/export compatibility, and search behavior.
 - K-02 workflow completion for customer, service, manufacturer, vendor, and product entity operations.
-- X-13 follow-through validation for dense layout ergonomics, remaining object-detail polish, and shared-shell consistency on lower-priority pages.
+- W-01 follow-through validation for deeper data-dependent continuity links and lower-priority object-detail adoption.
 
 Current implementation scope note:
 - no Epic E implementation has started in this refinement pass
@@ -163,6 +170,8 @@ Current workspace behavior:
 - Open Existing Project defaults to repository-backed project selection with search/sort/filter and archived visibility.
 - Manual path entry remains available only as an advanced development/recovery option.
 - Knowledge workspace is application-wide and excludes project-specific review pages.
+- Workspace Intelligence now preserves explicit selected project-object and selected Knowledge-record context, bounded return context, and bounded navigation history through existing workspace persistence.
+- Cross-workspace continuity now supports deterministic project-to-Knowledge and Knowledge-to-project movement where existing repository or reviewed-equipment data proves the relationship.
 - Active project identity is surfaced through a compact project header with lifecycle/status badges and recommended next action.
 - Project Workspace desktop layout is two-column (navigation + working content), with inline/on-demand object detail.
 - Home now contains primary project actions plus Action Center (critical/high deduplicated actions) and Recent Activity only.
