@@ -119,6 +119,30 @@ Workbench impact in X-02 is limited to consistent project identity context conti
 
 X-03 continues workflow hardening in project onboarding and stakeholder linkage and does not add new Engineering Workbench intelligence features.
 
+## Sprint X-05 Scope Boundary Note
+
+X-05 continues UI hardening in the shared Atlas shell and does not add new Engineering Workbench intelligence features.
+
+Workbench impact in X-05 is limited to header navigation consolidation, public Settings terminology for Administration, and deterministic Recent Projects presentation on Home.
+
+## Sprint X-06 Scope Boundary Note
+
+X-06 continues UI hardening in the shared Atlas shell and does not add new Engineering Workbench intelligence features.
+
+Workbench impact in X-06 is limited to the centered responsive shell width, Atlas-only Home action, simplified Search control, icon-only menu trigger, and removal of the global History dropdown.
+
+## Sprint X-07 Scope Boundary Note
+
+X-07 continues UI hardening in the shared Atlas shell and does not add new Engineering Workbench intelligence features.
+
+Workbench impact in X-07 is limited to focused search-mode rendering and compact navigation/readability refinements.
+
+## Sprint X-08 Scope Boundary Note
+
+X-08 continues UI hardening in the shared Atlas shell and does not add new Engineering Workbench intelligence features.
+
+Workbench impact in X-08 is limited to visual-system consistency updates and safe clear-search runtime state handling.
+
 Workbench impact in X-03 remains limited to context continuity from improved project identity and shared organization linkage in existing project shells.
 
 ## Sprint X-04 Scope Boundary Note

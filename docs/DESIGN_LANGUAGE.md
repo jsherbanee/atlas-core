@@ -114,6 +114,71 @@ Remaining non-blocking UX debt:
 - progressive disclosure opportunities in long evidence tables
 - smaller-screen ergonomics for dense engineering review contexts
 
+## 8.2 Sprint X-05 Navigation Consolidation Posture
+
+X-05 continues product hardening with a top-header primary navigation model and preserves the same scope boundaries:
+
+- no new product capabilities
+- no Epic E implementation start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
+X-05 focus is navigation clarity and terminology consistency:
+
+- move primary navigation into the header rather than a left-column rail
+- expose Administration publicly as Settings from an upper-right hamburger menu
+- replace Home recent activity with a deterministic Recent Projects list
+
+## 8.3 Sprint X-06 Responsive Shell Posture
+
+X-06 continues product hardening without architecture expansion:
+
+- no new product capabilities
+- no Epic E implementation start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
+X-06 focus is workstation-style responsiveness and shell simplification:
+
+- Atlas is the sole Home action
+- remove the public Home navigation tab from the shell
+- simplify the global Search control to a label-free input with the Search placeholder
+- expose Settings only as a dropdown option behind an icon-only menu trigger
+- remove the History dropdown from the global shell
+- keep Home content centered within a reasonable maximum width so it remains readable on large displays
+- allow header and action areas to wrap cleanly on narrower desktop and split-screen widths
+
+Remaining responsive UX debt:
+
+- some dense project-workspace tables still depend on wider monitor space for optimal readability
+- a few lower-priority review panels may still feel dense on very narrow split-screen layouts
+
+## 8.4 Sprint X-08 Visual System and Search Clear-State Hardening
+
+Completion status:
+
+- X-06 responsive shell refinement: completed
+- X-07 focused search refinement: completed
+- X-08 initial visual-system pass and safe clear-search remediation: completed
+
+X-08 continues product hardening without architecture expansion:
+
+- no new product capabilities
+- no Epic E implementation start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
+X-08 focus is visual-system consistency and runtime-safe search-state handling:
+
+- apply a calm workstation canvas with page background #FAFAF9
+- standardize primary action emphasis with Atlas green #004225
+- maintain neutral card/surface treatment and compact top navigation hierarchy
+- preserve focused search-results presentation while a submitted query is active
+- enforce safe search clear/reset behavior through separated widget-input and submitted-query state
+- ensure Clear Search exits focused search mode without widget-state mutation exceptions
+
+Remaining visual UX debt:
+
+- some data-dense tables still need progressive disclosure refinement for smaller split-screen use
+- a full migration from deprecated use_container_width parameters remains pending
+
 
 ## 8. Things Atlas Will Never Become
 
@@ -137,7 +202,7 @@ Status colors should be reserved for state communication only:
 
 Color assignment rules for interface actions:
 - Red is reserved for critical findings, blocking issues, failed operations, and destructive actions only.
-- Primary navigation and normal primary actions use the Atlas primary accent (blue family).
+- Primary navigation and normal primary actions use Atlas primary accent #004225.
 - Green indicates healthy or complete states.
 - Amber indicates needs review or cautionary states.
 - Gray indicates unknown, inactive, or unavailable states.

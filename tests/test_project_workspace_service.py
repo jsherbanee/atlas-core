@@ -91,6 +91,57 @@ def test_workspace_service_lists_recent_projects_by_last_opened(tmp_path: Path) 
     assert [record.workspace_id for record in recent[:2]] == ["project-b", "project-a"]
 
 
+def test_workspace_service_recent_projects_break_ties_by_workspace_id(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+
+    first = ProjectWorkspaceRecord(
+        workspace_id="project-a",
+        project=Project(project_id="project-a", name="A", client="Client A"),
+        last_opened_at="2024-01-02T00:00:00+00:00",
+    )
+    second = ProjectWorkspaceRecord(
+        workspace_id="project-b",
+        project=Project(project_id="project-b", name="B", client="Client B"),
+        last_opened_at="2024-01-02T00:00:00+00:00",
+    )
+
+    service.save_record(first)
+    service.save_record(second)
+
+    recent = service.list_recent_workspaces()
+
+    assert [record.workspace_id for record in recent[:2]] == ["project-b", "project-a"]
+
+
+def test_workspace_service_recent_projects_excludes_archived_by_default(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+
+    active = ProjectWorkspaceRecord(
+        workspace_id="project-active",
+        project=Project(project_id="project-active", name="Active", client="Client"),
+        last_opened_at="2024-01-02T00:00:00+00:00",
+    )
+    archived = ProjectWorkspaceRecord(
+        workspace_id="project-archived",
+        project=Project(
+            project_id="project-archived", name="Archived", client="Client"
+        ),
+        last_opened_at="2024-01-03T00:00:00+00:00",
+        archived=True,
+    )
+
+    service.save_record(active)
+    service.save_record(archived)
+
+    recent = service.list_recent_workspaces()
+
+    assert [record.workspace_id for record in recent] == ["project-active"]
+
+
 def test_workspace_service_project_manager_actions(tmp_path: Path) -> None:
     service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
     record = service.create_manual_record(

@@ -25,6 +25,71 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic X Sprint X-03 Onboarding and Stakeholder Workflow Hardening)
 
+## Unreleased (Epic X Sprint X-06 Responsive Header and Navigation Simplification)
+
+## Unreleased (Epic X Sprint X-08 Search Clear-State Runtime Fix and Visual-System Closeout)
+
+Completion status:
+
+- X-06 responsive shell refinement: completed
+- X-07 focused search refinement: completed
+- X-08 initial visual-system pass and safe clear-search remediation: completed
+
+### Improved
+
+- Visual-system hardening now standardizes workspace background #FAFAF9 and primary action accent #004225 across the bounded shell.
+- Global search now uses separated runtime state for widget input and submitted query.
+- Clear Search now performs a safe widget-key reset, exits focused search mode, and returns to the active page context without Streamlit widget-session mutation exceptions.
+- Direct search-result navigation clears focused search mode through the same safe reset path.
+
+### Scope Notes
+
+- product hardening only for existing Home/header/search workflows
+- no Epic E start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
+## Unreleased (Epic X Sprint X-07 Fixed-Width Navigation and Focused Search Results)
+
+### Improved
+
+- Global search now shows a focused results view while a meaningful query is active.
+- Search result rows are directly clickable, and the results panel replaces the page body during search mode.
+- Meaningless punctuation-only search strings no longer trigger broad search rendering.
+- Home action buttons stay compact, and the shell navigation remains bounded.
+
+### Scope Notes
+
+- product hardening only for existing Home/header/search workflows
+
+### Improved
+
+- Atlas is now the sole Home action in the global shell.
+- The public Home navigation tab has been removed.
+- Global Search is now a label-free input with the Search placeholder.
+- Settings is now exposed only from an icon-only hamburger trigger.
+- The History dropdown has been removed from the global shell.
+- The main shell is constrained to a centered workstation-style content width.
+
+### Scope Notes
+
+- product hardening only for existing Home/header/navigation workflows
+- no Epic E start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
+## Unreleased (Epic X Sprint X-05 Top-Header Navigation and Recent Projects)
+
+### Improved
+
+- Primary navigation now lives in the top header rather than a left-column rail.
+- Administration is exposed publicly as Settings through an upper-right hamburger menu.
+- Home now shows a deterministic Recent Projects list sourced from existing workspace open timestamps.
+
+### Scope Notes
+
+- product hardening only for existing Home/header/navigation workflows
+- no Epic E start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
 ## Unreleased (Epic X Sprint X-04 Home Page Simplification and Global Search Refinement)
 
 ### Improved

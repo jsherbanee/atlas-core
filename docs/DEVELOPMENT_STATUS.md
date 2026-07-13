@@ -36,12 +36,18 @@ Sprint X-01 performs pilot-readiness walkthrough validation and usability harden
 Sprint X-02 implements project creation and bid identity refinement with Atlas Bid ID allocation, explicit client/internal project identifiers, and metadata update workflows.
 Sprint X-03 hardens onboarding and stakeholder workflows with strict two-step create-then-upload behavior, pending-upload accumulation semantics, shared organization directory linkage, and compatibility-safe stakeholder persistence.
 Sprint X-04 completes Home/header/search simplification with Home terminology standardization, Enter-submit global search behavior, deterministic grouped search ordering, and removal of redundant Home portfolio sections.
+Sprint X-05 continues shell hardening with header-based primary navigation, public Settings terminology for Administration, and deterministic Recent Projects on Home.
+Sprint X-06 continues shell hardening with Atlas-only Home action, compact Search/menu controls, removal of the History dropdown, and centered responsive shell width.
+Sprint X-07 continues shell hardening with fixed-width navigation, compact Home actions, meaningful search-query gating, and focused search results that replace the page body while active.
+Sprint X-08 continues product hardening with visual-system consistency (#FAFAF9 workspace background, #004225 primary accent, neutralized surfaces) and a runtime-safe clear-search state model that separates widget input from submitted query state.
+
+X-06/X-07/X-08 closeout status: completed.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1127 tests)
+- pytest: full suite passing (1169 tests)
 
 ## Tooling Status
 - GitHub Actions configured
@@ -50,7 +56,7 @@ Sprint X-04 completes Home/header/search simplification with Home terminology st
   - .pre-commit-config.yaml
 
 ## Active Focus
-Sprint X-04 closeout and clean-tree validation.
+Sprint X-08 search clear-state runtime fix and visual-system closeout hardening.
 
 Secondary active focus:
 - low-risk UI helper refinement and consistency hardening in existing workspaces.
@@ -61,6 +67,10 @@ Current implementation scope note:
 - no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation features were introduced in X-02
 - no Epic E implementation has started in X-03
 - no Epic E implementation has started in X-04
+- no Epic E implementation has started in X-05
+- no Epic E implementation has started in X-06
+- no Epic E implementation has started in X-07
+- no Epic E implementation has started in X-08
 - X-03 remains workflow hardening only and does not introduce new estimating/commercial/procurement/execution capabilities
 
 

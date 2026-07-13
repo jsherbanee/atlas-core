@@ -16,6 +16,15 @@ Atlas Workspace UI Sprint 6 adds an object navigation layer that connects equipm
 Atlas Workspace UI Sprint 7 adds persistent Global Object Search and a project-scoped Working Set for active review objects.
 
 Atlas Workspace Sprint 7.5 performs UI repair and runtime-state isolation: shared project context header rendering, configuration-driven navigation (including disabled future lifecycle sections), shared object detail section scaffolding, breadcrumb normalization, meaningful empty-state messaging, and mutable runtime project storage outside immutable repository fixtures.
+Atlas Workspace UI Sprint X-05 moves primary navigation into the top header, renames Administration publicly to Settings via an upper-right hamburger menu, and replaces Home recent activity with a deterministic Recent Projects list.
+Atlas Workspace UI Sprint X-06 keeps the header-based shell while removing the public Home button, simplifying the Search control, removing the visible Settings trigger label, removing the History dropdown, and constraining the shell to a centered workstation-style width.
+Atlas Workspace UI Sprint X-07 keeps the bounded shell but turns global search into a focused results mode with compact navigation, meaningful-query gating, and direct row-click navigation while active.
+Atlas Workspace UI Sprint X-08 keeps the visual-system shell posture (background #FAFAF9, primary accent #004225, neutral surfaces) and fixes search clear-state runtime flow by separating widget input from submitted query state with safe widget-key reset on Clear Search.
+
+Completion status:
+- X-06 responsive shell refinement: completed
+- X-07 focused search refinement: completed
+- X-08 initial visual-system pass and safe clear-search remediation: completed
 
 Atlas Workspace Sprint A-04 consolidates workstation UX: shared workspace section headers, recommendation deduplication/grouping, filter reset consistency in dense tables, object-link continuity from estimate snapshot context, and terminology normalization for Products (Master Library).
 Atlas Workspace Sprint X-02 refines project creation and identity workflows with deterministic Atlas Bid ID preview/allocation and explicit project identifier surfaces.
@@ -35,6 +44,13 @@ Project Workspace is entered only after opening a specific project.
 
 Home remains application-level.
 Opening a project switches Atlas into project-specific navigation.
+
+Primary navigation is header-based in both workspace modes.
+Administration remains an internal route name only and appears publicly as Settings.
+Home now shows deterministic Recent Projects instead of Recent Activity.
+Atlas is the sole Home action.
+The header uses a compact centered content width so it does not stretch edge-to-edge on large monitors.
+Clear Search exits focused search mode and returns to the current page context without mutating an already-instantiated widget-owned session key.
 
 ## Repository-Backed Open Existing Project
 Open Existing Project now defaults to repository-backed project selection.
@@ -364,7 +380,7 @@ Working Set behavior:
 Navigation behavior:
 - navigation rendering is configuration-driven using shared group definitions
 - supports application-level and project-level navigation from the same renderer
-- responsive navigation remains Desktop sidebar, Tablet popover, and Mobile drawer-style popover
+- responsive navigation remains a compact top header shell with bounded content width
 - disabled future lifecycle sections are visible but non-interactive
 
 Status color rules:
@@ -380,9 +396,9 @@ Project Settings:
 - Workspace Settings
 
 ## Responsive Navigation
-- Desktop: persistent sidebar
-- Tablet: collapsible sidebar with navigation popover
-- Mobile: drawer-style navigation popover
+- Desktop: compact top-header navigation with bounded shell width
+- Tablet: compact top-header navigation with bounded shell width
+- Mobile: compact top-header navigation with bounded shell width
 
 The current page, selected project, and breadcrumb remain visible in all modes.
 
@@ -394,9 +410,9 @@ Context behavior:
 - Object detail is surfaced inline with tabs/expanders/sectioned detail areas.
 
 Responsive behavior:
-- Desktop: persistent left navigation and full-width working content.
-- Tablet: collapsible navigation popover and inline detail sections.
-- Mobile: drawer-style navigation and stacked list/detail flow.
+- Desktop: top-header navigation with centered/bounded working content.
+- Tablet: top-header navigation with centered/bounded working content.
+- Mobile: top-header navigation with centered/bounded working content.
 
 ## Upload Flow (X-03)
 1. Create workspace from Quick Start (Step 1).

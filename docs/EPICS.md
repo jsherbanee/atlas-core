@@ -134,12 +134,16 @@ Status: Implemented and Closed for current roadmap baseline
 
 ## Epic X: Product Hardening
 
-Status: Active (X-01 Closed, X-02 Closed, X-03 Closed, X-04 Closed)
+Status: Active (X-01 Closed, X-02 Closed, X-03 Closed, X-04 Closed, X-05 Closed, X-06 Closed, X-07 Closed, X-08 Closed)
 
 - X-01 Pilot Readiness and Application Walkthrough (Implemented, Closed)
 - X-02 Project Creation and Bid Identity Refinement (Implemented, Closed)
 - X-03 Onboarding and Stakeholder Workflow Hardening (Implemented, Closed)
 - X-04 Home Page Simplification and Global Search Refinement (Implemented, Closed)
+- X-05 Top-Header Navigation and Recent Projects (Implemented, Closed)
+- X-06 Responsive Header and Navigation Simplification (Implemented, Closed)
+- X-07 Fixed-Width Navigation and Focused Search Results (Implemented, Closed)
+- X-08 Search Clear-State Runtime Fix and Visual-System Closeout (Implemented, Closed)
 
 ### X-04 Scope (Completed)
 
@@ -147,6 +151,39 @@ Status: Active (X-01 Closed, X-02 Closed, X-03 Closed, X-04 Closed)
 - retain Mission Control as internal compatibility route/state naming only
 - simplify Home content to primary actions plus prioritized Action Center and Recent Activity
 - streamline header search interaction to direct Enter submit with deterministic grouped results
+
+Explicitly out of scope:
+
+- Epic E implementation start
+- new domain capability implementation
+
+### X-05 Scope (Completed)
+
+- move primary navigation into the top header
+- expose Administration publicly as Settings via an upper-right hamburger menu
+- replace Home Recent Activity with a deterministic Recent Projects list sourced from existing workspace timestamps
+
+### X-06 Scope (Completed)
+
+- remove the public Home navigation tab
+- keep Atlas as the single Home action
+- simplify the Search control and remove its visible label
+- expose Settings only from an icon-only hamburger trigger
+- remove the History dropdown from the global shell
+- constrain the shell to a centered responsive width
+
+### X-07 Scope (Completed)
+
+- keep compact fixed-width top navigation readability under resize
+- render focused search mode that suppresses unrelated page content while active
+- preserve deterministic grouped search behavior with meaningful-query gating
+
+### X-08 Scope (Completed)
+
+- apply initial visual-system pass for shared shell/page consistency (#FAFAF9 background, #004225 primary accent)
+- separate search widget-input and submitted-query state
+- fix Clear Search runtime behavior through safe widget generation reset
+- preserve route and project context when clearing or opening from focused search
 
 Explicitly out of scope:
 

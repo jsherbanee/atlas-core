@@ -32,6 +32,9 @@ class _FakeStreamlit:
     def rerun(self) -> None:
         self.rerun_called = True
 
+    def markdown(self, _text: str, **kwargs: Any) -> None:
+        _ = kwargs
+
 
 class _HomeContractStreamlit:
     def __init__(self, *, pressed: set[str] | None = None) -> None:
@@ -41,13 +44,34 @@ class _HomeContractStreamlit:
         self.markdowns: list[str] = []
         self.captions: list[str] = []
         self.dataframes: list[Any] = []
+        self.popover_labels: list[str] = []
+        self.column_specs: list[Any] = []
+        self.text_inputs: list[dict[str, Any]] = []
+        self.button_calls: list[dict[str, Any]] = []
         self.rerun_called = False
+
+    def __enter__(self) -> _HomeContractStreamlit:
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> Literal[False]:
+        _ = (exc_type, exc, tb)
+        return False
 
     def subheader(self, text: str) -> None:
         self.subheaders.append(text)
 
-    def columns(self, count: int) -> list[_HomeContractStreamlit]:
-        return [self for _ in range(count)]
+    def columns(self, count: int | list[Any]) -> list[_HomeContractStreamlit]:
+        self.column_specs.append(count)
+        size = len(count) if isinstance(count, list) else count
+        return [self for _ in range(size)]
+
+    def container(self, border: bool = False) -> _HomeContractStreamlit:
+        _ = border
+        return self
+
+    def popover(self, _label: str) -> _HomeContractStreamlit:
+        self.popover_labels.append(_label)
+        return self
 
     def button(
         self,
@@ -55,12 +79,27 @@ class _HomeContractStreamlit:
         type: str = "secondary",
         use_container_width: bool = False,
         key: str | None = None,
+        disabled: bool = False,
     ) -> bool:
-        _ = (type, use_container_width, key)
+        self.button_calls.append(
+            {
+                "label": label,
+                "type": type,
+                "key": key,
+                "disabled": disabled,
+                "use_container_width": use_container_width,
+            }
+        )
+        _ = (type, use_container_width, key, disabled)
         return label in self._pressed
 
-    def markdown(self, text: str) -> None:
+    def markdown(self, text: str, **kwargs: Any) -> None:
+        _ = kwargs
         self.markdowns.append(text)
+
+    def text_input(self, label: str, **kwargs: Any) -> str:
+        self.text_inputs.append({"label": label, **kwargs})
+        return ""
 
     def caption(self, text: str) -> None:
         self.captions.append(text)
@@ -76,6 +115,7 @@ class _HomeContractStreamlit:
 class _FakeWorkspaceService:
     def __init__(self, records: list[ProjectWorkspaceRecord]) -> None:
         self._records = records
+        self.saved_records: list[ProjectWorkspaceRecord] = []
 
     def list_workspaces(
         self,
@@ -86,6 +126,18 @@ class _FakeWorkspaceService:
 
     def preview_next_bid_id(self) -> str:
         return "BID-2099-0001"
+
+    def list_recent_workspaces(self, limit: int = 10) -> list[ProjectWorkspaceRecord]:
+        _ = limit
+        return list(self._records)[:limit]
+
+    def save_record(self, record: ProjectWorkspaceRecord) -> Path:
+        self.saved_records.append(record)
+        self._records = [
+            item for item in self._records if item.workspace_id != record.workspace_id
+        ]
+        self._records.insert(0, record)
+        return Path("workspace.json")
 
 
 class _NullContext:
@@ -545,6 +597,110 @@ def test_application_nav_exposes_home_with_compatibility_route_key() -> None:
     app_workspace_entries = app.APPLICATION_NAV_GROUPS[0][1]
 
     assert ("Home", "Mission Control") in app_workspace_entries
+    assert ("Administration", "Administration") not in app_workspace_entries
+
+
+def test_top_navigation_settings_menu_routes_to_administration() -> None:
+    st = _HomeContractStreamlit(pressed={"Settings"})
+    service = _FakeWorkspaceService([])
+
+    app._render_header(st, service, None, None)
+
+    assert st.popover_labels == ["☰"]
+    assert st.session_state["atlas_active_page"] == "Administration"
+    assert st.rerun_called is True
+
+
+def test_atlas_button_routes_back_home() -> None:
+    st = _HomeContractStreamlit(pressed={"Atlas"})
+    service = _FakeWorkspaceService([])
+
+    app._render_header(st, service, None, None)
+
+    assert st.session_state["atlas_active_page"] == "Mission Control"
+    assert st.rerun_called is True
+    assert st.button_calls[0]["use_container_width"] is False
+
+
+def test_top_navigation_renders_primary_header_buttons() -> None:
+    st = _HomeContractStreamlit(pressed={"Projects"})
+
+    app._render_top_navigation(st, st.columns(3))
+
+    assert st.session_state["atlas_active_page"] == "Projects"
+    assert [call["label"] for call in st.button_calls] == [
+        "Projects",
+        "Knowledge",
+        "Reports",
+    ]
+    assert all(call["use_container_width"] is False for call in st.button_calls)
+
+
+def test_top_navigation_hides_public_home_button() -> None:
+    st = _HomeContractStreamlit(pressed={"Home"})
+    st.session_state["atlas_active_page"] = "Projects"
+
+    app._render_top_navigation(st, st.columns(3))
+
+    assert st.session_state["atlas_active_page"] == "Projects"
+    assert all(call["label"] != "Home" for call in st.button_calls)
+
+
+def test_top_navigation_highlights_projects_in_project_workspace() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state["atlas_active_page"] = "Overview"
+
+    app._render_top_navigation(
+        st,
+        st.columns(3),
+        _project_record("project-a", "Project A"),
+    )
+
+    projects_call = next(
+        call for call in st.button_calls if call["label"] == "Projects"
+    )
+    assert projects_call["type"] == "primary"
+
+
+def test_top_navigation_highlights_knowledge_and_reports_workspaces() -> None:
+    knowledge = _HomeContractStreamlit()
+    knowledge.session_state["atlas_active_page"] = "Evidence"
+
+    app._render_top_navigation(knowledge, knowledge.columns(3))
+
+    knowledge_call = next(
+        call for call in knowledge.button_calls if call["label"] == "Knowledge"
+    )
+    assert knowledge_call["type"] == "primary"
+
+    reports = _HomeContractStreamlit()
+    reports.session_state["atlas_active_page"] = "Reports"
+
+    app._render_top_navigation(reports, reports.columns(3))
+
+    reports_call = next(
+        call for call in reports.button_calls if call["label"] == "Reports"
+    )
+    assert reports_call["type"] == "primary"
+
+
+def test_header_search_control_uses_simple_search_placeholder() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_header(st, _FakeWorkspaceService([]), None, None)
+
+    assert st.text_inputs[0]["label"] == "Search"
+    assert st.text_inputs[0]["placeholder"] == "Search"
+    assert st.text_inputs[0]["label_visibility"] == "collapsed"
+    assert all("Global Object Search" not in item for item in st.markdowns)
+
+
+def test_header_uses_compact_responsive_column_contract() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_header(st, _FakeWorkspaceService([]), None, None)
+
+    assert st.column_specs[:2] == [[1.05, 2.4, 4.4, 0.55], [0.95, 1.15, 0.95]]
 
 
 def test_group_for_page_keeps_internal_mission_control_compatibility() -> None:
@@ -558,23 +714,114 @@ def test_group_for_page_keeps_internal_mission_control_compatibility() -> None:
 
 
 def test_submit_global_search_ignores_empty_query() -> None:
-    st = _FakeStreamlit(session_state={"atlas_global_search": "   "})
+    st = _FakeStreamlit(session_state={"atlas_global_search_input_0": "   "})
 
     app._submit_global_search(st)
 
-    assert "atlas_global_search_last_submitted" not in st.session_state
+    assert "atlas_global_search_query" not in st.session_state
 
 
 def test_submit_global_search_records_non_empty_query() -> None:
-    st = _FakeStreamlit(session_state={"atlas_global_search": "  av-601  "})
+    st = _FakeStreamlit(session_state={"atlas_global_search_input_0": "  av-601  "})
 
     app._submit_global_search(st)
 
-    assert st.session_state["atlas_global_search_last_submitted"] == "av-601"
+    assert st.session_state["atlas_global_search_query"] == "av-601"
+
+
+def test_submit_global_search_rejects_punctuation_only_input() -> None:
+    st = _FakeStreamlit(session_state={"atlas_global_search_input_0": "..."})
+
+    app._submit_global_search(st)
+
+    assert "atlas_global_search_query" not in st.session_state
+
+
+def test_submit_global_search_accepts_qsc_and_bid_identifier() -> None:
+    st = _FakeStreamlit(session_state={"atlas_global_search_input_0": "QSC"})
+    app._submit_global_search(st)
+    assert st.session_state["atlas_global_search_query"] == "QSC"
+
+    st = _FakeStreamlit(session_state={"atlas_global_search_input_0": "BID-2026-0001"})
+    app._submit_global_search(st)
+    assert st.session_state["atlas_global_search_query"] == "BID-2026-0001"
+
+
+def test_global_search_query_validation_rejects_punctuation_only_queries() -> None:
+    assert app._is_meaningful_global_search_query("...") is False
+    assert app._is_meaningful_global_search_query("  ") is False
+
+
+def test_global_search_query_validation_accepts_compact_identifiers() -> None:
+    assert app._is_meaningful_global_search_query("AV-601") is True
+    assert app._is_meaningful_global_search_query("INT_0902") is True
+
+
+def test_global_search_panel_skips_rendering_for_meaningless_queries() -> None:
+    st = _FakeStreamlit(session_state={"atlas_global_search_query": "..."})
+    called = False
+
+    def _unexpected(*args: Any, **kwargs: Any) -> None:
+        nonlocal called
+        _ = (args, kwargs)
+        called = True
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(app, "_render_global_search_results", _unexpected)
+    monkeypatch.setattr(app, "_global_search_entries", lambda *args, **kwargs: [])
+    try:
+        app._render_global_search_panel(st, _FakeWorkspaceService([]), None, None)
+    finally:
+        monkeypatch.undo()
+
+    assert called is False
+
+
+def test_render_shell_suppresses_body_when_search_is_active(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_global_search_query": "AV-601",
+            "atlas_active_page": "Projects",
+        }
+    )
+    service = _FakeWorkspaceService([])
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        app, "_render_header", lambda *args, **kwargs: calls.append("header")
+    )
+    monkeypatch.setattr(
+        app,
+        "_sync_notebook_state_to_context",
+        lambda *args, **kwargs: calls.append("sync"),
+    )
+    monkeypatch.setattr(app, "_breadcrumb", lambda *args, **kwargs: "breadcrumb")
+    monkeypatch.setattr(
+        app,
+        "_render_global_search_panel",
+        lambda *args, **kwargs: calls.append("search"),
+    )
+    monkeypatch.setattr(
+        app, "_render_main_content", lambda *args, **kwargs: calls.append("body")
+    )
+    monkeypatch.setattr(
+        app, "_render_status_bar", lambda *args, **kwargs: calls.append("status")
+    )
+
+    app._render_shell(st, service, None, None)
+
+    assert "search" in calls
+    assert "body" not in calls
 
 
 def test_breadcrumb_page_label_maps_mission_control_to_home() -> None:
     assert app._breadcrumb_page_label("Mission Control") == "Home"
+
+
+def test_breadcrumb_page_label_maps_administration_to_settings() -> None:
+    assert app._breadcrumb_page_label("Administration") == "Settings"
 
 
 def test_breadcrumb_for_mission_control_renders_home_for_users() -> None:
@@ -583,10 +830,16 @@ def test_breadcrumb_for_mission_control_renders_home_for_users() -> None:
 
 def test_home_content_contract_headings_and_removed_sections() -> None:
     st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService(
+        [
+            _project_record("project-b", "Project B"),
+            _project_record("project-a", "Project A"),
+        ]
+    )
 
     app._render_home_page(
         st,
-        workspace_service=None,
+        workspace_service=service,
         record=None,
         context=None,
         mission_control_payload={},
@@ -594,7 +847,8 @@ def test_home_content_contract_headings_and_removed_sections() -> None:
 
     assert st.subheaders == ["Home"]
     assert "### Action Center" in st.markdowns
-    assert "### Recent Activity" in st.markdowns
+    assert "### Recent Projects" in st.markdowns
+    assert "Recent Activity" not in " ".join(st.markdowns)
     removed_titles = {
         "### Application Areas",
         "### Portfolio Signals",
@@ -614,10 +868,11 @@ def test_home_primary_actions_route_correctly() -> None:
     }
     for button_label, expected_page in actions.items():
         st = _HomeContractStreamlit(pressed={button_label})
+        service = _FakeWorkspaceService([])
 
         app._render_home_page(
             st,
-            workspace_service=None,
+            workspace_service=service,
             record=None,
             context=None,
             mission_control_payload={},
@@ -627,11 +882,70 @@ def test_home_primary_actions_route_correctly() -> None:
         assert st.rerun_called is True
 
 
+def test_home_primary_actions_use_compact_responsive_columns() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_home_page(
+        st,
+        workspace_service=_FakeWorkspaceService([]),
+        record=None,
+        context=None,
+        mission_control_payload={},
+    )
+
+    assert st.column_specs[0] == [1.0, 1.0, 1.0]
+
+
+def test_injected_styles_define_centered_content_width() -> None:
+    st = _HomeContractStreamlit()
+
+    app._inject_styles(st)
+
+    assert any("max-width: 1440px" in item for item in st.markdowns)
+    assert any("width: min(calc(100% - 2rem), 1440px)" in item for item in st.markdowns)
+
+
+def test_injected_styles_define_visual_system_background_and_accent() -> None:
+    st = _HomeContractStreamlit()
+
+    app._inject_styles(st)
+
+    assert any("--atlas-page-bg: #FAFAF9" in item for item in st.markdowns)
+    assert any("--atlas-primary: #004225" in item for item in st.markdowns)
+    assert any(
+        '.stButton > button[kind="primary"]' in item
+        and "background: var(--atlas-primary)" in item
+        for item in st.markdowns
+    )
+
+
+def test_injected_styles_keep_red_for_error_not_primary_actions() -> None:
+    st = _HomeContractStreamlit()
+
+    app._inject_styles(st)
+
+    stylesheet = "\n".join(st.markdowns)
+    assert "--atlas-red: #dc2626" in stylesheet
+    assert 'button[kind="primary"]' in stylesheet
+    assert (
+        'button[kind="primary"]' in stylesheet
+        and "#dc2626"
+        not in stylesheet.split(
+            '.stButton > button[kind="primary"]',
+            maxsplit=1,
+        )[
+            1
+        ].split("}", maxsplit=1)[0]
+    )
+
+
 def test_action_center_filters_to_high_priority_and_deduplicates() -> None:
     st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
 
     app._render_mission_control_panels(
         st,
+        service,
         {
             "actions": [
                 {
@@ -658,13 +972,77 @@ def test_action_center_filters_to_high_priority_and_deduplicates() -> None:
     )
 
     assert "### Action Center" in st.markdowns
-    assert "### Recent Activity" in st.markdowns
+    assert "### Recent Projects" in st.markdowns
     assert len(st.dataframes) == 1
     rows = st.dataframes[0]
     assert isinstance(rows, list)
     assert len(rows) == 1
     assert rows[0]["Priority"] == "High"
     assert rows[0]["Destination"] == "Documents"
+
+
+def test_recent_projects_section_renders_cards_and_open_actions() -> None:
+    record = _project_record("project-a", "Project A")
+    record.project.internal_project_number = "INT-42"
+    record.last_opened_at = "2024-01-02T12:00:00+00:00"
+    st = _HomeContractStreamlit(pressed={"Open Project"})
+    service = _FakeWorkspaceService([record])
+
+    app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
+
+    assert any("Project A" in item for item in st.markdowns)
+    assert any("INT-42" in item for item in st.captions)
+    assert st.rerun_called is True
+
+
+def test_recent_projects_section_limits_to_five_items() -> None:
+    records = []
+    for index in range(6):
+        record = _project_record(f"project-{index}", f"Project {index}")
+        record.last_opened_at = f"2024-01-0{index + 1}T12:00:00+00:00"
+        records.append(record)
+    st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService(records)
+
+    app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
+
+    card_markdowns = [item for item in st.markdowns if item.startswith("**Project")]
+    assert len(card_markdowns) == 5
+
+
+def test_recent_projects_open_action_updates_recency() -> None:
+    record = _project_record("project-a", "Project A")
+    st = _HomeContractStreamlit(pressed={"Open Project"})
+    service = _FakeWorkspaceService([record])
+
+    app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
+
+    assert service.saved_records[-1].workspace_id == "project-a"
+    assert st.rerun_called is True
+
+
+def test_recent_projects_empty_state_message_is_concise() -> None:
+    st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService([])
+
+    app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
+
+    assert "No recent projects." in st.captions
+
+
+def test_footer_shows_copyright_and_build_info_only() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_status_bar(st, None, None)
+
+    assert any(
+        "©2026 Corsa Systems. All rights reserved." in item for item in st.captions
+    )
+    assert any("Atlas v" in item and "commit" in item for item in st.captions)
+    assert all(
+        phrase not in " ".join(st.captions)
+        for phrase in ["Current workspace", "Section:", "Last intake", "Last review"]
+    )
 
 
 def test_open_search_reference_routes_to_target_page() -> None:
@@ -683,6 +1061,34 @@ def test_open_search_reference_routes_to_target_page() -> None:
     assert st.session_state["atlas_active_page"] == "Drawings"
     assert st.session_state["atlas_context_selection"]["kind"] == "drawing"
     assert st.rerun_called is True
+
+
+def test_open_search_reference_project_updates_recency() -> None:
+    record = _project_record("maw-demo", "MAW")
+    st = _FakeStreamlit(session_state={})
+    service = _FakeWorkspaceService([record])
+    reference = {
+        "selection_kind": "project_record",
+        "selection_data": {"workspace_id": "maw-demo"},
+        "object_id": "maw-demo",
+        "object_type": "Project",
+    }
+
+    app._open_search_reference(st, service, reference)
+
+    assert service.saved_records[-1].workspace_id == "maw-demo"
+    assert st.session_state["atlas_active_page"] == "Overview"
+
+
+def test_open_project_record_updates_recency() -> None:
+    record = _project_record("maw-demo", "MAW")
+    st = _FakeStreamlit(session_state={})
+    service = _FakeWorkspaceService([record])
+
+    app._open_project_record(st, record, service)
+
+    assert service.saved_records[-1].workspace_id == "maw-demo"
+    assert st.session_state["atlas_active_page"] == "Overview"
 
 
 def test_recent_search_queries_are_deduplicated() -> None:
@@ -734,7 +1140,7 @@ def test_workspace_snapshot_persists_working_set_and_search_history() -> None:
             "atlas_equipment_search": "",
             "atlas_search_type_filters": [],
             "atlas_relationship_search_enabled": False,
-            "atlas_global_search": "sony",
+            "atlas_global_search_query": "sony",
             "atlas_global_search_index": 0,
             "atlas_layout_mode": "Desktop",
             "atlas_navigation_collapsed": False,
@@ -754,6 +1160,164 @@ def test_workspace_snapshot_persists_working_set_and_search_history() -> None:
     assert snapshot["pinned_objects"][0]["object_id"] == "EQ-1"
     assert snapshot["recent_search_queries"] == ["sony"]
     assert snapshot["recent_opened_results"][0]["object_id"] == "EQ-1"
+
+
+def test_global_search_widget_key_uses_generation_token() -> None:
+    st = _FakeStreamlit(session_state={"atlas_global_search_input_generation": 2})
+
+    key = app._global_search_widget_key(st)
+
+    assert key == "atlas_global_search_input_2"
+
+
+def test_render_global_search_control_uses_separate_input_key() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state["atlas_global_search_query"] = "AV-601"
+
+    app._render_global_search_control(st, st)
+
+    text_input_call = st.text_inputs[0]
+    widget_key = text_input_call["key"]
+    assert widget_key == "atlas_global_search_input_0"
+    assert st.session_state[widget_key] == "AV-601"
+    assert widget_key != "atlas_global_search_query"
+
+
+def test_clear_global_search_state_clears_query_and_rotates_input_key() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_global_search_query": "AV-601",
+            "atlas_global_search_input_generation": 0,
+            "atlas_global_search_input_0": "AV-601",
+        }
+    )
+
+    app._clear_global_search_state(st)
+
+    assert st.session_state["atlas_global_search_query"] == ""
+    assert st.session_state["atlas_global_search_input_generation"] == 1
+    assert st.session_state["atlas_global_search_input_0"] == "AV-601"
+
+
+def test_clear_global_search_state_does_not_mutate_legacy_widget_key() -> None:
+    class _GuardedSessionState(dict[str, Any]):
+        def __setitem__(self, key: str, value: Any) -> None:
+            if key == "atlas_global_search":
+                raise AssertionError("legacy widget key mutation is not allowed")
+            super().__setitem__(key, value)
+
+    st = _FakeStreamlit(
+        session_state=_GuardedSessionState(
+            {
+                "atlas_global_search_query": "AV-601",
+                "atlas_global_search_input_generation": 0,
+            }
+        )
+    )
+
+    app._clear_global_search_state(st)
+
+    assert st.session_state["atlas_global_search_query"] == ""
+
+
+def test_clear_search_button_preserves_route_and_project_context() -> None:
+    st = _HomeContractStreamlit(pressed={"Clear Search"})
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            "atlas_active_workspace_id": "workspace-1",
+            "atlas_global_search_query": "AV-601",
+            "atlas_global_search_input_generation": 0,
+        }
+    )
+
+    app._render_global_search_results(
+        st,
+        _FakeWorkspaceService([]),
+        filtered=[],
+        grouped_refs={},
+        query="AV-601",
+    )
+
+    assert st.session_state["atlas_global_search_query"] == ""
+    assert st.session_state["atlas_global_search_input_generation"] == 1
+    assert st.session_state["atlas_active_page"] == "Knowledge"
+    assert st.session_state["atlas_active_workspace_id"] == "workspace-1"
+    assert st.rerun_called is True
+
+
+def test_clear_search_is_idempotent() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_global_search_query": "AV-601",
+            "atlas_global_search_input_generation": 0,
+        }
+    )
+
+    app._clear_global_search_state(st)
+    app._clear_global_search_state(st)
+
+    assert st.session_state["atlas_global_search_query"] == ""
+    assert st.session_state["atlas_global_search_input_generation"] == 2
+
+
+def test_active_global_search_query_uses_submitted_state_not_widget_input() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_global_search_query": "AV-601",
+            "atlas_global_search_input_0": "...",
+        }
+    )
+
+    query = app._active_global_search_query(st)
+
+    assert query == "AV-601"
+
+
+def test_open_search_result_clears_search_before_navigation() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_global_search_query": "AV-601",
+            "atlas_global_search_input_generation": 0,
+        }
+    )
+    service = _FakeWorkspaceService([])
+    captured: dict[str, Any] = {}
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        app,
+        "_open_search_reference",
+        lambda _st, _service, reference: captured.update({"reference": reference}),
+    )
+    try:
+        app._open_search_result(
+            st,
+            service,
+            {
+                "object_type": "Project",
+                "object_id": "BID-2026-0001",
+                "display_name": "Sample",
+            },
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert st.session_state["atlas_global_search_query"] == ""
+    assert st.session_state["atlas_global_search_input_generation"] == 1
+    assert captured["reference"]["object_id"] == "BID-2026-0001"
+
+
+def test_search_input_is_empty_after_clear_and_rerender() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state["atlas_global_search_query"] = "AV-601"
+
+    app._clear_global_search_state(st)
+    app._render_global_search_control(st, st)
+
+    widget_key = st.text_inputs[0]["key"]
+    assert widget_key == "atlas_global_search_input_1"
+    assert st.session_state[widget_key] == ""
 
 
 def test_project_record_identifier_and_secondary_labels() -> None:
@@ -812,6 +1376,26 @@ def test_project_identifier_match_fields_rank_for_client_and_internal_numbers() 
 
     assert len(client_filtered) == 1
     assert len(internal_filtered) == 1
+
+
+def test_master_product_secondary_label_accepts_float_confidence() -> None:
+    label = app._object_secondary_label(
+        "master_product",
+        {
+            "lifecycle_status": "active",
+            "vendor": "DIRECT",
+            "confidence": 0.91,
+        },
+    )
+
+    assert "active" in label
+    assert "DIRECT" in label
+    assert "confidence 0.91" in label
+
+
+def test_overall_confidence_text_handles_dict_and_float_values() -> None:
+    assert app._overall_confidence_text({"overall_confidence": 0.88}) == "0.88"
+    assert app._overall_confidence_text(0.91) == "0.91"
 
 
 def test_breadcrumb_generates_object_specific_path(

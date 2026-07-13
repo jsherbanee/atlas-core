@@ -128,6 +128,70 @@ Explicitly out of scope:
 - Epic E implementation start
 - new domain services, persistence model expansion, or post-D capability work
 
+## Sprint X-05 Navigation Consolidation Constraints (Closed)
+
+X-05 continues product hardening without architecture expansion:
+
+- no new domain capability
+- no Epic E implementation start
+- no Commercial Intelligence, Sell Pricing, or Proposal Generation implementation
+
+X-05 focus is header-based navigation consolidation and terminology cleanup:
+
+- move primary navigation into the header rather than a left-column rail
+- expose Administration publicly as Settings from an upper-right hamburger menu
+- replace Home Recent Activity with deterministic Recent Projects backed by existing workspace timestamps
+
+## Sprint X-06 Responsive Shell Constraints (Closed)
+
+X-06 continues product hardening without architecture expansion:
+
+- no new domain capability
+- no Epic E implementation start
+- no Commercial Intelligence, Sell Pricing, or Proposal Generation implementation
+
+X-06 focus is responsive shell simplification and width control:
+
+- remove the public Home navigation button and keep Atlas as the only Home action
+- simplify the global Search control to a label-free Search input
+- expose Settings only through an icon-only hamburger dropdown trigger
+- remove the History dropdown from the global header shell
+- constrain the shell to a centered maximum width so the interface remains readable across common desktop and laptop sizes
+
+This remains a UI-shell refinement only:
+
+- internal Home and Mission Control routes remain compatible
+- internal Administration routing remains intact
+- project open/selection/search persistence remain unchanged
+
+## Sprint X-07 Focused Search and Navigation Constraints (Closed)
+
+X-07 continues product hardening without architecture expansion:
+
+- no new domain capability
+- no Epic E implementation start
+- no Commercial Intelligence, Sell Pricing, or Proposal Generation implementation
+
+X-07 focus is focused search rendering and navigation polish:
+
+- meaningful-query gating for focused search mode
+- direct search-row open behavior
+- shell behavior where focused search suppresses unrelated page content
+
+## Sprint X-08 Visual System and Safe Search-Clear Constraints (Closed)
+
+X-08 continues product hardening without architecture expansion:
+
+- no new domain capability
+- no Epic E implementation start
+- no Commercial Intelligence, Sell Pricing, or Proposal Generation implementation
+
+X-08 focus is visual-system consistency and Streamlit-safe search clear-state handling:
+
+- global shell visual-system pass (#FAFAF9 background, #004225 primary accent, neutral surfaces)
+- explicit separation of search widget-input state and submitted-query state
+- generation-based safe widget-key reset for Clear Search and direct result-open flows
+
 
 Implementation structure:
 - domain: deterministic estimate entities and status enums

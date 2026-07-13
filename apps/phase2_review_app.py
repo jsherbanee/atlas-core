@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import platform
+import re
 import subprocess
 from typing import Any
 
@@ -263,7 +264,6 @@ APPLICATION_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("Projects", "Projects"),
             ("Knowledge", "Knowledge"),
             ("Reports", "Reports"),
-            ("Administration", "Administration"),
         ],
     )
 ]
@@ -377,68 +377,90 @@ def _inject_styles(st: Any) -> None:
         <style>
         :root {
             --atlas-gray: #6b7280;
-            --atlas-primary: #2563eb;
-            --atlas-blue: #2563eb;
-            --atlas-green: #16a34a;
+            --atlas-primary: #004225;
+            --atlas-page-bg: #FAFAF9;
+            --atlas-surface: #FFFFFF;
+            --atlas-border: #e5e7eb;
+            --atlas-hover: #f3f4f6;
+            --atlas-primary-soft: #dce8e2;
+            --atlas-primary-soft-hover: #cfdfd8;
             --atlas-amber: #d97706;
             --atlas-red: #dc2626;
         }
+        .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+            background: var(--atlas-page-bg) !important;
+        }
         .atlas-title {
-            font-size: 1.12rem;
-            font-weight: 650;
-            letter-spacing: 0.02rem;
-            margin-bottom: 0.2rem;
+            font-size: 1.26rem;
+            font-weight: 680;
+            letter-spacing: 0.01rem;
+            margin-bottom: 0.1rem;
         }
         .atlas-muted {
             color: var(--atlas-gray);
             font-size: 0.86rem;
         }
-        .atlas-breadcrumb {
-            color: var(--atlas-gray);
-            font-size: 0.82rem;
-            margin-bottom: 0.4rem;
+        .atlas-page-header {
+            margin: 0.15rem 0 0.9rem 0;
+            padding-bottom: 0.55rem;
+            border-bottom: 1px solid var(--atlas-border);
+        }
+        .atlas-page-subtitle {
+            color: #4b5563;
+            font-size: 0.88rem;
+            margin: 0;
         }
         .atlas-card {
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--atlas-border);
             border-radius: 10px;
-            padding: 0.55rem 0.7rem;
-            margin-bottom: 0.45rem;
-            background: #ffffff;
+            padding: 0.45rem 0.6rem;
+            margin-bottom: 0.4rem;
+            background: var(--atlas-surface);
         }
         .atlas-card-title {
-            color: var(--atlas-gray);
-            font-size: 0.76rem;
-            margin-bottom: 0.2rem;
+            color: #4b5563;
+            font-size: 0.72rem;
+            margin-bottom: 0.15rem;
         }
         .atlas-card-value {
-            font-size: 1.02rem;
+            font-size: 0.95rem;
             font-weight: 600;
         }
+        .main .block-container {
+            max-width: 1440px;
+            width: min(calc(100% - 2rem), 1440px);
+            margin: 0 auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            padding-top: 0.75rem;
+        }
         .atlas-statusbar {
-            border-top: 1px solid #e5e7eb;
-            margin-top: 0.7rem;
-            padding-top: 0.4rem;
+            border-top: 1px solid var(--atlas-border);
+            margin-top: 1rem;
+            padding-top: 0.45rem;
         }
         .atlas-chip {
             border-radius: 999px;
             padding: 2px 8px;
-            border: 1px solid #d1d5db;
+            border: 1px solid var(--atlas-border);
             font-size: 0.75rem;
             display: inline-block;
             margin-right: 4px;
             margin-top: 2px;
         }
-        .atlas-object-card {
-            border: 1px solid #dbe3ee;
+        .atlas-object-card,
+        .atlas-empty-state,
+        .atlas-search-row {
+            border: 1px solid var(--atlas-border);
             border-radius: 12px;
             padding: 0.55rem 0.7rem;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            margin-bottom: 0.45rem;
+            background: var(--atlas-surface);
             transition: all 120ms ease-in-out;
         }
-        .atlas-object-card:hover {
-            border-color: #93c5fd;
-            box-shadow: 0 2px 10px rgba(37, 99, 235, 0.12);
+        .atlas-search-row:hover {
+            border-color: #cbd5e1;
+            background: #fcfcfb;
         }
         .atlas-object-header {
             font-size: 0.82rem;
@@ -446,30 +468,12 @@ def _inject_styles(st: Any) -> None:
             font-weight: 600;
             margin-bottom: 0.15rem;
         }
-        .atlas-loading {
-            color: #1d4ed8;
-            font-size: 0.8rem;
-        }
-        .atlas-primary-action {
-            border: 1px solid #bfdbfe;
-            background: #eff6ff;
-            border-radius: 10px;
-            padding: 0.7rem 0.85rem;
-            margin: 0.45rem 0 0.6rem 0;
-        }
-        .atlas-primary-action strong {
-            display: block;
-            color: #1e3a8a;
-            font-size: 0.78rem;
-            margin-bottom: 0.2rem;
-            letter-spacing: 0.01rem;
-        }
         .atlas-project-header {
             position: sticky;
             top: 0;
             z-index: 10;
-            border: 1px solid #dbe3ee;
-            background: #f8fafc;
+            border: 1px solid var(--atlas-border);
+            background: var(--atlas-surface);
             border-radius: 12px;
             padding: 0.7rem 0.85rem;
             margin: 0.35rem 0 0.55rem 0;
@@ -489,6 +493,149 @@ def _inject_styles(st: Any) -> None:
             color: #475569;
             font-size: 0.8rem;
             margin-top: 0.25rem;
+        }
+        .atlas-workspace-context {
+            border: 1px solid var(--atlas-border);
+            border-radius: 10px;
+            background: #fcfcfb;
+            padding: 0.45rem 0.65rem;
+            margin: 0.2rem 0 0.75rem 0;
+            color: #475569;
+            font-size: 0.82rem;
+        }
+        .atlas-empty-title {
+            font-size: 0.95rem;
+            font-weight: 650;
+            color: #0f172a;
+            margin-bottom: 0.2rem;
+        }
+        .atlas-empty-copy {
+            color: #475569;
+            font-size: 0.84rem;
+            margin: 0;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.35rem;
+            padding-bottom: 0.35rem;
+        }
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 8px;
+            border: 1px solid var(--atlas-border);
+            background: #f8f8f7;
+            color: #1f2937;
+            height: 34px;
+            padding: 0 0.7rem;
+            font-weight: 550;
+        }
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            border-color: var(--atlas-primary);
+            background: var(--atlas-primary-soft);
+            color: var(--atlas-primary);
+        }
+        .stButton > button[kind="primary"] {
+            background: var(--atlas-primary) !important;
+            border-color: var(--atlas-primary) !important;
+            color: #ffffff !important;
+            border-radius: 8px !important;
+            font-weight: 650 !important;
+        }
+        .stButton > button[kind="primary"]:hover {
+            background: #00351e !important;
+            border-color: #00351e !important;
+        }
+        .stButton > button[kind="secondary"] {
+            border-radius: 8px !important;
+            border-color: var(--atlas-border) !important;
+            background: var(--atlas-surface) !important;
+            color: #111827 !important;
+        }
+        .stButton > button[kind="secondary"]:hover {
+            background: var(--atlas-hover) !important;
+        }
+        .stTextInput input,
+        .stSelectbox div[data-baseweb="select"] > div,
+        .stTextArea textarea,
+        .stNumberInput input {
+            border-radius: 8px !important;
+            border-color: var(--atlas-border) !important;
+            background: var(--atlas-surface) !important;
+        }
+        .stTextInput input:focus,
+        .stTextInput input:focus-visible,
+        .stTextArea textarea:focus,
+        .stTextArea textarea:focus-visible,
+        .stSelectbox div[data-baseweb="select"] > div:focus,
+        .stSelectbox div[data-baseweb="select"] > div:focus-visible,
+        .stButton > button:focus,
+        .stButton > button:focus-visible {
+            border-color: var(--atlas-primary) !important;
+            box-shadow: 0 0 0 1px var(--atlas-primary) !important;
+            outline: none !important;
+        }
+        [data-testid="stDataFrame"] {
+            border: 1px solid var(--atlas-border);
+            border-radius: 10px;
+            overflow: hidden;
+            background: var(--atlas-surface);
+        }
+        .st-key-atlas_header_nav_Atlas button,
+        .st-key-atlas_header_nav_Projects button,
+        .st-key-atlas_header_nav_Knowledge button,
+        .st-key-atlas_header_nav_Reports button {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            color: #111827 !important;
+            min-width: max-content !important;
+            padding: 0.15rem 0.35rem !important;
+            font-weight: 700 !important;
+            line-height: 1.1 !important;
+            border-radius: 8px !important;
+        }
+        .st-key-atlas_header_nav_Atlas button[kind="primary"],
+        .st-key-atlas_header_nav_Projects button[kind="primary"],
+        .st-key-atlas_header_nav_Knowledge button[kind="primary"],
+        .st-key-atlas_header_nav_Reports button[kind="primary"] {
+            background: var(--atlas-primary-soft) !important;
+            color: var(--atlas-primary) !important;
+        }
+        .st-key-atlas_header_nav_Projects button p,
+        .st-key-atlas_header_nav_Knowledge button p,
+        .st-key-atlas_header_nav_Reports button p {
+            white-space: nowrap !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+        }
+        .st-key-atlas_header_nav_Atlas button p {
+            white-space: nowrap !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+        }
+        .st-key-atlas_header_nav_Atlas button:hover,
+        .st-key-atlas_header_nav_Projects button:hover,
+        .st-key-atlas_header_nav_Knowledge button:hover,
+        .st-key-atlas_header_nav_Reports button:hover {
+            background: var(--atlas-hover) !important;
+        }
+        .st-key-atlas_header_nav_Atlas button[kind="primary"]:hover,
+        .st-key-atlas_header_nav_Projects button[kind="primary"]:hover,
+        .st-key-atlas_header_nav_Knowledge button[kind="primary"]:hover,
+        .st-key-atlas_header_nav_Reports button[kind="primary"]:hover {
+            background: var(--atlas-primary-soft-hover) !important;
+        }
+        .st-key-atlas_header_nav_Atlas button:focus,
+        .st-key-atlas_header_nav_Atlas button:focus-visible,
+        .st-key-atlas_header_nav_Projects button:focus,
+        .st-key-atlas_header_nav_Knowledge button:focus,
+        .st-key-atlas_header_nav_Reports button:focus,
+        .st-key-atlas_header_nav_Projects button:focus-visible,
+        .st-key-atlas_header_nav_Knowledge button:focus-visible,
+        .st-key-atlas_header_nav_Reports button:focus-visible {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        .stButton > button {
+            white-space: nowrap;
         }
         </style>
         """,
@@ -610,7 +757,13 @@ def _render_page_header(st: Any, title: str, subtitle: str) -> None:
 
 
 def _render_empty_state(st: Any, message: str) -> None:
-    st.info(message)
+    st.markdown(
+        "<div class='atlas-empty-state'>"
+        "<div class='atlas-empty-title'>Nothing to show yet</div>"
+        f"<p class='atlas-empty-copy'>{message}</p>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _render_guided_empty_state(
@@ -620,11 +773,14 @@ def _render_guided_empty_state(
     action_to_populate: str,
     next_location: str,
 ) -> None:
-    st.info(
-        f"What is missing: {why_empty}\n\n"
-        f"Why it matters: this view cannot provide reliable review context until data exists.\n\n"
-        f"Action to populate: {action_to_populate}\n\n"
-        f"Next: {next_location}"
+    st.markdown(
+        "<div class='atlas-empty-state'>"
+        "<div class='atlas-empty-title'>No data available</div>"
+        f"<p class='atlas-empty-copy'>{why_empty}</p>"
+        f"<p class='atlas-empty-copy'><strong>Next action:</strong> {action_to_populate}</p>"
+        f"<p class='atlas-empty-copy'><strong>Go to:</strong> {next_location}</p>"
+        "</div>",
+        unsafe_allow_html=True,
     )
 
 
@@ -635,16 +791,11 @@ def _render_workspace_section_header(
     objective: str,
     current_focus: str,
 ) -> None:
-    st.dataframe(
-        [
-            {
-                "Workspace": workspace,
-                "Objective": objective,
-                "Current Focus": current_focus,
-            }
-        ],
-        use_container_width=True,
-        hide_index=True,
+    st.markdown(
+        "<div class='atlas-workspace-context'>"
+        f"<strong>{workspace}</strong> · Objective: {objective} · Focus: {current_focus}"
+        "</div>",
+        unsafe_allow_html=True,
     )
 
 
@@ -3236,6 +3387,8 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_context_selection", {"kind": "project"})
     st.session_state.setdefault("atlas_file_search", "")
     st.session_state.setdefault("atlas_global_search", "")
+    st.session_state.setdefault("atlas_global_search_query", "")
+    st.session_state.setdefault("atlas_global_search_input_generation", 0)
     st.session_state.setdefault("atlas_global_search_index", 0)
     st.session_state.setdefault("atlas_quick_jump", "Current Page")
     st.session_state.setdefault("atlas_equipment_search", "")
@@ -3270,6 +3423,13 @@ def _init_session_state(st: Any) -> None:
         "atlas_os",
         "macos" if platform.system().lower() == "darwin" else "other",
     )
+    # Backward-compatible migration from legacy single-key search state.
+    if not _safe_text(
+        st.session_state.get("atlas_global_search_query"), ""
+    ) and _safe_text(st.session_state.get("atlas_global_search"), ""):
+        st.session_state["atlas_global_search_query"] = _safe_text(
+            st.session_state.get("atlas_global_search"), ""
+        )
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -3628,6 +3788,8 @@ def _group_for_page(page: str, record: ProjectWorkspaceRecord | None) -> str:
         return "Advanced"
     if page in REPORT_PAGES:
         return "Reports"
+    if page == "Administration":
+        return "Settings"
     if page in SETTINGS_PAGES:
         return "Advanced"
     return "Project Workspace"
@@ -3636,6 +3798,7 @@ def _group_for_page(page: str, record: ProjectWorkspaceRecord | None) -> str:
 def _breadcrumb_page_label(page: str) -> str:
     mapping = {
         "Mission Control": "Home",
+        "Administration": "Settings",
         "Project Metadata": "Project Settings",
         "Workspace Settings": "Workspace Settings",
         "Relationship Visualization": "Relationship Graph",
@@ -3736,8 +3899,17 @@ def _render_project_context_header(st: Any, header: ProjectContextHeader) -> Non
     )
 
 
-def _open_project_record(st: Any, record: ProjectWorkspaceRecord) -> None:
-    _navigate_to_project_page(st, record=record, page="Overview")
+def _open_project_record(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    workspace_service: ProjectWorkspaceService | None = None,
+) -> None:
+    _navigate_to_project_page(
+        st,
+        record=record,
+        page="Overview",
+        workspace_service=workspace_service,
+    )
 
 
 def _clear_create_project_widget_state(st: Any) -> None:
@@ -3758,9 +3930,12 @@ def _navigate_to_project_page(
     *,
     record: ProjectWorkspaceRecord,
     page: str,
+    workspace_service: ProjectWorkspaceService | None = None,
 ) -> None:
     st.session_state["atlas_active_workspace_id"] = record.workspace_id
     st.session_state["atlas_active_page"] = page
+    if workspace_service is not None and hasattr(workspace_service, "save_record"):
+        workspace_service.save_record(record)
     if page == "Documents":
         _clear_create_project_widget_state(st)
     st.rerun()
@@ -3893,29 +4068,37 @@ def _open_project_from_local_path(
         return
 
     if path.is_dir() and (path / "project.json").exists():
-        _open_project_record(st, workspace_service.load_record(path / "project.json"))
+        _open_project_record(
+            st,
+            workspace_service.load_record(path / "project.json"),
+            workspace_service,
+        )
         return
 
     if path.is_dir() and (path / "workspace.json").exists():
-        _open_project_record(st, workspace_service.load_record(path / "workspace.json"))
+        _open_project_record(
+            st,
+            workspace_service.load_record(path / "workspace.json"),
+            workspace_service,
+        )
         return
 
     if path.name in {"workspace.json", "project.json", "metadata.json"}:
-        _open_project_record(st, workspace_service.load_record(path))
+        _open_project_record(st, workspace_service.load_record(path), workspace_service)
         return
 
     if path.name == "intake_snapshot.json":
         context = build_intake_review_context(path)
         record = _build_record_from_context(context)
         workspace_service.save_record(record)
-        _open_project_record(st, record)
+        _open_project_record(st, record, workspace_service)
         return
 
     if path.is_dir():
         context = build_reference_project_context(path)
         record = _build_record_from_context(context)
         workspace_service.save_record(record)
-        _open_project_record(st, record)
+        _open_project_record(st, record, workspace_service)
         return
 
     st.error(
@@ -3924,70 +4107,112 @@ def _open_project_from_local_path(
 
 
 def _render_global_search_control(st: Any, host: Any) -> None:
+    _hydrate_global_search_input_state(st)
     host.text_input(
-        "Global Object Search",
-        key="atlas_global_search",
-        placeholder="Search projects, equipment, drawings, specs, systems, rooms, RFIs, risks, manufacturers, products...",
+        "Search",
+        key=_global_search_widget_key(st),
+        placeholder="Search",
+        label_visibility="collapsed",
         on_change=_submit_global_search,
         args=(st,),
     )
 
 
 def _submit_global_search(st: Any) -> None:
-    query = _safe_text(st.session_state.get("atlas_global_search"), "").strip()
-    if not query:
+    query = _normalize_global_search_query(_global_search_input_value(st))
+    if not _is_meaningful_global_search_query(query):
         return
+    st.session_state["atlas_global_search_query"] = query
     st.session_state["atlas_global_search_last_submitted"] = query
 
 
-def _render_header_history_popover(
-    st: Any,
-    workspace_service: ProjectWorkspaceService,
-) -> None:
-    popover = st.popover("History")
-    popover.markdown("#### Recently Viewed")
-    recent = list(st.session_state.get("atlas_recently_viewed_objects") or [])
-    if recent:
-        labels = [
-            f"{_safe_text(item.get('object_type'), '')}: {_safe_text(item.get('display_name'), '')}"
-            for item in recent[:8]
-        ]
-        selected_label = popover.selectbox(
-            "Open recent",
-            options=labels,
-            key="atlas_header_recent_open",
-        )
-        selected = recent[:8][labels.index(selected_label)]
-        if popover.button(
-            "Open",
-            key="atlas_header_open_recent",
-            use_container_width=True,
-        ):
-            _open_search_reference(st, workspace_service, selected)
-    else:
-        popover.caption("No recently viewed objects.")
+def _open_page(st: Any, page: str) -> None:
+    st.session_state["atlas_active_page"] = page
+    st.rerun()
 
-    popover.markdown("#### Working Set")
-    working_set = _working_set(st)
-    if working_set:
-        labels = [
-            f"{_safe_text(item.get('object_type'), '')}: {_safe_text(item.get('display_name'), '')}"
-            for item in working_set[:8]
-        ]
-        selected_label = popover.selectbox(
-            "Open working set object",
-            options=labels,
-            key="atlas_header_working_set_open",
-        )
-        selected = working_set[:8][labels.index(selected_label)]
-        if popover.button(
-            "Open Working Set Object",
-            key="atlas_header_open_working_set",
+
+def _format_recent_opened_at(timestamp: str | None) -> str:
+    normalized = _safe_text(timestamp, "")
+    if not normalized:
+        return "n/a"
+    try:
+        parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    except Exception:
+        return normalized
+    return parsed.strftime("%b %d, %Y %H:%M")
+
+
+def _top_navigation_groups(
+    record: ProjectWorkspaceRecord | None,
+) -> list[tuple[str, list[tuple[str, str]]]]:
+    if record is None:
+        return APPLICATION_NAV_GROUPS
+    return [APPLICATION_NAV_GROUPS[0], *PROJECT_NAV_GROUPS]
+
+
+def _render_navigation_menu(
+    st: Any,
+    host: Any,
+    menu_label: str,
+    entries: list[tuple[str, str]],
+    active_page: str,
+) -> None:
+    menu = host.popover(menu_label)
+    menu.caption("Navigate to a workspace page.")
+    for label, page in entries:
+        is_future_disabled = page in DISABLED_LIFECYCLE_PAGES
+        if menu.button(
+            label,
+            key=f"atlas_top_nav_{menu_label}_{label}_{page}",
+            type="primary" if active_page == page else "secondary",
+            disabled=is_future_disabled,
             use_container_width=True,
         ):
-            _open_search_reference(st, workspace_service, selected)
-    else:
-        popover.caption("Working Set is empty.")
+            _open_page(st, page)
+        if is_future_disabled:
+            menu.caption(f"{label} is reserved for future lifecycle scope.")
+
+
+def _render_top_navigation(
+    st: Any,
+    nav_columns: list[Any],
+    record: ProjectWorkspaceRecord | None = None,
+) -> None:
+    active_page = st.session_state.get("atlas_active_page", "Mission Control")
+    nav_items = [
+        ("Projects", "Projects"),
+        ("Knowledge", "Knowledge"),
+        ("Reports", "Reports"),
+    ]
+
+    for column, (label, page) in zip(nav_columns, nav_items):
+        is_active = active_page == page
+        if (
+            label == "Projects"
+            and record is not None
+            and active_page != "Mission Control"
+        ):
+            is_active = True
+        elif label == "Knowledge" and active_page in KNOWLEDGE_PAGES:
+            is_active = True
+        if column.button(
+            label,
+            key=f"atlas_header_nav_{label}",
+            type="primary" if is_active else "secondary",
+            use_container_width=False,
+        ):
+            _open_page(st, page)
+
+
+def _render_header_menu(st: Any, host: Any) -> None:
+    menu = host.popover("☰")
+    if menu.button(
+        "Settings",
+        key="atlas_header_settings",
+        type="secondary",
+        use_container_width=True,
+    ):
+        _open_page(st, "Administration")
 
 
 def _render_header(
@@ -3996,90 +4221,25 @@ def _render_header(
     record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> None:
-    records = workspace_service.list_workspaces(include_archived=True, limit=200)
+    current_page = st.session_state.get("atlas_active_page", "Mission Control")
 
-    header_cols = st.columns([1.1, 2.0, 2.8, 1.6])
-    if header_cols[0].button("Atlas", use_container_width=True, type="secondary"):
-        st.session_state["atlas_active_page"] = "Mission Control"
-        st.rerun()
-
-    if record is None:
-        st.session_state["atlas_active_project_name"] = ""
-        _render_global_search_control(st, header_cols[2])
-        _render_header_history_popover(st, workspace_service)
-        return
-
-    _render_global_search_control(st, header_cols[2])
-
-    summary = _build_project_analysis_summary(record, context)
-    st.session_state["atlas_active_project_name"] = record.project.name
-    next_action = _next_review_action(_review_step_status_rows(st, record, context))
-    review = context.get("review") if context else None
-    confidence = getattr(review, "confidence", None)
-    confidence_text = "n/a"
-    if isinstance(confidence, (int, float)):
-        confidence_text = f"{int(confidence * 100)}%"
-    elif confidence is not None:
-        confidence_text = _safe_text(confidence, "n/a")
-
-    selector_options = {
-        f"{item.project.name} · {item.workspace_id}": item for item in records
-    }
-    if selector_options:
-        active_label = next(
-            (
-                label
-                for label, item in selector_options.items()
-                if item.workspace_id == record.workspace_id
-            ),
-            None,
-        )
-        selected_label = header_cols[1].selectbox(
-            "Project",
-            options=list(selector_options.keys()),
-            index=(
-                list(selector_options.keys()).index(active_label)
-                if active_label in selector_options
-                else 0
-            ),
-            key="atlas_header_project_selector",
-        )
-        selected_record = selector_options.get(selected_label)
-        if (
-            selected_record is not None
-            and selected_record.workspace_id != record.workspace_id
-        ):
-            _open_project_record(st, selected_record)
-    else:
-        header_cols[1].caption("Project selector unavailable.")
-
-    if header_cols[3].button("Back to Projects", use_container_width=True):
-        st.session_state["atlas_active_page"] = "Projects"
-        st.rerun()
-
-    _render_header_history_popover(st, workspace_service)
-
-    project_header = _build_project_context_header(
-        record,
-        customer=_safe_text(summary.get("customer"), "Not available"),
-        confidence=confidence_text,
-        recommended_next_action=_safe_text(
-            next_action.get("step"),
-            "Review project overview",
-        ),
-    )
-    _render_project_context_header(st, project_header)
-
-    if st.button(
-        f"Recommended Next: {_safe_text(next_action.get('step'), 'Review project overview')}",
-        type="primary",
-        use_container_width=True,
+    header_cols = st.columns([1.05, 2.4, 4.4, 0.55])
+    if header_cols[0].button(
+        "Atlas",
+        key="atlas_header_nav_Atlas",
+        use_container_width=False,
+        type="primary" if current_page == "Mission Control" else "secondary",
     ):
-        st.session_state["atlas_active_page"] = _safe_text(
-            next_action.get("page"),
-            "Overview",
-        )
-        st.rerun()
+        _open_page(st, "Mission Control")
+    nav_cols = header_cols[1].columns([0.95, 1.15, 0.95])
+    _render_top_navigation(st, nav_cols, record)
+    _render_global_search_control(st, header_cols[2])
+    _render_header_menu(st, header_cols[3])
+
+    if record is None or current_page == "Mission Control":
+        st.session_state["atlas_active_project_name"] = ""
+        return
+    st.session_state["atlas_active_project_name"] = record.project.name
 
 
 def _nav_buttons(
@@ -4327,6 +4487,14 @@ def _object_display_name(kind: str, data: dict[str, Any]) -> str:
     return _safe_text(data.get("title"), _safe_text(data.get("object_id"), "Object"))
 
 
+def _overall_confidence_text(value: Any) -> str:
+    if isinstance(value, dict):
+        return _safe_text(value.get("overall_confidence"), "")
+    if isinstance(value, (int, float, str)):
+        return _safe_text(value, "")
+    return ""
+
+
 def _object_secondary_label(kind: str, data: dict[str, Any]) -> str:
     if kind == "equipment":
         return _safe_text(data.get("description"), "")
@@ -4347,10 +4515,11 @@ def _object_secondary_label(kind: str, data: dict[str, Any]) -> str:
             data.get("lifecycle_status"), _safe_text(data.get("status"), "")
         )
         vendor = _safe_text(data.get("vendor"), "")
+        confidence_value = _overall_confidence_text(
+            data.get("confidence") or data.get("confidence_summary")
+        )
         confidence = _safe_text(
-            dict(data.get("confidence") or data.get("confidence_summary") or {}).get(
-                "overall_confidence"
-            ),
+            confidence_value,
             "",
         )
         return " | ".join(
@@ -4725,7 +4894,7 @@ def _open_search_reference(
             selected_record = records.get(workspace_id)
             if selected_record is not None:
                 _record_recent_search_open(st, reference)
-                _open_project_record(st, selected_record)
+                _open_project_record(st, selected_record, workspace_service)
                 return
 
     st.session_state["atlas_active_page"] = _safe_text(
@@ -4768,7 +4937,11 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
             ),
         },
         "search_state": {
-            "global_search": str(st.session_state.get("atlas_global_search") or ""),
+            "global_search": str(
+                st.session_state.get("atlas_global_search_query")
+                or st.session_state.get("atlas_global_search")
+                or ""
+            ),
             "result_index": int(st.session_state.get("atlas_global_search_index") or 0),
         },
         "window_preferences": {
@@ -4834,7 +5007,7 @@ def _restore_workspace_state(
     )
 
     search_state = dict(state.get("search_state") or {})
-    st.session_state["atlas_global_search"] = str(
+    st.session_state["atlas_global_search_query"] = str(
         search_state.get("global_search") or ""
     )
     st.session_state["atlas_global_search_index"] = int(
@@ -5239,10 +5412,13 @@ def _render_home_page(
     context: dict[str, Any] | None,
     mission_control_payload: dict[str, Any] | None = None,
 ) -> None:
-    _ = (workspace_service, record, context)
+    _ = (record, context)
     st.subheader("Home")
+    st.caption(
+        "Start project work quickly and keep high-priority engineering actions visible."
+    )
 
-    action_cols = st.columns(3)
+    action_cols = st.columns([1.0, 1.0, 1.0])
     if action_cols[0].button(
         "Create New Project",
         type="primary",
@@ -5257,7 +5433,11 @@ def _render_home_page(
         st.session_state["atlas_active_page"] = "Projects"
         st.rerun()
 
-    _render_mission_control_panels(st, mission_control_payload or {})
+    _render_mission_control_panels(
+        st,
+        workspace_service,
+        mission_control_payload or {},
+    )
 
 
 def _render_application_knowledge_page(
@@ -6328,7 +6508,12 @@ def _render_application_reports_page(
     )
     rows = _collect_workspace_signals(workspace_service, limit=30)
     if not rows:
-        st.info("No projects available for application-level reporting.")
+        _render_guided_empty_state(
+            st,
+            why_empty="No projects are currently available for reporting.",
+            action_to_populate="Create or open projects to generate reportable workflow signals.",
+            next_location="Use Home or Projects to open a project workspace.",
+        )
         return
     st.dataframe(
         [
@@ -6353,7 +6538,7 @@ def _render_application_administration_page(
 ) -> None:
     _render_page_header(
         st,
-        "Administration",
+        "Settings",
         "Application-level settings and local repository controls.",
     )
     st.dataframe(
@@ -6370,12 +6555,7 @@ def _render_application_administration_page(
             },
             {
                 "Setting": "Navigation Behavior",
-                "Value": (
-                    "Persistent sidebar"
-                    if _safe_text(st.session_state.get("atlas_layout_mode"), "Desktop")
-                    == "Desktop"
-                    else "Collapsed navigation"
-                ),
+                "Value": "Top header navigation",
             },
         ],
         use_container_width=True,
@@ -6405,7 +6585,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         )
         return
 
-    action_cols = st.columns(3)
+    action_cols = st.columns([1.2, 1.2, 1.2, 2.4])
     if action_cols[0].button(
         "Create New Project", type="primary", use_container_width=True
     ):
@@ -6423,7 +6603,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         temp_path = Path("/tmp") / f"atlas-import-{project_bundle.name}"
         temp_path.write_bytes(project_bundle.getvalue())
         imported = workspace_service.import_project_bundle(str(temp_path))
-        _open_project_record(st, imported)
+        _open_project_record(st, imported, workspace_service)
 
     if action_cols[2].button("Open Existing Project", use_container_width=True):
         st.session_state["atlas_active_page"] = "Open Existing Project"
@@ -6533,7 +6713,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         if action_cols[0].button(
             "Open Project", type="primary", use_container_width=True
         ):
-            _open_project_record(st, selected)
+            _open_project_record(st, selected, workspace_service)
 
         pin_label = "Unpin" if selected.pinned else "Pin"
         if action_cols[1].button(pin_label, use_container_width=True):
@@ -8532,7 +8712,7 @@ def _render_open_existing_page(
             if actions[0].button(
                 "Open Project", type="primary", use_container_width=True
             ):
-                _open_project_record(st, selected)
+                _open_project_record(st, selected, workspace_service)
             pin_label = "Unpin" if selected.pinned else "Pin"
             if actions[1].button(pin_label, use_container_width=True):
                 workspace_service.pin_project(
@@ -11374,13 +11554,13 @@ def _render_overview_page(
         hide_index=True,
     )
 
-    st.markdown("### Recent Project Activity")
+    st.markdown("### Project Timeline")
     if timeline:
         st.dataframe(timeline[:10], use_container_width=True, hide_index=True)
     else:
         _render_guided_empty_state(
             st,
-            why_empty="Recent activity is empty because this workspace has no recorded events yet.",
+            why_empty="Project timeline is empty because this workspace has no recorded events yet.",
             action_to_populate="Upload documents or run project analysis to generate activity.",
             next_location="Go to Documents and run project analysis.",
         )
@@ -12403,7 +12583,7 @@ def _search_rank(
     query: str,
     *,
     project_open: bool,
-) -> tuple[int, int, str, str]:
+) -> tuple[int, int, str, str, str]:
     normalized_query = query.strip().lower()
     object_id, name, secondary, extra = _search_match_candidates(reference)
     exact_fields = {item for item in [object_id, name] + extra.split(" ") if item}
@@ -12436,6 +12616,7 @@ def _search_rank(
         scope_penalty,
         _safe_text(reference.get("object_type"), "Object"),
         _safe_text(reference.get("display_name"), "Object"),
+        _safe_text(reference.get("object_id"), ""),
     )
 
 
@@ -12475,6 +12656,7 @@ def _group_search_results(
 ) -> dict[str, list[dict[str, Any]]]:
     preferred_order = [
         "Project",
+        "Product",
         "Equipment",
         "Drawing",
         "Specification",
@@ -12482,16 +12664,16 @@ def _group_search_results(
         "Room",
         "RFI Candidate",
         "Risk / Finding",
+        "Organization",
         "Manufacturer",
         "Vendor",
-        "Product",
-        "Organization",
         "Price List",
         "Estimate",
         "Assembly",
     ]
     label_map = {
         "Project": "Projects",
+        "Product": "Products",
         "Equipment": "Equipment",
         "Drawing": "Drawings",
         "Specification": "Specifications",
@@ -12499,10 +12681,9 @@ def _group_search_results(
         "Room": "Rooms",
         "RFI Candidate": "RFIs",
         "Risk / Finding": "Risks",
+        "Organization": "Organizations",
         "Manufacturer": "Manufacturers",
         "Vendor": "Vendors",
-        "Product": "Products",
-        "Organization": "Organizations",
         "Price List": "Price Sheets",
         "Estimate": "Estimates",
         "Assembly": "Assemblies",
@@ -12524,6 +12705,151 @@ def _group_search_results(
             grouped_refs[label_map.get(object_type, object_type)] = rows
 
     return grouped_refs
+
+
+def _normalize_global_search_query(query: Any) -> str:
+    return " ".join(_safe_text(query, "").split())
+
+
+def _global_search_input_generation(st: Any) -> int:
+    return int(st.session_state.get("atlas_global_search_input_generation") or 0)
+
+
+def _global_search_widget_key(st: Any) -> str:
+    return f"atlas_global_search_input_{_global_search_input_generation(st)}"
+
+
+def _global_search_input_value(st: Any) -> str:
+    return _safe_text(st.session_state.get(_global_search_widget_key(st)), "")
+
+
+def _hydrate_global_search_input_state(st: Any) -> None:
+    widget_key = _global_search_widget_key(st)
+    if widget_key in st.session_state:
+        return
+    st.session_state[widget_key] = _safe_text(
+        st.session_state.get("atlas_global_search_query"), ""
+    )
+
+
+def _is_meaningful_global_search_query(query: Any) -> bool:
+    normalized = _normalize_global_search_query(query)
+    if not normalized:
+        return False
+    if any(character.isalnum() for character in normalized) is False:
+        return False
+    if (
+        len(normalized) >= 2
+        and sum(1 for character in normalized if character.isalnum()) >= 2
+    ):
+        return True
+    compact_identifier_patterns = (
+        r"^[A-Za-z][A-Za-z0-9]{0,4}[-_/]?[A-Za-z0-9]{1,12}$",
+        r"^[A-Za-z0-9]{2,}[-_/][A-Za-z0-9]+$",
+    )
+    return any(re.match(pattern, normalized) for pattern in compact_identifier_patterns)
+
+
+def _active_global_search_query(st: Any) -> str:
+    query = _normalize_global_search_query(
+        st.session_state.get("atlas_global_search_query")
+        or st.session_state.get("atlas_global_search")
+    )
+    if not _is_meaningful_global_search_query(query):
+        return ""
+    return query
+
+
+def _clear_global_search_state(st: Any) -> None:
+    st.session_state["atlas_global_search_query"] = ""
+    st.session_state["atlas_global_search_last_submitted"] = ""
+    st.session_state["atlas_global_search_index"] = 0
+    st.session_state["atlas_global_search_input_generation"] = (
+        _global_search_input_generation(st) + 1
+    )
+
+
+def _search_result_subtitle(reference: dict[str, Any]) -> str:
+    secondary = _safe_text(reference.get("secondary_label"), "")
+    if secondary:
+        return secondary
+    object_type = _safe_text(reference.get("object_type"), "Object")
+    object_id = _safe_text(reference.get("object_id"), "")
+    if object_id:
+        return f"{object_type} · {object_id}"
+    return object_type
+
+
+def _open_search_result(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    reference: dict[str, Any],
+) -> None:
+    _clear_global_search_state(st)
+    _open_search_reference(st, workspace_service, reference)
+
+
+def _render_search_result_row(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    reference: dict[str, Any],
+    *,
+    key_prefix: str,
+) -> None:
+    primary = _safe_text(reference.get("display_name"), "Object")
+    subtitle = _search_result_subtitle(reference)
+    object_type = _safe_text(reference.get("object_type"), "Object")
+    object_id = _safe_text(reference.get("object_id"), "")
+    project_name = _safe_text(reference.get("project_name"), "")
+    with st.container(border=True):
+        if st.button(
+            primary,
+            key=f"{key_prefix}_{object_type}_{object_id}",
+            use_container_width=True,
+            type="secondary",
+        ):
+            _open_search_result(st, workspace_service, reference)
+        metadata = [subtitle, object_type]
+        if object_id:
+            metadata.append(object_id)
+        if project_name:
+            metadata.append(project_name)
+        st.caption(" · ".join(item for item in metadata if item))
+
+
+def _render_global_search_results(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    filtered: list[dict[str, Any]],
+    grouped_refs: dict[str, list[dict[str, Any]]],
+    query: str,
+) -> None:
+    _render_page_header(
+        st,
+        "Search Results",
+        "Focused object search across application and project scopes.",
+    )
+    st.caption(f"Query: {query}")
+    if st.button(
+        "Clear Search", key="atlas_clear_global_search", use_container_width=False
+    ):
+        _clear_global_search_state(st)
+        st.rerun()
+        return
+
+    if not filtered:
+        st.caption("No results match your query.")
+        return
+
+    for group_name, rows in grouped_refs.items():
+        st.markdown(f"#### {group_name} ({len(rows)})")
+        for index, reference in enumerate(rows):
+            _render_search_result_row(
+                st,
+                workspace_service,
+                reference,
+                key_prefix=f"atlas_search_result_{group_name}_{index}",
+            )
 
 
 def _application_search_entries(
@@ -12732,10 +13058,8 @@ def _application_search_entries(
             ),
             _safe_text(item.get("vendor"), ""),
             _safe_text(item.get("price_version"), ""),
-            str(
-                dict(
-                    item.get("confidence") or item.get("confidence_summary") or {}
-                ).get("overall_confidence", "")
+            _overall_confidence_text(
+                item.get("confidence") or item.get("confidence_summary")
             ),
             " ".join(list(item.get("alternate_skus") or [])),
         ]
@@ -16970,196 +17294,20 @@ def _render_global_search_panel(
     record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> None:
-    query = str(st.session_state.get("atlas_global_search") or "").strip()
+    query = _active_global_search_query(st)
     if not query:
         return
 
     references = _global_search_entries(st, workspace_service, record, context)
-    object_types = sorted(
-        {
-            _safe_text(item.get("object_type"), "")
-            for item in references
-            if item.get("object_type")
-        }
-    )
-
-    if query:
-        _record_recent_search_query(st, query)
-
-    with st.expander("Search Filters", expanded=False):
-        selected_types = st.multiselect(
-            "Type filters",
-            options=object_types,
-            default=[],
-            key="atlas_search_type_filters",
-            help="Filter by object type.",
-        )
-
+    _record_recent_search_query(st, query)
     filtered = _filter_search_results(
         references,
         query=query,
-        selected_types=list(selected_types),
+        selected_types=[],
         project_open=record is not None,
     )
     grouped_refs = _group_search_results(filtered)
-
-    with st.expander(f"Global Search Results ({len(filtered)})", expanded=True):
-        if not filtered:
-            _render_guided_empty_state(
-                st,
-                why_empty=f"No search results match \"{query or 'current filters'}\".",
-                action_to_populate="Try broader terms, remove type filters, or search by identifier/model/drawing/spec number.",
-                next_location="Atlas searched projects, knowledge objects, equipment, drawings, specifications, systems, rooms, risks, RFIs, evidence, notebook entries, and relationships.",
-            )
-            if st.button(
-                "Clear Search Filters",
-                key="atlas_search_clear_filters",
-                use_container_width=True,
-            ):
-                st.session_state["atlas_search_type_filters"] = []
-                st.rerun()
-            return
-
-        for object_type in grouped_refs.keys():
-            st.markdown(f"#### {object_type}")
-            st.dataframe(
-                [
-                    {
-                        "Primary": _safe_text(item.get("display_name"), "Object"),
-                        "Context": _safe_text(item.get("secondary_label"), "n/a"),
-                        "Type": _safe_text(item.get("object_type"), "Object"),
-                        "Identity": _safe_text(item.get("object_id"), "n/a"),
-                        "Project": _safe_text(item.get("project_name"), "n/a"),
-                        "Action": "Open",
-                    }
-                    for item in grouped_refs[object_type][:15]
-                ],
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        labels = [
-            f"{_safe_text(item.get('object_type'), 'Object')}: {_safe_text(item.get('display_name'), 'Object')} | {_safe_text(item.get('secondary_label'), '')}"
-            for item in filtered
-        ]
-        selected_label = st.selectbox(
-            "Results", options=labels, key="atlas_search_result"
-        )
-        selected = filtered[labels.index(selected_label)]
-
-        st.markdown(
-            "<div class='atlas-object-card'>"
-            f"<div class='atlas-object-header'>Selected Result: {_safe_text(selected.get('object_type'), 'Object')}</div>"
-            f"{_safe_text(selected.get('display_name'), 'Object')}<br/><span class='atlas-muted'>{_safe_text(selected.get('secondary_label'), '')}</span>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-        action_cols = st.columns(3)
-        if action_cols[0].button(
-            "Open Result",
-            key="atlas_open_search_result",
-            type="primary",
-            use_container_width=True,
-        ):
-            _open_search_reference(st, workspace_service, selected)
-
-        pinned = _is_reference_pinned(st, selected)
-        if action_cols[1].button(
-            "Remove from Working Set" if pinned else "Add to Working Set",
-            key="atlas_search_pin_result",
-            use_container_width=True,
-        ):
-            _toggle_pin_reference(st, selected, should_pin=not pinned)
-            st.rerun()
-
-        if action_cols[2].button(
-            "Clear Working Set",
-            key="atlas_search_clear_working_set",
-            use_container_width=True,
-        ):
-            st.session_state["atlas_pinned_objects"] = []
-            st.rerun()
-
-        st.markdown("#### Working Set")
-        st.caption("Keep important project objects close while you review the project.")
-        working_set = _working_set(st)
-        if working_set:
-            st.dataframe(
-                [
-                    {
-                        "Object": _safe_text(item.get("display_name"), "Object"),
-                        "Type": _safe_text(item.get("object_type"), "n/a"),
-                        "Project": _safe_text(item.get("project_name"), "n/a"),
-                    }
-                    for item in working_set[:12]
-                ],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.caption("Working Set is empty.")
-
-        st.markdown("#### Recent Searches")
-        recent_queries = list(st.session_state.get("atlas_recent_search_queries") or [])
-        recent_opened = list(st.session_state.get("atlas_recent_opened_results") or [])
-        if recent_queries:
-            st.dataframe(
-                [{"Query": item} for item in recent_queries[:8]],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.caption("No recent queries.")
-
-        if recent_opened:
-            st.dataframe(
-                [
-                    {
-                        "Object": _safe_text(item.get("display_name"), "Object"),
-                        "Type": _safe_text(item.get("object_type"), "n/a"),
-                        "Opened": _safe_text(item.get("last_opened_at"), "n/a"),
-                    }
-                    for item in recent_opened[:8]
-                ],
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        clear_cols = st.columns(2)
-        if clear_cols[0].button(
-            "Clear Recent Queries",
-            key="atlas_clear_recent_queries",
-            use_container_width=True,
-        ):
-            st.session_state["atlas_recent_search_queries"] = []
-            st.rerun()
-        if clear_cols[1].button(
-            "Clear Recently Opened",
-            key="atlas_clear_recent_opened",
-            use_container_width=True,
-        ):
-            st.session_state["atlas_recent_opened_results"] = []
-            st.rerun()
-
-        st.markdown("#### Recently Viewed")
-        recent = list(st.session_state.get("atlas_recently_viewed_objects") or [])
-        if recent:
-            st.dataframe(
-                [
-                    {
-                        "Object": _safe_text(item.get("display_name"), "Object"),
-                        "Type": _safe_text(item.get("object_type"), "n/a"),
-                        "Project": _safe_text(item.get("project_name"), "n/a"),
-                        "Last Viewed": _safe_text(item.get("last_viewed_at"), "n/a"),
-                    }
-                    for item in recent[:8]
-                ],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.caption("No recently viewed objects.")
+    _render_global_search_results(st, workspace_service, filtered, grouped_refs, query)
 
 
 def _render_upload_panel(
@@ -21359,21 +21507,11 @@ def _render_status_bar(
     record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> None:
+    _ = (record, context)
     st.markdown("<div class='atlas-statusbar'></div>", unsafe_allow_html=True)
-    intake = _safe_text(context.get("package_location") if context else None, "n/a")
-    review_time = _safe_text(record.updated_at if record else None, "n/a")
-    commit = _current_commit()
-
-    cols = st.columns(5)
-    cols[0].caption(
-        f"Current project: {record.project.name if record is not None else 'None selected'}"
-    )
-    cols[1].caption(
-        f"Lifecycle stage: {_project_stage(record) if record is not None else 'Application Workspace'}"
-    )
-    cols[2].caption(f"Last intake: {intake}")
-    cols[3].caption(f"Last review: {review_time}")
-    cols[4].caption(f"Atlas v{__version__} · commit {commit}")
+    cols = st.columns([7, 3])
+    cols[0].caption("©2026 Corsa Systems. All rights reserved.")
+    cols[1].caption(f"Atlas v{__version__} · commit {_current_commit()}")
 
 
 def _render_main_content(
@@ -21481,11 +21619,11 @@ def _render_main_content(
 
 def _render_mission_control_panels(
     st: Any,
+    workspace_service: ProjectWorkspaceService,
     mission_control_payload: dict[str, Any] | None,
 ) -> None:
     payload = mission_control_payload or {}
     actions = list(payload.get("actions") or [])
-    timeline = list(payload.get("timeline") or [])
 
     high_priority_actions: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -21526,25 +21664,36 @@ def _render_mission_control_panels(
     else:
         st.caption("No high-priority actions detected.")
 
-    st.markdown("### Recent Activity")
-    if timeline:
-        st.dataframe(
-            [
-                {
-                    "Event": item.get("event"),
-                    "Status": item.get("status"),
-                    "Timestamp": item.get("timestamp"),
-                }
-                for item in timeline[:8]
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-        if st.button("View full activity", key="atlas_side_view_activity"):
-            st.session_state["atlas_active_page"] = "Timeline"
-            st.rerun()
+    st.markdown("### Recent Projects")
+    recent_projects = workspace_service.list_recent_workspaces(limit=5)
+    if recent_projects:
+        for record in recent_projects:
+            with st.container(border=True):
+                st.markdown(f"**{_safe_text(record.project.name, 'Project')}**")
+                details = [
+                    f"Atlas Bid ID: {_safe_text(record.project.project_id, 'n/a')}",
+                ]
+                internal_number = _safe_text(
+                    record.project.internal_project_number
+                    or record.metadata.get("internal_project_number"),
+                    "",
+                )
+                if internal_number:
+                    details.append(f"Internal Project Number: {internal_number}")
+                st.caption(" · ".join(details))
+                st.caption(
+                    f"Last opened: {_format_recent_opened_at(record.last_opened_at or record.updated_at)}"
+                )
+                if st.button(
+                    "Open Project",
+                    key=f"atlas_recent_open_{record.workspace_id}",
+                    use_container_width=True,
+                ):
+                    _open_project_record(st, record, workspace_service)
+        if st.button("View All Projects", key="atlas_side_view_recent_projects"):
+            _open_page(st, "Projects")
     else:
-        st.caption("No activity yet.")
+        st.caption("No recent projects.")
 
 
 def _render_shell(
@@ -21555,6 +21704,7 @@ def _render_shell(
 ) -> None:
     _render_header(st, workspace_service, record, context)
     _sync_notebook_state_to_context(st, context)
+    global_search_query = _active_global_search_query(st)
 
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
     mission_control_payload = None
@@ -21573,47 +21723,85 @@ def _render_shell(
                 "pending_timeline": [],
             }
 
-    st.markdown(
-        f"<div class='atlas-breadcrumb'>{_breadcrumb(record, current_page)}</div>",
-        unsafe_allow_html=True,
-    )
+    if record is not None and current_page != "Mission Control":
+        project_cols = st.columns([3.8, 1.2])
+        selector_options = {
+            f"{item.project.name} · {item.workspace_id}": item
+            for item in workspace_service.list_workspaces(
+                include_archived=True,
+                limit=200,
+            )
+        }
+        if selector_options:
+            active_label = next(
+                (
+                    label
+                    for label, item in selector_options.items()
+                    if item.workspace_id == record.workspace_id
+                ),
+                None,
+            )
+            selected_label = project_cols[0].selectbox(
+                "Project",
+                options=list(selector_options.keys()),
+                index=(
+                    list(selector_options.keys()).index(active_label)
+                    if active_label in selector_options
+                    else 0
+                ),
+                key="atlas_header_project_selector",
+            )
+            selected_record = selector_options.get(selected_label)
+            if (
+                selected_record is not None
+                and selected_record.workspace_id != record.workspace_id
+            ):
+                _open_project_record(st, selected_record, workspace_service)
+        else:
+            project_cols[0].caption("Project selector unavailable.")
 
-    _render_global_search_panel(
-        st,
-        workspace_service,
-        record,
-        context,
-    )
+        summary = _build_project_analysis_summary(record, context)
+        next_action = _next_review_action(_review_step_status_rows(st, record, context))
+        review = context.get("review") if context else None
+        confidence = getattr(review, "confidence", None)
+        confidence_text = "n/a"
+        if isinstance(confidence, (int, float)):
+            confidence_text = f"{int(confidence * 100)}%"
+        elif confidence is not None:
+            confidence_text = _safe_text(confidence, "n/a")
 
-    layout_mode = st.session_state.get("atlas_layout_mode", "Desktop")
+        project_header = _build_project_context_header(
+            record,
+            customer=_safe_text(summary.get("customer"), "Not available"),
+            confidence=confidence_text,
+            recommended_next_action=_safe_text(
+                next_action.get("step"),
+                "Review project overview",
+            ),
+        )
+        _render_project_context_header(st, project_header)
 
-    if layout_mode == "Desktop":
-        nav_col, main_col = st.columns([2.3, 7.7])
-        with nav_col:
-            _nav_buttons(st, st, "desktop", record)
-        with main_col:
-            _render_main_content(
+        if st.button(
+            f"Recommended Next: {_safe_text(next_action.get('step'), 'Review project overview')}",
+            type="primary",
+            use_container_width=True,
+        ):
+            _open_page(
                 st,
-                workspace_service,
-                record,
-                context,
-                mission_control_payload,
+                _safe_text(
+                    next_action.get("page"),
+                    "Overview",
+                ),
             )
 
-    elif layout_mode == "Tablet":
-        nav_popover = st.popover("Open Navigation")
-        _nav_buttons(st, nav_popover, "tablet", record)
-        _render_main_content(
+    if global_search_query:
+        _render_global_search_panel(
             st,
             workspace_service,
             record,
             context,
-            mission_control_payload,
         )
-
     else:
-        nav_drawer = st.popover("Open Navigation")
-        _nav_buttons(st, nav_drawer, "mobile", record)
         _render_main_content(
             st,
             workspace_service,

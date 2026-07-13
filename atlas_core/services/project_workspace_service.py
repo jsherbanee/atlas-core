@@ -834,5 +834,8 @@ class ProjectWorkspaceService:
         return normalized
 
     @staticmethod
-    def _sort_key(record: ProjectWorkspaceRecord) -> str:
-        return record.last_opened_at or record.updated_at or record.created_at
+    def _sort_key(record: ProjectWorkspaceRecord) -> tuple[str, str]:
+        return (
+            record.last_opened_at or record.updated_at or record.created_at,
+            record.workspace_id,
+        )
