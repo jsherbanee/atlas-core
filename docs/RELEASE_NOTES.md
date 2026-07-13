@@ -19,6 +19,28 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Epic X Sprint X-13 Navigation Clarity and UX Refinement) (Closed)
+
+### Improved
+
+- architecture-facing navigation labels and implementation-only page notes were removed from validated production UI surfaces
+- shared-shell secondary navigation is now contextual across application, project-library, and active-project modes
+- Knowledge no longer renders a duplicate internal navigation panel; the shared shell owns visible navigation presentation
+- Home now behaves as an operational landing page around Continue Working, Recent Projects, Action Center, Notifications, and Favorites
+- Reports is now organized around deliverable readiness and output-oriented tables rather than a workflow-summary posture
+
+### Scope Notes
+
+- UX refinement only
+- no routing, persistence, search-behavior, business-logic, or workflow changes
+- no Epic E start
+
+### Validation
+
+- manual validation covered Home, Projects, Knowledge, Reports, active-project workspace navigation, focused search mode, and medium-width layout behavior
+- validated surfaces showed no horizontal overflow during X-13 review widths
+- full quality gates passed (`black`, `ruff`, `mypy`, `pytest`) with full-suite regression count at 1203 tests
+
 ## Unreleased (Epic K Sprint K-02 Core Knowledge Entities and Operational Workflows)
 
 ### Improved

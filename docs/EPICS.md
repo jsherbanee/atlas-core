@@ -139,7 +139,7 @@ Status: Implemented and Closed for current roadmap baseline
 
 ## Epic X: Product Hardening
 
-Status: Completed and Closed (X-01 through X-11 closed; no active Epic X sprint)
+Status: Completed and Closed (X-01 through X-13 closed; no active Epic X sprint)
 
 - X-01 Pilot Readiness and Application Walkthrough (Implemented, Closed)
 - X-02 Project Creation and Bid Identity Refinement (Implemented, Closed)
@@ -153,6 +153,7 @@ Status: Completed and Closed (X-01 through X-11 closed; no active Epic X sprint)
 - X-10 Workspace Consistency and Information Density (Implemented, Closed)
 - X-11 Typography System and Visual Polish (Implemented, Closed)
 - X-12 Secondary and Tertiary Navigation Framework (Implemented, Closed)
+- X-13 Navigation Clarity and UX Refinement (Implemented, Closed)
 
 No Epic X sprint is currently active.
 
@@ -184,6 +185,18 @@ Explicitly out of scope:
 - apply the framework to Knowledge first so search handoff can restore the correct workspace branch deterministically
 - keep the implementation reusable for future workspace surfaces rather than hard-coding Knowledge-only behavior
 - preserve existing Knowledge entity workflows and routing contracts
+
+Explicitly out of scope:
+
+- Epic E implementation start
+- new domain capability implementation
+
+### X-13 Scope (Completed)
+
+- remove architecture-facing labels and duplicate navigation scaffolding from production UI surfaces
+- keep primary navigation global while making secondary navigation contextual to application/project workspace state
+- make tertiary navigation action-oriented rather than page-name repetition
+- tighten page headers, Home information architecture, and Reports deliverable orientation without changing workflows
 
 Explicitly out of scope:
 

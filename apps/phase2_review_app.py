@@ -1146,7 +1146,8 @@ def _safe_text(value: Any, default: str = "Unknown") -> str:
 
 def _render_page_header(st: Any, title: str, subtitle: str) -> None:
     st.subheader(title)
-    st.caption(subtitle)
+    if subtitle and title in {"Open Existing Project", "Create New Project"}:
+        st.caption(subtitle)
 
 
 def _render_empty_state(st: Any, message: str) -> None:
@@ -1193,6 +1194,70 @@ def _render_section_title(st: Any, title: str) -> None:
 
 def _render_notice_panel(st: Any, title: str, body: str) -> None:
     st.markdown(render_notice_panel_html(title, body), unsafe_allow_html=True)
+
+
+def _navigation_section_group(primary: str, mode: str, secondary_key: str) -> str:
+    if primary == "Knowledge":
+        if secondary_key in {"customers", "contacts", "locations"}:
+            return "Accounts"
+        if secondary_key in {"vendors", "manufacturers", "products", "services"}:
+            return "Commercial"
+        if secondary_key in {"price_lists", "imports", "assemblies"}:
+            return "Operations"
+        return "Summary"
+    if primary != "Projects":
+        return "Workspace"
+    if mode == "library":
+        if secondary_key in {
+            "overview",
+            "all_projects",
+            "recent_projects",
+            "pinned_projects",
+            "archived_projects",
+            "repository",
+        }:
+            return "Library"
+        return "Actions"
+    if secondary_key in {
+        "overview",
+        "documents",
+        "bom_review",
+        "scope_risk",
+        "engineering_review",
+        "estimate",
+        "notebook",
+        "reports",
+    }:
+        return "Review"
+    if secondary_key == "project_details":
+        return "Details"
+    return "Settings"
+
+
+def _group_navigation_sections(
+    primary: str,
+    mode: str,
+    sections: list[dict[str, Any]],
+) -> list[tuple[str, list[dict[str, Any]]]]:
+    grouped: list[tuple[str, list[dict[str, Any]]]] = []
+    current_group = ""
+    current_sections: list[dict[str, Any]] = []
+    for section in sections:
+        group_name = _navigation_section_group(
+            primary,
+            mode,
+            _safe_text(section.get("secondary_key"), ""),
+        )
+        if group_name != current_group:
+            if current_sections:
+                grouped.append((current_group, current_sections))
+            current_group = group_name
+            current_sections = [section]
+            continue
+        current_sections.append(section)
+    if current_sections:
+        grouped.append((current_group, current_sections))
+    return grouped
 
 
 def _render_status_badge(st: Any, label: str, tone: str = "neutral") -> None:
@@ -4615,6 +4680,52 @@ def _set_knowledge_navigation_selection(
         )
 
 
+def _knowledge_content_view_from_shell(st: Any) -> str:
+    primary = _safe_text(st.session_state.get(_navigation_primary_state_key()), "")
+    secondary = _safe_text(st.session_state.get(_navigation_secondary_state_key()), "")
+    tertiary = _safe_text(st.session_state.get(_navigation_tertiary_state_key()), "")
+    if primary != "Knowledge":
+        return _safe_text(
+            st.session_state.get(_knowledge_tertiary_state_key()), "Summary"
+        )
+
+    if secondary == "overview":
+        if tertiary == "data_health":
+            return "Commercial Health"
+        if tertiary == "recent_activity":
+            return "Import History"
+        return "Summary"
+
+    secondary_to_view = {
+        "customers": "Customers",
+        "contacts": "Contacts",
+        "locations": "Locations",
+        "vendors": "Vendors",
+        "manufacturers": "Manufacturers",
+        "products": "Products",
+        "services": "Services",
+        "price_lists": "Price Lists",
+        "assemblies": "Assemblies",
+    }
+    if secondary in secondary_to_view:
+        return secondary_to_view[secondary]
+    if secondary == "imports":
+        if tertiary in {"completed", "activity", "import_history"}:
+            return "Import History"
+        return "Imports"
+    return _safe_text(st.session_state.get(_knowledge_tertiary_state_key()), "Summary")
+
+
+def _sync_knowledge_content_state(st: Any) -> str:
+    _knowledge_navigation_defaults(st)
+    active_view = _knowledge_content_view_from_shell(st)
+    st.session_state[_knowledge_secondary_state_key()] = (
+        _knowledge_secondary_group_for_page(active_view)
+    )
+    st.session_state[_knowledge_tertiary_state_key()] = active_view
+    return active_view
+
+
 def _render_knowledge_navigation_frame(st: Any) -> None:
     _knowledge_navigation_defaults(st)
     active_secondary = _safe_text(
@@ -5138,7 +5249,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
     if primary == "Knowledge":
         templates = _knowledge_secondary_templates()
         sections = [
-            ("overview", "Overview"),
+            ("overview", "Library Health"),
             ("customers", "Customers"),
             ("contacts", "Contacts"),
             ("locations", "Locations"),
@@ -5222,7 +5333,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                 ("schedules", "Schedules", "detail_view", None),
                 ("addenda", "Addenda", "detail_view", None),
                 ("images", "Images", "detail_view", None),
-                ("import_activity", "Import Activity", "history_activity_view", None),
+                ("import_activity", "Imports", "history_activity_view", None),
             ],
         ),
         (
@@ -5266,10 +5377,10 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             "Estimate",
             "Estimate",
             [
-                ("overview", "Overview", "collection_view", None),
+                ("overview", "Summary", "collection_view", None),
                 ("equipment", "Equipment", "detail_view", None),
                 ("labor", "Labor", "detail_view", None),
-                ("accessories", "Accessories", "detail_view", None),
+                ("accessories", "Freight", "detail_view", None),
                 ("general_conditions", "General Conditions", "detail_view", None),
                 ("allowances", "Allowances", "detail_view", None),
                 ("revisions", "Revisions", "history_activity_view", None),
@@ -5282,8 +5393,8 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             "Notebook",
             "Notebook",
             [
-                ("add_entry", "Add Entry", "create_action", None),
                 ("browse", "Browse", "collection_view", None),
+                ("add_entry", "Add Entry", "create_action", None),
                 ("decisions", "Decisions", "detail_view", None),
                 ("timeline", "Timeline", "history_activity_view", None),
             ],
@@ -5312,7 +5423,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
         ),
         (
             "project_details",
-            "Project Details",
+            "Details",
             "Overview",
             [
                 ("summary", "Summary", "collection_view", None),
@@ -5327,7 +5438,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
         ),
         (
             "project_settings",
-            "Project Settings",
+            "Settings",
             "Project Metadata",
             [
                 ("metadata", "Metadata", "settings_view", None),
@@ -5551,40 +5662,51 @@ def _render_workspace_navigation(
     if not sections:
         return
 
-    shell_cols = st.columns([1.2, 4.8])
+    grouped_sections = _group_navigation_sections(primary, mode, sections)
+    shell_cols = st.columns([1.25, 4.75])
     with shell_cols[0]:
-        st.markdown("### Secondary")
-        for section in sections:
-            secondary_key = _safe_text(section.get("secondary_key"), "")
-            is_active = secondary_key == _safe_text(
-                st.session_state.get(_navigation_secondary_state_key()),
-                "",
-            )
-            if st.button(
-                _safe_text(section.get("label"), secondary_key),
-                key=f"atlas_secondary_{primary}_{mode}_{secondary_key}",
-                type="primary" if is_active else "secondary",
-                width="stretch",
-                disabled=not bool(section.get("enabled", True)),
-            ):
-                st.session_state[_navigation_secondary_state_key()] = secondary_key
-                actions = list(section.get("supported_tertiary_actions") or [])
-                st.session_state[_navigation_tertiary_state_key()] = _safe_text(
-                    section.get("default_tertiary_action"),
-                    _safe_text(actions[0].get("tertiary_key"), "") if actions else "",
+        for group_index, (group_name, section_group) in enumerate(grouped_sections):
+            if group_index > 0:
+                st.markdown("---")
+            st.caption(group_name.upper())
+            for section in section_group:
+                secondary_key = _safe_text(section.get("secondary_key"), "")
+                is_active = secondary_key == _safe_text(
+                    st.session_state.get(_navigation_secondary_state_key()),
+                    "",
                 )
-                st.session_state[_navigation_prior_route_key()] = {
-                    "page": _safe_text(st.session_state.get("atlas_active_page"), ""),
-                    "workspace": primary,
-                    "mode": mode,
-                }
-                st.session_state["atlas_active_page"] = _safe_text(
-                    section.get("route"),
-                    _safe_text(
-                        st.session_state.get("atlas_active_page"), "Mission Control"
-                    ),
-                )
-                st.rerun()
+                if st.button(
+                    _safe_text(section.get("label"), secondary_key),
+                    key=f"atlas_secondary_{primary}_{mode}_{secondary_key}",
+                    type="primary" if is_active else "secondary",
+                    width="stretch",
+                    disabled=not bool(section.get("enabled", True)),
+                ):
+                    st.session_state[_navigation_secondary_state_key()] = secondary_key
+                    actions = list(section.get("supported_tertiary_actions") or [])
+                    st.session_state[_navigation_tertiary_state_key()] = _safe_text(
+                        section.get("default_tertiary_action"),
+                        (
+                            _safe_text(actions[0].get("tertiary_key"), "")
+                            if actions
+                            else ""
+                        ),
+                    )
+                    st.session_state[_navigation_prior_route_key()] = {
+                        "page": _safe_text(
+                            st.session_state.get("atlas_active_page"), ""
+                        ),
+                        "workspace": primary,
+                        "mode": mode,
+                    }
+                    st.session_state["atlas_active_page"] = _safe_text(
+                        section.get("route"),
+                        _safe_text(
+                            st.session_state.get("atlas_active_page"),
+                            "Mission Control",
+                        ),
+                    )
+                    st.rerun()
 
     with shell_cols[1]:
         section = next(
@@ -5604,7 +5726,6 @@ def _render_workspace_navigation(
             if bool(item.get("visibility", True))
         ]
         if actions:
-            st.markdown("### Tertiary")
             action_cols = st.columns(max(1, min(6, len(actions))))
             for index, action in enumerate(actions):
                 key = _safe_text(action.get("tertiary_key"), "")
@@ -5655,7 +5776,7 @@ def _render_workspace_navigation(
                 actions[0],
             )
             if _tertiary_action_requires_selection(st, active_action, record):
-                st.info(
+                st.caption(
                     _safe_text(
                         active_action.get("empty_state_behavior"),
                         "Select a record in Browse to continue.",
@@ -7194,16 +7315,7 @@ def _render_home_page(
     mission_control_payload: dict[str, Any] | None = None,
 ) -> None:
     _ = (record, context)
-    _render_page_header(
-        st,
-        "Home",
-        "Start project work quickly and keep high-priority engineering actions visible.",
-    )
-    _render_notice_panel(
-        st,
-        "Workspace Focus",
-        "Use Action Center for high-priority blockers and Recent Projects to resume active bids.",
-    )
+    _render_page_header(st, "Home", "")
 
     action_cols = _responsive_control_columns(st, [1.0, 1.0, 1.0])
     if action_cols[0].button(
@@ -7230,22 +7342,8 @@ def _render_home_page(
 def _render_application_knowledge_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    _render_page_header(
-        st,
-        "Knowledge",
-        "Application-wide reusable knowledge. Project-specific review data is intentionally excluded.",
-    )
-    _render_workspace_section_header(
-        st,
-        workspace="Knowledge",
-        objective="Maintain reusable commercial and master-library records.",
-        current_focus="Normalize manufacturer/vendor/product coverage and close missing pricing gaps.",
-    )
-    _render_notice_panel(
-        st,
-        "Design-System Surface",
-        "Knowledge summary, health tables, and controls now use shared section/table primitives.",
-    )
+    _render_page_header(st, "Knowledge", "")
+    active_knowledge_view = _sync_knowledge_content_state(st)
 
     project_rows = _project_library_rows(
         workspace_service,
@@ -7401,28 +7499,7 @@ def _render_application_knowledge_page(
         str(product_dashboard.get("average_confidence", 0.0)),
     )
 
-    _render_knowledge_navigation_frame(st)
-
-    tabs = st.tabs(
-        [
-            "Summary",
-            "Commercial Health",
-            "Manufacturers",
-            "Vendors",
-            "Customers",
-            "Services",
-            "Contacts",
-            "Locations",
-            "Projects",
-            "Products",
-            "Price Lists",
-            "Imports",
-            "Import History",
-            "Assemblies",
-        ]
-    )
-
-    with tabs[0]:
+    if active_knowledge_view == "Summary":
         _render_data_table(
             st,
             [
@@ -7485,7 +7562,7 @@ def _render_application_knowledge_page(
             ],
         )
 
-    with tabs[1]:
+    if active_knowledge_view == "Commercial Health":
         freshness = commercial_dashboard.get("knowledge_freshness", {})
         _render_data_table(
             st,
@@ -7532,7 +7609,7 @@ def _render_application_knowledge_page(
             ],
         )
 
-    with tabs[2]:
+    if active_knowledge_view == "Manufacturers":
         _render_section_title(st, "Manufacturers")
         with st.expander("Add Manufacturer", expanded=False):
             m_cols = st.columns(2)
@@ -7727,7 +7804,7 @@ def _render_application_knowledge_page(
                     key_prefix="atlas_ck_mfr_io",
                 )
 
-    with tabs[3]:
+    if active_knowledge_view == "Vendors":
         _render_section_title(st, "Vendors")
         with st.expander("Add Vendor", expanded=False):
             v_cols = st.columns(2)
@@ -7912,7 +7989,7 @@ def _render_application_knowledge_page(
                     key_prefix="atlas_ck_vendor_io",
                 )
 
-    with tabs[4]:
+    if active_knowledge_view == "Customers":
         _render_section_title(st, "Customers")
         with st.expander("Add Customer", expanded=False):
             c_cols = st.columns(2)
@@ -8106,7 +8183,7 @@ def _render_application_knowledge_page(
                     key_prefix="atlas_ck_customer_io",
                 )
 
-    with tabs[5]:
+    if active_knowledge_view == "Services":
         _render_section_title(st, "Services")
         with st.expander("Add Service", expanded=False):
             svc_cols = st.columns(2)
@@ -8276,7 +8353,7 @@ def _render_application_knowledge_page(
                     key_prefix="atlas_ck_service_io",
                 )
 
-    with tabs[6]:
+    if active_knowledge_view == "Contacts":
         _render_section_title(st, "Contacts")
         with st.expander("Add Contact", expanded=False):
             contact_cols = st.columns(2)
@@ -8486,7 +8563,7 @@ def _render_application_knowledge_page(
                     key_prefix="atlas_ck_contact_io",
                 )
 
-    with tabs[10]:
+    if active_knowledge_view == "Locations":
         _render_section_title(st, "Locations")
         with st.expander("Add Location", expanded=False):
             location_cols = st.columns(2)
@@ -8726,7 +8803,7 @@ def _render_application_knowledge_page(
                     key_prefix="atlas_ck_location_io",
                 )
 
-    with tabs[11]:
+    if active_knowledge_view == "Projects":
         _render_section_title(st, "Projects")
         if not project_entities:
             _render_guided_empty_state(
@@ -8893,7 +8970,7 @@ def _render_application_knowledge_page(
                     key_prefix="atlas_ck_project_io",
                 )
 
-    with tabs[12]:
+    if active_knowledge_view == "Products":
         _render_section_title(st, "Products (Master Library)")
         managed_products = product_service.list_products(include_inactive=True)
         if managed_products:
@@ -9301,7 +9378,7 @@ def _render_application_knowledge_page(
                 hide_index=True,
             )
 
-    with tabs[7]:
+    if active_knowledge_view == "Price Lists":
         st.markdown("### Price Lists")
         st.caption(
             "Price list uploads are discoverable here and managed in Project Workspace Price List Library."
@@ -9330,7 +9407,7 @@ def _render_application_knowledge_page(
                 else:
                     st.info("No vendor price lists are indexed yet.")
 
-    with tabs[8]:
+    if active_knowledge_view == "Imports":
         st.markdown("### Knowledge Imports")
         if not import_history:
             _render_guided_empty_state(
@@ -9342,7 +9419,7 @@ def _render_application_knowledge_page(
         else:
             st.dataframe(import_history[:100], width="stretch", hide_index=True)
 
-    with tabs[9]:
+    if active_knowledge_view == "Import History":
         st.markdown("### Commercial Import History")
         if not commercial_import_history:
             st.info("No commercial import history available.")
@@ -9365,7 +9442,7 @@ def _render_application_knowledge_page(
                 hide_index=True,
             )
 
-    with tabs[13]:
+    if active_knowledge_view == "Assemblies":
         st.markdown("### Assembly Library")
         engine = _estimate_engine_service(st)
         assembly_service = AssemblyExpansionService(
@@ -9652,11 +9729,7 @@ def _render_application_knowledge_page(
 def _render_application_reports_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    _render_page_header(
-        st,
-        "Reports",
-        "Application-level project pipeline and health reporting.",
-    )
+    _render_page_header(st, "Reports", "")
     rows = _collect_workspace_signals(workspace_service, limit=30)
     if not rows:
         _render_guided_empty_state(
@@ -9666,22 +9739,257 @@ def _render_application_reports_page(
             next_location="Use Home or Projects to open a project workspace.",
         )
         return
-    st.dataframe(
+    ready_projects = [
+        item for item in rows if int(item.get("review_artifacts", 0) or 0) > 0
+    ]
+    attention_projects = [
+        item
+        for item in rows
+        if _safe_text(item.get("status"), "") in {"Blocked", "Needs Attention"}
+    ]
+    cards = st.columns(4)
+    _metric_card(cards[0], "Deliverables Ready", str(len(ready_projects)))
+    _metric_card(cards[1], "Needs Attention", str(len(attention_projects)))
+    _metric_card(cards[2], "Projects Tracked", str(len(rows)))
+    _metric_card(
+        cards[3],
+        "Artifacts",
+        str(sum(int(item.get("review_artifacts", 0) or 0) for item in rows)),
+    )
+
+    _render_data_table(
+        st,
         [
             {
                 "Project": item.get("project"),
-                "Status": item.get("status"),
-                "Stage": item.get("stage"),
+                "Deliverable Readiness": item.get("status"),
+                "Next Output": item.get("destination"),
                 "Reason": item.get("reason"),
-                "Documents": item.get("documents"),
-                "Review Artifacts": item.get("review_artifacts"),
+                "Artifacts": item.get("review_artifacts"),
                 "Updated": item.get("updated_at"),
             }
             for item in rows
         ],
-        width="stretch",
-        hide_index=True,
     )
+
+    if ready_projects:
+        _render_section_title(st, "Ready to Export")
+        _render_data_table(
+            st,
+            [
+                {
+                    "Project": item.get("project"),
+                    "Recommended Output": item.get("destination"),
+                    "Artifacts": item.get("review_artifacts"),
+                    "Updated": item.get("updated_at"),
+                }
+                for item in ready_projects[:8]
+            ],
+        )
+
+    if attention_projects:
+        _render_section_title(st, "Blocked or In Review")
+        _render_data_table(
+            st,
+            [
+                {
+                    "Project": item.get("project"),
+                    "Status": item.get("status"),
+                    "Reason": item.get("reason"),
+                    "Next Location": item.get("destination"),
+                }
+                for item in attention_projects[:8]
+            ],
+        )
+
+
+def _render_compact_reference_list(
+    st: Any,
+    items: list[dict[str, Any]],
+    *,
+    empty_message: str,
+    open_label: str,
+) -> None:
+    if not items:
+        st.caption(empty_message)
+        return
+    for item in items[:6]:
+        with st.container(border=True):
+            st.markdown(f"**{_safe_text(item.get('title'), 'Item')}**")
+            details = [
+                _safe_text(item.get("detail"), ""),
+                _safe_text(item.get("subdetail"), ""),
+            ]
+            details = [value for value in details if value]
+            if details:
+                st.caption(" · ".join(details))
+            if st.button(
+                open_label,
+                key=_safe_text(item.get("key"), _safe_text(item.get("title"), "open")),
+                width="stretch",
+            ):
+                item["on_open"]()
+
+
+def _render_home_workspace_panels(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    mission_control_payload: dict[str, Any] | None,
+) -> None:
+    payload = mission_control_payload or {}
+    actions = list(payload.get("actions") or [])
+    signals = list(payload.get("signals") or [])
+    high_priority_actions: list[dict[str, Any]] = []
+    seen_actions: set[str] = set()
+    for item in actions:
+        if _safe_text(item.get("priority"), "").lower() not in {
+            "critical",
+            "high",
+        }:
+            continue
+        dedupe_key = "|".join(
+            [
+                _normalize_recommendation_text(item.get("title")),
+                _normalize_recommendation_text(item.get("project")),
+                _normalize_recommendation_text(item.get("destination")),
+            ]
+        )
+        if dedupe_key in seen_actions:
+            continue
+        seen_actions.add(dedupe_key)
+        high_priority_actions.append(item)
+    notifications = [
+        item
+        for item in signals
+        if _safe_text(item.get("status"), "") in {"Blocked", "Needs Attention"}
+    ]
+    recent_projects = workspace_service.list_recent_workspaces(limit=5)
+    continue_items = []
+    recent_opened_results = list(
+        st.session_state.get("atlas_recent_opened_results") or []
+    )
+    recent_records_by_id = {
+        item.workspace_id: item
+        for item in workspace_service.list_recent_workspaces(limit=20)
+    }
+    for recent_result in recent_opened_results[:3]:
+        workspace_id = _safe_text(recent_result.get("workspace_id"), "")
+        recent = recent_records_by_id.get(workspace_id)
+        if recent is None:
+            continue
+        continue_items.append(
+            {
+                "title": _safe_text(recent.project.name, "Project"),
+                "detail": f"Resume in {_safe_text(recent.workspace_state.get('last_open_page') if isinstance(recent.workspace_state, dict) else '', 'Overview')}",
+                "subdetail": f"Last opened {_format_recent_opened_at(recent.last_opened_at or recent.updated_at)}",
+                "key": f"atlas_continue_{recent.workspace_id}",
+                "on_open": lambda record=recent: _open_project_record(
+                    st,
+                    record,
+                    workspace_service,
+                ),
+            }
+        )
+
+    pinned = list(st.session_state.get("atlas_pinned_objects") or [])
+    favorite_items = [
+        {
+            "title": _safe_text(item.get("display_name"), "Saved item"),
+            "detail": _safe_text(item.get("object_type"), "Object"),
+            "subdetail": _safe_text(item.get("secondary_label"), ""),
+            "key": f"atlas_favorite_{index}",
+            "on_open": lambda reference=item: _open_search_reference(
+                st,
+                workspace_service,
+                reference,
+            ),
+        }
+        for index, item in enumerate(pinned[:6])
+        if isinstance(item, dict)
+    ]
+
+    top_cols = st.columns(2)
+    with top_cols[0]:
+        _render_section_title(st, "Continue Working")
+        _render_compact_reference_list(
+            st,
+            continue_items,
+            empty_message="Open a project to build a working session history.",
+            open_label="Resume",
+        )
+    with top_cols[1]:
+        _render_section_title(st, "Notifications")
+        if notifications:
+            _render_data_table(
+                st,
+                [
+                    {
+                        "Project": item.get("project"),
+                        "Status": item.get("status"),
+                        "Next": item.get("destination"),
+                    }
+                    for item in notifications[:6]
+                ],
+            )
+        else:
+            st.caption("No active portfolio notifications.")
+
+    lower_cols = st.columns(2)
+    with lower_cols[0]:
+        _render_section_title(st, "Action Center")
+        if high_priority_actions:
+            _render_data_table(
+                st,
+                [
+                    {
+                        "Priority": item.get("priority"),
+                        "Action": item.get("title"),
+                        "Project": item.get("project"),
+                        "Destination": item.get("destination"),
+                    }
+                    for item in high_priority_actions[:8]
+                ],
+            )
+        else:
+            st.caption("No high-priority actions detected.")
+    with lower_cols[1]:
+        _render_section_title(st, "Favorites")
+        _render_compact_reference_list(
+            st,
+            favorite_items,
+            empty_message="Add items to the Working Set to keep them close at hand.",
+            open_label="Open",
+        )
+
+    _render_section_title(st, "Recent Projects")
+    if recent_projects:
+        project_cols = st.columns(min(3, len(recent_projects)))
+        for index, recent in enumerate(recent_projects[:5]):
+            with project_cols[index % len(project_cols)]:
+                with st.container(border=True):
+                    st.markdown(f"**{_safe_text(recent.project.name, 'Project')}**")
+                    details = [
+                        f"Atlas Bid ID: {_safe_text(recent.project.project_id, 'n/a')}"
+                    ]
+                    internal_number = _safe_text(
+                        recent.project.internal_project_number
+                        or recent.metadata.get("internal_project_number"),
+                        "",
+                    )
+                    if internal_number:
+                        details.append(f"Internal Project Number: {internal_number}")
+                    st.caption(" · ".join(details))
+                    st.caption(
+                        f"Last opened: {_format_recent_opened_at(recent.last_opened_at or recent.updated_at)}"
+                    )
+                    if st.button(
+                        "Open Project",
+                        key=f"atlas_recent_open_card_{recent.workspace_id}",
+                        width="stretch",
+                    ):
+                        _open_project_record(st, recent, workspace_service)
+    else:
+        st.caption("No recent projects.")
 
 
 def _render_application_administration_page(
@@ -9719,11 +10027,6 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         st,
         "Projects",
         "Primary project library for opening, creating, importing, and managing repository projects.",
-    )
-    _render_notice_panel(
-        st,
-        "Project Library",
-        "Filters and table layout use shared control and table wrappers to reduce visual drift.",
     )
 
     include_archived = st.checkbox("Show archived projects", value=False)
@@ -24952,78 +25255,7 @@ def _render_mission_control_panels(
     workspace_service: ProjectWorkspaceService,
     mission_control_payload: dict[str, Any] | None,
 ) -> None:
-    payload = mission_control_payload or {}
-    actions = list(payload.get("actions") or [])
-
-    high_priority_actions: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for item in actions:
-        priority = _safe_text(item.get("priority"), "").lower()
-        if priority not in {"critical", "high"}:
-            continue
-        key = "|".join(
-            [
-                _normalize_recommendation_text(item.get("title")),
-                _normalize_recommendation_text(item.get("project")),
-                _normalize_recommendation_text(item.get("destination")),
-            ]
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        high_priority_actions.append(item)
-
-    _render_section_title(st, "Action Center")
-    if high_priority_actions:
-        st.dataframe(
-            [
-                {
-                    "Priority": item.get("priority"),
-                    "Action": item.get("title"),
-                    "Project": item.get("project"),
-                    "Destination": item.get("destination"),
-                }
-                for item in high_priority_actions[:8]
-            ],
-            width="stretch",
-            hide_index=True,
-        )
-        if st.button("View all action items", key="atlas_side_view_actions"):
-            st.session_state["atlas_active_page"] = "Overview"
-            st.rerun()
-    else:
-        st.caption("No high-priority actions detected.")
-
-    _render_section_title(st, "Recent Projects")
-    recent_projects = workspace_service.list_recent_workspaces(limit=5)
-    if recent_projects:
-        for record in recent_projects:
-            with st.container(border=True):
-                st.markdown(f"**{_safe_text(record.project.name, 'Project')}**")
-                details = [
-                    f"Atlas Bid ID: {_safe_text(record.project.project_id, 'n/a')}",
-                ]
-                internal_number = _safe_text(
-                    record.project.internal_project_number
-                    or record.metadata.get("internal_project_number"),
-                    "",
-                )
-                if internal_number:
-                    details.append(f"Internal Project Number: {internal_number}")
-                st.caption(" · ".join(details))
-                st.caption(
-                    f"Last opened: {_format_recent_opened_at(record.last_opened_at or record.updated_at)}"
-                )
-                if st.button(
-                    "Open Project",
-                    key=f"atlas_recent_open_{record.workspace_id}",
-                    width="stretch",
-                ):
-                    _open_project_record(st, record, workspace_service)
-        if st.button("View All Projects", key="atlas_side_view_recent_projects"):
-            _open_page(st, "Projects")
-    else:
-        st.caption("No recent projects.")
+    _render_home_workspace_panels(st, workspace_service, mission_control_payload)
 
 
 def _render_shell(

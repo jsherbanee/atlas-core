@@ -47,8 +47,9 @@ Sprint X-06 continues shell hardening with Atlas-only Home action, compact Searc
 Sprint X-07 continues shell hardening with fixed-width navigation, compact Home actions, meaningful search-query gating, and focused search results that replace the page body while active.
 Sprint X-08 completed product hardening with visual-system consistency (#FAFAF9 workspace background, #004225 primary accent, neutralized surfaces) and a runtime-safe clear-search state model that separates widget input from submitted query state.
 Sprint X-12 implements a reusable secondary and tertiary navigation framework for Knowledge, including deterministic Knowledge navigation state, search-handoff restoration, and reusable navigation contract modeling for future workspace reuse.
+Sprint X-13 completes navigation clarity and UX refinement, removing architecture-facing UI artifacts, shifting contextual navigation ownership into the shared shell, and tightening Home/Reports information architecture without changing workflows.
 
-X-01 through X-12 are closed.
+X-01 through X-13 are closed.
 
 Epic X is completed and formally closed.
 
@@ -56,6 +57,7 @@ X-09 Design System Foundation is complete and formally closed.
 X-10 Workspace Consistency and Information Density is complete and formally closed.
 X-11 Typography System and Visual Polish is complete and closed.
 X-12 Secondary and Tertiary Navigation Framework is complete and closed.
+X-13 Navigation Clarity and UX Refinement is complete and closed.
 
 X-09 scope remains behavior-preserving and does not start Epic E.
 X-10 scope remains behavior-preserving and does not start Epic E.
@@ -67,12 +69,13 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1198 tests)
+- pytest: full suite passing (1203 tests)
 
-## Manual UI Validation (X-11)
-- viewport checks passed at widths 820, 980, 1180, 1366, and large desktop
-- no horizontal overflow regressions observed in validated shell/workspace surfaces
-- validated core routes and controls: Atlas, Projects, Knowledge, Reports, Overview, focused search mode, and Settings access
+## Manual UI Validation (X-13)
+- validated Home, Projects, Knowledge, Reports, and active-project workspace navigation surfaces
+- validated focused search mode and shared-shell navigation continuity
+- viewport checks passed at widths 820, 980, 1180, and current desktop-width validation with no horizontal overflow observed on validated surfaces
+- duplicate Knowledge page navigation scaffolding was removed so the shared shell now owns Knowledge navigation presentation
 
 ## Tooling Status
 - GitHub Actions configured
@@ -81,7 +84,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
   - .pre-commit-config.yaml
 
 ## Active Focus
-Sprint X-12 navigation implementation and validation for reusable secondary/tertiary workspace routing.
+Post-X-13 regression monitoring and lower-priority UX debt triage.
 
 Broader product direction remains aligned to the lifecycle-platform roadmap, while current implementation priority is deterministic knowledge-entity foundation hardening within Phase 2 boundaries.
 
@@ -91,7 +94,7 @@ Secondary active focus:
 - Epic E readiness assessment only (architecture review and sprint approval required; Epic E not started).
 - K-01 follow-through validation for entity relationships, import/export compatibility, and search behavior.
 - K-02 workflow completion for customer, service, manufacturer, vendor, and product entity operations.
-- X-12 follow-through validation for Knowledge navigation reuse, breadcrumb/search state restoration, and future workspace adoption.
+- X-13 follow-through validation for dense layout ergonomics, remaining object-detail polish, and shared-shell consistency on lower-priority pages.
 
 Current implementation scope note:
 - no Epic E implementation has started in this refinement pass

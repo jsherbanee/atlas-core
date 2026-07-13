@@ -325,6 +325,21 @@ Atlas navigation uses two explicit workspace layers:
 Home remains the public application-level landing page even when a project is active.
 Mission Control remains an internal compatibility route name only.
 
+Primary navigation should stay global and stable.
+It should answer where the user can go across Atlas without changing meaning between application and project modes.
+
+Secondary navigation should be contextual.
+When no project is open, Projects should present project-library navigation.
+When a project is open, the secondary rail should shift to project-workspace navigation.
+Knowledge should emphasize operational groupings and reusable records rather than forcing a nominal overview page when that page does not unlock a task.
+
+Tertiary navigation should be action-oriented.
+It should answer what the user can do in the current area rather than repeat the current page name.
+Preferred examples include Browse, Add, Edit, Relationships, Import, Export, Decisions, Timeline, Equipment, Labor, Summary, and similar task verbs or deliverable-focused actions.
+
+Navigation should remove implementation noise.
+Avoid exposing framework labels, diagnostic terms, duplicate workspace labels, development banners, or explanatory text that does not help the user act.
+
 Navigation should always help answer four questions:
 
 - Where am I?
@@ -340,6 +355,9 @@ Search should remain available in the header across application and project work
 Header search executes directly on Enter and avoids separate open/close interaction modes.
 
 Navigation should be persistent, require minimal clicks, and maintain a predictable hierarchy. The interface should feel like a workspace, not a maze.
+
+Group related navigation items with subtle separators instead of extending long undifferentiated lists.
+Hierarchy should be communicated through alignment, typography, and grouping more than through extra containers or labels.
 
 The interface should also feel configurable, tenant-aware, and consistent across organizations.
 
@@ -378,6 +396,10 @@ Preferred patterns:
 - Atlas / Projects / <Project Name> / <Page>
 
 Breadcrumbs should avoid internal route names, duplicate workspace labels, and implementation terminology.
+
+Page headers should be concise.
+Keep the title, optional breadcrumb, and contextual actions when they materially help task flow.
+Remove repeated descriptions, duplicated workspace names, and explanatory paragraphs that restate the obvious.
 
 ## 13. Data Visualization
 

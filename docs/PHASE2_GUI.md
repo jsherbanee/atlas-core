@@ -23,8 +23,10 @@ Atlas Workspace UI Sprint X-08 keeps the visual-system shell posture (background
 Atlas Workspace UI Sprint X-09 establishes a reusable design-system foundation (shared tokens, centralized stylesheet authority, and reusable UI primitives) and migrates Home, Projects, Knowledge, and Reports to those primitives without changing workflow behavior.
 Atlas Workspace UI Sprint X-10 completes consistency migration for remaining primary project workspaces using existing shared wrappers and deterministic behavior-preserving UI hardening.
 Atlas Workspace UI Sprint X-12 introduces a reusable secondary and tertiary navigation framework for Knowledge and Projects modes, with deterministic state restore and search-handoff routing.
+Atlas Workspace UI Sprint X-13 completes navigation clarity and UX refinement, removing production-facing implementation artifacts and consolidating contextual navigation into the shared shell.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
+X-13 closeout status: complete and closed.
 
 Completion status:
 - X-06 responsive shell refinement: completed
@@ -59,6 +61,15 @@ Home now shows deterministic Recent Projects instead of Recent Activity.
 Atlas is the sole Home action.
 The header uses a compact centered content width so it does not stretch edge-to-edge on large monitors.
 Clear Search exits focused search mode and returns to the current page context without mutating an already-instantiated widget-owned session key.
+
+Sprint X-13 refines navigation clarity and information architecture without changing workflow behavior.
+
+- primary navigation remains global
+- secondary navigation is contextual to the active workspace
+- tertiary navigation is presented as task-oriented actions rather than page-name repetition
+- development-only labels, diagnostic phrasing, and redundant explanatory copy are removed where they do not create direct user value
+- Home is treated as an operational landing page centered on continue-working context, recent projects, action triage, notifications, and favorites
+- Reports is treated as an output-oriented workspace organized around deliverables and readiness
 
 ## Design-System Foundation (X-09)
 
@@ -357,8 +368,11 @@ Application navigation groups:
 - Administration
 
 Home also shows:
-- Action Center (high-priority deduplicated actions)
-- Recent Activity
+- Continue Working
+- Recent Projects
+- Action Center
+- Notifications
+- Favorites
 
 Project-specific engineering pages are not shown while no project is open.
 
@@ -375,6 +389,15 @@ Sprint X-04 home/search refinement notes:
 
 ## Project Workspace Navigation
 When a project is opened, Atlas switches to project navigation.
+
+Secondary navigation changes with workspace context:
+
+- no active project: project-library navigation for create/open/manage flows
+- active project: project-workspace navigation for review, detail, estimate, notebook, reports, and settings
+
+Tertiary navigation is action-oriented and contextual.
+It should present what the user can do in the current area, such as Browse, Add, Edit, Relationships, Import, Export, Summary, Decisions, Timeline, Equipment, or Labor.
+It should not merely mirror page titles.
 
 Project:
 - Overview
