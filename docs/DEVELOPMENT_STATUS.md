@@ -65,7 +65,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1182 tests)
+- pytest: full suite passing (1190 tests)
 
 ## Manual UI Validation (X-11)
 - viewport checks passed at widths 820, 980, 1180, 1366, and large desktop

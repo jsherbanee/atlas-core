@@ -3,7 +3,7 @@
 ## Purpose
 The Knowledge Entity Framework provides a deterministic, reusable entity layer for shared Atlas knowledge records.
 
-It is the common foundation for customer, service, manufacturer, vendor, and product knowledge objects used by the Knowledge workspace and search/indexing flows.
+It is the common foundation for customer, service, manufacturer, vendor, product, contact, location, and project knowledge objects used by the Knowledge workspace and search/indexing flows.
 
 ## Scope
 
@@ -20,6 +20,12 @@ Implemented in K-02:
 - entity-level summary metrics (counts by type, activity state, relationship totals)
 - product lifecycle synchronization into framework-managed product entities
 - Knowledge page operational controls for customer/service create and archive/restore
+
+Implemented in K-03:
+- reusable contact, location, and project entity support
+- typed search/import/export for contact, location, and project records
+- explicit relationship support for project-linked knowledge entities
+- Knowledge page operational controls for contact, location, and project workflows
 
 Out of scope:
 - procurement execution and purchase-order workflows
@@ -81,7 +87,7 @@ The Knowledge workspace now supports:
 - global search object references for customer/service entity records
 
 ## Validation
-K-02 validation baseline:
+K-03 validation baseline:
 - focused tests: `tests/test_knowledge_entity_framework.py`
 - app/search regression: `tests/test_phase2_global_search_working_set.py`
 - quality gates remain `black`, `ruff`, `mypy`, `pytest`

@@ -43,6 +43,16 @@ ALLOWED_PRICE_RECORD_RESOLUTION = {
     "resolved_vendor_offering",
 }
 ALLOWED_CURRENCIES = {"USD", "CAD", "EUR", "GBP", "AUD", "JPY"}
+SUPPORTED_KNOWLEDGE_ENTITY_TYPES = {
+    "customer",
+    "service",
+    "manufacturer",
+    "vendor",
+    "product",
+    "contact",
+    "location",
+    "project",
+}
 
 
 class CommercialProductService:
@@ -605,6 +615,135 @@ class CommercialProductService:
             fail_on_duplicate=True,
         )
 
+    def create_contact(
+        self,
+        *,
+        contact_id: str,
+        canonical_name: str,
+        display_name: str | None = None,
+        aliases: list[str] | None = None,
+        email: str | None = None,
+        phone: str | None = None,
+        title: str | None = None,
+        organization: str | None = None,
+        external_identifier: str | None = None,
+        notes: str = "",
+        active: bool = True,
+        attributes: dict[str, Any] | None = None,
+        relationships: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        if not self._safe(contact_id):
+            raise ValueError("contact_id cannot be blank")
+        record = self._upsert_knowledge_entity(
+            entity_id=f"contact:{self._safe(contact_id)}",
+            entity_type="contact",
+            canonical_name=canonical_name,
+            display_name=display_name,
+            aliases=list(aliases or []),
+            notes=notes,
+            active=active,
+            attributes={
+                "contact_id": self._safe(contact_id),
+                "email": self._safe(email),
+                "phone": self._safe(phone),
+                "title": self._safe(title),
+                "organization": self._safe(organization),
+                "external_identifier": self._safe(external_identifier),
+                **dict(attributes or {}),
+            },
+            fail_on_duplicate=True,
+        )
+        self._upsert_relationship_specs(relationships or [])
+        return record
+
+    def create_location(
+        self,
+        *,
+        location_id: str,
+        canonical_name: str,
+        display_name: str | None = None,
+        aliases: list[str] | None = None,
+        address_line1: str | None = None,
+        address_line2: str | None = None,
+        city: str | None = None,
+        state: str | None = None,
+        postal_code: str | None = None,
+        country: str | None = None,
+        external_identifier: str | None = None,
+        notes: str = "",
+        active: bool = True,
+        attributes: dict[str, Any] | None = None,
+        relationships: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        if not self._safe(location_id):
+            raise ValueError("location_id cannot be blank")
+        record = self._upsert_knowledge_entity(
+            entity_id=f"location:{self._safe(location_id)}",
+            entity_type="location",
+            canonical_name=canonical_name,
+            display_name=display_name,
+            aliases=list(aliases or []),
+            notes=notes,
+            active=active,
+            attributes={
+                "location_id": self._safe(location_id),
+                "address_line1": self._safe(address_line1),
+                "address_line2": self._safe(address_line2),
+                "city": self._safe(city),
+                "state": self._safe(state),
+                "postal_code": self._safe(postal_code),
+                "country": self._safe(country),
+                "external_identifier": self._safe(external_identifier),
+                **dict(attributes or {}),
+            },
+            fail_on_duplicate=True,
+        )
+        self._upsert_relationship_specs(relationships or [])
+        return record
+
+    def create_project_entity(
+        self,
+        *,
+        project_id: str,
+        canonical_name: str,
+        display_name: str | None = None,
+        aliases: list[str] | None = None,
+        customer: str | None = None,
+        location: str | None = None,
+        client_project_number: str | None = None,
+        internal_project_number: str | None = None,
+        status: str | None = None,
+        external_identifier: str | None = None,
+        notes: str = "",
+        active: bool = True,
+        attributes: dict[str, Any] | None = None,
+        relationships: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        if not self._safe(project_id):
+            raise ValueError("project_id cannot be blank")
+        record = self._upsert_knowledge_entity(
+            entity_id=f"project:{self._safe(project_id)}",
+            entity_type="project",
+            canonical_name=canonical_name,
+            display_name=display_name,
+            aliases=list(aliases or []),
+            notes=notes,
+            active=active,
+            attributes={
+                "project_id": self._safe(project_id),
+                "customer": self._safe(customer),
+                "location": self._safe(location),
+                "client_project_number": self._safe(client_project_number),
+                "internal_project_number": self._safe(internal_project_number),
+                "status": self._safe(status),
+                "external_identifier": self._safe(external_identifier),
+                **dict(attributes or {}),
+            },
+            fail_on_duplicate=False,
+        )
+        self._upsert_relationship_specs(relationships or [])
+        return record
+
     def get_knowledge_entity(self, entity_id: str) -> dict[str, Any] | None:
         normalized_id = self._safe(entity_id)
         return (
@@ -745,6 +884,222 @@ class CommercialProductService:
             active=active,
         )
 
+    def get_contact(self, contact_id: str) -> dict[str, Any] | None:
+        return self.get_knowledge_entity(f"contact:{self._safe(contact_id)}")
+
+    def list_contacts(self, *, include_inactive: bool = True) -> list[dict[str, Any]]:
+        return self.list_knowledge_entities(
+            entity_type="contact",
+            include_inactive=include_inactive,
+        )
+
+    def search_contacts(
+        self,
+        query: str,
+        *,
+        include_inactive: bool = True,
+    ) -> list[dict[str, Any]]:
+        return self.search_knowledge_entities(
+            query,
+            entity_type="contact",
+            include_inactive=include_inactive,
+        )
+
+    def update_contact(
+        self,
+        contact_id: str,
+        *,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self.update_knowledge_entity(
+            entity_id=f"contact:{self._safe(contact_id)}",
+            updates=updates,
+        )
+
+    def set_contact_active(self, contact_id: str, active: bool) -> None:
+        self.set_knowledge_entity_active(
+            entity_id=f"contact:{self._safe(contact_id)}",
+            active=active,
+        )
+
+    def get_location(self, location_id: str) -> dict[str, Any] | None:
+        return self.get_knowledge_entity(f"location:{self._safe(location_id)}")
+
+    def list_locations(self, *, include_inactive: bool = True) -> list[dict[str, Any]]:
+        return self.list_knowledge_entities(
+            entity_type="location",
+            include_inactive=include_inactive,
+        )
+
+    def search_locations(
+        self,
+        query: str,
+        *,
+        include_inactive: bool = True,
+    ) -> list[dict[str, Any]]:
+        return self.search_knowledge_entities(
+            query,
+            entity_type="location",
+            include_inactive=include_inactive,
+        )
+
+    def update_location(
+        self,
+        location_id: str,
+        *,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self.update_knowledge_entity(
+            entity_id=f"location:{self._safe(location_id)}",
+            updates=updates,
+        )
+
+    def set_location_active(self, location_id: str, active: bool) -> None:
+        self.set_knowledge_entity_active(
+            entity_id=f"location:{self._safe(location_id)}",
+            active=active,
+        )
+
+    def get_project_entity(self, project_id: str) -> dict[str, Any] | None:
+        return self.get_knowledge_entity(f"project:{self._safe(project_id)}")
+
+    def list_project_entities(
+        self,
+        *,
+        include_inactive: bool = True,
+    ) -> list[dict[str, Any]]:
+        return self.list_knowledge_entities(
+            entity_type="project",
+            include_inactive=include_inactive,
+        )
+
+    def search_project_entities(
+        self,
+        query: str,
+        *,
+        include_inactive: bool = True,
+    ) -> list[dict[str, Any]]:
+        return self.search_knowledge_entities(
+            query,
+            entity_type="project",
+            include_inactive=include_inactive,
+        )
+
+    def update_project_entity(
+        self,
+        project_id: str,
+        *,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self.update_knowledge_entity(
+            entity_id=f"project:{self._safe(project_id)}",
+            updates=updates,
+        )
+
+    def set_project_entity_active(self, project_id: str, active: bool) -> None:
+        self.set_knowledge_entity_active(
+            entity_id=f"project:{self._safe(project_id)}",
+            active=active,
+        )
+
+    def _knowledge_entity_matches_query(self, item: dict[str, Any], query: str) -> bool:
+        return self._knowledge_entity_search_rank(item, query)[0] < 9
+
+    def _knowledge_entity_search_rank(
+        self,
+        item: dict[str, Any],
+        query: str,
+    ) -> tuple[int, str, str]:
+        normalized_query = self.normalize_name(query)
+        entity_type = self._safe(item.get("entity_type"), "").lower()
+        search_terms = self._knowledge_entity_search_terms(item)
+
+        if not normalized_query:
+            return (9, entity_type, self._safe(item.get("entity_id"), ""))
+
+        normalized_terms = {
+            self.normalize_name(term) for term in search_terms if self._safe(term)
+        }
+        if normalized_query in normalized_terms:
+            return (0, entity_type, self._safe(item.get("entity_id"), ""))
+
+        if any(
+            self.normalize_name(term).startswith(normalized_query)
+            for term in search_terms
+        ):
+            return (1, entity_type, self._safe(item.get("entity_id"), ""))
+
+        if any(normalized_query in self.normalize_name(term) for term in search_terms):
+            return (2, entity_type, self._safe(item.get("entity_id"), ""))
+
+        return (9, entity_type, self._safe(item.get("entity_id"), ""))
+
+    def _knowledge_entity_search_terms(self, item: dict[str, Any]) -> list[str]:
+        entity_type = self._safe(item.get("entity_type"), "").lower()
+        attributes = dict(item.get("attributes") or {})
+        terms = [
+            self._safe(item.get("entity_id"), ""),
+            self._safe(item.get("canonical_name"), ""),
+            self._safe(item.get("display_name"), ""),
+            self._safe(item.get("normalized_name"), ""),
+            " ".join(list(item.get("aliases") or [])),
+        ]
+        if entity_type == "contact":
+            terms.extend(
+                [
+                    self._safe(attributes.get("contact_id"), ""),
+                    self._safe(attributes.get("email"), ""),
+                    self._safe(attributes.get("phone"), ""),
+                    self._safe(attributes.get("title"), ""),
+                    self._safe(attributes.get("organization"), ""),
+                    self._safe(attributes.get("external_identifier"), ""),
+                ]
+            )
+        elif entity_type == "location":
+            terms.extend(
+                [
+                    self._safe(attributes.get("location_id"), ""),
+                    self._safe(attributes.get("address_line1"), ""),
+                    self._safe(attributes.get("address_line2"), ""),
+                    self._safe(attributes.get("city"), ""),
+                    self._safe(attributes.get("state"), ""),
+                    self._safe(attributes.get("postal_code"), ""),
+                    self._safe(attributes.get("country"), ""),
+                    self._safe(attributes.get("external_identifier"), ""),
+                ]
+            )
+        elif entity_type == "project":
+            terms.extend(
+                [
+                    self._safe(attributes.get("project_id"), ""),
+                    self._safe(attributes.get("customer"), ""),
+                    self._safe(attributes.get("location"), ""),
+                    self._safe(attributes.get("client_project_number"), ""),
+                    self._safe(attributes.get("internal_project_number"), ""),
+                    self._safe(attributes.get("status"), ""),
+                    self._safe(attributes.get("external_identifier"), ""),
+                ]
+            )
+        else:
+            terms.extend(
+                [
+                    self._safe(attributes.get("manufacturer_id"), ""),
+                    self._safe(attributes.get("manufacturer_code"), ""),
+                    self._safe(attributes.get("vendor_id"), ""),
+                    self._safe(attributes.get("vendor_code"), ""),
+                    self._safe(attributes.get("atlas_product_uuid"), ""),
+                    self._safe(attributes.get("manufacturer_part_number"), ""),
+                    self._safe(
+                        attributes.get("normalized_manufacturer_part_number"), ""
+                    ),
+                    self._safe(attributes.get("category"), ""),
+                    self._safe(attributes.get("lifecycle_status"), ""),
+                    self._safe(attributes.get("website"), ""),
+                    self._safe(attributes.get("service_id"), ""),
+                ]
+            )
+        return [term for term in terms if self._safe(term)]
+
     def knowledge_entity_summary(self) -> dict[str, Any]:
         rows = self.list_knowledge_entities(include_inactive=True)
         relationships = self.list_knowledge_relationships()
@@ -834,6 +1189,93 @@ class CommercialProductService:
                 "notes": "",
                 "active": "true",
             }
+        elif normalized_type == "contact":
+            fieldnames = [
+                "contact_id",
+                "canonical_name",
+                "display_name",
+                "email",
+                "phone",
+                "title",
+                "organization",
+                "external_identifier",
+                "aliases",
+                "notes",
+                "active",
+            ]
+            sample = {
+                "contact_id": "contact-001",
+                "canonical_name": "Example Contact",
+                "display_name": "Example Contact",
+                "email": "contact@example.com",
+                "phone": "555-0100",
+                "title": "Project Manager",
+                "organization": "Example Organization",
+                "external_identifier": "EXT-CONTACT-001",
+                "aliases": "EC",
+                "notes": "",
+                "active": "true",
+            }
+        elif normalized_type == "location":
+            fieldnames = [
+                "location_id",
+                "canonical_name",
+                "display_name",
+                "address_line1",
+                "address_line2",
+                "city",
+                "state",
+                "postal_code",
+                "country",
+                "external_identifier",
+                "aliases",
+                "notes",
+                "active",
+            ]
+            sample = {
+                "location_id": "loc-001",
+                "canonical_name": "Example Location",
+                "display_name": "Example Location",
+                "address_line1": "100 Main St",
+                "address_line2": "Suite 200",
+                "city": "Los Angeles",
+                "state": "CA",
+                "postal_code": "90001",
+                "country": "US",
+                "external_identifier": "EXT-LOC-001",
+                "aliases": "HQ",
+                "notes": "",
+                "active": "true",
+            }
+        elif normalized_type == "project":
+            fieldnames = [
+                "project_id",
+                "canonical_name",
+                "display_name",
+                "customer",
+                "location",
+                "client_project_number",
+                "internal_project_number",
+                "status",
+                "external_identifier",
+                "aliases",
+                "notes",
+                "active",
+            ]
+            sample = {
+                "project_id": "project-001",
+                "canonical_name": "Example Project",
+                "display_name": "Example Project",
+                "customer": "Example Customer",
+                "location": "Example Location",
+                "client_project_number": "C-1001",
+                "internal_project_number": "I-1001",
+                "status": "active",
+                "external_identifier": "EXT-PROJ-001",
+                "aliases": "EP",
+                "notes": "",
+                "active": "true",
+            }
         elif normalized_type == "manufacturer":
             fieldnames = [
                 "manufacturer_id",
@@ -916,6 +1358,9 @@ class CommercialProductService:
         if normalized_type not in {
             "customer",
             "service",
+            "contact",
+            "location",
+            "project",
             "manufacturer",
             "vendor",
             "product",
@@ -1070,6 +1515,97 @@ class CommercialProductService:
                 imported += 1
                 continue
 
+            if normalized_type == "contact":
+                contact_id = self._safe(normalized_row.get("contact_id"), "")
+                if self.get_contact(contact_id):
+                    self.update_contact(contact_id, updates=normalized_row)
+                else:
+                    self.create_contact(
+                        contact_id=contact_id,
+                        canonical_name=self._safe(
+                            normalized_row.get("canonical_name"), ""
+                        ),
+                        display_name=self._safe(normalized_row.get("display_name"), ""),
+                        email=self._safe(normalized_row.get("email"), ""),
+                        phone=self._safe(normalized_row.get("phone"), ""),
+                        title=self._safe(normalized_row.get("title"), ""),
+                        organization=self._safe(normalized_row.get("organization"), ""),
+                        external_identifier=self._safe(
+                            normalized_row.get("external_identifier"),
+                            "",
+                        ),
+                        aliases=list(normalized_row.get("aliases") or []),
+                        notes=self._safe(normalized_row.get("notes"), ""),
+                        active=bool(normalized_row.get("active", True)),
+                    )
+                imported += 1
+                continue
+
+            if normalized_type == "location":
+                location_id = self._safe(normalized_row.get("location_id"), "")
+                if self.get_location(location_id):
+                    self.update_location(location_id, updates=normalized_row)
+                else:
+                    self.create_location(
+                        location_id=location_id,
+                        canonical_name=self._safe(
+                            normalized_row.get("canonical_name"), ""
+                        ),
+                        display_name=self._safe(normalized_row.get("display_name"), ""),
+                        address_line1=self._safe(
+                            normalized_row.get("address_line1"), ""
+                        ),
+                        address_line2=self._safe(
+                            normalized_row.get("address_line2"), ""
+                        ),
+                        city=self._safe(normalized_row.get("city"), ""),
+                        state=self._safe(normalized_row.get("state"), ""),
+                        postal_code=self._safe(normalized_row.get("postal_code"), ""),
+                        country=self._safe(normalized_row.get("country"), ""),
+                        external_identifier=self._safe(
+                            normalized_row.get("external_identifier"),
+                            "",
+                        ),
+                        aliases=list(normalized_row.get("aliases") or []),
+                        notes=self._safe(normalized_row.get("notes"), ""),
+                        active=bool(normalized_row.get("active", True)),
+                    )
+                imported += 1
+                continue
+
+            if normalized_type == "project":
+                project_id = self._safe(normalized_row.get("project_id"), "")
+                if self.get_project_entity(project_id):
+                    self.update_project_entity(project_id, updates=normalized_row)
+                else:
+                    self.create_project_entity(
+                        project_id=project_id,
+                        canonical_name=self._safe(
+                            normalized_row.get("canonical_name"), ""
+                        ),
+                        display_name=self._safe(normalized_row.get("display_name"), ""),
+                        customer=self._safe(normalized_row.get("customer"), ""),
+                        location=self._safe(normalized_row.get("location"), ""),
+                        client_project_number=self._safe(
+                            normalized_row.get("client_project_number"),
+                            "",
+                        ),
+                        internal_project_number=self._safe(
+                            normalized_row.get("internal_project_number"),
+                            "",
+                        ),
+                        status=self._safe(normalized_row.get("status"), ""),
+                        external_identifier=self._safe(
+                            normalized_row.get("external_identifier"),
+                            "",
+                        ),
+                        aliases=list(normalized_row.get("aliases") or []),
+                        notes=self._safe(normalized_row.get("notes"), ""),
+                        active=bool(normalized_row.get("active", True)),
+                    )
+                imported += 1
+                continue
+
             if normalized_type == "manufacturer":
                 manufacturer_id = self._safe(normalized_row.get("manufacturer_id"), "")
                 if self.get_manufacturer(manufacturer_id):
@@ -1202,7 +1738,14 @@ class CommercialProductService:
                 "status": self._safe(item.get("status"), ""),
                 "errors": " | ".join(list(item.get("errors") or [])),
                 "warnings": " | ".join(list(item.get("warnings") or [])),
-                "raw_row": json.dumps(dict(item.get("raw_row") or {}), sort_keys=True),
+                "raw_row": json.dumps(
+                    {
+                        self._safe(key): self._safe(value)
+                        for key, value in dict(item.get("raw_row") or {}).items()
+                        if self._safe(key)
+                    },
+                    sort_keys=True,
+                ),
             }
             for item in list(preview_rows or [])
             if self._safe(item.get("status"), "") == "rejected"
@@ -1344,16 +1887,11 @@ class CommercialProductService:
         )
         if not q:
             return rows
-        return [
-            item
-            for item in rows
-            if q in self.normalize_name(item.get("canonical_name", ""))
-            or q in self.normalize_name(item.get("display_name", ""))
-            or any(
-                q in self.normalize_name(alias)
-                for alias in list(item.get("aliases") or [])
-            )
+        matched = [
+            item for item in rows if self._knowledge_entity_matches_query(item, q)
         ]
+        matched.sort(key=lambda item: self._knowledge_entity_search_rank(item, q))
+        return matched
 
     def detect_duplicate_knowledge_entities(
         self,
@@ -1476,6 +2014,28 @@ class CommercialProductService:
             )
         )
         return [dict(item) for item in rows]
+
+    def _upsert_relationship_specs(self, relationships: list[dict[str, Any]]) -> None:
+        for item in list(relationships or []):
+            if not isinstance(item, dict):
+                continue
+            source_entity_id = self._safe(item.get("source_entity_id"), "")
+            target_entity_id = self._safe(item.get("target_entity_id"), "")
+            relationship_type = self._safe(item.get("relationship_type"), "")
+            if not source_entity_id or not target_entity_id or not relationship_type:
+                continue
+            self.create_knowledge_relationship(
+                source_entity_id=source_entity_id,
+                target_entity_id=target_entity_id,
+                relationship_type=relationship_type,
+                confidence=float(item.get("confidence", 1.0) or 1.0),
+                evidence_refs=[
+                    self._safe(reference)
+                    for reference in list(item.get("evidence_refs") or [])
+                    if self._safe(reference)
+                ],
+                notes=self._safe(item.get("notes"), ""),
+            )
 
     def export_knowledge_entity_bundle(self) -> dict[str, Any]:
         return {
@@ -4672,6 +5232,66 @@ class CommercialProductService:
                 "notes": self._safe(row.get("notes"), ""),
                 "active": active,
             }
+        if entity_type == "contact":
+            return {
+                "contact_id": self._safe(row.get("contact_id"), ""),
+                "canonical_name": self._safe(row.get("canonical_name"), ""),
+                "display_name": self._safe(row.get("display_name"), ""),
+                "email": self._safe(row.get("email"), ""),
+                "phone": self._safe(row.get("phone"), ""),
+                "title": self._safe(row.get("title"), ""),
+                "organization": self._safe(row.get("organization"), ""),
+                "external_identifier": self._safe(
+                    row.get("external_identifier"),
+                    "",
+                ),
+                "aliases": aliases,
+                "notes": self._safe(row.get("notes"), ""),
+                "active": active,
+            }
+        if entity_type == "location":
+            return {
+                "location_id": self._safe(row.get("location_id"), ""),
+                "canonical_name": self._safe(row.get("canonical_name"), ""),
+                "display_name": self._safe(row.get("display_name"), ""),
+                "address_line1": self._safe(row.get("address_line1"), ""),
+                "address_line2": self._safe(row.get("address_line2"), ""),
+                "city": self._safe(row.get("city"), ""),
+                "state": self._safe(row.get("state"), ""),
+                "postal_code": self._safe(row.get("postal_code"), ""),
+                "country": self._safe(row.get("country"), ""),
+                "external_identifier": self._safe(
+                    row.get("external_identifier"),
+                    "",
+                ),
+                "aliases": aliases,
+                "notes": self._safe(row.get("notes"), ""),
+                "active": active,
+            }
+        if entity_type == "project":
+            return {
+                "project_id": self._safe(row.get("project_id"), ""),
+                "canonical_name": self._safe(row.get("canonical_name"), ""),
+                "display_name": self._safe(row.get("display_name"), ""),
+                "customer": self._safe(row.get("customer"), ""),
+                "location": self._safe(row.get("location"), ""),
+                "client_project_number": self._safe(
+                    row.get("client_project_number"),
+                    "",
+                ),
+                "internal_project_number": self._safe(
+                    row.get("internal_project_number"),
+                    "",
+                ),
+                "status": self._safe(row.get("status"), ""),
+                "external_identifier": self._safe(
+                    row.get("external_identifier"),
+                    "",
+                ),
+                "aliases": aliases,
+                "notes": self._safe(row.get("notes"), ""),
+                "active": active,
+            }
         if entity_type == "manufacturer":
             return {
                 "manufacturer_id": self._safe(row.get("manufacturer_id"), ""),
@@ -4721,6 +5341,12 @@ class CommercialProductService:
             return self._safe(normalized_row.get("customer_id"), "")
         if entity_type == "service":
             return self._safe(normalized_row.get("service_id"), "")
+        if entity_type == "contact":
+            return self._safe(normalized_row.get("contact_id"), "")
+        if entity_type == "location":
+            return self._safe(normalized_row.get("location_id"), "")
+        if entity_type == "project":
+            return self._safe(normalized_row.get("project_id"), "")
         if entity_type == "manufacturer":
             return self._safe(normalized_row.get("manufacturer_id"), "")
         if entity_type == "vendor":
@@ -4750,6 +5376,24 @@ class CommercialProductService:
         if entity_type == "service":
             if not self._safe(normalized_row.get("service_id"), ""):
                 errors.append("service_id is required")
+            if not self._safe(normalized_row.get("canonical_name"), ""):
+                errors.append("canonical_name is required")
+            return errors
+        if entity_type == "contact":
+            if not self._safe(normalized_row.get("contact_id"), ""):
+                errors.append("contact_id is required")
+            if not self._safe(normalized_row.get("canonical_name"), ""):
+                errors.append("canonical_name is required")
+            return errors
+        if entity_type == "location":
+            if not self._safe(normalized_row.get("location_id"), ""):
+                errors.append("location_id is required")
+            if not self._safe(normalized_row.get("canonical_name"), ""):
+                errors.append("canonical_name is required")
+            return errors
+        if entity_type == "project":
+            if not self._safe(normalized_row.get("project_id"), ""):
+                errors.append("project_id is required")
             if not self._safe(normalized_row.get("canonical_name"), ""):
                 errors.append("canonical_name is required")
             return errors

@@ -42,6 +42,73 @@ def test_create_customer_and_service_entities_and_search() -> None:
     assert rows[0]["entity_id"] == "customer:cust-maw"
 
 
+def test_create_contact_location_and_project_entities_and_search() -> None:
+    service = CommercialProductService()
+    customer = service.create_customer(
+        customer_id="cust-1",
+        canonical_name="Client One",
+    )
+    contact = service.create_contact(
+        contact_id="contact-1",
+        canonical_name="Jordan Lee",
+        display_name="Jordan Lee",
+        email="jordan@example.com",
+        phone="555-0101",
+        title="Project Manager",
+        organization="Client One",
+    )
+    location = service.create_location(
+        location_id="loc-1",
+        canonical_name="Main Office",
+        display_name="Main Office",
+        address_line1="100 Main St",
+        city="Los Angeles",
+        state="CA",
+        postal_code="90001",
+        country="US",
+        external_identifier="LOC-EXT-1",
+    )
+    project = service.create_project_entity(
+        project_id="proj-1",
+        canonical_name="Project One",
+        display_name="Project One",
+        customer="Client One",
+        location="Main Office",
+        client_project_number="C-1001",
+        internal_project_number="I-1001",
+        status="active",
+        relationships=[
+            {
+                "source_entity_id": customer["entity_id"],
+                "target_entity_id": contact["entity_id"],
+                "relationship_type": "has_contact",
+            },
+            {
+                "source_entity_id": "project:proj-1",
+                "target_entity_id": location["entity_id"],
+                "relationship_type": "located_at",
+            },
+        ],
+    )
+
+    assert contact["entity_type"] == "contact"
+    assert location["entity_type"] == "location"
+    assert project["entity_type"] == "project"
+
+    assert (
+        service.search_contacts("jordan@example.com")[0]["entity_id"]
+        == contact["entity_id"]
+    )
+    assert (
+        service.search_locations("loc-ext-1")[0]["entity_id"] == location["entity_id"]
+    )
+    assert (
+        service.search_project_entities("c-1001")[0]["entity_id"]
+        == project["entity_id"]
+    )
+    assert len(service.list_knowledge_relationships()) == 2
+
+
 def test_knowledge_duplicate_detection_is_deterministic() -> None:
     service = CommercialProductService()
     service.create_customer(customer_id="cust-1", canonical_name="Acme University")
@@ -214,6 +281,9 @@ def test_knowledge_entity_summary_and_product_lifecycle_sync() -> None:
         ("service", "service_id", "svc-100", "Service 100"),
         ("manufacturer", "manufacturer_id", "mfr-100", "Manufacturer 100"),
         ("vendor", "vendor_id", "vendor-100", "Vendor 100"),
+        ("contact", "contact_id", "contact-100", "Contact 100"),
+        ("location", "location_id", "location-100", "Location 100"),
+        ("project", "project_id", "project-100", "Project 100"),
     ],
 )
 def test_csv_template_and_partial_success_import_for_core_entities(
@@ -252,6 +322,49 @@ def test_csv_template_and_partial_success_import_for_core_entities(
     assert canonical_name in exported_csv
     exported_json = service.export_knowledge_entities_json(entity_type=entity_type)
     assert canonical_name in exported_json
+
+
+def test_contact_location_and_project_csv_import_roundtrip() -> None:
+    service = CommercialProductService()
+    contact_csv = (
+        "contact_id,canonical_name,display_name,email,phone,title,organization,external_identifier,aliases,notes,active\n"
+        "contact-200,Contact 200,Contact 200,contact200@example.com,555-0200,Coordinator,Client One,EXT-200,Alias One,ok,true\n"
+        ",Broken Contact,,,,,,,,missing id,true\n"
+    ).encode("utf-8")
+    location_csv = (
+        "location_id,canonical_name,display_name,address_line1,address_line2,city,state,postal_code,country,external_identifier,aliases,notes,active\n"
+        "location-200,Location 200,Location 200,200 Main St,,Los Angeles,CA,90002,US,EXT-200,Alias Two,ok,true\n"
+        ",Broken Location,,,,,,,,,,missing id,true\n"
+    ).encode("utf-8")
+    project_csv = (
+        "project_id,canonical_name,display_name,customer,location,client_project_number,internal_project_number,status,external_identifier,aliases,notes,active\n"
+        "project-200,Project 200,Project 200,Client One,Location 200,C-200,I-200,active,EXT-PROJ-200,Alias Three,ok,true\n"
+        ",Broken Project,,,,,,,,,,missing id,true\n"
+    ).encode("utf-8")
+
+    for entity_type, payload, expected in [
+        ("contact", contact_csv, "contact-200"),
+        ("location", location_csv, "location-200"),
+        ("project", project_csv, "project-200"),
+    ]:
+        preview = service.preview_knowledge_entity_import_csv(
+            entity_type=entity_type,
+            file_bytes=payload,
+        )
+        assert preview["record_count"] == 2
+        assert preview["accepted_count"] == 1
+        assert preview["rejected_count"] == 1
+
+        imported = service.import_knowledge_entities_from_csv(
+            entity_type=entity_type,
+            file_bytes=payload,
+            allow_partial_success=True,
+        )
+        assert imported["imported_rows"] == 1
+        assert imported["rejected_rows"] == 1
+        assert expected in service.export_knowledge_entities_csv(
+            entity_type=entity_type
+        )
 
 
 def test_product_csv_import_requires_manufacturer_identity_and_part_number() -> None:

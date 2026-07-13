@@ -55,6 +55,9 @@ When a relationship cannot be proven, the graph should preserve unresolved or lo
 K-02 implementation note:
 - Framework-managed customer/service/manufacturer/vendor/product entities now expose deterministic operational relationship updates through stable relationship IDs and audited upsert events.
 
+K-03 implementation note:
+- Framework-managed contact, location, and project entities now participate in deterministic search, import/export, and explicit relationship upserts alongside the existing customer/service/manufacturer/vendor/product graph.
+
 ## Versioning
 The graph should support versioned edges and nodes so historical context can be reproduced when inputs change.
 

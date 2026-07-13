@@ -4146,8 +4146,11 @@ def _object_type_label(kind: str) -> str:
         "vendor": "Vendor",
         "customer": "Customer",
         "service": "Service",
+        "contact": "Contact",
+        "location": "Location",
         "organization": "Organization",
         "price_list": "Price List",
+        "project": "Project",
         "project_record": "Project",
         "notebook_entry": "Notebook Entry",
         "master_product": "Product",
@@ -4183,6 +4186,21 @@ def _object_id_for_selection(kind: str, data: dict[str, Any]) -> str:
         return _safe_text(
             data.get("service_id"),
             _safe_text(data.get("service"), _safe_text(data.get("entity_id"), "")),
+        )
+    if kind == "contact":
+        return _safe_text(
+            data.get("contact_id"),
+            _safe_text(data.get("contact"), _safe_text(data.get("entity_id"), "")),
+        )
+    if kind == "location":
+        return _safe_text(
+            data.get("location_id"),
+            _safe_text(data.get("location"), _safe_text(data.get("entity_id"), "")),
+        )
+    if kind == "project":
+        return _safe_text(
+            data.get("project_id"),
+            _safe_text(data.get("project"), _safe_text(data.get("entity_id"), "")),
         )
     if kind == "organization":
         return _safe_text(
@@ -4304,6 +4322,42 @@ def _object_secondary_label(kind: str, data: dict[str, Any]) -> str:
         return _safe_text(data.get("vendor_type"), _safe_text(data.get("status"), ""))
     if kind == "customer":
         return _safe_text(data.get("portfolio"), "")
+    if kind == "contact":
+        return " | ".join(
+            [
+                item
+                for item in [
+                    _safe_text(data.get("title"), ""),
+                    _safe_text(data.get("organization"), ""),
+                    _safe_text(data.get("email"), ""),
+                ]
+                if item
+            ]
+        )
+    if kind == "location":
+        return " | ".join(
+            [
+                item
+                for item in [
+                    _safe_text(data.get("city"), ""),
+                    _safe_text(data.get("state"), ""),
+                    _safe_text(data.get("country"), ""),
+                ]
+                if item
+            ]
+        )
+    if kind == "project":
+        return " | ".join(
+            [
+                item
+                for item in [
+                    _safe_text(data.get("customer"), ""),
+                    _safe_text(data.get("status"), ""),
+                    _safe_text(data.get("location"), ""),
+                ]
+                if item
+            ]
+        )
     if kind == "organization":
         return " | ".join(
             [
@@ -4355,6 +4409,9 @@ def _selection_route(kind: str) -> str:
         "vendor": "Knowledge",
         "customer": "Knowledge",
         "service": "Knowledge",
+        "contact": "Knowledge",
+        "location": "Knowledge",
+        "project": "Knowledge",
         "organization": "Project Settings",
         "price_list": "Knowledge",
         "project_record": "Overview",
@@ -5354,6 +5411,47 @@ def _render_application_knowledge_page(
         include_inactive=True,
     )
     service_entities = product_service.list_service_entities(include_inactive=True)
+    contact_entities = product_service.list_knowledge_entities(
+        entity_type="contact",
+        include_inactive=True,
+    )
+    location_entities = product_service.list_knowledge_entities(
+        entity_type="location",
+        include_inactive=True,
+    )
+    project_entities = product_service.list_project_entities(include_inactive=True)
+
+    for item in project_rows:
+        record = item["record"]
+        project_name = _safe_text(record.project.name, record.workspace_id)
+        try:
+            product_service.create_project_entity(
+                project_id=record.workspace_id,
+                canonical_name=project_name,
+                display_name=project_name,
+                customer=_safe_text(
+                    record.metadata.get("owner"), record.project.client
+                ),
+                location=_safe_text(record.project.location, ""),
+                client_project_number=_safe_text(
+                    record.project.client_project_number,
+                    "",
+                ),
+                internal_project_number=_safe_text(
+                    record.project.internal_project_number,
+                    "",
+                ),
+                status=_safe_text(record.project.status.value, ""),
+                notes=", ".join(list(record.warnings or [])),
+                active=not bool(record.archived),
+                attributes={
+                    "workspace_id": record.workspace_id,
+                    "project_name": project_name,
+                },
+            )
+        except Exception:
+            continue
+    project_entities = product_service.list_project_entities(include_inactive=True)
 
     product_rows: list[dict[str, Any]] = []
     for item in project_rows:
@@ -5459,6 +5557,9 @@ def _render_application_knowledge_page(
             "Vendors",
             "Customers",
             "Services",
+            "Contacts",
+            "Locations",
+            "Projects",
             "Products",
             "Price Lists",
             "Imports",
@@ -6322,6 +6423,623 @@ def _render_application_knowledge_page(
                 )
 
     with tabs[6]:
+        _render_section_title(st, "Contacts")
+        with st.expander("Add Contact", expanded=False):
+            contact_cols = st.columns(2)
+            contact_id = contact_cols[0].text_input(
+                "Contact ID", key="atlas_ck_contact_id"
+            )
+            contact_name = contact_cols[1].text_input(
+                "Canonical Name", key="atlas_ck_contact_name"
+            )
+            contact_display = contact_cols[0].text_input(
+                "Display Name", key="atlas_ck_contact_display"
+            )
+            contact_email = contact_cols[1].text_input(
+                "Email", key="atlas_ck_contact_email"
+            )
+            contact_phone = contact_cols[0].text_input(
+                "Phone", key="atlas_ck_contact_phone"
+            )
+            contact_title = contact_cols[1].text_input(
+                "Title", key="atlas_ck_contact_title"
+            )
+            contact_org = contact_cols[0].text_input(
+                "Organization", key="atlas_ck_contact_organization"
+            )
+            contact_external_id = contact_cols[1].text_input(
+                "External Identifier", key="atlas_ck_contact_external_id"
+            )
+            contact_notes = st.text_input("Notes", key="atlas_ck_contact_notes")
+            duplicates = product_service.detect_duplicate_knowledge_entities(
+                entity_type="contact",
+                canonical_name=contact_name,
+                normalized_name=product_service.normalize_name(contact_name),
+            )
+            if duplicates:
+                st.warning("Potential duplicate contact names detected.")
+            if st.button(
+                "Create Contact", key="atlas_ck_create_contact", width="stretch"
+            ):
+                try:
+                    product_service.create_contact(
+                        contact_id=contact_id,
+                        canonical_name=contact_name,
+                        display_name=contact_display,
+                        email=contact_email,
+                        phone=contact_phone,
+                        title=contact_title,
+                        organization=contact_org,
+                        external_identifier=contact_external_id,
+                        notes=contact_notes,
+                    )
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Contact created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create contact: {exc}")
+
+        if not contact_entities:
+            _render_guided_empty_state(
+                st,
+                why_empty="No contact records are currently available.",
+                action_to_populate="Create a reusable contact or import a contact CSV.",
+                next_location="Use Add Contact or import a reusable contact list.",
+            )
+        else:
+            contact_search = st.text_input(
+                "Contact Search",
+                key="atlas_ck_contact_search",
+                placeholder="name, email, phone, organization",
+            )
+            contact_active_filter = st.selectbox(
+                "Contact Active Filter",
+                options=["All", "Active", "Inactive"],
+                key="atlas_ck_contact_active_filter",
+            )
+            filtered_contacts = product_service.search_contacts(contact_search)
+            if contact_active_filter == "Active":
+                filtered_contacts = [
+                    item for item in filtered_contacts if bool(item.get("active", True))
+                ]
+            if contact_active_filter == "Inactive":
+                filtered_contacts = [
+                    item
+                    for item in filtered_contacts
+                    if not bool(item.get("active", True))
+                ]
+            workflow_ids = [
+                _safe_text(
+                    item.get("attributes", {}).get("contact_id"),
+                    _safe_text(item.get("entity_id"), ""),
+                )
+                for item in filtered_contacts
+                if _safe_text(item.get("entity_id"), "")
+            ]
+            if workflow_ids:
+                selected_contact_id = st.selectbox(
+                    "Contact Workflow",
+                    options=workflow_ids,
+                    key="atlas_ck_contact_workflow",
+                )
+                selected_contact = (
+                    product_service.get_contact(selected_contact_id) or {}
+                )
+                contact_edit_cols = st.columns(2)
+                contact_edit_display = contact_edit_cols[0].text_input(
+                    "Edit Display",
+                    value=_safe_text(selected_contact.get("display_name"), ""),
+                    key="atlas_ck_contact_edit_display",
+                )
+                contact_edit_email = contact_edit_cols[1].text_input(
+                    "Edit Email",
+                    value=_safe_text(
+                        selected_contact.get("attributes", {}).get("email"), ""
+                    ),
+                    key="atlas_ck_contact_edit_email",
+                )
+                contact_edit_phone = contact_edit_cols[0].text_input(
+                    "Edit Phone",
+                    value=_safe_text(
+                        selected_contact.get("attributes", {}).get("phone"), ""
+                    ),
+                    key="atlas_ck_contact_edit_phone",
+                )
+                contact_edit_notes = st.text_input(
+                    "Edit Notes",
+                    value=_safe_text(selected_contact.get("notes"), ""),
+                    key="atlas_ck_contact_edit_notes",
+                )
+                contact_action_cols = st.columns(3)
+                if contact_action_cols[0].button(
+                    "Save Contact Edits",
+                    key="atlas_ck_contact_edit_save",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.update_contact(
+                            selected_contact_id,
+                            updates={
+                                "display_name": contact_edit_display,
+                                "email": contact_edit_email,
+                                "phone": contact_edit_phone,
+                                "notes": contact_edit_notes,
+                            },
+                        )
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Contact updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to update contact: {exc}")
+                if contact_action_cols[1].button(
+                    "Archive Contact", key="atlas_ck_contact_archive", width="stretch"
+                ):
+                    try:
+                        product_service.set_contact_active(selected_contact_id, False)
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Contact archived.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to archive contact: {exc}")
+                if contact_action_cols[2].button(
+                    "Restore Contact", key="atlas_ck_contact_restore", width="stretch"
+                ):
+                    try:
+                        product_service.set_contact_active(selected_contact_id, True)
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Contact restored.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to restore contact: {exc}")
+            st.dataframe(
+                [
+                    {
+                        "Contact": _safe_text(
+                            item.get("display_name"),
+                            _safe_text(item.get("canonical_name"), "Contact"),
+                        ),
+                        "Contact ID": _safe_text(
+                            item.get("attributes", {}).get("contact_id"),
+                            _safe_text(item.get("entity_id"), ""),
+                        ),
+                        "Email": _safe_text(
+                            item.get("attributes", {}).get("email"), ""
+                        ),
+                        "Phone": _safe_text(
+                            item.get("attributes", {}).get("phone"), ""
+                        ),
+                        "Organization": _safe_text(
+                            item.get("attributes", {}).get("organization"), ""
+                        ),
+                        "Active": bool(item.get("active", True)),
+                        "Relationships": len(
+                            product_service.list_knowledge_relationships(
+                                source_entity_id=_safe_text(item.get("entity_id"), "")
+                            )
+                        ),
+                        "Updated": _safe_text(item.get("updated_at"), ""),
+                    }
+                    for item in filtered_contacts
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            with st.expander("Contact CSV/JSON Import Export", expanded=False):
+                _render_knowledge_entity_import_export_controls(
+                    st,
+                    product_service,
+                    entity_type="contact",
+                    key_prefix="atlas_ck_contact_io",
+                )
+
+    with tabs[10]:
+        _render_section_title(st, "Locations")
+        with st.expander("Add Location", expanded=False):
+            location_cols = st.columns(2)
+            location_id = location_cols[0].text_input(
+                "Location ID", key="atlas_ck_location_id"
+            )
+            location_name = location_cols[1].text_input(
+                "Canonical Name", key="atlas_ck_location_name"
+            )
+            location_display = location_cols[0].text_input(
+                "Display Name", key="atlas_ck_location_display"
+            )
+            location_line1 = location_cols[1].text_input(
+                "Address Line 1", key="atlas_ck_location_line1"
+            )
+            location_line2 = location_cols[0].text_input(
+                "Address Line 2", key="atlas_ck_location_line2"
+            )
+            location_city = location_cols[1].text_input(
+                "City", key="atlas_ck_location_city"
+            )
+            location_state = location_cols[0].text_input(
+                "State", key="atlas_ck_location_state"
+            )
+            location_postal = location_cols[1].text_input(
+                "Postal Code", key="atlas_ck_location_postal"
+            )
+            location_country = location_cols[0].text_input(
+                "Country", key="atlas_ck_location_country"
+            )
+            location_external_id = location_cols[1].text_input(
+                "External Identifier", key="atlas_ck_location_external_id"
+            )
+            location_notes = st.text_input("Notes", key="atlas_ck_location_notes")
+            duplicates = product_service.detect_duplicate_knowledge_entities(
+                entity_type="location",
+                canonical_name=location_name,
+                normalized_name=product_service.normalize_name(location_name),
+            )
+            if duplicates:
+                st.warning("Potential duplicate location names detected.")
+            if st.button(
+                "Create Location", key="atlas_ck_create_location", width="stretch"
+            ):
+                try:
+                    product_service.create_location(
+                        location_id=location_id,
+                        canonical_name=location_name,
+                        display_name=location_display,
+                        address_line1=location_line1,
+                        address_line2=location_line2,
+                        city=location_city,
+                        state=location_state,
+                        postal_code=location_postal,
+                        country=location_country,
+                        external_identifier=location_external_id,
+                        notes=location_notes,
+                    )
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Location created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create location: {exc}")
+
+        if not location_entities:
+            _render_guided_empty_state(
+                st,
+                why_empty="No location records are currently available.",
+                action_to_populate="Create a reusable location or import a location CSV.",
+                next_location="Use Add Location or import a reusable address list.",
+            )
+        else:
+            location_search = st.text_input(
+                "Location Search",
+                key="atlas_ck_location_search",
+                placeholder="name, city, postal, address",
+            )
+            location_active_filter = st.selectbox(
+                "Location Active Filter",
+                options=["All", "Active", "Inactive"],
+                key="atlas_ck_location_active_filter",
+            )
+            filtered_locations = product_service.search_locations(location_search)
+            if location_active_filter == "Active":
+                filtered_locations = [
+                    item
+                    for item in filtered_locations
+                    if bool(item.get("active", True))
+                ]
+            if location_active_filter == "Inactive":
+                filtered_locations = [
+                    item
+                    for item in filtered_locations
+                    if not bool(item.get("active", True))
+                ]
+            workflow_ids = [
+                _safe_text(
+                    item.get("attributes", {}).get("location_id"),
+                    _safe_text(item.get("entity_id"), ""),
+                )
+                for item in filtered_locations
+                if _safe_text(item.get("entity_id"), "")
+            ]
+            if workflow_ids:
+                selected_location_id = st.selectbox(
+                    "Location Workflow",
+                    options=workflow_ids,
+                    key="atlas_ck_location_workflow",
+                )
+                selected_location = (
+                    product_service.get_location(selected_location_id) or {}
+                )
+                location_edit_cols = st.columns(2)
+                location_edit_display = location_edit_cols[0].text_input(
+                    "Edit Display",
+                    value=_safe_text(selected_location.get("display_name"), ""),
+                    key="atlas_ck_location_edit_display",
+                )
+                location_edit_city = location_edit_cols[1].text_input(
+                    "Edit City",
+                    value=_safe_text(
+                        selected_location.get("attributes", {}).get("city"), ""
+                    ),
+                    key="atlas_ck_location_edit_city",
+                )
+                location_edit_state = location_edit_cols[0].text_input(
+                    "Edit State",
+                    value=_safe_text(
+                        selected_location.get("attributes", {}).get("state"), ""
+                    ),
+                    key="atlas_ck_location_edit_state",
+                )
+                location_edit_notes = st.text_input(
+                    "Edit Notes",
+                    value=_safe_text(selected_location.get("notes"), ""),
+                    key="atlas_ck_location_edit_notes",
+                )
+                location_action_cols = st.columns(3)
+                if location_action_cols[0].button(
+                    "Save Location Edits",
+                    key="atlas_ck_location_edit_save",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.update_location(
+                            selected_location_id,
+                            updates={
+                                "display_name": location_edit_display,
+                                "city": location_edit_city,
+                                "state": location_edit_state,
+                                "notes": location_edit_notes,
+                            },
+                        )
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Location updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to update location: {exc}")
+                if location_action_cols[1].button(
+                    "Archive Location", key="atlas_ck_location_archive", width="stretch"
+                ):
+                    try:
+                        product_service.set_location_active(selected_location_id, False)
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Location archived.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to archive location: {exc}")
+                if location_action_cols[2].button(
+                    "Restore Location", key="atlas_ck_location_restore", width="stretch"
+                ):
+                    try:
+                        product_service.set_location_active(selected_location_id, True)
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Location restored.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to restore location: {exc}")
+            st.dataframe(
+                [
+                    {
+                        "Location": _safe_text(
+                            item.get("display_name"),
+                            _safe_text(item.get("canonical_name"), "Location"),
+                        ),
+                        "Location ID": _safe_text(
+                            item.get("attributes", {}).get("location_id"),
+                            _safe_text(item.get("entity_id"), ""),
+                        ),
+                        "Address": ", ".join(
+                            [
+                                part
+                                for part in [
+                                    _safe_text(
+                                        item.get("attributes", {}).get("address_line1"),
+                                        "",
+                                    ),
+                                    _safe_text(
+                                        item.get("attributes", {}).get("address_line2"),
+                                        "",
+                                    ),
+                                    _safe_text(
+                                        item.get("attributes", {}).get("city"), ""
+                                    ),
+                                    _safe_text(
+                                        item.get("attributes", {}).get("state"), ""
+                                    ),
+                                    _safe_text(
+                                        item.get("attributes", {}).get("postal_code"),
+                                        "",
+                                    ),
+                                    _safe_text(
+                                        item.get("attributes", {}).get("country"), ""
+                                    ),
+                                ]
+                                if part
+                            ]
+                        ),
+                        "Active": bool(item.get("active", True)),
+                        "Relationships": len(
+                            product_service.list_knowledge_relationships(
+                                source_entity_id=_safe_text(item.get("entity_id"), "")
+                            )
+                        ),
+                        "Updated": _safe_text(item.get("updated_at"), ""),
+                    }
+                    for item in filtered_locations
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            with st.expander("Location CSV/JSON Import Export", expanded=False):
+                _render_knowledge_entity_import_export_controls(
+                    st,
+                    product_service,
+                    entity_type="location",
+                    key_prefix="atlas_ck_location_io",
+                )
+
+    with tabs[11]:
+        _render_section_title(st, "Projects")
+        if not project_entities:
+            _render_guided_empty_state(
+                st,
+                why_empty="No project knowledge entities are currently available.",
+                action_to_populate="Open projects and let Atlas sync them into the reusable graph.",
+                next_location="Go to Projects or import a project bundle.",
+            )
+        else:
+            project_search = st.text_input(
+                "Project Search",
+                key="atlas_ck_project_search",
+                placeholder="project, customer, location, status",
+            )
+            project_active_filter = st.selectbox(
+                "Project Active Filter",
+                options=["All", "Active", "Inactive"],
+                key="atlas_ck_project_active_filter",
+            )
+            filtered_projects = product_service.search_project_entities(project_search)
+            if project_active_filter == "Active":
+                filtered_projects = [
+                    item for item in filtered_projects if bool(item.get("active", True))
+                ]
+            if project_active_filter == "Inactive":
+                filtered_projects = [
+                    item
+                    for item in filtered_projects
+                    if not bool(item.get("active", True))
+                ]
+            workflow_ids = [
+                _safe_text(
+                    item.get("attributes", {}).get("project_id"),
+                    _safe_text(item.get("entity_id"), ""),
+                )
+                for item in filtered_projects
+                if _safe_text(item.get("entity_id"), "")
+            ]
+            if workflow_ids:
+                selected_project_id = st.selectbox(
+                    "Project Workflow",
+                    options=workflow_ids,
+                    key="atlas_ck_project_workflow",
+                )
+                selected_project = (
+                    product_service.get_project_entity(selected_project_id) or {}
+                )
+                project_edit_cols = st.columns(2)
+                project_edit_display = project_edit_cols[0].text_input(
+                    "Edit Display",
+                    value=_safe_text(selected_project.get("display_name"), ""),
+                    key="atlas_ck_project_edit_display",
+                )
+                project_edit_status = project_edit_cols[1].text_input(
+                    "Edit Status",
+                    value=_safe_text(
+                        selected_project.get("attributes", {}).get("status"), ""
+                    ),
+                    key="atlas_ck_project_edit_status",
+                )
+                project_edit_customer = project_edit_cols[0].text_input(
+                    "Edit Customer",
+                    value=_safe_text(
+                        selected_project.get("attributes", {}).get("customer"), ""
+                    ),
+                    key="atlas_ck_project_edit_customer",
+                )
+                project_edit_location = project_edit_cols[1].text_input(
+                    "Edit Location",
+                    value=_safe_text(
+                        selected_project.get("attributes", {}).get("location"), ""
+                    ),
+                    key="atlas_ck_project_edit_location",
+                )
+                project_edit_notes = st.text_input(
+                    "Edit Notes",
+                    value=_safe_text(selected_project.get("notes"), ""),
+                    key="atlas_ck_project_edit_notes",
+                )
+                project_action_cols = st.columns(3)
+                if project_action_cols[0].button(
+                    "Save Project Edits",
+                    key="atlas_ck_project_edit_save",
+                    width="stretch",
+                ):
+                    try:
+                        product_service.update_project_entity(
+                            selected_project_id,
+                            updates={
+                                "display_name": project_edit_display,
+                                "status": project_edit_status,
+                                "customer": project_edit_customer,
+                                "location": project_edit_location,
+                                "notes": project_edit_notes,
+                            },
+                        )
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Project updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to update project: {exc}")
+                if project_action_cols[1].button(
+                    "Archive Project", key="atlas_ck_project_archive", width="stretch"
+                ):
+                    try:
+                        product_service.set_project_entity_active(
+                            selected_project_id, False
+                        )
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Project archived.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to archive project: {exc}")
+                if project_action_cols[2].button(
+                    "Restore Project", key="atlas_ck_project_restore", width="stretch"
+                ):
+                    try:
+                        product_service.set_project_entity_active(
+                            selected_project_id, True
+                        )
+                        _save_commercial_product_state(st, product_service)
+                        st.success("Project restored.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to restore project: {exc}")
+            st.dataframe(
+                [
+                    {
+                        "Project": _safe_text(
+                            item.get("display_name"),
+                            _safe_text(item.get("canonical_name"), "Project"),
+                        ),
+                        "Project ID": _safe_text(
+                            item.get("attributes", {}).get("project_id"),
+                            _safe_text(item.get("entity_id"), ""),
+                        ),
+                        "Customer": _safe_text(
+                            item.get("attributes", {}).get("customer"), ""
+                        ),
+                        "Location": _safe_text(
+                            item.get("attributes", {}).get("location"), ""
+                        ),
+                        "Status": _safe_text(
+                            item.get("attributes", {}).get("status"), ""
+                        ),
+                        "Active": bool(item.get("active", True)),
+                        "Relationships": len(
+                            product_service.list_knowledge_relationships(
+                                source_entity_id=_safe_text(item.get("entity_id"), "")
+                            )
+                        ),
+                        "Updated": _safe_text(item.get("updated_at"), ""),
+                    }
+                    for item in filtered_projects
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            with st.expander("Project CSV/JSON Import Export", expanded=False):
+                _render_knowledge_entity_import_export_controls(
+                    st,
+                    product_service,
+                    entity_type="project",
+                    key_prefix="atlas_ck_project_io",
+                )
+
+    with tabs[12]:
         _render_section_title(st, "Products (Master Library)")
         managed_products = product_service.list_products(include_inactive=True)
         if managed_products:
@@ -6793,7 +7511,7 @@ def _render_application_knowledge_page(
                 hide_index=True,
             )
 
-    with tabs[10]:
+    with tabs[13]:
         st.markdown("### Assembly Library")
         engine = _estimate_engine_service(st)
         assembly_service = AssemblyExpansionService(
@@ -13259,6 +13977,8 @@ def _group_search_results(
         "Organization",
         "Manufacturer",
         "Vendor",
+        "Contact",
+        "Location",
         "Service",
         "Price List",
         "Estimate",
@@ -13277,6 +13997,8 @@ def _group_search_results(
         "Organization": "Organizations",
         "Manufacturer": "Manufacturers",
         "Vendor": "Vendors",
+        "Contact": "Contacts",
+        "Location": "Locations",
         "Service": "Services",
         "Price List": "Price Sheets",
         "Estimate": "Estimates",
@@ -13623,6 +14345,9 @@ def _application_search_entries(
             "manufacturer",
             "vendor",
             "product",
+            "contact",
+            "location",
+            "project",
         }:
             continue
         kind_map = {
@@ -13630,6 +14355,9 @@ def _application_search_entries(
             "customer": "customer",
             "manufacturer": "manufacturer",
             "vendor": "vendor",
+            "contact": "contact",
+            "location": "location",
+            "project": "project",
             "product": "master_product",
         }
         kind = _safe_text(kind_map.get(entity_type), "")
@@ -13637,6 +14365,9 @@ def _application_search_entries(
         data = {
             "entity_id": _safe_text(item.get("entity_id"), ""),
             "service_id": _safe_text(attributes.get("service_id"), ""),
+            "contact_id": _safe_text(attributes.get("contact_id"), ""),
+            "location_id": _safe_text(attributes.get("location_id"), ""),
+            "project_id": _safe_text(attributes.get("project_id"), ""),
             "service": _safe_text(
                 item.get("display_name"),
                 _safe_text(item.get("canonical_name"), "Service"),
@@ -13649,12 +14380,38 @@ def _application_search_entries(
                 item.get("display_name"),
                 _safe_text(item.get("canonical_name"), "Vendor"),
             ),
+            "contact": _safe_text(
+                item.get("display_name"),
+                _safe_text(item.get("canonical_name"), "Contact"),
+            ),
+            "location": _safe_text(
+                item.get("display_name"),
+                _safe_text(item.get("canonical_name"), "Location"),
+            ),
+            "project": _safe_text(
+                item.get("display_name"),
+                _safe_text(item.get("canonical_name"), "Project"),
+            ),
             "manufacturer_id": _safe_text(attributes.get("manufacturer_id"), ""),
             "vendor_id": _safe_text(attributes.get("vendor_id"), ""),
             "customer": _safe_text(
                 item.get("display_name"),
                 _safe_text(item.get("canonical_name"), "Customer"),
             ),
+            "email": _safe_text(attributes.get("email"), ""),
+            "phone": _safe_text(attributes.get("phone"), ""),
+            "title": _safe_text(attributes.get("title"), ""),
+            "organization": _safe_text(attributes.get("organization"), ""),
+            "external_identifier": _safe_text(
+                attributes.get("external_identifier"),
+                "",
+            ),
+            "address_line1": _safe_text(attributes.get("address_line1"), ""),
+            "address_line2": _safe_text(attributes.get("address_line2"), ""),
+            "city": _safe_text(attributes.get("city"), ""),
+            "state": _safe_text(attributes.get("state"), ""),
+            "postal_code": _safe_text(attributes.get("postal_code"), ""),
+            "country": _safe_text(attributes.get("country"), ""),
             "product_id": _safe_text(attributes.get("atlas_product_uuid"), ""),
             "atlas_product_uuid": _safe_text(attributes.get("atlas_product_uuid"), ""),
             "model": _safe_text(
@@ -13686,12 +14443,53 @@ def _application_search_entries(
         )
         reference["project_name"] = "Knowledge"
         reference["scope"] = "application"
-        reference["match_fields"] = [
+        match_fields = [
             _safe_text(item.get("entity_id"), ""),
             _safe_text(item.get("canonical_name"), ""),
             _safe_text(item.get("display_name"), ""),
             " ".join(list(item.get("aliases") or [])),
         ]
+        if entity_type == "contact":
+            match_fields.extend(
+                [
+                    _safe_text(attributes.get("contact_id"), ""),
+                    _safe_text(attributes.get("email"), ""),
+                    _safe_text(attributes.get("phone"), ""),
+                    _safe_text(attributes.get("title"), ""),
+                    _safe_text(attributes.get("organization"), ""),
+                    _safe_text(attributes.get("external_identifier"), ""),
+                ]
+            )
+        elif entity_type == "location":
+            match_fields.extend(
+                [
+                    _safe_text(attributes.get("location_id"), ""),
+                    _safe_text(attributes.get("address_line1"), ""),
+                    _safe_text(attributes.get("address_line2"), ""),
+                    _safe_text(attributes.get("city"), ""),
+                    _safe_text(attributes.get("state"), ""),
+                    _safe_text(attributes.get("postal_code"), ""),
+                    _safe_text(attributes.get("country"), ""),
+                    _safe_text(attributes.get("external_identifier"), ""),
+                ]
+            )
+        elif entity_type == "project":
+            match_fields.extend(
+                [
+                    _safe_text(attributes.get("project_id"), ""),
+                    _safe_text(attributes.get("customer"), ""),
+                    _safe_text(attributes.get("location"), ""),
+                    _safe_text(attributes.get("client_project_number"), ""),
+                    _safe_text(attributes.get("internal_project_number"), ""),
+                    _safe_text(attributes.get("status"), ""),
+                    _safe_text(attributes.get("external_identifier"), ""),
+                ]
+            )
+        elif entity_type == "service":
+            match_fields.extend([_safe_text(attributes.get("service_id"), "")])
+        elif entity_type == "customer":
+            match_fields.extend([_safe_text(attributes.get("customer_id"), "")])
+        reference["match_fields"] = match_fields
         references.append(reference)
 
     product_rows: list[dict[str, Any]] = []
