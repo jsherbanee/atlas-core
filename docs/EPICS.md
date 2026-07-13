@@ -31,9 +31,10 @@ Status: Active
 
 ## Epic W: Workspace Intelligence
 
-Status: Active (W-01 completed; no active Epic W sprint)
+Status: Active (W-01 and W-02 completed; no active Epic W sprint)
 
 - W-01 Context Persistence and Cross-Workspace Navigation
+- W-02 Universal Object Contract
 
 ### W-01 Scope
 
@@ -55,6 +56,20 @@ Explicitly out of scope:
 - mixed project-object and Knowledge-entity Working Set continuity is supported
 
 No Epic W sprint is currently active.
+
+### W-02 Scope
+
+- define one universal object contract as an adapter/interoperability layer, not a second source of truth
+- cover identity, metadata, relationships, activity, actions, lifecycle, and presentation hints
+- add registry-backed adapter lookup for representative project, knowledge, and engineering object families
+- align search, Working Set, and W-01 context persistence with universal object identity where practical
+
+Explicitly out of scope:
+
+- Universal Object Workspace UI
+- AI or semantic retrieval
+- new business workflows or domain entities
+- Epic E implementation start
 
 ### A-04 Scope (Completed)
 

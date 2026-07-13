@@ -19,6 +19,26 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Epic W Sprint W-02 Universal Object Contract)
+
+### Improved
+
+- Atlas now defines a universal object adapter contract for identity, metadata, relationships, activity, lifecycle, actions, and presentation hints
+- representative adapters are available for project, knowledge, and engineering object families without replacing existing domain models
+- search references, Working Set-compatible records, and W-01 context persistence can now carry universal object identity where practical
+- registry-backed adapter lookup and duplicate-registration validation provide deterministic object-contract resolution
+
+### Scope Notes
+
+- contract and interoperability layer only
+- no Universal Object Workspace UI yet
+- no AI, semantic retrieval, new workflows, or Epic E start
+
+### Validation
+
+- focused contract and interoperability tests now cover identity determinism, registry behavior, representative adapters, relationship validation, lifecycle/actions/presentation metadata, search compatibility, Working Set compatibility, and W-01 context compatibility
+- full quality gates passed (`black`, `ruff`, `mypy`, `pytest`) with full-suite regression count at 1231 tests
+
 ## Unreleased (Epic W Sprint W-01 Context Persistence and Cross-Workspace Navigation) (Closed)
 
 ### Improved

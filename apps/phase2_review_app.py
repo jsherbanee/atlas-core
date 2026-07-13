@@ -56,6 +56,10 @@ from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
 from atlas_core.services.runtime_workspace import ensure_runtime_workspace_root
+from atlas_core.services.universal_object_registry import (
+    UniversalObjectRegistry,
+    build_default_universal_object_registry,
+)
 from atlas_core.ui.design_system import (
     atlas_stylesheet,
     render_empty_state_html,
@@ -264,6 +268,8 @@ ALL_ACTIVE_PAGES = (
         "Addenda",
     ]
 )
+
+_UNIVERSAL_OBJECT_REGISTRY: UniversalObjectRegistry | None = None
 
 APPLICATION_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
     (
@@ -3915,8 +3921,10 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault(_navigation_prior_route_key(), {})
     st.session_state.setdefault(_selected_project_object_type_key(), "")
     st.session_state.setdefault(_selected_project_object_id_key(), "")
+    st.session_state.setdefault(_selected_project_object_identity_key(), {})
     st.session_state.setdefault(_selected_knowledge_entity_type_key(), "")
     st.session_state.setdefault(_selected_knowledge_entity_id_key(), "")
+    st.session_state.setdefault(_selected_knowledge_entity_identity_key(), {})
     st.session_state.setdefault(_return_context_key(), {})
     st.session_state.setdefault(_navigation_history_key(), [])
     st.session_state.setdefault(_originating_workspace_key(), "")
@@ -4835,12 +4843,20 @@ def _selected_project_object_id_key() -> str:
     return "atlas_selected_project_object_id"
 
 
+def _selected_project_object_identity_key() -> str:
+    return "atlas_selected_project_object_identity"
+
+
 def _selected_knowledge_entity_type_key() -> str:
     return "atlas_selected_knowledge_entity_type"
 
 
 def _selected_knowledge_entity_id_key() -> str:
     return "atlas_selected_knowledge_entity_id"
+
+
+def _selected_knowledge_entity_identity_key() -> str:
+    return "atlas_selected_knowledge_entity_identity"
 
 
 def _return_context_key() -> str:
@@ -4865,6 +4881,102 @@ def _context_history_limit() -> int:
 
 def _tenant_scope_key() -> str:
     return "atlas_tenant_scope"
+
+
+def _universal_object_registry() -> UniversalObjectRegistry:
+    global _UNIVERSAL_OBJECT_REGISTRY
+    if _UNIVERSAL_OBJECT_REGISTRY is None:
+        _UNIVERSAL_OBJECT_REGISTRY = build_default_universal_object_registry()
+    return _UNIVERSAL_OBJECT_REGISTRY
+
+
+def _universal_object_adapter_key(kind: str) -> str:
+    mapping = {
+        "master_product": "product",
+        "project_record": "project",
+    }
+    return mapping.get(kind, kind)
+
+
+def _universal_identity_payload(
+    *,
+    kind: str,
+    data: dict[str, Any],
+    st: Any | None = None,
+    route: str | None = None,
+    project_id: str | None = None,
+    tenant_id: str | None = None,
+) -> dict[str, Any]:
+    adapter_key = _universal_object_adapter_key(kind)
+    owning_workspace = (
+        "Knowledge"
+        if adapter_key
+        in {
+            "customer",
+            "vendor",
+            "manufacturer",
+            "product",
+            "service",
+            "contact",
+            "location",
+            "organization",
+            "price_list",
+        }
+        else "Projects"
+    )
+    payload = dict(data)
+    payload.setdefault("display_name", _object_display_name(kind, data))
+    payload.setdefault("canonical_name", _object_display_name(kind, data))
+    payload.setdefault("object_id", _object_id_for_selection(kind, data))
+    payload.setdefault("title", _object_display_name(kind, data))
+    payload.setdefault("status", _safe_text(data.get("status"), "indexed"))
+    active_project_id = _safe_text(
+        project_id,
+        _safe_text(
+            (
+                st.session_state.get("atlas_active_workspace_id")
+                if st is not None
+                else None
+            ),
+            "",
+        ),
+    )
+    owning_project_id = (
+        active_project_id
+        if adapter_key
+        in {
+            "project",
+            "drawing",
+            "specification",
+            "equipment",
+            "system",
+            "room",
+            "evidence",
+            "rfi",
+        }
+        else None
+    )
+    try:
+        universal_object = _universal_object_registry().adapt(
+            adapter_key,
+            payload,
+            tenant_id=_safe_text(
+                tenant_id,
+                _safe_text(
+                    (
+                        st.session_state.get(_tenant_scope_key())
+                        if st is not None
+                        else None
+                    ),
+                    "local",
+                ),
+            ),
+            owning_workspace=owning_workspace,
+            owning_project_id=owning_project_id,
+        )
+    except Exception:
+        return {}
+    return universal_object.identity.to_dict()
 
 
 def _knowledge_selection_kinds() -> set[str]:
@@ -4900,19 +5012,24 @@ def _project_object_selection_kinds() -> set[str]:
 def _reset_selected_context_targets(st: Any) -> None:
     st.session_state[_selected_project_object_type_key()] = ""
     st.session_state[_selected_project_object_id_key()] = ""
+    st.session_state[_selected_project_object_identity_key()] = {}
     st.session_state[_selected_knowledge_entity_type_key()] = ""
     st.session_state[_selected_knowledge_entity_id_key()] = ""
+    st.session_state[_selected_knowledge_entity_identity_key()] = {}
 
 
 def _apply_context_selection_state(st: Any, kind: str, data: dict[str, Any]) -> None:
     _reset_selected_context_targets(st)
     selected_id = _safe_text(_object_id_for_selection(kind, data), "")
+    identity_payload = _universal_identity_payload(kind=kind, data=data, st=st)
     if kind in _knowledge_selection_kinds():
         st.session_state[_selected_knowledge_entity_type_key()] = kind
         st.session_state[_selected_knowledge_entity_id_key()] = selected_id
+        st.session_state[_selected_knowledge_entity_identity_key()] = identity_payload
     elif kind in _project_object_selection_kinds():
         st.session_state[_selected_project_object_type_key()] = kind
         st.session_state[_selected_project_object_id_key()] = selected_id
+        st.session_state[_selected_project_object_identity_key()] = identity_payload
 
 
 def _current_workspace_context(st: Any) -> dict[str, Any]:
@@ -4959,6 +5076,9 @@ def _current_workspace_context(st: Any) -> dict[str, Any]:
             st.session_state.get(_selected_project_object_id_key()),
             "",
         ),
+        "selected_project_object_identity": dict(
+            st.session_state.get(_selected_project_object_identity_key()) or {}
+        ),
         "selected_knowledge_entity_type": _safe_text(
             st.session_state.get(_selected_knowledge_entity_type_key()),
             "",
@@ -4966,6 +5086,9 @@ def _current_workspace_context(st: Any) -> dict[str, Any]:
         "selected_knowledge_entity_id": _safe_text(
             st.session_state.get(_selected_knowledge_entity_id_key()),
             "",
+        ),
+        "selected_knowledge_entity_identity": dict(
+            st.session_state.get(_selected_knowledge_entity_identity_key()) or {}
         ),
     }
 
@@ -4990,6 +5113,12 @@ def _record_return_context(
         "source_project_name": _safe_text(context.get("project_name"), ""),
         "source_object_kind": _safe_text(context.get("selection_kind"), ""),
         "source_object_id": _safe_text(context.get("selection_id"), ""),
+        "source_object_identity": (
+            dict(context.get("selected_knowledge_entity_identity") or {})
+            if _safe_text(context.get("selection_kind"), "")
+            in _knowledge_selection_kinds()
+            else dict(context.get("selected_project_object_identity") or {})
+        ),
         "source_selection": dict(context.get("selection_data") or {}),
         "source_secondary": _safe_text(context.get("secondary"), ""),
         "source_tertiary": _safe_text(context.get("tertiary"), ""),
@@ -7020,6 +7149,12 @@ def _build_object_reference(
     source_refs = list(data.get("source_documents") or [])
     if not source_refs and kind == "evidence":
         source_refs = [_safe_text(data.get("source_file"), "")]
+    identity_payload = _universal_identity_payload(
+        kind=kind,
+        data=data,
+        route=route,
+        project_id=project_id,
+    )
     return {
         "object_id": _object_id_for_selection(kind, data),
         "object_type": _object_type_label(kind),
@@ -7035,6 +7170,11 @@ def _build_object_reference(
         "warning_count": int(warning_count),
         "selection_kind": kind,
         "selection_data": dict(data),
+        "universal_object_identity": identity_payload,
+        "universal_object_id": _safe_text(
+            identity_payload.get("universal_object_id"),
+            "",
+        ),
     }
 
 
@@ -7449,6 +7589,9 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
                 st.session_state.get(_selected_project_object_id_key()),
                 "",
             ),
+            "selected_project_object_identity": dict(
+                st.session_state.get(_selected_project_object_identity_key()) or {}
+            ),
             "selected_knowledge_entity_type": _safe_text(
                 st.session_state.get(_selected_knowledge_entity_type_key()),
                 "",
@@ -7456,6 +7599,9 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
             "selected_knowledge_entity_id": _safe_text(
                 st.session_state.get(_selected_knowledge_entity_id_key()),
                 "",
+            ),
+            "selected_knowledge_entity_identity": dict(
+                st.session_state.get(_selected_knowledge_entity_identity_key()) or {}
             ),
             "return_context": dict(st.session_state.get(_return_context_key()) or {}),
             "navigation_history": [
@@ -7595,6 +7741,9 @@ def _restore_workspace_state(
             context_state.get("selected_project_object_id"),
             "",
         )
+        st.session_state[_selected_project_object_identity_key()] = dict(
+            context_state.get("selected_project_object_identity") or {}
+        )
         st.session_state[_selected_knowledge_entity_type_key()] = _safe_text(
             context_state.get("selected_knowledge_entity_type"),
             "",
@@ -7602,6 +7751,9 @@ def _restore_workspace_state(
         st.session_state[_selected_knowledge_entity_id_key()] = _safe_text(
             context_state.get("selected_knowledge_entity_id"),
             "",
+        )
+        st.session_state[_selected_knowledge_entity_identity_key()] = dict(
+            context_state.get("selected_knowledge_entity_identity") or {}
         )
         st.session_state[_return_context_key()] = dict(
             context_state.get("return_context") or {}

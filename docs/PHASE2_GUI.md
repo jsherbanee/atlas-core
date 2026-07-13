@@ -71,6 +71,12 @@ Sprint X-13 refines navigation clarity and information architecture without chan
 - Home is treated as an operational landing page centered on continue-working context, recent projects, action triage, notifications, and favorites
 - Reports is treated as an output-oriented workspace organized around deliverables and readiness
 
+W-02 defines the Universal Object contract layer only.
+
+- no universal object workspace UI is introduced yet
+- future object surfaces can consume shared identity, action, relationship, activity, and presentation contracts
+- existing page layouts remain authoritative until a later workspace-migration sprint adopts the shared object shell
+
 ## Design-System Foundation (X-09)
 
 X-09 introduces shared UI authority for the Streamlit shell:

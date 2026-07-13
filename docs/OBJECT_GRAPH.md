@@ -30,6 +30,10 @@ It should support deterministic relationship construction today and more advance
 - Confidence: how strong or explicit the relationship is.
 - Provenance: where the relationship came from and how it was derived.
 
+W-02 contract note:
+- universal object identity now provides a shared adapter-layer identity envelope for project, knowledge, and engineering objects without replacing existing domain models
+- universal relationship contracts preserve tenant scope, source/target identity, direction, provenance, and effective timing in a reusable shape for graph traversal and future object rendering
+
 ## Relationship Types
 Representative relationship types include:
 - contains

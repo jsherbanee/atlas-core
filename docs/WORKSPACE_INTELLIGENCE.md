@@ -17,6 +17,12 @@ Implemented in W-01:
 - breadcrumb and return affordances owned by the shared shell
 - deterministic related-project sections for Knowledge records where existing repository and reviewed-equipment data prove the relationship
 
+Implemented in W-02:
+- universal object interoperability contract for identity, metadata, relationships, activity, lifecycle, actions, and presentation hints
+- registry-backed adapter lookup for representative project, knowledge, and engineering object families
+- compatibility alignment between W-01 context persistence and universal object identity payloads
+- universal identity exposure in search references and Working Set-compatible records
+
 Out of scope:
 - AI
 - semantic retrieval
@@ -119,3 +125,4 @@ Compatibility rules:
 - some continuity actions are still data-dependent and only appear when the underlying project or Knowledge payload proves the relationship
 - deeper coverage for vendor and service project-backlinks depends on stronger deterministic relationship surfacing in existing repository artifacts
 - additional object-detail pages can adopt the same return-context affordance in future W-series hardening
+- the Universal Object Workspace UI itself is still deferred; W-02 defines the contract and adapter layer only

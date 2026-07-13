@@ -401,6 +401,9 @@ Page headers should be concise.
 Keep the title, optional breadcrumb, and contextual actions when they materially help task flow.
 Remove repeated descriptions, duplicated workspace names, and explanatory paragraphs that restate the obvious.
 
+Future universal object surfaces should share the same stable object shell.
+The object type may change, but identity presentation, action location, relationship grouping, activity placement, and context-banner behavior should remain consistent.
+
 ## 13. Data Visualization
 
 Charts should exist only when they improve engineering understanding.
