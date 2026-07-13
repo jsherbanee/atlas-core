@@ -157,13 +157,22 @@ def atlas_stylesheet() -> str:
         [data-testid="stAppViewContainer"] p,
         [data-testid="stAppViewContainer"] li,
         [data-testid="stAppViewContainer"] label,
-        [data-testid="stAppViewContainer"] span,
-        [data-testid="stAppViewContainer"] div,
         [data-testid="stAppViewContainer"] input,
         [data-testid="stAppViewContainer"] textarea,
         [data-testid="stAppViewContainer"] button,
         [data-testid="stAppViewContainer"] select {{
             font-family: var(--atlas-font-interface);
+        }}
+        .material-icons,
+        .material-symbols-rounded,
+        .material-symbols-outlined {{
+            letter-spacing: normal;
+        }}
+        [data-testid="stIconMaterial"] {{
+            font-family: "Material Symbols Rounded", "Material Symbols Outlined", "Material Icons" !important;
+            font-style: normal;
+            letter-spacing: normal !important;
+            font-feature-settings: "liga";
         }}
         code,
         pre,
