@@ -70,12 +70,13 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1213 tests)
+- pytest: full suite passing (1217 tests)
 
 ## Manual UI Validation (W-01)
 - validated project-to-Knowledge continuity from project reports summary into Knowledge Customers with visible return context
 - validated shared-shell breadcrumb and return affordance behavior across the project-to-Knowledge continuity path
 - validated focused search mode from an active project, including project/application scope labels and Clear Search return to the prior page
+- validated active-project report breadcrumbs and meaningful return labels after continuity hops
 - validated widths 820, 980, 1180, 1366, and large desktop on the continuity path with no horizontal overflow observed
 
 ## Manual UI Validation (X-13)
