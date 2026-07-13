@@ -1,6 +1,3 @@
-Atlas Workspace UI Sprint X-12 introduces a reusable secondary and tertiary navigation framework, with Knowledge as the first workspace to carry explicit secondary-group and tertiary-page session state for deterministic search handoff and future reuse.
-
-Atlas Workspace UI Sprint X-09 establishes a reusable design-system foundation (shared tokens, centralized stylesheet authority, and reusable UI primitives) and migrates Home, Projects, Knowledge, and Reports to those primitives without changing workflow behavior.
 # Atlas
 
 ## Purpose
@@ -25,6 +22,7 @@ Atlas Workspace UI Sprint X-07 keeps the bounded shell but turns global search i
 Atlas Workspace UI Sprint X-08 keeps the visual-system shell posture (background #FAFAF9, primary accent #004225, neutral surfaces) and fixes search clear-state runtime flow by separating widget input from submitted query state with safe widget-key reset on Clear Search.
 Atlas Workspace UI Sprint X-09 establishes a reusable design-system foundation (shared tokens, centralized stylesheet authority, and reusable UI primitives) and migrates Home, Projects, Knowledge, and Reports to those primitives without changing workflow behavior.
 Atlas Workspace UI Sprint X-10 completes consistency migration for remaining primary project workspaces using existing shared wrappers and deterministic behavior-preserving UI hardening.
+Atlas Workspace UI Sprint X-12 introduces a reusable secondary and tertiary navigation framework for Knowledge and Projects modes, with deterministic state restore and search-handoff routing.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 

@@ -398,6 +398,581 @@ KNOWLEDGE_TERTIARY_BY_PAGE: dict[str, str] = {
     "Assemblies": "Assemblies",
 }
 
+NAVIGATION_ACTION_TYPES = {
+    "collection_view",
+    "detail_view",
+    "create_action",
+    "edit_action",
+    "relationship_view",
+    "history_activity_view",
+    "import_action",
+    "export_action",
+    "operational_view",
+    "settings_view",
+}
+
+PROJECTS_LIBRARY_PAGES = {
+    "Projects",
+    "Pinned Projects",
+    "Reference Projects",
+    "Recent Projects",
+    "Create New Project",
+    "Open Existing Project",
+}
+
+PROJECTS_ACTIVE_PAGES = {
+    "Overview",
+    "Documents",
+    "BOM Review",
+    "Scope & Risk",
+    "Engineering Review",
+    "Estimate",
+    "Notebook",
+    "Reports",
+    "Drawings",
+    "Specifications",
+    "Equipment",
+    "Systems",
+    "Evidence",
+    "Relationships",
+    "Timeline",
+    "Project Metadata",
+    "Repository",
+    "Workspace Settings",
+}
+
+KNOWLEDGE_NAVIGATION_CONTRACT: list[dict[str, Any]] = [
+    {
+        "workspace": "Knowledge",
+        "workspace_mode": "application",
+        "secondary_key": "overview",
+        "label": "Overview",
+        "icon": "overview",
+        "route": "Knowledge",
+        "visibility": True,
+        "enabled": True,
+        "required_context": None,
+        "default_tertiary_action": "summary",
+        "selected_record_requirement": False,
+        "selected_project_requirement": False,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [
+            {
+                "tertiary_key": "summary",
+                "label": "Summary",
+                "route": "Knowledge",
+                "action_type": "collection_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Show summary metrics.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "summary",
+            },
+            {
+                "tertiary_key": "recent_activity",
+                "label": "Recent Activity",
+                "route": "Knowledge",
+                "action_type": "history_activity_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Show import and history activity when available.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "summary",
+            },
+            {
+                "tertiary_key": "data_health",
+                "label": "Data Health",
+                "route": "Knowledge",
+                "action_type": "operational_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Show health/completeness indicators.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "summary",
+            },
+        ],
+    },
+    {
+        "workspace": "Knowledge",
+        "workspace_mode": "application",
+        "secondary_key": "customers",
+        "label": "Customers",
+        "icon": "customer",
+        "route": "Knowledge",
+        "visibility": True,
+        "enabled": True,
+        "required_context": None,
+        "default_tertiary_action": "browse",
+        "selected_record_requirement": False,
+        "selected_project_requirement": False,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "route": "Knowledge",
+                "action_type": "create_action",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Create a new customer.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "route": "Knowledge",
+                "action_type": "collection_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Browse customer records.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "route": "Knowledge",
+                "action_type": "edit_action",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": "entity",
+                "empty_state_behavior": "Select a customer record in Browse before editing.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "relationships",
+                "label": "Relationships",
+                "route": "Knowledge",
+                "action_type": "relationship_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": "entity",
+                "empty_state_behavior": "Select a customer record to view relationships.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "projects",
+                "label": "Projects",
+                "route": "Knowledge",
+                "action_type": "detail_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": "entity",
+                "empty_state_behavior": "Select a customer record to inspect linked projects.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "route": "Knowledge",
+                "action_type": "history_activity_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Show customer entity activity when available.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+        ],
+    },
+]
+
+PROJECTS_LIBRARY_NAVIGATION_CONTRACT: list[dict[str, Any]] = [
+    {
+        "workspace": "Projects",
+        "workspace_mode": "library",
+        "secondary_key": "overview",
+        "label": "Overview",
+        "icon": "overview",
+        "route": "Projects",
+        "visibility": True,
+        "enabled": True,
+        "required_context": None,
+        "default_tertiary_action": "browse",
+        "selected_record_requirement": False,
+        "selected_project_requirement": False,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "route": "Projects",
+                "action_type": "collection_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Browse project library records.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "open",
+                "label": "Open",
+                "route": "Projects",
+                "action_type": "detail_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": "project",
+                "empty_state_behavior": "Select a project in the library table before opening.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "archive",
+                "label": "Archive",
+                "route": "Projects",
+                "action_type": "operational_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": "project",
+                "empty_state_behavior": "Select a project before archiving.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "duplicate",
+                "label": "Duplicate",
+                "route": "Projects",
+                "action_type": "operational_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": "project",
+                "empty_state_behavior": "Select a project before duplicating.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "delete",
+                "label": "Delete",
+                "route": "Projects",
+                "action_type": "operational_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": "project",
+                "empty_state_behavior": "Select a project before deleting.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "export",
+                "label": "Export",
+                "route": "Projects",
+                "action_type": "export_action",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": "project",
+                "empty_state_behavior": "Select a project before export actions.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+        ],
+    },
+    {
+        "workspace": "Projects",
+        "workspace_mode": "library",
+        "secondary_key": "all_projects",
+        "label": "All Projects",
+        "icon": "projects",
+        "route": "Projects",
+        "visibility": True,
+        "enabled": True,
+        "required_context": None,
+        "default_tertiary_action": "browse",
+        "selected_record_requirement": False,
+        "selected_project_requirement": False,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [],
+    },
+    {
+        "workspace": "Projects",
+        "workspace_mode": "library",
+        "secondary_key": "recent_projects",
+        "label": "Recent Projects",
+        "icon": "history",
+        "route": "Recent Projects",
+        "visibility": True,
+        "enabled": True,
+        "required_context": None,
+        "default_tertiary_action": "browse",
+        "selected_record_requirement": False,
+        "selected_project_requirement": False,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [],
+    },
+    {
+        "workspace": "Projects",
+        "workspace_mode": "library",
+        "secondary_key": "pinned_projects",
+        "label": "Pinned Projects",
+        "icon": "pin",
+        "route": "Pinned Projects",
+        "visibility": True,
+        "enabled": True,
+        "required_context": None,
+        "default_tertiary_action": "browse",
+        "selected_record_requirement": False,
+        "selected_project_requirement": False,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [],
+    },
+    {
+        "workspace": "Projects",
+        "workspace_mode": "library",
+        "secondary_key": "archived_projects",
+        "label": "Archived Projects",
+        "icon": "archive",
+        "route": "Projects",
+        "visibility": True,
+        "enabled": True,
+        "required_context": None,
+        "default_tertiary_action": "browse",
+        "selected_record_requirement": False,
+        "selected_project_requirement": False,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [],
+    },
+    {
+        "workspace": "Projects",
+        "workspace_mode": "library",
+        "secondary_key": "create_project",
+        "label": "Create Project",
+        "icon": "add",
+        "route": "Create New Project",
+        "visibility": True,
+        "enabled": True,
+        "required_context": None,
+        "default_tertiary_action": "quick_start",
+        "selected_record_requirement": False,
+        "selected_project_requirement": False,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [
+            {
+                "tertiary_key": "quick_start",
+                "label": "Quick Start",
+                "route": "Create New Project",
+                "action_type": "create_action",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Create project from required metadata only.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "quick_start",
+            },
+            {
+                "tertiary_key": "details",
+                "label": "Details",
+                "route": "Create New Project",
+                "action_type": "detail_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Show optional project details form fields.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "quick_start",
+            },
+        ],
+    },
+    {
+        "workspace": "Projects",
+        "workspace_mode": "library",
+        "secondary_key": "import_project",
+        "label": "Import Project",
+        "icon": "import",
+        "route": "Projects",
+        "visibility": True,
+        "enabled": True,
+        "required_context": None,
+        "default_tertiary_action": "import",
+        "selected_record_requirement": False,
+        "selected_project_requirement": False,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [
+            {
+                "tertiary_key": "import",
+                "label": "Import",
+                "route": "Projects",
+                "action_type": "import_action",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Import .atlaspkg bundles into repository.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "import",
+            }
+        ],
+    },
+    {
+        "workspace": "Projects",
+        "workspace_mode": "library",
+        "secondary_key": "repository",
+        "label": "Repository",
+        "icon": "repository",
+        "route": "Open Existing Project",
+        "visibility": True,
+        "enabled": True,
+        "required_context": None,
+        "default_tertiary_action": "browse",
+        "selected_record_requirement": False,
+        "selected_project_requirement": False,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [],
+    },
+]
+
+PROJECTS_ACTIVE_NAVIGATION_CONTRACT: list[dict[str, Any]] = [
+    {
+        "workspace": "Projects",
+        "workspace_mode": "active",
+        "secondary_key": "overview",
+        "label": "Overview",
+        "icon": "overview",
+        "route": "Overview",
+        "visibility": True,
+        "enabled": True,
+        "required_context": "project",
+        "default_tertiary_action": "summary",
+        "selected_record_requirement": False,
+        "selected_project_requirement": True,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [
+            {
+                "tertiary_key": "summary",
+                "label": "Summary",
+                "route": "Overview",
+                "action_type": "collection_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Show project overview summary.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "summary",
+            }
+        ],
+    },
+    {
+        "workspace": "Projects",
+        "workspace_mode": "active",
+        "secondary_key": "documents",
+        "label": "Documents",
+        "icon": "documents",
+        "route": "Documents",
+        "visibility": True,
+        "enabled": True,
+        "required_context": "project",
+        "default_tertiary_action": "add_files",
+        "selected_record_requirement": False,
+        "selected_project_requirement": True,
+        "responsive_behavior": "persistent",
+        "supported_tertiary_actions": [
+            {
+                "tertiary_key": "add_files",
+                "label": "Add Files",
+                "route": "Documents",
+                "action_type": "import_action",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Add files to project documents.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "route": "Documents",
+                "action_type": "collection_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Browse document packages and files.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "drawings",
+                "label": "Drawings",
+                "route": "Drawings",
+                "action_type": "detail_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Open drawings workspace.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "specifications",
+                "label": "Specifications",
+                "route": "Specifications",
+                "action_type": "detail_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Open specifications workspace.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "schedules",
+                "label": "Schedules",
+                "route": "Schedules",
+                "action_type": "detail_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Open schedule files.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "addenda",
+                "label": "Addenda",
+                "route": "Addenda",
+                "action_type": "detail_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Open addenda files.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "images",
+                "label": "Images",
+                "route": "Documents",
+                "action_type": "detail_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Images render in document workspace views.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+            {
+                "tertiary_key": "import_activity",
+                "label": "Import Activity",
+                "route": "Import History",
+                "action_type": "history_activity_view",
+                "visibility": True,
+                "enabled": True,
+                "required_selection": None,
+                "empty_state_behavior": "Open import history for document intake.",
+                "permission_hook": "future_permission_check",
+                "deterministic_fallback": "browse",
+            },
+        ],
+    },
+]
+
 SUPPORTED_UPLOAD_TYPES = [
     "pdf",
     "docx",
@@ -3266,6 +3841,13 @@ def _init_session_state(st: Any) -> None:
         st.session_state["atlas_global_search_query"] = _safe_text(
             st.session_state.get("atlas_global_search"), ""
         )
+    st.session_state.setdefault(_navigation_primary_state_key(), "Atlas")
+    st.session_state.setdefault(_navigation_mode_state_key(), "application")
+    st.session_state.setdefault(_navigation_secondary_state_key(), "overview")
+    st.session_state.setdefault(_navigation_tertiary_state_key(), "browse")
+    st.session_state.setdefault(_navigation_selected_entity_type_key(), "")
+    st.session_state.setdefault(_navigation_selected_entity_id_key(), "")
+    st.session_state.setdefault(_navigation_prior_route_key(), {})
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -4081,6 +4663,1016 @@ def _render_knowledge_navigation_frame(st: Any) -> None:
                 _knowledge_secondary_group_for_page(page)
             )
             st.rerun()
+
+
+def _navigation_primary_state_key() -> str:
+    return "atlas_active_primary_workspace"
+
+
+def _navigation_mode_state_key() -> str:
+    return "atlas_active_workspace_mode"
+
+
+def _navigation_secondary_state_key() -> str:
+    return "atlas_active_secondary_section"
+
+
+def _navigation_tertiary_state_key() -> str:
+    return "atlas_active_tertiary_action"
+
+
+def _navigation_selected_entity_type_key() -> str:
+    return "atlas_selected_entity_type"
+
+
+def _navigation_selected_entity_id_key() -> str:
+    return "atlas_selected_entity_id"
+
+
+def _navigation_prior_route_key() -> str:
+    return "atlas_prior_route_context"
+
+
+def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
+    return {
+        "overview": [
+            {
+                "tertiary_key": "summary",
+                "label": "Summary",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "recent_activity",
+                "label": "Recent Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "data_health",
+                "label": "Data Health",
+                "action_type": "operational_view",
+                "required_selection": None,
+            },
+        ],
+        "customers": [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "relationships",
+                "label": "Relationships",
+                "action_type": "relationship_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "projects",
+                "label": "Projects",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+        "contacts": [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "relationships",
+                "label": "Relationships",
+                "action_type": "relationship_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+        "locations": [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "relationships",
+                "label": "Relationships",
+                "action_type": "relationship_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+        "vendors": [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "relationships",
+                "label": "Relationships",
+                "action_type": "relationship_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "transactions",
+                "label": "View Transactions",
+                "action_type": "history_activity_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "import",
+                "label": "Import",
+                "action_type": "import_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "export",
+                "label": "Export",
+                "action_type": "export_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+        "manufacturers": [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "relationships",
+                "label": "Relationships",
+                "action_type": "relationship_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "products",
+                "label": "Products",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "vendors",
+                "label": "Vendors",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "knowledge",
+                "label": "Knowledge",
+                "action_type": "detail_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+        "products": [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "relationships",
+                "label": "Relationships",
+                "action_type": "relationship_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "vendor_offerings",
+                "label": "Vendor Offerings",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "commercial_history",
+                "label": "Commercial History",
+                "action_type": "history_activity_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "import",
+                "label": "Import",
+                "action_type": "import_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "export",
+                "label": "Export",
+                "action_type": "export_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+        "services": [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "relationships",
+                "label": "Relationships",
+                "action_type": "relationship_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "lifecycle_usage",
+                "label": "Lifecycle Usage",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "import",
+                "label": "Import",
+                "action_type": "import_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "export",
+                "label": "Export",
+                "action_type": "export_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+        "price_lists": [
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "import",
+                "label": "Import",
+                "action_type": "import_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "drafts",
+                "label": "Drafts",
+                "action_type": "operational_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "import_history",
+                "label": "Import History",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "change_reports",
+                "label": "Change Reports",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+        "imports": [
+            {
+                "tertiary_key": "new_import",
+                "label": "New Import",
+                "action_type": "import_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "pending",
+                "label": "Pending",
+                "action_type": "operational_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "completed",
+                "label": "Completed",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "rejected_rows",
+                "label": "Rejected Rows",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+        "assemblies": [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "components",
+                "label": "Components",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "preview",
+                "label": "Preview",
+                "action_type": "detail_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "versions",
+                "label": "Versions",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+    }
+
+
+def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, Any]]:
+    if primary == "Knowledge":
+        templates = _knowledge_secondary_templates()
+        sections = [
+            ("overview", "Overview"),
+            ("customers", "Customers"),
+            ("contacts", "Contacts"),
+            ("locations", "Locations"),
+            ("vendors", "Vendors"),
+            ("manufacturers", "Manufacturers"),
+            ("products", "Products"),
+            ("services", "Services"),
+            ("price_lists", "Price Lists"),
+            ("imports", "Imports"),
+            ("assemblies", "Assemblies"),
+        ]
+        built: list[dict[str, Any]] = []
+        for secondary_key, label in sections:
+            actions = templates.get(secondary_key, [])
+            built.append(
+                {
+                    "workspace": "Knowledge",
+                    "workspace_mode": "application",
+                    "secondary_key": secondary_key,
+                    "label": label,
+                    "icon": None,
+                    "route": "Knowledge",
+                    "visibility": True,
+                    "enabled": True,
+                    "required_context": None,
+                    "default_tertiary_action": (
+                        _safe_text(actions[0].get("tertiary_key"), "browse")
+                        if actions
+                        else "browse"
+                    ),
+                    "supported_tertiary_actions": [
+                        {
+                            "tertiary_key": _safe_text(
+                                action.get("tertiary_key"), "browse"
+                            ),
+                            "label": _safe_text(action.get("label"), "Browse"),
+                            "route": "Knowledge",
+                            "action_type": _safe_text(
+                                action.get("action_type"), "collection_view"
+                            ),
+                            "visibility": True,
+                            "enabled": True,
+                            "required_selection": action.get("required_selection"),
+                            "empty_state_behavior": "Use Browse to select a record before record-level actions.",
+                            "permission_hook": "future_permission_check",
+                            "deterministic_fallback": "browse",
+                        }
+                        for action in actions
+                    ],
+                    "selected_record_requirement": False,
+                    "selected_project_requirement": False,
+                    "responsive_behavior": "persistent",
+                }
+            )
+        return built
+
+    if primary != "Projects":
+        return []
+
+    if mode == "library":
+        return PROJECTS_LIBRARY_NAVIGATION_CONTRACT
+
+    active_sections: list[
+        tuple[str, str, str, list[tuple[str, str, str, str | None]]]
+    ] = [
+        (
+            "overview",
+            "Overview",
+            "Overview",
+            [("summary", "Summary", "collection_view", None)],
+        ),
+        (
+            "documents",
+            "Documents",
+            "Documents",
+            [
+                ("add_files", "Add Files", "import_action", None),
+                ("browse", "Browse", "collection_view", None),
+                ("drawings", "Drawings", "detail_view", None),
+                ("specifications", "Specifications", "detail_view", None),
+                ("schedules", "Schedules", "detail_view", None),
+                ("addenda", "Addenda", "detail_view", None),
+                ("images", "Images", "detail_view", None),
+                ("import_activity", "Import Activity", "history_activity_view", None),
+            ],
+        ),
+        (
+            "bom_review",
+            "BOM Review",
+            "BOM Review",
+            [
+                ("summary", "Summary", "collection_view", None),
+                ("review_items", "Review Items", "detail_view", None),
+                ("product_resolution", "Product Resolution", "operational_view", None),
+                ("cost_selection", "Cost Selection", "operational_view", None),
+                ("export", "Export", "export_action", None),
+            ],
+        ),
+        (
+            "scope_risk",
+            "Scope & Risk",
+            "Scope & Risk",
+            [
+                ("summary", "Summary", "collection_view", None),
+                ("findings", "Findings", "detail_view", None),
+                ("rfis", "RFIs", "detail_view", None),
+                ("responsibilities", "Responsibilities", "detail_view", None),
+                ("export", "Export", "export_action", None),
+            ],
+        ),
+        (
+            "engineering_review",
+            "Engineering Review",
+            "Engineering Review",
+            [
+                ("summary", "Summary", "collection_view", None),
+                ("insights", "Insights", "detail_view", None),
+                ("coordination", "Coordination", "detail_view", None),
+                ("systems", "Systems", "detail_view", None),
+                ("workbench", "Workbench", "operational_view", None),
+            ],
+        ),
+        (
+            "estimate",
+            "Estimate",
+            "Estimate",
+            [
+                ("overview", "Overview", "collection_view", None),
+                ("equipment", "Equipment", "detail_view", None),
+                ("labor", "Labor", "detail_view", None),
+                ("accessories", "Accessories", "detail_view", None),
+                ("general_conditions", "General Conditions", "detail_view", None),
+                ("allowances", "Allowances", "detail_view", None),
+                ("revisions", "Revisions", "history_activity_view", None),
+                ("confidence", "Confidence", "detail_view", None),
+                ("export", "Export", "export_action", None),
+            ],
+        ),
+        (
+            "notebook",
+            "Notebook",
+            "Notebook",
+            [
+                ("add_entry", "Add Entry", "create_action", None),
+                ("browse", "Browse", "collection_view", None),
+                ("decisions", "Decisions", "detail_view", None),
+                ("timeline", "Timeline", "history_activity_view", None),
+            ],
+        ),
+        (
+            "reports",
+            "Reports",
+            "Reports",
+            [
+                ("project_summary", "Project Summary", "export_action", None),
+                ("estimator_brief", "Estimator Brief", "export_action", None),
+                ("bom_export", "BOM Export", "export_action", None),
+                (
+                    "scope_risk_export",
+                    "Scope & Risk Export",
+                    "export_action",
+                    None,
+                ),
+                (
+                    "engineering_review_export",
+                    "Engineering Review Export",
+                    "export_action",
+                    None,
+                ),
+            ],
+        ),
+        (
+            "project_details",
+            "Project Details",
+            "Overview",
+            [
+                ("summary", "Summary", "collection_view", None),
+                ("drawings", "Drawings", "detail_view", None),
+                ("specifications", "Specifications", "detail_view", None),
+                ("equipment", "Equipment", "detail_view", None),
+                ("systems", "Systems", "detail_view", None),
+                ("evidence", "Evidence", "detail_view", None),
+                ("relationships", "Relationships", "relationship_view", None),
+                ("timeline", "Timeline", "history_activity_view", None),
+            ],
+        ),
+        (
+            "project_settings",
+            "Project Settings",
+            "Project Metadata",
+            [
+                ("metadata", "Metadata", "settings_view", None),
+                ("stakeholders", "Stakeholders", "settings_view", None),
+                ("repository", "Repository", "settings_view", None),
+                ("workspace", "Workspace", "settings_view", None),
+            ],
+        ),
+    ]
+
+    contract: list[dict[str, Any]] = []
+    for secondary_key, label, route, active_actions in active_sections:
+        contract.append(
+            {
+                "workspace": "Projects",
+                "workspace_mode": "active",
+                "secondary_key": secondary_key,
+                "label": label,
+                "icon": None,
+                "route": route,
+                "visibility": True,
+                "enabled": True,
+                "required_context": "project",
+                "default_tertiary_action": active_actions[0][0],
+                "supported_tertiary_actions": [
+                    {
+                        "tertiary_key": key,
+                        "label": action_label,
+                        "route": route,
+                        "action_type": action_type,
+                        "visibility": True,
+                        "enabled": True,
+                        "required_selection": required_selection,
+                        "empty_state_behavior": "Use the section browse/action controls to establish selection context.",
+                        "permission_hook": "future_permission_check",
+                        "deterministic_fallback": active_actions[0][0],
+                    }
+                    for key, action_label, action_type, required_selection in active_actions
+                ],
+                "selected_record_requirement": False,
+                "selected_project_requirement": True,
+                "responsive_behavior": "persistent",
+            }
+        )
+    return contract
+
+
+def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
+    if primary == "Knowledge":
+        page_map = {
+            "Knowledge": "overview",
+            "Summary": "overview",
+            "Commercial Health": "overview",
+            "Customers": "customers",
+            "Contacts": "contacts",
+            "Locations": "locations",
+            "Vendors": "vendors",
+            "Manufacturers": "manufacturers",
+            "Products": "products",
+            "Services": "services",
+            "Price Lists": "price_lists",
+            "Imports": "imports",
+            "Import History": "imports",
+            "Assemblies": "assemblies",
+        }
+        return page_map.get(page, "overview")
+
+    if primary != "Projects":
+        return None
+    if mode == "library":
+        page_map = {
+            "Projects": "all_projects",
+            "Pinned Projects": "pinned_projects",
+            "Reference Projects": "repository",
+            "Recent Projects": "recent_projects",
+            "Create New Project": "create_project",
+            "Open Existing Project": "repository",
+        }
+        return page_map.get(page, "overview")
+
+    page_map = {
+        "Overview": "overview",
+        "Documents": "documents",
+        "BOM Review": "bom_review",
+        "Scope & Risk": "scope_risk",
+        "Engineering Review": "engineering_review",
+        "Estimate": "estimate",
+        "Notebook": "notebook",
+        "Reports": "reports",
+        "Drawings": "project_details",
+        "Specifications": "project_details",
+        "Equipment": "project_details",
+        "Systems": "project_details",
+        "Evidence": "project_details",
+        "Relationships": "project_details",
+        "Timeline": "project_details",
+        "Project Metadata": "project_settings",
+        "Repository": "project_settings",
+        "Workspace Settings": "project_settings",
+    }
+    return page_map.get(page, "overview")
+
+
+def _active_primary_workspace(page: str, record: ProjectWorkspaceRecord | None) -> str:
+    if page == "Knowledge":
+        return "Knowledge"
+    if page in PROJECTS_LIBRARY_PAGES or page in PROJECTS_ACTIVE_PAGES:
+        return "Projects"
+    if record is not None and page not in {"Mission Control", "Administration"}:
+        return "Projects"
+    if page == "Reports":
+        return "Reports"
+    if page == "Administration":
+        return "Settings"
+    return "Atlas"
+
+
+def _active_workspace_mode(page: str, record: ProjectWorkspaceRecord | None) -> str:
+    if page == "Knowledge":
+        return "application"
+    if page in PROJECTS_LIBRARY_PAGES:
+        return "library"
+    if page in PROJECTS_ACTIVE_PAGES:
+        return "active"
+    if record is not None and page not in {"Mission Control", "Administration"}:
+        return "active"
+    return "application"
+
+
+def _sync_workspace_navigation_state(
+    st: Any,
+    record: ProjectWorkspaceRecord | None,
+) -> None:
+    page = _safe_text(st.session_state.get("atlas_active_page"), "Mission Control")
+    primary = _active_primary_workspace(page, record)
+    mode = _active_workspace_mode(page, record)
+    st.session_state[_navigation_primary_state_key()] = primary
+    st.session_state[_navigation_mode_state_key()] = mode
+
+    selection = dict(st.session_state.get("atlas_context_selection") or {})
+    selection_kind = _safe_text(selection.get("kind"), "")
+    selection_data = dict(selection.get("data") or {})
+    st.session_state[_navigation_selected_entity_type_key()] = selection_kind
+    st.session_state[_navigation_selected_entity_id_key()] = _safe_text(
+        _object_id_for_selection(selection_kind, selection_data),
+        "",
+    )
+
+    if primary not in {"Knowledge", "Projects"}:
+        return
+
+    sections = _workspace_navigation_contract(primary, mode)
+    if not sections:
+        return
+
+    active_secondary = _safe_text(
+        st.session_state.get(_navigation_secondary_state_key()),
+        _safe_text(sections[0].get("secondary_key"), ""),
+    )
+    derived_secondary = _safe_text(_secondary_key_for_page(primary, mode, page), "")
+    if derived_secondary:
+        active_secondary = derived_secondary
+
+    section = next(
+        (
+            item
+            for item in sections
+            if _safe_text(item.get("secondary_key"), "") == active_secondary
+        ),
+        sections[0],
+    )
+    st.session_state[_navigation_secondary_state_key()] = _safe_text(
+        section.get("secondary_key"),
+        "",
+    )
+
+    actions = list(section.get("supported_tertiary_actions") or [])
+    default_tertiary = _safe_text(
+        section.get("default_tertiary_action"),
+        _safe_text(actions[0].get("tertiary_key"), "") if actions else "",
+    )
+    active_tertiary = _safe_text(
+        st.session_state.get(_navigation_tertiary_state_key()),
+        default_tertiary,
+    )
+    if actions and active_tertiary not in {
+        _safe_text(item.get("tertiary_key"), "") for item in actions
+    }:
+        active_tertiary = default_tertiary
+    st.session_state[_navigation_tertiary_state_key()] = active_tertiary
+
+
+def _tertiary_action_requires_selection(
+    st: Any,
+    action: dict[str, Any],
+    record: ProjectWorkspaceRecord | None,
+) -> bool:
+    required = _safe_text(action.get("required_selection"), "")
+    if required == "project":
+        return record is None
+    if required == "entity":
+        return not _safe_text(
+            st.session_state.get(_navigation_selected_entity_id_key()), ""
+        )
+    return False
+
+
+def _render_workspace_navigation(
+    st: Any,
+    record: ProjectWorkspaceRecord | None,
+) -> None:
+    primary = _safe_text(
+        st.session_state.get(_navigation_primary_state_key()),
+        "Atlas",
+    )
+    mode = _safe_text(
+        st.session_state.get(_navigation_mode_state_key()),
+        "application",
+    )
+    sections = _workspace_navigation_contract(primary, mode)
+    if not sections:
+        return
+
+    shell_cols = st.columns([1.2, 4.8])
+    with shell_cols[0]:
+        st.markdown("### Secondary")
+        for section in sections:
+            secondary_key = _safe_text(section.get("secondary_key"), "")
+            is_active = secondary_key == _safe_text(
+                st.session_state.get(_navigation_secondary_state_key()),
+                "",
+            )
+            if st.button(
+                _safe_text(section.get("label"), secondary_key),
+                key=f"atlas_secondary_{primary}_{mode}_{secondary_key}",
+                type="primary" if is_active else "secondary",
+                width="stretch",
+                disabled=not bool(section.get("enabled", True)),
+            ):
+                st.session_state[_navigation_secondary_state_key()] = secondary_key
+                actions = list(section.get("supported_tertiary_actions") or [])
+                st.session_state[_navigation_tertiary_state_key()] = _safe_text(
+                    section.get("default_tertiary_action"),
+                    _safe_text(actions[0].get("tertiary_key"), "") if actions else "",
+                )
+                st.session_state[_navigation_prior_route_key()] = {
+                    "page": _safe_text(st.session_state.get("atlas_active_page"), ""),
+                    "workspace": primary,
+                    "mode": mode,
+                }
+                st.session_state["atlas_active_page"] = _safe_text(
+                    section.get("route"),
+                    _safe_text(
+                        st.session_state.get("atlas_active_page"), "Mission Control"
+                    ),
+                )
+                st.rerun()
+
+    with shell_cols[1]:
+        section = next(
+            (
+                item
+                for item in sections
+                if _safe_text(item.get("secondary_key"), "")
+                == _safe_text(
+                    st.session_state.get(_navigation_secondary_state_key()), ""
+                )
+            ),
+            sections[0],
+        )
+        actions = [
+            item
+            for item in list(section.get("supported_tertiary_actions") or [])
+            if bool(item.get("visibility", True))
+        ]
+        if actions:
+            st.markdown("### Tertiary")
+            action_cols = st.columns(max(1, min(6, len(actions))))
+            for index, action in enumerate(actions):
+                key = _safe_text(action.get("tertiary_key"), "")
+                label = _safe_text(action.get("label"), key)
+                requires_selection = _tertiary_action_requires_selection(
+                    st,
+                    action,
+                    record,
+                )
+                if action_cols[index % len(action_cols)].button(
+                    label,
+                    key=f"atlas_tertiary_{primary}_{mode}_{_safe_text(section.get('secondary_key'), '')}_{key}",
+                    type=(
+                        "primary"
+                        if key
+                        == _safe_text(
+                            st.session_state.get(_navigation_tertiary_state_key()),
+                            "",
+                        )
+                        else "secondary"
+                    ),
+                    disabled=requires_selection
+                    or not bool(action.get("enabled", True)),
+                    width="stretch",
+                ):
+                    st.session_state[_navigation_tertiary_state_key()] = key
+                    st.session_state[_navigation_prior_route_key()] = {
+                        "page": _safe_text(
+                            st.session_state.get("atlas_active_page"), ""
+                        ),
+                        "workspace": primary,
+                        "mode": mode,
+                    }
+                    route = _safe_text(action.get("route"), "")
+                    if route:
+                        st.session_state["atlas_active_page"] = route
+                    st.rerun()
+
+            active_action = next(
+                (
+                    item
+                    for item in actions
+                    if _safe_text(item.get("tertiary_key"), "")
+                    == _safe_text(
+                        st.session_state.get(_navigation_tertiary_state_key()), ""
+                    )
+                ),
+                actions[0],
+            )
+            if _tertiary_action_requires_selection(st, active_action, record):
+                st.info(
+                    _safe_text(
+                        active_action.get("empty_state_behavior"),
+                        "Select a record in Browse to continue.",
+                    )
+                )
+                fallback = _safe_text(
+                    active_action.get("deterministic_fallback"), "browse"
+                )
+                if st.button(
+                    "Open Browse",
+                    key=(
+                        f"atlas_tertiary_fallback_{primary}_{mode}_{_safe_text(section.get('secondary_key'), '')}_{fallback}"
+                    ),
+                    width="content",
+                ):
+                    st.session_state[_navigation_tertiary_state_key()] = fallback
+                    st.rerun()
 
 
 def _render_navigation_menu(
@@ -5009,16 +6601,39 @@ def _open_search_reference(
                 _open_project_record(st, selected_record, workspace_service)
                 return
 
-    st.session_state["atlas_active_page"] = _safe_text(
-        reference.get("route"), "Overview"
-    )
-    if _safe_text(reference.get("route"), "") == "Knowledge":
+    route = _safe_text(reference.get("route"), "Overview")
+    st.session_state["atlas_active_page"] = route
+    if route == "Knowledge":
         _knowledge_navigation_defaults(st)
         _set_knowledge_navigation_selection(
             st,
             kind=selection_kind,
-            page=_safe_text(reference.get("route"), "Knowledge"),
+            page=route,
         )
+        st.session_state[_navigation_primary_state_key()] = "Knowledge"
+        st.session_state[_navigation_mode_state_key()] = "application"
+        st.session_state[_navigation_secondary_state_key()] = _safe_text(
+            _secondary_key_for_page("Knowledge", "application", route),
+            "overview",
+        )
+        st.session_state[_navigation_tertiary_state_key()] = "browse"
+    elif route in PROJECTS_LIBRARY_PAGES:
+        st.session_state[_navigation_primary_state_key()] = "Projects"
+        st.session_state[_navigation_mode_state_key()] = "library"
+        st.session_state[_navigation_secondary_state_key()] = _safe_text(
+            _secondary_key_for_page("Projects", "library", route),
+            "overview",
+        )
+        st.session_state[_navigation_tertiary_state_key()] = "browse"
+    else:
+        st.session_state[_navigation_primary_state_key()] = "Projects"
+        st.session_state[_navigation_mode_state_key()] = "active"
+        st.session_state[_navigation_secondary_state_key()] = _safe_text(
+            _secondary_key_for_page("Projects", "active", route),
+            "overview",
+        )
+        st.session_state[_navigation_tertiary_state_key()] = "browse"
+
     _set_context_selection(st, selection_kind, selection_data)
     _record_recent_search_open(st, reference)
     st.rerun()
@@ -5091,6 +6706,32 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
         "recent_opened_results": list(
             st.session_state.get("atlas_recent_opened_results") or []
         ),
+        "navigation_state": {
+            "primary": _safe_text(
+                st.session_state.get(_navigation_primary_state_key()),
+                "Atlas",
+            ),
+            "mode": _safe_text(
+                st.session_state.get(_navigation_mode_state_key()),
+                "application",
+            ),
+            "secondary": _safe_text(
+                st.session_state.get(_navigation_secondary_state_key()),
+                "overview",
+            ),
+            "tertiary": _safe_text(
+                st.session_state.get(_navigation_tertiary_state_key()),
+                "browse",
+            ),
+            "selected_entity_type": _safe_text(
+                st.session_state.get(_navigation_selected_entity_type_key()),
+                "",
+            ),
+            "selected_entity_id": _safe_text(
+                st.session_state.get(_navigation_selected_entity_id_key()),
+                "",
+            ),
+        },
     }
 
 
@@ -5172,6 +6813,33 @@ def _restore_workspace_state(
     recently_viewed = state.get("recently_viewed_objects")
     if isinstance(recently_viewed, list):
         st.session_state["atlas_recently_viewed_objects"] = list(recently_viewed)
+
+    navigation_state = state.get("navigation_state")
+    if isinstance(navigation_state, dict):
+        st.session_state[_navigation_primary_state_key()] = _safe_text(
+            navigation_state.get("primary"),
+            "Atlas",
+        )
+        st.session_state[_navigation_mode_state_key()] = _safe_text(
+            navigation_state.get("mode"),
+            "application",
+        )
+        st.session_state[_navigation_secondary_state_key()] = _safe_text(
+            navigation_state.get("secondary"),
+            "overview",
+        )
+        st.session_state[_navigation_tertiary_state_key()] = _safe_text(
+            navigation_state.get("tertiary"),
+            "browse",
+        )
+        st.session_state[_navigation_selected_entity_type_key()] = _safe_text(
+            navigation_state.get("selected_entity_type"),
+            "",
+        )
+        st.session_state[_navigation_selected_entity_id_key()] = _safe_text(
+            navigation_state.get("selected_entity_id"),
+            "",
+        )
 
     pinned_objects = state.get("pinned_objects")
     if isinstance(pinned_objects, list):
@@ -23464,6 +25132,8 @@ def _render_shell(
             context,
         )
     else:
+        _sync_workspace_navigation_state(st, record)
+        _render_workspace_navigation(st, record)
         _render_main_content(
             st,
             workspace_service,

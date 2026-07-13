@@ -1108,6 +1108,44 @@ def test_open_search_reference_sets_knowledge_navigation_state() -> None:
     assert st.rerun_called is True
 
 
+def test_open_search_reference_sets_projects_library_navigation_state() -> None:
+    st = _FakeStreamlit(session_state={})
+    service = _FakeWorkspaceService(records=[])
+    reference = {
+        "route": "Projects",
+        "selection_kind": "project",
+        "selection_data": {"project_id": "BID-2026-1001"},
+        "object_id": "BID-2026-1001",
+        "object_type": "Project",
+    }
+
+    app._open_search_reference(st, service, reference)
+
+    assert st.session_state["atlas_active_primary_workspace"] == "Projects"
+    assert st.session_state["atlas_active_workspace_mode"] == "library"
+    assert st.session_state["atlas_active_secondary_section"] == "all_projects"
+    assert st.rerun_called is True
+
+
+def test_open_search_reference_sets_projects_active_navigation_state() -> None:
+    st = _FakeStreamlit(session_state={})
+    service = _FakeWorkspaceService(records=[])
+    reference = {
+        "route": "Drawings",
+        "selection_kind": "drawing",
+        "selection_data": {"drawing_number": "AV-601"},
+        "object_id": "AV-601",
+        "object_type": "Drawing",
+    }
+
+    app._open_search_reference(st, service, reference)
+
+    assert st.session_state["atlas_active_primary_workspace"] == "Projects"
+    assert st.session_state["atlas_active_workspace_mode"] == "active"
+    assert st.session_state["atlas_active_secondary_section"] == "project_details"
+    assert st.rerun_called is True
+
+
 def test_open_search_reference_project_updates_recency() -> None:
     record = _project_record("maw-demo", "MAW")
     st = _FakeStreamlit(session_state={})
@@ -1123,6 +1161,88 @@ def test_open_search_reference_project_updates_recency() -> None:
 
     assert service.saved_records[-1].workspace_id == "maw-demo"
     assert st.session_state["atlas_active_page"] == "Overview"
+
+
+def test_sync_workspace_navigation_state_resolves_projects_library_secondary() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_active_page": "Pinned Projects",
+            "atlas_context_selection": {"kind": "project", "data": {}},
+        }
+    )
+
+    app._sync_workspace_navigation_state(st, record=None)
+
+    assert st.session_state["atlas_active_primary_workspace"] == "Projects"
+    assert st.session_state["atlas_active_workspace_mode"] == "library"
+    assert st.session_state["atlas_active_secondary_section"] == "pinned_projects"
+
+
+def test_workspace_state_snapshot_includes_navigation_state() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_active_page": "Overview",
+            "atlas_navigation_collapsed": False,
+            "atlas_layout_mode": "Desktop",
+            "atlas_context_selection": {"kind": "project", "data": {}},
+            "atlas_notebook_entries": [],
+            "atlas_review_flags": {},
+            "atlas_price_list_library": {},
+            "atlas_product_resolution_overrides": {},
+            "atlas_product_resolution_filters": [],
+            "atlas_recently_viewed_objects": [],
+            "atlas_pinned_objects": [],
+            "atlas_recent_search_queries": [],
+            "atlas_recent_opened_results": [],
+            "atlas_active_primary_workspace": "Projects",
+            "atlas_active_workspace_mode": "active",
+            "atlas_active_secondary_section": "overview",
+            "atlas_active_tertiary_action": "summary",
+            "atlas_selected_entity_type": "drawing",
+            "atlas_selected_entity_id": "AV-601",
+        }
+    )
+
+    snapshot = app._workspace_state_snapshot(st)
+
+    navigation = dict(snapshot.get("navigation_state") or {})
+    assert navigation["primary"] == "Projects"
+    assert navigation["mode"] == "active"
+    assert navigation["secondary"] == "overview"
+    assert navigation["tertiary"] == "summary"
+    assert navigation["selected_entity_type"] == "drawing"
+    assert navigation["selected_entity_id"] == "AV-601"
+
+
+def test_restore_workspace_state_restores_navigation_state() -> None:
+    class _RestoreService:
+        def load_workspace_state(self, _workspace_id: str) -> dict[str, Any]:
+            return {
+                "last_open_page": "Overview",
+                "filters": {},
+                "search_state": {},
+                "window_preferences": {},
+                "navigation_state": {
+                    "primary": "Projects",
+                    "mode": "active",
+                    "secondary": "project_details",
+                    "tertiary": "drawings",
+                    "selected_entity_type": "drawing",
+                    "selected_entity_id": "AV-601",
+                },
+            }
+
+    st = _FakeStreamlit(session_state={})
+    record = _project_record("maw-demo", "MAW")
+
+    app._restore_workspace_state(st, _RestoreService(), record)
+
+    assert st.session_state["atlas_active_primary_workspace"] == "Projects"
+    assert st.session_state["atlas_active_workspace_mode"] == "active"
+    assert st.session_state["atlas_active_secondary_section"] == "project_details"
+    assert st.session_state["atlas_active_tertiary_action"] == "drawings"
+    assert st.session_state["atlas_selected_entity_type"] == "drawing"
+    assert st.session_state["atlas_selected_entity_id"] == "AV-601"
 
 
 def test_open_project_record_updates_recency() -> None:
