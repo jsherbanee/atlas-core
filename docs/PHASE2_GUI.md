@@ -1,11 +1,11 @@
 # Atlas
 
 ## Purpose
-Provide a local project-analysis workspace for estimators and reviewers to create or open a project, upload documents, run analysis, review BOM and risk conclusions, and export a concise internal report.
+Provide the Atlas application workspace for bid-intelligence and lifecycle operations so users can create or open a project, upload documents, run analysis, review BOM and risk conclusions, and export an operational project summary.
 
-This interface is local-only:
+This interface is local-first for development, while the product direction remains commercial SaaS:
 - Local file-backed project repository persistence under `AtlasProjects/`.
-- No procurement/RFQ/submittal/invoice/execution/closeout/vendor communication workflows.
+- No procurement/RFQ/submittal/invoice/execution/closeout/vendor communication workflows in this phase.
 
 Atlas Workspace v1 (Sprint 8) launches into a persistent interactive engineering shell.
 
@@ -20,11 +20,14 @@ Atlas Workspace UI Sprint X-05 moves primary navigation into the top header, ren
 Atlas Workspace UI Sprint X-06 keeps the header-based shell while removing the public Home button, simplifying the Search control, removing the visible Settings trigger label, removing the History dropdown, and constraining the shell to a centered workstation-style width.
 Atlas Workspace UI Sprint X-07 keeps the bounded shell but turns global search into a focused results mode with compact navigation, meaningful-query gating, and direct row-click navigation while active.
 Atlas Workspace UI Sprint X-08 keeps the visual-system shell posture (background #FAFAF9, primary accent #004225, neutral surfaces) and fixes search clear-state runtime flow by separating widget input from submitted query state with safe widget-key reset on Clear Search.
+Atlas Workspace UI Sprint X-09 establishes a reusable design-system foundation (shared tokens, centralized stylesheet authority, and reusable UI primitives) and migrates Home, Projects, Knowledge, and Reports to those primitives without changing workflow behavior.
+X-09 closeout status: complete and closed.
 
 Completion status:
 - X-06 responsive shell refinement: completed
 - X-07 focused search refinement: completed
 - X-08 initial visual-system pass and safe clear-search remediation: completed
+- X-09 design-system foundation and representative page migration: completed and closed
 
 Atlas Workspace Sprint A-04 consolidates workstation UX: shared workspace section headers, recommendation deduplication/grouping, filter reset consistency in dense tables, object-link continuity from estimate snapshot context, and terminology normalization for Products (Master Library).
 Atlas Workspace Sprint X-02 refines project creation and identity workflows with deterministic Atlas Bid ID preview/allocation and explicit project identifier surfaces.
@@ -51,6 +54,32 @@ Home now shows deterministic Recent Projects instead of Recent Activity.
 Atlas is the sole Home action.
 The header uses a compact centered content width so it does not stretch edge-to-edge on large monitors.
 Clear Search exits focused search mode and returns to the current page context without mutating an already-instantiated widget-owned session key.
+
+## Design-System Foundation (X-09)
+
+X-09 introduces shared UI authority for the Streamlit shell:
+
+- token authority lives in `atlas_core/ui/design_system.py`
+- `_inject_styles` now consumes centralized stylesheet output rather than a large local CSS literal
+- page helpers consume shared HTML primitives for metric cards, empty states, guided empty states, workspace context, and status badges
+
+Representative migration scope (behavior-preserving only):
+
+- Home
+- Projects
+- Knowledge
+- Reports
+
+Out of scope for X-09:
+
+- any business-logic or persistence changes
+- new workflow capabilities
+- Epic E initiation
+
+Remaining migration debt after X-09 closeout:
+
+- project-workspace pages beyond Home/Projects/Knowledge/Reports still rely on legacy inline table/layout wrappers
+- shared section, notice, badge, and responsive-control wrappers should continue rollout across lower-priority project-workspace surfaces
 
 ## Repository-Backed Open Existing Project
 Open Existing Project now defaults to repository-backed project selection.
@@ -566,7 +595,7 @@ Inside project Reports, navigation now explicitly includes:
 - Engineering Review Export
 
 ## Project Summary Report
-Project Summary is an internal engineering report (not a proposal).
+Project Summary is an operational summary report for the active organization, not a proposal.
 
 Default sections:
 - Project Overview

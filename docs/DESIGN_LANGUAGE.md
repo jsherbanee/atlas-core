@@ -16,17 +16,21 @@ The goal of this document is not to prescribe implementation details, CSS values
 
 ## 2. Design Philosophy
 
-Atlas is an engineering instrument, a decision-support system, and a precision tool.
+Atlas is a commercial operations instrument, a decision-support system, and a precision tool.
 
 Atlas is not a dashboard.
 Atlas is not a marketing application.
 Atlas is not a consumer app.
 
+Atlas is not a generic business app.
+
+Atlas should feel purpose-built for systems integrators that need calm, professional, information-dense, responsive, deterministic, and low-friction software.
+
 Every visual element should exist because it improves engineering decision-making. Every pixel should justify its existence.
 
 ## 3. Engineering Philosophy
 
-Atlas should behave like an engineering instrument rather than a reporting dashboard.
+Atlas should behave like an operational control surface rather than a reporting dashboard.
 
 The role of Atlas is to:
 
@@ -41,6 +45,8 @@ The role of Atlas is to:
 Atlas should never attempt to replace engineering judgment.
 
 Its purpose is to help engineers make better decisions more quickly.
+
+Its broader purpose is to help an integration organization coordinate lifecycle work without visual or workflow friction.
 
 ## 4. Brand Personality
 
@@ -63,9 +69,9 @@ Atlas should reduce uncertainty, help users orient quickly, and make engineering
 
 ## 6. Visual Inspiration
 
-Atlas draws inspiration from engineering and industrial design disciplines, not from racing aesthetics.
+Atlas draws inspiration from engineering, product-operations, and industrial design disciplines, not from racing aesthetics.
 
-Relevant references include British Racing engineering, the Aston Martin Formula One engineering environment, McLaren race engineering, Porsche Motorsport telemetry, Leica industrial design, Apple Xcode, VS Code, Bluebeam, Revit, Bloomberg Terminal, and NASA mission control.
+Relevant references include Autodesk Fusion, Linear, Notion, Arc Browser, Figma, Formula 1 telemetry dashboards, Leica industrial design, Apple Xcode, VS Code, Bluebeam, Revit, Bloomberg Terminal, and NASA mission control.
 
 The influence to borrow is engineering discipline: clarity under pressure, dense but legible information, and interfaces that support critical decisions. Atlas should not copy the appearance of any of these systems.
 
@@ -76,6 +82,8 @@ Atlas is informed by the engineering culture behind motorsport telemetry, not by
 The relevant ideas are engineering discipline, data integrity, traceability, confidence, relationship analysis, performance optimization, decision support, and real-time awareness.
 
 Atlas should take the mindset of careful instrumentation and rapid analysis while remaining a platform for commercial AV, theatrical, themed entertainment, and systems integration.
+
+Atlas should also feel like software that can scale across the full lifecycle of an integration business without becoming visually noisy or generic.
 
 Atlas should not reference or imitate specific telemetry products, software interfaces, logos, branding, or proprietary implementations.
 
@@ -159,7 +167,7 @@ Completion status:
 - X-07 focused search refinement: completed
 - X-08 initial visual-system pass and safe clear-search remediation: completed
 
-X-08 continues product hardening without architecture expansion:
+X-08 completed product hardening without architecture expansion:
 
 - no new product capabilities
 - no Epic E implementation start
@@ -177,7 +185,31 @@ X-08 focus is visual-system consistency and runtime-safe search-state handling:
 Remaining visual UX debt:
 
 - some data-dense tables still need progressive disclosure refinement for smaller split-screen use
-- a full migration from deprecated use_container_width parameters remains pending
+- additional width API alignment may continue across older or less frequently used UI surfaces
+
+## 8.5 Sprint X-09 Design System Foundation and Reusable Components
+
+Completion status:
+
+- X-09 design-system foundation and reusable-components migration: completed and closed
+
+X-09 continues product hardening without architecture expansion:
+
+- no new product capabilities
+- no Epic E implementation start
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+
+X-09 focus is reusable UI authority and visual consistency hardening:
+
+- establish a shared token authority for color, spacing, radius, typography, layout widths, and control heights
+- centralize shell/page CSS into a single reusable design-system source
+- define reusable UI primitives for section headings, notice panels, status badges, metric cards, tables, and responsive control groups
+- migrate representative pages (Home, Projects, Knowledge, and Reports) onto shared primitives without changing product behavior
+
+Post-X-09 migration debt:
+
+- project-workspace pages outside Home/Projects/Knowledge/Reports still contain legacy inline layout and table wrappers (for example Documents, BOM Review, Scope & Risk, Engineering Review, Estimate, Notebook, and object-detail pages)
+- table hierarchy and responsive-control wrappers should continue to expand through future hardening sprints
 
 
 ## 8. Things Atlas Will Never Become
@@ -211,7 +243,7 @@ Color should support confidence and orientation. It should never compete with th
 
 ## 10. Typography Philosophy
 
-Typography should be readable, engineering-focused, professional, and timeless.
+Typography should be readable, operations-focused, professional, and timeless.
 
 It should favor legibility in dense working environments and support long sessions without fatigue. Likely inspirations include DIN, Inter, and IBM Plex Sans, but this document does not lock implementation fonts.
 
@@ -229,7 +261,7 @@ Cards should be used only when they improve comprehension. Tables should remain 
 
 ## 12. Navigation Philosophy
 
-Atlas is project-centric, not document-centric and not estimate-centric.
+Atlas is lifecycle-centric, not document-centric and not estimate-centric.
 
 Atlas navigation uses two explicit workspace layers:
 - Application Workspace for Home, project management, portfolio reporting, and administration.
@@ -253,6 +285,8 @@ Search should remain available in the header across application and project work
 Header search executes directly on Enter and avoids separate open/close interaction modes.
 
 Navigation should be persistent, require minimal clicks, and maintain a predictable hierarchy. The interface should feel like a workspace, not a maze.
+
+The interface should also feel configurable, tenant-aware, and consistent across organizations.
 
 Project Workspace pages should follow an action-first hierarchy:
 - Recommended next action

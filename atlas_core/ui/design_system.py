@@ -1,0 +1,508 @@
+"""Atlas design-system tokens and reusable HTML/CSS primitives.
+
+This module is intentionally framework-light: it only returns HTML/CSS strings so
+Streamlit pages can reuse the same visual authority without introducing a second
+UI architecture.
+"""
+
+from __future__ import annotations
+
+from html import escape
+
+ATLAS_TOKENS: dict[str, dict[str, str]] = {
+    "color": {
+        "gray": "#6b7280",
+        "primary": "#004225",
+        "page_bg": "#FAFAF9",
+        "surface": "#FFFFFF",
+        "border": "#e5e7eb",
+        "hover": "#f3f4f6",
+        "primary_soft": "#dce8e2",
+        "primary_soft_hover": "#cfdfd8",
+        "amber": "#d97706",
+        "red": "#dc2626",
+        "blue": "#0f4c81",
+        "success": "#166534",
+        "warning": "#92400e",
+        "danger": "#991b1b",
+        "neutral": "#334155",
+    },
+    "radius": {
+        "sm": "8px",
+        "md": "10px",
+        "lg": "12px",
+        "pill": "999px",
+    },
+    "space": {
+        "xs": "0.2rem",
+        "sm": "0.45rem",
+        "md": "0.7rem",
+        "lg": "1rem",
+    },
+    "elevation": {
+        "subtle": "0 1px 2px rgba(15, 23, 42, 0.06)",
+        "hover": "0 2px 8px rgba(15, 23, 42, 0.08)",
+    },
+    "layout": {
+        "max_content_width": "1440px",
+        "input_height": "34px",
+        "control_height": "34px",
+    },
+    "typography": {
+        "title_size": "1.26rem",
+        "subtitle_size": "0.88rem",
+        "body_small": "0.84rem",
+        "label": "0.72rem",
+        "value": "0.95rem",
+    },
+}
+
+
+def atlas_stylesheet() -> str:
+    """Return the canonical stylesheet for Atlas app shell components."""
+
+    c = ATLAS_TOKENS["color"]
+    r = ATLAS_TOKENS["radius"]
+    s = ATLAS_TOKENS["space"]
+    e = ATLAS_TOKENS["elevation"]
+    layout = ATLAS_TOKENS["layout"]
+    t = ATLAS_TOKENS["typography"]
+    return f"""
+        <style>
+        :root {{
+            --atlas-gray: {c['gray']};
+            --atlas-primary: {c['primary']};
+            --atlas-page-bg: {c['page_bg']};
+            --atlas-surface: {c['surface']};
+            --atlas-border: {c['border']};
+            --atlas-hover: {c['hover']};
+            --atlas-primary-soft: {c['primary_soft']};
+            --atlas-primary-soft-hover: {c['primary_soft_hover']};
+            --atlas-amber: {c['amber']};
+            --atlas-red: {c['red']};
+            --atlas-blue: {c['blue']};
+            --atlas-success: {c['success']};
+            --atlas-warning: {c['warning']};
+            --atlas-danger: {c['danger']};
+            --atlas-neutral: {c['neutral']};
+            --atlas-radius-sm: {r['sm']};
+            --atlas-radius-md: {r['md']};
+            --atlas-radius-lg: {r['lg']};
+            --atlas-radius-pill: {r['pill']};
+            --atlas-space-xs: {s['xs']};
+            --atlas-space-sm: {s['sm']};
+            --atlas-space-md: {s['md']};
+            --atlas-space-lg: {s['lg']};
+            --atlas-elevation-subtle: {e['subtle']};
+            --atlas-elevation-hover: {e['hover']};
+            --atlas-max-content-width: {layout['max_content_width']};
+            --atlas-control-height: {layout['control_height']};
+            --atlas-input-height: {layout['input_height']};
+            --atlas-title-size: {t['title_size']};
+            --atlas-subtitle-size: {t['subtitle_size']};
+            --atlas-label-size: {t['label']};
+            --atlas-value-size: {t['value']};
+            --atlas-body-small-size: {t['body_small']};
+        }}
+        .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {{
+            background: var(--atlas-page-bg) !important;
+        }}
+        .atlas-title {{
+            font-size: var(--atlas-title-size);
+            font-weight: 680;
+            letter-spacing: 0.01rem;
+            margin-bottom: 0.1rem;
+        }}
+        .atlas-muted {{
+            color: var(--atlas-gray);
+            font-size: 0.86rem;
+        }}
+        .atlas-page-header {{
+            margin: 0.15rem 0 0.9rem 0;
+            padding-bottom: 0.55rem;
+            border-bottom: 1px solid var(--atlas-border);
+        }}
+        .atlas-page-subtitle {{
+            color: #4b5563;
+            font-size: var(--atlas-subtitle-size);
+            margin: 0;
+        }}
+        .atlas-card {{
+            border: 1px solid var(--atlas-border);
+            border-radius: var(--atlas-radius-md);
+            padding: var(--atlas-space-sm) 0.6rem;
+            margin-bottom: 0.4rem;
+            background: var(--atlas-surface);
+            box-shadow: var(--atlas-elevation-subtle);
+        }}
+        .atlas-card-title {{
+            color: #4b5563;
+            font-size: var(--atlas-label-size);
+            margin-bottom: 0.15rem;
+        }}
+        .atlas-card-value {{
+            font-size: var(--atlas-value-size);
+            font-weight: 600;
+        }}
+        .atlas-action-row,
+        .atlas-toolbar,
+        .atlas-responsive-control-group {{
+            display: grid;
+            gap: var(--atlas-space-sm);
+            margin-bottom: var(--atlas-space-sm);
+        }}
+        .atlas-content-section {{
+            border: 1px solid var(--atlas-border);
+            border-radius: var(--atlas-radius-lg);
+            background: var(--atlas-surface);
+            padding: var(--atlas-space-md);
+            margin: 0.35rem 0 0.65rem 0;
+            box-shadow: var(--atlas-elevation-subtle);
+        }}
+        .atlas-content-section h3,
+        .atlas-content-section h4 {{
+            margin-top: 0;
+        }}
+        .main .block-container {{
+            max-width: 1440px;
+            width: min(calc(100% - 2rem), 1440px);
+            margin: 0 auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            padding-top: 0.75rem;
+        }}
+        .atlas-statusbar {{
+            border-top: 1px solid var(--atlas-border);
+            margin-top: 1rem;
+            padding-top: 0.45rem;
+        }}
+        .atlas-chip {{
+            border-radius: var(--atlas-radius-pill);
+            padding: 2px 8px;
+            border: 1px solid var(--atlas-border);
+            font-size: 0.75rem;
+            display: inline-block;
+            margin-right: 4px;
+            margin-top: 2px;
+            background: var(--atlas-surface);
+        }}
+        .atlas-status-badge {{
+            border-radius: var(--atlas-radius-pill);
+            display: inline-block;
+            font-size: 0.74rem;
+            font-weight: 650;
+            line-height: 1;
+            padding: 0.3rem 0.5rem;
+            border: 1px solid transparent;
+            margin-right: 0.3rem;
+        }}
+        .atlas-status-badge--success {{
+            background: color-mix(in srgb, var(--atlas-success) 12%, white);
+            border-color: color-mix(in srgb, var(--atlas-success) 38%, white);
+            color: var(--atlas-success);
+        }}
+        .atlas-status-badge--warning {{
+            background: color-mix(in srgb, var(--atlas-warning) 12%, white);
+            border-color: color-mix(in srgb, var(--atlas-warning) 36%, white);
+            color: var(--atlas-warning);
+        }}
+        .atlas-status-badge--danger {{
+            background: color-mix(in srgb, var(--atlas-danger) 12%, white);
+            border-color: color-mix(in srgb, var(--atlas-danger) 36%, white);
+            color: var(--atlas-danger);
+        }}
+        .atlas-status-badge--neutral {{
+            background: #eef2f7;
+            border-color: #d5dde8;
+            color: var(--atlas-neutral);
+        }}
+        .atlas-notice-panel {{
+            border-radius: var(--atlas-radius-md);
+            border: 1px solid var(--atlas-border);
+            background: #f7faf9;
+            padding: 0.55rem 0.75rem;
+            margin: 0.35rem 0 0.65rem 0;
+            color: #0f172a;
+            font-size: var(--atlas-body-small-size);
+        }}
+        .atlas-notice-panel strong {{
+            color: #0b3f2a;
+        }}
+        .atlas-table-shell [data-testid="stDataFrame"] {{
+            margin-top: 0.15rem;
+        }}
+        .atlas-object-card,
+        .atlas-empty-state,
+        .atlas-search-row {{
+            border: 1px solid var(--atlas-border);
+            border-radius: var(--atlas-radius-lg);
+            padding: 0.55rem 0.7rem;
+            margin-bottom: 0.45rem;
+            background: var(--atlas-surface);
+            transition: all 120ms ease-in-out;
+        }}
+        .atlas-search-row:hover {{
+            border-color: #cbd5e1;
+            background: #fcfcfb;
+            box-shadow: var(--atlas-elevation-hover);
+        }}
+        .atlas-object-header {{
+            font-size: 0.82rem;
+            color: #334155;
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+        }}
+        .atlas-project-header {{
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border: 1px solid var(--atlas-border);
+            background: var(--atlas-surface);
+            border-radius: var(--atlas-radius-lg);
+            padding: 0.7rem 0.85rem;
+            margin: 0.35rem 0 0.55rem 0;
+        }}
+        .atlas-project-name {{
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 0.05rem;
+        }}
+        .atlas-project-customer {{
+            color: #334155;
+            font-size: 0.88rem;
+            margin-bottom: 0.3rem;
+        }}
+        .atlas-project-meta {{
+            color: #475569;
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+        }}
+        .atlas-workspace-context {{
+            border: 1px solid var(--atlas-border);
+            border-radius: var(--atlas-radius-md);
+            background: #fcfcfb;
+            padding: 0.45rem 0.65rem;
+            margin: 0.2rem 0 0.75rem 0;
+            color: #475569;
+            font-size: 0.82rem;
+        }}
+        .atlas-empty-title {{
+            font-size: 0.95rem;
+            font-weight: 650;
+            color: #0f172a;
+            margin-bottom: 0.2rem;
+        }}
+        .atlas-empty-copy {{
+            color: #475569;
+            font-size: var(--atlas-body-small-size);
+            margin: 0;
+        }}
+        .stTabs [data-baseweb="tab-list"] {{
+            gap: 0.35rem;
+            padding-bottom: 0.35rem;
+        }}
+        .stTabs [data-baseweb="tab"] {{
+            border-radius: var(--atlas-radius-sm);
+            border: 1px solid var(--atlas-border);
+            background: #f8f8f7;
+            color: #1f2937;
+            height: var(--atlas-control-height);
+            padding: 0 0.7rem;
+            font-weight: 550;
+        }}
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {{
+            border-color: var(--atlas-primary);
+            background: var(--atlas-primary-soft);
+            color: var(--atlas-primary);
+        }}
+        .stButton > button[kind="primary"] {{
+            background: var(--atlas-primary) !important;
+            border-color: var(--atlas-primary) !important;
+            color: #ffffff !important;
+            border-radius: var(--atlas-radius-sm) !important;
+            font-weight: 650 !important;
+        }}
+        .stButton > button[kind="primary"]:hover {{
+            background: #00351e !important;
+            border-color: #00351e !important;
+        }}
+        .stButton > button[kind="secondary"] {{
+            border-radius: var(--atlas-radius-sm) !important;
+            border-color: var(--atlas-border) !important;
+            background: var(--atlas-surface) !important;
+            color: #111827 !important;
+        }}
+        .stButton > button[kind="secondary"]:hover {{
+            background: var(--atlas-hover) !important;
+        }}
+        .stTextInput input,
+        .stSelectbox div[data-baseweb="select"] > div,
+        .stTextArea textarea,
+        .stNumberInput input {{
+            border-radius: var(--atlas-radius-sm) !important;
+            border-color: var(--atlas-border) !important;
+            background: var(--atlas-surface) !important;
+            min-height: var(--atlas-input-height) !important;
+        }}
+        .stTextInput input:focus,
+        .stTextInput input:focus-visible,
+        .stTextArea textarea:focus,
+        .stTextArea textarea:focus-visible,
+        .stSelectbox div[data-baseweb="select"] > div:focus,
+        .stSelectbox div[data-baseweb="select"] > div:focus-visible,
+        .stButton > button:focus,
+        .stButton > button:focus-visible {{
+            border-color: var(--atlas-primary) !important;
+            box-shadow: 0 0 0 1px var(--atlas-primary) !important;
+            outline: none !important;
+        }}
+        [data-testid="stDataFrame"] {{
+            border: 1px solid var(--atlas-border);
+            border-radius: var(--atlas-radius-md);
+            overflow: hidden;
+            background: var(--atlas-surface);
+        }}
+        .st-key-atlas_header_nav_Atlas button,
+        .st-key-atlas_header_nav_Projects button,
+        .st-key-atlas_header_nav_Knowledge button,
+        .st-key-atlas_header_nav_Reports button {{
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            color: #111827 !important;
+            min-width: max-content !important;
+            padding: 0.15rem 0.35rem !important;
+            font-weight: 700 !important;
+            line-height: 1.1 !important;
+            border-radius: var(--atlas-radius-sm) !important;
+        }}
+        .st-key-atlas_header_nav_Atlas button[kind="primary"],
+        .st-key-atlas_header_nav_Projects button[kind="primary"],
+        .st-key-atlas_header_nav_Knowledge button[kind="primary"],
+        .st-key-atlas_header_nav_Reports button[kind="primary"] {{
+            background: var(--atlas-primary-soft) !important;
+            color: var(--atlas-primary) !important;
+        }}
+        .st-key-atlas_header_nav_Projects button p,
+        .st-key-atlas_header_nav_Knowledge button p,
+        .st-key-atlas_header_nav_Reports button p,
+        .st-key-atlas_header_nav_Atlas button p {{
+            white-space: nowrap !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+        }}
+        .st-key-atlas_header_nav_Atlas button:hover,
+        .st-key-atlas_header_nav_Projects button:hover,
+        .st-key-atlas_header_nav_Knowledge button:hover,
+        .st-key-atlas_header_nav_Reports button:hover {{
+            background: var(--atlas-hover) !important;
+        }}
+        .st-key-atlas_header_nav_Atlas button[kind="primary"]:hover,
+        .st-key-atlas_header_nav_Projects button[kind="primary"]:hover,
+        .st-key-atlas_header_nav_Knowledge button[kind="primary"]:hover,
+        .st-key-atlas_header_nav_Reports button[kind="primary"]:hover {{
+            background: var(--atlas-primary-soft-hover) !important;
+        }}
+        .st-key-atlas_header_nav_Atlas button:focus,
+        .st-key-atlas_header_nav_Atlas button:focus-visible,
+        .st-key-atlas_header_nav_Projects button:focus,
+        .st-key-atlas_header_nav_Knowledge button:focus,
+        .st-key-atlas_header_nav_Reports button:focus,
+        .st-key-atlas_header_nav_Projects button:focus-visible,
+        .st-key-atlas_header_nav_Knowledge button:focus-visible,
+        .st-key-atlas_header_nav_Reports button:focus-visible {{
+            outline: none !important;
+            box-shadow: none !important;
+        }}
+        .stButton > button {{
+            white-space: nowrap;
+        }}
+        @media (max-width: 1280px) {{
+            .main .block-container {{
+                width: min(calc(100% - 1.5rem), var(--atlas-max-content-width));
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }}
+            .atlas-action-row,
+            .atlas-toolbar,
+            .atlas-responsive-control-group {{
+                gap: var(--atlas-space-xs);
+            }}
+        }}
+        @media (max-width: 960px) {{
+            .atlas-content-section {{
+                padding: var(--atlas-space-sm);
+            }}
+        }}
+        </style>
+    """
+
+
+def render_metric_card_html(title: str, value: str) -> str:
+    return (
+        "<div class='atlas-card'>"
+        f"<div class='atlas-card-title'>{escape(title)}</div>"
+        f"<div class='atlas-card-value'>{escape(value)}</div>"
+        "</div>"
+    )
+
+
+def render_empty_state_html(message: str) -> str:
+    return (
+        "<div class='atlas-empty-state'>"
+        "<div class='atlas-empty-title'>Nothing to show yet</div>"
+        f"<p class='atlas-empty-copy'>{escape(message)}</p>"
+        "</div>"
+    )
+
+
+def render_guided_empty_state_html(
+    *,
+    why_empty: str,
+    action_to_populate: str,
+    next_location: str,
+) -> str:
+    return (
+        "<div class='atlas-empty-state'>"
+        "<div class='atlas-empty-title'>No data available</div>"
+        f"<p class='atlas-empty-copy'>{escape(why_empty)}</p>"
+        f"<p class='atlas-empty-copy'><strong>Next action:</strong> {escape(action_to_populate)}</p>"
+        f"<p class='atlas-empty-copy'><strong>Go to:</strong> {escape(next_location)}</p>"
+        "</div>"
+    )
+
+
+def render_workspace_context_html(
+    *,
+    workspace: str,
+    objective: str,
+    current_focus: str,
+) -> str:
+    return (
+        "<div class='atlas-workspace-context'>"
+        f"<strong>{escape(workspace)}</strong>"
+        f" · Objective: {escape(objective)}"
+        f" · Focus: {escape(current_focus)}"
+        "</div>"
+    )
+
+
+def render_notice_panel_html(title: str, body: str) -> str:
+    return (
+        "<div class='atlas-notice-panel'>"
+        f"<strong>{escape(title)}</strong><br/>"
+        f"{escape(body)}"
+        "</div>"
+    )
+
+
+def render_status_badge_html(label: str, tone: str = "neutral") -> str:
+    normalized = tone.strip().lower()
+    allowed = {"success", "warning", "danger", "neutral"}
+    if normalized not in allowed:
+        normalized = "neutral"
+    return (
+        "<span class='atlas-status-badge "
+        f"atlas-status-badge--{normalized}'>{escape(label)}</span>"
+    )

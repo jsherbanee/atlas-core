@@ -13,6 +13,11 @@ Use [ROADMAP.md](ROADMAP.md) for executive milestone communication.
 - Keep this document implementation-oriented and current.
 - Preserve architecture boundaries from [ARCHITECTURE.md](ARCHITECTURE.md) and [DOMAIN_MODEL.md](DOMAIN_MODEL.md).
 
+Atlas's long-term product direction is a complete lifecycle platform for AV and lighting systems integrators. Current implementation remains centered on Phase 2 Bid Intelligence, with Epic E not started.
+
+For executive milestone framing, see [ROADMAP.md](ROADMAP.md) and [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md).
+For engineering sequencing and readiness gates, see [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md).
+
 ## Epic A: Core Platform
 
 Status: Active
@@ -134,7 +139,7 @@ Status: Implemented and Closed for current roadmap baseline
 
 ## Epic X: Product Hardening
 
-Status: Active (X-01 Closed, X-02 Closed, X-03 Closed, X-04 Closed, X-05 Closed, X-06 Closed, X-07 Closed, X-08 Closed)
+Status: Active (X-01 through X-09 closed; no active Epic X sprint)
 
 - X-01 Pilot Readiness and Application Walkthrough (Implemented, Closed)
 - X-02 Project Creation and Bid Identity Refinement (Implemented, Closed)
@@ -144,6 +149,9 @@ Status: Active (X-01 Closed, X-02 Closed, X-03 Closed, X-04 Closed, X-05 Closed,
 - X-06 Responsive Header and Navigation Simplification (Implemented, Closed)
 - X-07 Fixed-Width Navigation and Focused Search Results (Implemented, Closed)
 - X-08 Search Clear-State Runtime Fix and Visual-System Closeout (Implemented, Closed)
+- X-09 Design System Foundation and Reusable UI Components (Implemented, Closed)
+
+No Epic X sprint is currently active.
 
 ### X-04 Scope (Completed)
 
@@ -190,6 +198,18 @@ Explicitly out of scope:
 - Epic E implementation start
 - new domain capability implementation
 
+### X-09 Scope (Completed)
+
+- establish a reusable design-system foundation for existing Streamlit shell surfaces
+- centralize token authority and shared stylesheet output
+- consolidate reusable page/UI primitives (section headings, notice panels, status badges, metric cards, table wrappers, responsive control groups)
+- migrate representative pages (Home, Projects, Knowledge, Reports) without changing product behavior
+
+Explicitly out of scope:
+
+- Epic E implementation start
+- new domain capability implementation
+
 ## Epic E: Knowledge and Shared Objects
 
 Status: Not Started
@@ -224,6 +244,24 @@ Status: Deferred (Post-Phase 2)
 - H-02 Closeout Data and Service History Handback
 - H-03 Lifecycle Trace from Estimate to Completion
 
+## Long-Term Platform Roadmap
+
+The epic map is intentionally incremental. The broader Atlas platform should eventually span the full operational lifecycle:
+
+- CRM / Opportunity Management
+- Bid Intelligence
+- Estimating
+- Engineering
+- Procurement
+- Project Management
+- Field Installation
+- Commissioning
+- Service & Warranty
+- Asset Lifecycle Management
+- Executive Reporting & Business Intelligence
+
+The current plan keeps these domains separate until their boundaries are explicitly designed and validated.
+
 ## Usage in Codex Sessions
 
 For implementation prompts:
@@ -231,3 +269,6 @@ For implementation prompts:
 1. Reference the relevant epic and sprint ID from this document.
 2. Validate planned work against architecture docs before coding.
 3. Keep implementation and docs synchronized in the same change.
+
+For product-horizon prompts, use [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md).
+For technical-execution prompts, use [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md).

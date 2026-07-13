@@ -56,6 +56,15 @@ from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
 from atlas_core.services.runtime_workspace import ensure_runtime_workspace_root
+from atlas_core.ui.design_system import (
+    atlas_stylesheet,
+    render_empty_state_html,
+    render_guided_empty_state_html,
+    render_metric_card_html,
+    render_notice_panel_html,
+    render_status_badge_html,
+    render_workspace_context_html,
+)
 
 PROJECT_MANAGER_PAGES = [
     "Mission Control",
@@ -372,275 +381,7 @@ def _load_streamlit() -> Any:
 
 
 def _inject_styles(st: Any) -> None:
-    st.markdown(
-        """
-        <style>
-        :root {
-            --atlas-gray: #6b7280;
-            --atlas-primary: #004225;
-            --atlas-page-bg: #FAFAF9;
-            --atlas-surface: #FFFFFF;
-            --atlas-border: #e5e7eb;
-            --atlas-hover: #f3f4f6;
-            --atlas-primary-soft: #dce8e2;
-            --atlas-primary-soft-hover: #cfdfd8;
-            --atlas-amber: #d97706;
-            --atlas-red: #dc2626;
-        }
-        .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
-            background: var(--atlas-page-bg) !important;
-        }
-        .atlas-title {
-            font-size: 1.26rem;
-            font-weight: 680;
-            letter-spacing: 0.01rem;
-            margin-bottom: 0.1rem;
-        }
-        .atlas-muted {
-            color: var(--atlas-gray);
-            font-size: 0.86rem;
-        }
-        .atlas-page-header {
-            margin: 0.15rem 0 0.9rem 0;
-            padding-bottom: 0.55rem;
-            border-bottom: 1px solid var(--atlas-border);
-        }
-        .atlas-page-subtitle {
-            color: #4b5563;
-            font-size: 0.88rem;
-            margin: 0;
-        }
-        .atlas-card {
-            border: 1px solid var(--atlas-border);
-            border-radius: 10px;
-            padding: 0.45rem 0.6rem;
-            margin-bottom: 0.4rem;
-            background: var(--atlas-surface);
-        }
-        .atlas-card-title {
-            color: #4b5563;
-            font-size: 0.72rem;
-            margin-bottom: 0.15rem;
-        }
-        .atlas-card-value {
-            font-size: 0.95rem;
-            font-weight: 600;
-        }
-        .main .block-container {
-            max-width: 1440px;
-            width: min(calc(100% - 2rem), 1440px);
-            margin: 0 auto;
-            padding-left: 1rem;
-            padding-right: 1rem;
-            padding-top: 0.75rem;
-        }
-        .atlas-statusbar {
-            border-top: 1px solid var(--atlas-border);
-            margin-top: 1rem;
-            padding-top: 0.45rem;
-        }
-        .atlas-chip {
-            border-radius: 999px;
-            padding: 2px 8px;
-            border: 1px solid var(--atlas-border);
-            font-size: 0.75rem;
-            display: inline-block;
-            margin-right: 4px;
-            margin-top: 2px;
-        }
-        .atlas-object-card,
-        .atlas-empty-state,
-        .atlas-search-row {
-            border: 1px solid var(--atlas-border);
-            border-radius: 12px;
-            padding: 0.55rem 0.7rem;
-            margin-bottom: 0.45rem;
-            background: var(--atlas-surface);
-            transition: all 120ms ease-in-out;
-        }
-        .atlas-search-row:hover {
-            border-color: #cbd5e1;
-            background: #fcfcfb;
-        }
-        .atlas-object-header {
-            font-size: 0.82rem;
-            color: #334155;
-            font-weight: 600;
-            margin-bottom: 0.15rem;
-        }
-        .atlas-project-header {
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            border: 1px solid var(--atlas-border);
-            background: var(--atlas-surface);
-            border-radius: 12px;
-            padding: 0.7rem 0.85rem;
-            margin: 0.35rem 0 0.55rem 0;
-        }
-        .atlas-project-name {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: #0f172a;
-            margin-bottom: 0.05rem;
-        }
-        .atlas-project-customer {
-            color: #334155;
-            font-size: 0.88rem;
-            margin-bottom: 0.3rem;
-        }
-        .atlas-project-meta {
-            color: #475569;
-            font-size: 0.8rem;
-            margin-top: 0.25rem;
-        }
-        .atlas-workspace-context {
-            border: 1px solid var(--atlas-border);
-            border-radius: 10px;
-            background: #fcfcfb;
-            padding: 0.45rem 0.65rem;
-            margin: 0.2rem 0 0.75rem 0;
-            color: #475569;
-            font-size: 0.82rem;
-        }
-        .atlas-empty-title {
-            font-size: 0.95rem;
-            font-weight: 650;
-            color: #0f172a;
-            margin-bottom: 0.2rem;
-        }
-        .atlas-empty-copy {
-            color: #475569;
-            font-size: 0.84rem;
-            margin: 0;
-        }
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 0.35rem;
-            padding-bottom: 0.35rem;
-        }
-        .stTabs [data-baseweb="tab"] {
-            border-radius: 8px;
-            border: 1px solid var(--atlas-border);
-            background: #f8f8f7;
-            color: #1f2937;
-            height: 34px;
-            padding: 0 0.7rem;
-            font-weight: 550;
-        }
-        .stTabs [data-baseweb="tab"][aria-selected="true"] {
-            border-color: var(--atlas-primary);
-            background: var(--atlas-primary-soft);
-            color: var(--atlas-primary);
-        }
-        .stButton > button[kind="primary"] {
-            background: var(--atlas-primary) !important;
-            border-color: var(--atlas-primary) !important;
-            color: #ffffff !important;
-            border-radius: 8px !important;
-            font-weight: 650 !important;
-        }
-        .stButton > button[kind="primary"]:hover {
-            background: #00351e !important;
-            border-color: #00351e !important;
-        }
-        .stButton > button[kind="secondary"] {
-            border-radius: 8px !important;
-            border-color: var(--atlas-border) !important;
-            background: var(--atlas-surface) !important;
-            color: #111827 !important;
-        }
-        .stButton > button[kind="secondary"]:hover {
-            background: var(--atlas-hover) !important;
-        }
-        .stTextInput input,
-        .stSelectbox div[data-baseweb="select"] > div,
-        .stTextArea textarea,
-        .stNumberInput input {
-            border-radius: 8px !important;
-            border-color: var(--atlas-border) !important;
-            background: var(--atlas-surface) !important;
-        }
-        .stTextInput input:focus,
-        .stTextInput input:focus-visible,
-        .stTextArea textarea:focus,
-        .stTextArea textarea:focus-visible,
-        .stSelectbox div[data-baseweb="select"] > div:focus,
-        .stSelectbox div[data-baseweb="select"] > div:focus-visible,
-        .stButton > button:focus,
-        .stButton > button:focus-visible {
-            border-color: var(--atlas-primary) !important;
-            box-shadow: 0 0 0 1px var(--atlas-primary) !important;
-            outline: none !important;
-        }
-        [data-testid="stDataFrame"] {
-            border: 1px solid var(--atlas-border);
-            border-radius: 10px;
-            overflow: hidden;
-            background: var(--atlas-surface);
-        }
-        .st-key-atlas_header_nav_Atlas button,
-        .st-key-atlas_header_nav_Projects button,
-        .st-key-atlas_header_nav_Knowledge button,
-        .st-key-atlas_header_nav_Reports button {
-            border: none !important;
-            box-shadow: none !important;
-            background: transparent !important;
-            color: #111827 !important;
-            min-width: max-content !important;
-            padding: 0.15rem 0.35rem !important;
-            font-weight: 700 !important;
-            line-height: 1.1 !important;
-            border-radius: 8px !important;
-        }
-        .st-key-atlas_header_nav_Atlas button[kind="primary"],
-        .st-key-atlas_header_nav_Projects button[kind="primary"],
-        .st-key-atlas_header_nav_Knowledge button[kind="primary"],
-        .st-key-atlas_header_nav_Reports button[kind="primary"] {
-            background: var(--atlas-primary-soft) !important;
-            color: var(--atlas-primary) !important;
-        }
-        .st-key-atlas_header_nav_Projects button p,
-        .st-key-atlas_header_nav_Knowledge button p,
-        .st-key-atlas_header_nav_Reports button p {
-            white-space: nowrap !important;
-            overflow: visible !important;
-            text-overflow: clip !important;
-        }
-        .st-key-atlas_header_nav_Atlas button p {
-            white-space: nowrap !important;
-            overflow: visible !important;
-            text-overflow: clip !important;
-        }
-        .st-key-atlas_header_nav_Atlas button:hover,
-        .st-key-atlas_header_nav_Projects button:hover,
-        .st-key-atlas_header_nav_Knowledge button:hover,
-        .st-key-atlas_header_nav_Reports button:hover {
-            background: var(--atlas-hover) !important;
-        }
-        .st-key-atlas_header_nav_Atlas button[kind="primary"]:hover,
-        .st-key-atlas_header_nav_Projects button[kind="primary"]:hover,
-        .st-key-atlas_header_nav_Knowledge button[kind="primary"]:hover,
-        .st-key-atlas_header_nav_Reports button[kind="primary"]:hover {
-            background: var(--atlas-primary-soft-hover) !important;
-        }
-        .st-key-atlas_header_nav_Atlas button:focus,
-        .st-key-atlas_header_nav_Atlas button:focus-visible,
-        .st-key-atlas_header_nav_Projects button:focus,
-        .st-key-atlas_header_nav_Knowledge button:focus,
-        .st-key-atlas_header_nav_Reports button:focus,
-        .st-key-atlas_header_nav_Projects button:focus-visible,
-        .st-key-atlas_header_nav_Knowledge button:focus-visible,
-        .st-key-atlas_header_nav_Reports button:focus-visible {
-            outline: none !important;
-            box-shadow: none !important;
-        }
-        .stButton > button {
-            white-space: nowrap;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(atlas_stylesheet(), unsafe_allow_html=True)
 
 
 def _status_chip(value: str) -> str:
@@ -757,13 +498,7 @@ def _render_page_header(st: Any, title: str, subtitle: str) -> None:
 
 
 def _render_empty_state(st: Any, message: str) -> None:
-    st.markdown(
-        "<div class='atlas-empty-state'>"
-        "<div class='atlas-empty-title'>Nothing to show yet</div>"
-        f"<p class='atlas-empty-copy'>{message}</p>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown(render_empty_state_html(message), unsafe_allow_html=True)
 
 
 def _render_guided_empty_state(
@@ -774,12 +509,11 @@ def _render_guided_empty_state(
     next_location: str,
 ) -> None:
     st.markdown(
-        "<div class='atlas-empty-state'>"
-        "<div class='atlas-empty-title'>No data available</div>"
-        f"<p class='atlas-empty-copy'>{why_empty}</p>"
-        f"<p class='atlas-empty-copy'><strong>Next action:</strong> {action_to_populate}</p>"
-        f"<p class='atlas-empty-copy'><strong>Go to:</strong> {next_location}</p>"
-        "</div>",
+        render_guided_empty_state_html(
+            why_empty=why_empty,
+            action_to_populate=action_to_populate,
+            next_location=next_location,
+        ),
         unsafe_allow_html=True,
     )
 
@@ -792,11 +526,36 @@ def _render_workspace_section_header(
     current_focus: str,
 ) -> None:
     st.markdown(
-        "<div class='atlas-workspace-context'>"
-        f"<strong>{workspace}</strong> · Objective: {objective} · Focus: {current_focus}"
-        "</div>",
+        render_workspace_context_html(
+            workspace=workspace,
+            objective=objective,
+            current_focus=current_focus,
+        ),
         unsafe_allow_html=True,
     )
+
+
+def _render_section_title(st: Any, title: str) -> None:
+    st.markdown(f"### {title}")
+
+
+def _render_notice_panel(st: Any, title: str, body: str) -> None:
+    st.markdown(render_notice_panel_html(title, body), unsafe_allow_html=True)
+
+
+def _render_status_badge(st: Any, label: str, tone: str = "neutral") -> None:
+    st.markdown(render_status_badge_html(label, tone), unsafe_allow_html=True)
+
+
+def _render_data_table(st: Any, rows: list[dict[str, Any]]) -> None:
+    st.dataframe(rows, width="stretch", hide_index=True)
+
+
+def _responsive_control_columns(
+    st: Any,
+    spec: list[float] | int,
+) -> list[Any]:
+    return st.columns(spec)
 
 
 def _normalize_recommendation_text(value: Any) -> str:
@@ -5139,13 +4898,7 @@ def _persist_repository_artifacts(
 
 
 def _metric_card(st: Any, title: str, value: str) -> None:
-    st.markdown(
-        "<div class='atlas-card'>"
-        f"<div class='atlas-card-title'>{title}</div>"
-        f"<div class='atlas-card-value'>{value}</div>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown(render_metric_card_html(title, value), unsafe_allow_html=True)
 
 
 def _priority_rank(value: str) -> int:
@@ -5413,12 +5166,18 @@ def _render_home_page(
     mission_control_payload: dict[str, Any] | None = None,
 ) -> None:
     _ = (record, context)
-    st.subheader("Home")
-    st.caption(
-        "Start project work quickly and keep high-priority engineering actions visible."
+    _render_page_header(
+        st,
+        "Home",
+        "Start project work quickly and keep high-priority engineering actions visible.",
+    )
+    _render_notice_panel(
+        st,
+        "Workspace Focus",
+        "Use Action Center for high-priority blockers and Recent Projects to resume active bids.",
     )
 
-    action_cols = st.columns([1.0, 1.0, 1.0])
+    action_cols = _responsive_control_columns(st, [1.0, 1.0, 1.0])
     if action_cols[0].button(
         "Create New Project",
         type="primary",
@@ -5453,6 +5212,11 @@ def _render_application_knowledge_page(
         workspace="Knowledge",
         objective="Maintain reusable commercial and master-library records.",
         current_focus="Normalize manufacturer/vendor/product coverage and close missing pricing gaps.",
+    )
+    _render_notice_panel(
+        st,
+        "Design-System Surface",
+        "Knowledge summary, health tables, and controls now use shared section/table primitives.",
     )
 
     project_rows = _project_library_rows(
@@ -5579,7 +5343,8 @@ def _render_application_knowledge_page(
     )
 
     with tabs[0]:
-        st.dataframe(
+        _render_data_table(
+            st,
             [
                 {
                     "Knowledge Area": "Manufacturers",
@@ -5626,13 +5391,12 @@ def _render_application_knowledge_page(
                     "Next Action": "Import project packages or document sets to create import events.",
                 },
             ],
-            width="stretch",
-            hide_index=True,
         )
 
     with tabs[1]:
         freshness = commercial_dashboard.get("knowledge_freshness", {})
-        st.dataframe(
+        _render_data_table(
+            st,
             [
                 {
                     "Manufacturers": commercial_dashboard.get("manufacturers", 0),
@@ -5674,12 +5438,10 @@ def _render_application_knowledge_page(
                     ),
                 }
             ],
-            width="stretch",
-            hide_index=True,
         )
 
     with tabs[2]:
-        st.markdown("### Manufacturers")
+        _render_section_title(st, "Manufacturers")
         with st.expander("Add Manufacturer", expanded=False):
             m_cols = st.columns(2)
             m_id = m_cols[0].text_input("Manufacturer ID", key="atlas_ck_mfr_id")
@@ -5744,7 +5506,7 @@ def _render_application_knowledge_page(
             )
 
     with tabs[3]:
-        st.markdown("### Vendors")
+        _render_section_title(st, "Vendors")
         with st.expander("Add Vendor", expanded=False):
             v_cols = st.columns(2)
             v_id = v_cols[0].text_input("Vendor ID", key="atlas_ck_vendor_id")
@@ -5810,7 +5572,7 @@ def _render_application_knowledge_page(
             )
 
     with tabs[4]:
-        st.markdown("### Customers")
+        _render_section_title(st, "Customers")
         if not customers:
             _render_guided_empty_state(
                 st,
@@ -5836,7 +5598,7 @@ def _render_application_knowledge_page(
             )
 
     with tabs[5]:
-        st.markdown("### Products (Master Library)")
+        _render_section_title(st, "Products (Master Library)")
         with st.expander("Manual Single-SKU Workflow", expanded=False):
             st.caption(
                 "Add one isolated SKU without requiring full catalog or price-sheet import."
@@ -6563,6 +6325,11 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         "Projects",
         "Primary project library for opening, creating, importing, and managing repository projects.",
     )
+    _render_notice_panel(
+        st,
+        "Project Library",
+        "Filters and table layout use shared control and table wrappers to reduce visual drift.",
+    )
 
     include_archived = st.checkbox("Show archived projects", value=False)
     rows = _project_library_rows(
@@ -6579,7 +6346,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         )
         return
 
-    action_cols = st.columns([1.2, 1.2, 1.2, 2.4])
+    action_cols = _responsive_control_columns(st, [1.2, 1.2, 1.2, 2.4])
     if action_cols[0].button("Create New Project", type="primary", width="stretch"):
         st.session_state["atlas_active_page"] = "Create New Project"
         st.rerun()
@@ -6601,7 +6368,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         st.session_state["atlas_active_page"] = "Open Existing Project"
         st.rerun()
 
-    filter_cols = st.columns(5)
+    filter_cols = _responsive_control_columns(st, 5)
     search = filter_cols[0].text_input("Search", value="")
     lifecycle_filter = filter_cols[1].selectbox(
         "Lifecycle",
@@ -6671,7 +6438,8 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
     ]
     filtered.sort(key=lambda item: _safe_text(item.get(sort_field), ""), reverse=True)
 
-    st.dataframe(
+    _render_data_table(
+        st,
         [
             {
                 "Project": item["project_name"],
@@ -6691,8 +6459,6 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
             }
             for item in filtered
         ],
-        width="stretch",
-        hide_index=True,
     )
 
     labels = [f"{item['project_name']} · {item['atlas_bid_id']}" for item in filtered]
@@ -10721,10 +10487,16 @@ def _render_workflow_reports_page(
         "Reports",
         "Project report center for guided review completion and deterministic exports.",
     )
+    _render_notice_panel(
+        st,
+        "Reports Workspace",
+        "Summary and checklist tables are rendered through shared primitives for consistency.",
+    )
 
-    st.markdown("### Guided Review Progress")
+    _render_section_title(st, "Guided Review Progress")
     st.progress(completed_steps / max(len(step_rows), 1))
-    st.dataframe(
+    _render_data_table(
+        st,
         [
             {
                 "Step": row.get("step"),
@@ -10734,11 +10506,14 @@ def _render_workflow_reports_page(
             }
             for row in step_rows
         ],
-        width="stretch",
-        hide_index=True,
     )
 
-    st.markdown("### Recommended Next Action")
+    _render_section_title(st, "Recommended Next Action")
+    _render_status_badge(
+        st,
+        _safe_text(next_action.get("step"), "Next Review Step"),
+        tone="success",
+    )
     st.markdown(
         "<div class='atlas-primary-action'>"
         "<strong>Next Review Step</strong>"
@@ -10761,8 +10536,9 @@ def _render_workflow_reports_page(
         st.rerun()
     action_cols[1].caption(_safe_text(next_action.get("why"), ""))
 
-    st.markdown("### Project Review Checklist")
-    st.dataframe(
+    _render_section_title(st, "Project Review Checklist")
+    _render_data_table(
+        st,
         [
             {
                 "Checklist": row.get("Checklist Item"),
@@ -10771,8 +10547,6 @@ def _render_workflow_reports_page(
             }
             for row in checklist_rows
         ],
-        width="stretch",
-        hide_index=True,
     )
 
     report_views = [
@@ -21611,7 +21385,7 @@ def _render_mission_control_panels(
         seen.add(key)
         high_priority_actions.append(item)
 
-    st.markdown("### Action Center")
+    _render_section_title(st, "Action Center")
     if high_priority_actions:
         st.dataframe(
             [
@@ -21632,7 +21406,7 @@ def _render_mission_control_panels(
     else:
         st.caption("No high-priority actions detected.")
 
-    st.markdown("### Recent Projects")
+    _render_section_title(st, "Recent Projects")
     recent_projects = workspace_service.list_recent_workspaces(limit=5)
     if recent_projects:
         for record in recent_projects:

@@ -19,6 +19,48 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Epic X Sprint X-09 Design System Foundation and Reusable UI Components) (Closed)
+
+### Improved
+
+- Atlas shell styling now comes from a centralized design-system stylesheet source instead of a large inline CSS block in the app shell.
+- Shared design tokens now provide consistent color, spacing, radius, control sizing, and bounded-layout authority.
+- Shared UI primitives now back common rendering patterns (metric cards, empty/guided-empty states, workspace context banners, notice panels, status badges).
+- Representative pages (Home, Projects, Knowledge, Reports) now use shared wrappers for section headings, responsive control groups, and table rendering to reduce visual inconsistency.
+
+### Scope Notes
+
+- UI architecture and visual hardening only
+- no business-logic or persistence changes
+- no Epic E start
+
+### Closeout Validation
+
+- Manual validation confirmed Home, Projects, Knowledge, Reports, Project Workspace shell, focused global search, clear-search behavior, direct search-result navigation, and Settings menu routing.
+- Responsive checks at common desktop and split-screen widths showed no horizontal overflow regressions on migrated pages.
+
+### Remaining Migration Debt
+
+- Additional project-workspace pages still rely on legacy inline layout and table wrappers and remain candidates for future design-system primitive migration.
+
+## Unreleased (Documentation Refresh for Atlas Product Direction Update)
+
+### Improved
+
+- Repository documentation now describes Atlas as a commercial SaaS platform for AV and lighting systems integrators.
+- Product vision now frames Atlas as an Intelligent Lifecycle Solutions Management Platform with a broader lifecycle roadmap.
+- Product vision now documents a future Atlas AI assistant, data boundary, and governance posture.
+- Product vision now includes a dedicated foundational-knowledge policy for future AI features.
+- Architecture documentation now states the operational-system-of-record vs financial-system-of-record boundary.
+- Roadmap documentation now balances future lifecycle areas beyond bid intelligence.
+- Onboarding and design guidance now reflect the multi-tenant, AWS, and Stripe direction without changing product behavior.
+
+### Scope Notes
+
+- documentation-only update
+- no production code changes
+- no change to current Phase 2 implementation priorities
+
 ## Unreleased (Sprint D-01 Core Cost Selection Engine)
 
 ## Unreleased (Epic A Sprint A-04 Engineering Workstation UX Consolidation)

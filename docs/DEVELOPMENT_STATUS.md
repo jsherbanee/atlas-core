@@ -1,8 +1,8 @@
-# Atlas Core Development Status
+# Atlas Development Status
 
 This document answers: Where is Atlas today?
 
-It represents the current implementation state of Atlas Core.
+It represents the current implementation state of Atlas.
 
 ## Related Documentation
 - [README.md](README.md)
@@ -15,7 +15,13 @@ It represents the current implementation state of Atlas Core.
 - [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)
 
 ## Current State
-Atlas Core is in active Phase 2 Bid Intelligence development with a stabilization baseline candidate prepared and a project-specific Atlas workspace shell implemented.
+Atlas is in active Phase 2 Bid Intelligence development within the broader Atlas SaaS platform direction.
+
+Atlas is being shaped as a multi-tenant Intelligent Lifecycle Solutions Management Platform for AV and lighting systems integrators, with QuickBooks Online as the Financial System of Record and AWS as the long-term hosting direction.
+
+The AI assistant and broader lifecycle-platform capabilities are documented as future strategic direction rather than current implementation.
+
+The current stabilization baseline candidate includes a project-specific Atlas workspace shell and the supporting bid-intelligence workspace surfaces.
 Sprint 3 UX delivery added guided project review progression, explicit review status modeling, checklist visibility, and a concise project summary report center with deterministic exports.
 Sprint 4 UI refinement adds repository-backed Open Existing Project, a stronger Projects library workflow, application-wide Knowledge scope, compact active-project identity, concise breadcrumbs, and a two-column Project Workspace layout (no persistent third context column).
 Sprint 5 introduces an Equipment Object Workspace that treats equipment as first-class engineering objects with deterministic detail, relationship navigation, evidence, and recommended actions.
@@ -39,15 +45,23 @@ Sprint X-04 completes Home/header/search simplification with Home terminology st
 Sprint X-05 continues shell hardening with header-based primary navigation, public Settings terminology for Administration, and deterministic Recent Projects on Home.
 Sprint X-06 continues shell hardening with Atlas-only Home action, compact Search/menu controls, removal of the History dropdown, and centered responsive shell width.
 Sprint X-07 continues shell hardening with fixed-width navigation, compact Home actions, meaningful search-query gating, and focused search results that replace the page body while active.
-Sprint X-08 continues product hardening with visual-system consistency (#FAFAF9 workspace background, #004225 primary accent, neutralized surfaces) and a runtime-safe clear-search state model that separates widget input from submitted query state.
+Sprint X-08 completed product hardening with visual-system consistency (#FAFAF9 workspace background, #004225 primary accent, neutralized surfaces) and a runtime-safe clear-search state model that separates widget input from submitted query state.
 
-X-06/X-07/X-08 closeout status: completed.
+X-01 through X-08 are closed.
+
+Epic X remains open for future product-hardening work, and no new Epic X sprint is currently active.
+
+X-09 Design System Foundation is complete and formally closed.
+
+X-09 scope remains behavior-preserving and does not start Epic E.
+
+X-06/X-07/X-08/X-09 closeout status: completed.
 
 ## Quality Status (Latest Full Run)
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1169 tests)
+- pytest: full suite passing (1177 tests)
 
 ## Tooling Status
 - GitHub Actions configured
@@ -56,10 +70,12 @@ X-06/X-07/X-08 closeout status: completed.
   - .pre-commit-config.yaml
 
 ## Active Focus
-Sprint X-08 search clear-state runtime fix and visual-system closeout hardening.
+Phase 2 bid intelligence remains the active implementation target.
+
+Broader product direction remains aligned to the lifecycle-platform roadmap, while current implementation priority stays on Phase 2 bid intelligence and low-risk hardening.
 
 Secondary active focus:
-- low-risk UI helper refinement and consistency hardening in existing workspaces.
+- closeout regression monitoring and remaining page-migration debt triage for legacy project-workspace surfaces.
 - explicit identifier discoverability across project creation, listing, open flows, global search, and project settings.
 
 Current implementation scope note:
@@ -71,6 +87,7 @@ Current implementation scope note:
 - no Epic E implementation has started in X-06
 - no Epic E implementation has started in X-07
 - no Epic E implementation has started in X-08
+- no Epic E implementation has started in X-09
 - X-03 remains workflow hardening only and does not introduce new estimating/commercial/procurement/execution capabilities
 
 
