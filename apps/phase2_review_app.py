@@ -11092,7 +11092,7 @@ def _render_overview_page(
         ],
     )
 
-    primary_actions = _responsive_control_columns(st, 4)
+    primary_actions = _responsive_control_columns(st, 5)
     if primary_actions[0].button("Open Documents", width="stretch"):
         st.session_state["atlas_active_page"] = "Documents"
         st.rerun()
@@ -11104,6 +11104,9 @@ def _render_overview_page(
         st.rerun()
     if primary_actions[3].button("Open Engineering Review", width="stretch"):
         st.session_state["atlas_active_page"] = "Engineering Review"
+        st.rerun()
+    if primary_actions[4].button("Open Notebook", width="stretch"):
+        st.session_state["atlas_active_page"] = "Notebook"
         st.rerun()
 
     _render_section_title(st, "Object Navigation")
@@ -16358,10 +16361,10 @@ def _render_engineering_notebook_page(
                 _render_section_title(st, "Linked Objects")
                 related_objects = list(selected_entry.get("related_objects") or [])
                 if related_objects:
-                    for ref in related_objects[:20]:
+                    for index, ref in enumerate(related_objects[:20]):
                         if st.button(
                             f"Open {_safe_text(ref, 'object')}",
-                            key=f"atlas_note_open_{_safe_text(selected_entry.get('entry_id'), 'entry')}_{_safe_text(ref, 'ref')}",
+                            key=f"atlas_note_open_{index}_{_safe_text(ref, 'ref')}",
                             width="stretch",
                         ):
                             _open_linked_object(st, ref)

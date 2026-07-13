@@ -49,7 +49,9 @@ Sprint X-08 completed product hardening with visual-system consistency (#FAFAF9 
 
 X-01 through X-08 are closed.
 
-Epic X remains open for future product-hardening work, and no new Epic X sprint is currently active.
+Epic X is complete and formally closed after X-10 closeout validation.
+
+No new Epic X sprint is active.
 
 X-09 Design System Foundation is complete and formally closed.
 X-10 Workspace Consistency and Information Density is complete and formally closed.
@@ -72,13 +74,14 @@ X-06/X-07/X-08/X-09/X-10 closeout status: completed.
   - .pre-commit-config.yaml
 
 ## Active Focus
-Phase 2 bid intelligence remains the active implementation target.
+Phase 2 roadmap reassessment is the active implementation focus.
 
-Broader product direction remains aligned to the lifecycle-platform roadmap, while current implementation priority stays on Phase 2 bid intelligence and low-risk hardening.
+Broader product direction remains aligned to the lifecycle-platform roadmap, while current implementation priority is reassessing post-Epic-X sequencing within Phase 2 boundaries.
 
 Secondary active focus:
 - closeout regression monitoring and remaining page-migration debt triage for lower-priority advanced and object-detail surfaces.
 - explicit identifier discoverability across project creation, listing, open flows, global search, and project settings.
+- Epic E readiness assessment only (architecture review and sprint approval required; Epic E not started).
 
 Current implementation scope note:
 - no Epic E implementation has started in this refinement pass

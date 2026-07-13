@@ -1,117 +1,54 @@
-# Atlas Core Roadmap
+# Atlas Roadmap
 
-Detailed implementation planning by epic and sprint stream is maintained in [EPICS.md](EPICS.md).
+This document is the executive milestone overview for Atlas.
 
-This roadmap is the executive milestone view.
+For product-horizon detail, see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md).
+For engineering execution detail, see [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md).
+For implementation planning and epic IDs, see [EPICS.md](EPICS.md).
+For lifecycle sequencing, see [AV_LIFECYCLE.md](AV_LIFECYCLE.md).
 
-Domain object continuity and lifecycle boundaries referenced in this roadmap are defined in [DOMAIN_MODEL.md](DOMAIN_MODEL.md).
+## Executive Milestones
 
-## Product Milestones
+Atlas milestones describe customer-visible capability horizons rather than sprint-level implementation detail.
 
-Sprints describe implementation work.
+### Preview Line
+- Preview 0.5: Engineering Intelligence Workspace
+- Preview 0.6: Engineering Understanding, Master Library, Manufacturer Registry, Product Intelligence, Equipment Resolution, System Templates
+- Preview 0.7: Drawing and specification maturation, commercial knowledge foundation, deterministic pricing and cost foundations
 
-Milestones describe customer-visible product capability.
+### Stabilization Line
+- Beta 1.0: internal production readiness, benchmark validation, performance tuning, documentation completion
+- RC1: release-candidate stabilization
 
-### Preview 0.5 (Current)
-- Engineering Intelligence Workspace
+### Platform Line
+- Atlas 1.0: Intelligent Lifecycle Solutions Management Platform for AV and lighting systems integrators
+- Atlas 2.0: Complete Operational Lifecycle Platform
 
-### Preview 0.6
-- Engineering Understanding
-- Master Library
-- Manufacturer Registry
-- Product Intelligence
-- Equipment Resolution
-- System Templates
+## Roadmap Layering
 
-### Preview 0.7
-- Atlas Vision Foundations
-- Drawing Intelligence maturation
-- Specification Intelligence maturation
-- Cross-sheet intelligence
-- Symbol libraries
-- Title block intelligence
-- Future OCR integration points
-- Commercial Knowledge Foundation with immutable price versioning
-- Deterministic Pricing Engine with immutable record selection and explainable pricing traces
-- Deterministic Cost Engine with acquisition-cost traceability and vendor hierarchy
+- [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) describes business-facing capability horizons.
+- [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md) describes technical sequencing, gates, and dependencies.
+- [EPICS.md](EPICS.md) describes implementation planning and sprint streams.
+- [AV_LIFECYCLE.md](AV_LIFECYCLE.md) defines the lifecycle model that informs both product and engineering roadmaps.
 
-### Beta 1.0
-- Internal production-ready
-- Real benchmark project validation
-- Performance tuning
-- Documentation complete
+## Current Status
 
-### RC1
-- Release Candidate
-- Final stabilization
+Phase 2 Bid Intelligence remains the active implementation target.
 
-### Atlas 1.0
-- Commercial AV Bid Intelligence Platform
+Epic X is complete and formally closed.
 
-### Atlas 2.0
-- Complete Project Lifecycle Platform
+X-01 through X-10 are closed.
 
-## Phase 1: Foundation (Completed)
-Completed outcomes:
-- Core domain model scaffolding
-- Service orchestration baseline
-- Initial export and workflow patterns
-- Test-first quality gate and CI baseline
+No Epic X sprint is active.
 
-## Phase 2: Bid Intelligence (Active)
-Current objective:
-Sprint X-04 Home/search closeout is complete and under stabilization validation.
-Sprint X-05 navigation consolidation is complete with top-header primary navigation, public Settings terminology, and deterministic Recent Projects.
-Sprint X-06 responsive shell simplification is complete with Atlas-only Home control, icon-only menu access, label-free Search, and a centered max-width shell.
-Sprint X-07 focused search refinement is complete with meaningful-query gating and focused result rendering.
-Sprint X-08 initial visual-system closeout is complete with safe Clear Search runtime behavior.
+Current focus is Phase 2 roadmap reassessment.
 
-Current UX hardening stream:
+Epic E is the next candidate epic pending architecture review and sprint approval.
 
-- Epic X Product Hardening continuation (A-05 and X-01/X-02/X-03/X-04/X-05/X-06/X-07/X-08 complete)
-- focused on estimator/project-engineer/design-engineer workflow usability hardening for existing capabilities
-- preserves D-03 scope boundaries and does not start Epic E or Commercial Intelligence implementation
-- includes onboarding/stakeholder hardening in existing project-management workflows and preserves prior X-02 identity model refinements
-- includes Home/header/search simplification with deterministic grouped global search and Home terminology normalization
+Epic E has not started.
 
-Implemented in current baseline candidate:
-- Bid package review orchestration
-- Drawing/spec indexing
-- System and equipment detection
-- Cross-reference/scoping diagnostics
-- Scope reconciliation
-- Engineering rule engine assumptions
-- RFI candidate generation
-- Labor estimation engine
-- Bid completeness scoring
-- Plan review readiness scoring
-- Estimator brief enhancements
-- Revision comparison engine
-- Commercial knowledge model (vendor offerings, price sheets, immutable versions, and price records)
-- Deterministic price version comparison and product change reporting
-- Commercial freshness and lifecycle tracking for price recency and missing-from-latest detection
+## Historical Context
 
-- Deterministic pricing engine for estimate lines with candidate/rule traces, manual override audit, and pricing snapshot reproducibility
-- Advisory pricing impact detection without silent repricing
-- Deterministic pricing exports for summary, priced BOM, coverage, and exceptions
-- Deterministic cost engine for acquisition cost selection, cost traceability, commercial coverage, and project-only quick-add product support
+Historical release and preview detail remains preserved in [RELEASE_NOTES.md](RELEASE_NOTES.md), [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md), and [PREVIEW_0_5_CHECKLIST.md](PREVIEW_0_5_CHECKLIST.md).
 
-Remaining Phase 2 refinements:
-- D-03/A-05/X-01/X-02 closeout verified: full quality-gate validation and architecture review complete
-- Epic E and post-D feature-epic implementation has not started in this pass
-- remaining UX debt: table-density/pagination consistency, progressive disclosure, and smaller-screen ergonomics
-- PDF ingestion and indexing robustness
-- Drawing/spec intelligence quality refinements
-- Device schedule extraction quality refinements
-- Additional deterministic regression snapshots and export validations
-- Additional pricing policy calibration and broader multi-vendor benchmark coverage
-- Additional cost confidence calibration and larger quick-add promotion regression coverage
-
-## Phase 3: Project Initialization (Deferred)
-Deferred until Phase 2 completion.
-
-## Phase 4: Procurement (Deferred)
-Deferred until Phase 2 completion.
-
-## Phase 5: Construction/Closeout (Deferred)
-Deferred until Phase 2 completion.
+Do not use this executive roadmap as the source of truth for sprint-level scope or current implementation status.

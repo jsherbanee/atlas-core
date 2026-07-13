@@ -19,6 +19,32 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Epic X Closeout Validation and Closure) (Closed)
+
+### Improved
+
+- Engineering Notebook now has a validated normal-flow entry from Overview Guided Project Review actions (Open Notebook).
+- Linked-object navigation from Notebook entries now reliably executes for generated entries by using stable linked-object action keys.
+- Epic X closeout validation confirmed no blocking shell, navigation, search, responsive, or design-system defects across validated X-01 through X-10 surfaces.
+
+### Scope Notes
+
+- validation and closure hardening only
+- no new domain capabilities
+- no persistence/business-logic expansion
+- no Epic E start
+
+### Closeout Validation
+
+- Manual validation covered Notebook entry path, list/empty-state behavior, filtering, linked-object navigation, decision-log tab, return navigation, context preservation, and medium-width layout behavior.
+- X-09 and X-10 migrated surfaces remained intact during closeout checks.
+- Full quality gates passed (`black`, `ruff`, `mypy`, `pytest`) with full-suite regression count unchanged at 1177 tests.
+
+### Remaining Non-Blocking UX Debt
+
+- lower-priority advanced/object-detail surfaces still rely on older inline wrappers and should continue migration to shared primitives.
+- broader notebook discoverability beyond guided Overview actions can be improved further in a future hardening sprint.
+
 ## Unreleased (Epic X Sprint X-10 Workspace Consistency and Information Density) (Closed)
 
 ### Improved

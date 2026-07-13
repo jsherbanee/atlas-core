@@ -139,7 +139,7 @@ Status: Implemented and Closed for current roadmap baseline
 
 ## Epic X: Product Hardening
 
-Status: Active (X-01 through X-10 closed; no active Epic X sprint)
+Status: Completed and Closed (X-01 through X-10 closed; no active Epic X sprint)
 
 - X-01 Pilot Readiness and Application Walkthrough (Implemented, Closed)
 - X-02 Project Creation and Bid Identity Refinement (Implemented, Closed)
@@ -153,6 +153,16 @@ Status: Active (X-01 through X-10 closed; no active Epic X sprint)
 - X-10 Workspace Consistency and Information Density (Implemented, Closed)
 
 No Epic X sprint is currently active.
+
+Epic X closeout notes:
+
+- final validation pass completed across shell, navigation, search, responsive, and design-system migration surfaces
+- Engineering Notebook discoverability is restored through existing guided workflow actions
+- remaining UX debt is non-blocking and documented in status/release/design docs
+
+Post-closeout planning note:
+
+- Epic E remains Not Started and is the next candidate epic pending architecture review and explicit sprint approval
 
 ### X-04 Scope (Completed)
 

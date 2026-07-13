@@ -117,6 +117,30 @@ Remaining UX debt after X-10:
 - lower-priority advanced/object-detail pages still need full shared-wrapper migration
 - notebook entry-point discoverability should be further improved from primary workflow pages
 
+## Epic X Closeout Validation
+
+Validation-only closeout pass completed for Epic X.
+
+Engineering Notebook entry path:
+
+- normal project workflow now includes Open Notebook from Overview Guided Project Review actions
+- return path validated by navigating back to Overview and reopening Notebook while preserving project context
+
+Notebook validation results:
+
+- Notebook open from normal project flow: pass
+- Notebook list and empty states: pass
+- entry filtering (search/date): pass
+- linked-object navigation: pass
+- decision-log view (Engineering Decisions tab): pass
+- return navigation: pass
+- project context preservation: pass
+- medium-width behavior: pass (no regressions observed during validation)
+
+Closeout note:
+
+- linked-object navigation reliability for generated entries was corrected by stabilizing linked-object action keys; no Notebook feature expansion was introduced
+
 ## Repository-Backed Open Existing Project
 Open Existing Project now defaults to repository-backed project selection.
 
