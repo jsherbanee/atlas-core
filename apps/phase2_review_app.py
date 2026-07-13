@@ -321,6 +321,83 @@ PROJECT_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
     ),
 ]
 
+KNOWLEDGE_SECONDARY_GROUPS: list[tuple[str, list[str]]] = [
+    (
+        "Reusable Entities",
+        [
+            "Manufacturers",
+            "Vendors",
+            "Customers",
+            "Services",
+            "Contacts",
+            "Locations",
+            "Projects",
+        ],
+    ),
+    (
+        "Commercial Library",
+        [
+            "Products",
+            "Price Lists",
+            "Imports",
+            "Import History",
+            "Assemblies",
+        ],
+    ),
+    (
+        "Knowledge Overview",
+        ["Summary", "Commercial Health"],
+    ),
+]
+
+KNOWLEDGE_SECONDARY_BY_PAGE: dict[str, str] = {
+    "Summary": "Knowledge Overview",
+    "Commercial Health": "Knowledge Overview",
+    "Manufacturers": "Reusable Entities",
+    "Vendors": "Reusable Entities",
+    "Customers": "Reusable Entities",
+    "Services": "Reusable Entities",
+    "Contacts": "Reusable Entities",
+    "Locations": "Reusable Entities",
+    "Projects": "Reusable Entities",
+    "Products": "Commercial Library",
+    "Price Lists": "Commercial Library",
+    "Imports": "Commercial Library",
+    "Import History": "Commercial Library",
+    "Assemblies": "Commercial Library",
+}
+
+KNOWLEDGE_TERTIARY_BY_KIND: dict[str, str] = {
+    "manufacturer": "Manufacturers",
+    "vendor": "Vendors",
+    "customer": "Customers",
+    "service": "Services",
+    "contact": "Contacts",
+    "location": "Locations",
+    "project": "Projects",
+    "master_product": "Products",
+    "price_list": "Price Lists",
+    "assembly": "Assemblies",
+}
+
+KNOWLEDGE_TERTIARY_BY_PAGE: dict[str, str] = {
+    "Knowledge": "Summary",
+    "Summary": "Summary",
+    "Commercial Health": "Commercial Health",
+    "Manufacturers": "Manufacturers",
+    "Vendors": "Vendors",
+    "Customers": "Customers",
+    "Services": "Services",
+    "Contacts": "Contacts",
+    "Locations": "Locations",
+    "Projects": "Projects",
+    "Products": "Products",
+    "Price Lists": "Price Lists",
+    "Imports": "Imports",
+    "Import History": "Import History",
+    "Assemblies": "Assemblies",
+}
+
 SUPPORTED_UPLOAD_TYPES = [
     "pdf",
     "docx",
@@ -3909,6 +3986,103 @@ def _top_navigation_groups(
     return [APPLICATION_NAV_GROUPS[0], *PROJECT_NAV_GROUPS]
 
 
+def _knowledge_secondary_state_key() -> str:
+    return "atlas_knowledge_secondary_group"
+
+
+def _knowledge_tertiary_state_key() -> str:
+    return "atlas_knowledge_tertiary_page"
+
+
+def _knowledge_navigation_defaults(st: Any) -> None:
+    st.session_state.setdefault(_knowledge_secondary_state_key(), "Knowledge Overview")
+    st.session_state.setdefault(_knowledge_tertiary_state_key(), "Summary")
+
+
+def _knowledge_secondary_group_for_page(page: str) -> str:
+    return KNOWLEDGE_SECONDARY_BY_PAGE.get(page, "Knowledge Overview")
+
+
+def _knowledge_tertiary_page_for_kind(kind: str) -> str:
+    return KNOWLEDGE_TERTIARY_BY_KIND.get(kind, "Summary")
+
+
+def _knowledge_tertiary_page_for_route(page: str) -> str:
+    return KNOWLEDGE_TERTIARY_BY_PAGE.get(page, "Summary")
+
+
+def _set_knowledge_navigation_selection(
+    st: Any,
+    *,
+    page: str | None = None,
+    kind: str | None = None,
+) -> None:
+    if page is not None:
+        st.session_state[_knowledge_secondary_state_key()] = (
+            _knowledge_secondary_group_for_page(page)
+        )
+        st.session_state[_knowledge_tertiary_state_key()] = (
+            _knowledge_tertiary_page_for_route(page)
+        )
+    if kind is not None:
+        st.session_state[_knowledge_tertiary_state_key()] = (
+            _knowledge_tertiary_page_for_kind(kind)
+        )
+        st.session_state[_knowledge_secondary_state_key()] = (
+            _knowledge_secondary_group_for_page(_knowledge_tertiary_page_for_kind(kind))
+        )
+
+
+def _render_knowledge_navigation_frame(st: Any) -> None:
+    _knowledge_navigation_defaults(st)
+    active_secondary = _safe_text(
+        st.session_state.get(_knowledge_secondary_state_key()),
+        "Knowledge Overview",
+    )
+    active_tertiary = _safe_text(
+        st.session_state.get(_knowledge_tertiary_state_key()),
+        "Summary",
+    )
+
+    st.markdown("### Knowledge Navigation")
+    st.caption(f"Secondary: {active_secondary} · Tertiary: {active_tertiary}")
+    secondary_cols = st.columns([1.1, 1.1, 1.1])
+    for column, (group_name, pages) in zip(secondary_cols, KNOWLEDGE_SECONDARY_GROUPS):
+        is_active = group_name == active_secondary or active_tertiary in pages
+        if column.button(
+            group_name,
+            key=f"atlas_knowledge_secondary_{group_name}",
+            type="primary" if is_active else "secondary",
+            width="stretch",
+        ):
+            st.session_state[_knowledge_secondary_state_key()] = group_name
+            if pages:
+                st.session_state[_knowledge_tertiary_state_key()] = pages[0]
+            st.rerun()
+
+    selected_pages = next(
+        (
+            pages
+            for group_name, pages in KNOWLEDGE_SECONDARY_GROUPS
+            if group_name == active_secondary
+        ),
+        list(KNOWLEDGE_TERTIARY_BY_PAGE.values()),
+    )
+    tertiary_columns = st.columns(max(1, len(selected_pages)))
+    for column, page in zip(tertiary_columns, selected_pages):
+        if column.button(
+            page,
+            key=f"atlas_knowledge_tertiary_{page}",
+            type="primary" if page == active_tertiary else "secondary",
+            width="stretch",
+        ):
+            st.session_state[_knowledge_tertiary_state_key()] = page
+            st.session_state[_knowledge_secondary_state_key()] = (
+                _knowledge_secondary_group_for_page(page)
+            )
+            st.rerun()
+
+
 def _render_navigation_menu(
     st: Any,
     host: Any,
@@ -4709,6 +4883,9 @@ def _set_context_selection(st: Any, kind: str, data: dict[str, Any]) -> None:
         return
 
     route = _selection_route(kind)
+    if route == "Knowledge":
+        _knowledge_navigation_defaults(st)
+        _set_knowledge_navigation_selection(st, kind=kind)
     project_id = _safe_text(st.session_state.get("atlas_active_workspace_id"), "")
     warnings = list(data.get("warnings") or [])
     reference = _build_object_reference(
@@ -4835,6 +5012,13 @@ def _open_search_reference(
     st.session_state["atlas_active_page"] = _safe_text(
         reference.get("route"), "Overview"
     )
+    if _safe_text(reference.get("route"), "") == "Knowledge":
+        _knowledge_navigation_defaults(st)
+        _set_knowledge_navigation_selection(
+            st,
+            kind=selection_kind,
+            page=_safe_text(reference.get("route"), "Knowledge"),
+        )
     _set_context_selection(st, selection_kind, selection_data)
     _record_recent_search_open(st, reference)
     st.rerun()
@@ -5548,6 +5732,8 @@ def _render_application_knowledge_page(
         "Avg Confidence",
         str(product_dashboard.get("average_confidence", 0.0)),
     )
+
+    _render_knowledge_navigation_frame(st)
 
     tabs = st.tabs(
         [

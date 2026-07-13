@@ -57,6 +57,9 @@ Search should be aware of object families such as:
 K-02 search note:
 - Application-scope search now includes framework-managed customer and service knowledge entities, and preserves deterministic object routing into Knowledge workflows.
 
+X-12 search note:
+- Knowledge search handoff now restores reusable secondary and tertiary Knowledge navigation state so opening a result lands in the right workspace branch with deterministic breadcrumb context.
+
 ## Permissions And Tenant Scope
 Search results must respect:
 - tenant boundaries

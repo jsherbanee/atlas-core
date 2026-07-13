@@ -1,3 +1,6 @@
+Atlas Workspace UI Sprint X-12 introduces a reusable secondary and tertiary navigation framework, with Knowledge as the first workspace to carry explicit secondary-group and tertiary-page session state for deterministic search handoff and future reuse.
+
+Atlas Workspace UI Sprint X-09 establishes a reusable design-system foundation (shared tokens, centralized stylesheet authority, and reusable UI primitives) and migrates Home, Projects, Knowledge, and Reports to those primitives without changing workflow behavior.
 # Atlas
 
 ## Purpose

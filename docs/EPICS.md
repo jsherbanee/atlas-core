@@ -152,6 +152,7 @@ Status: Completed and Closed (X-01 through X-11 closed; no active Epic X sprint)
 - X-09 Design System Foundation and Reusable UI Components (Implemented, Closed)
 - X-10 Workspace Consistency and Information Density (Implemented, Closed)
 - X-11 Typography System and Visual Polish (Implemented, Closed)
+- X-12 Secondary and Tertiary Navigation Framework (Implemented, Closed)
 
 No Epic X sprint is currently active.
 
@@ -171,6 +172,18 @@ Post-closeout planning note:
 - centralize typography rhythm tokens (line heights and letter spacing) for deterministic hierarchy
 - apply behavior-preserving visual polish to heading, table, badge, and control typography
 - keep workflow logic, routing contracts, persistence, and domain behavior unchanged
+
+Explicitly out of scope:
+
+- Epic E implementation start
+- new domain capability implementation
+
+### X-12 Scope (Completed)
+
+- introduce a reusable three-level navigation contract with explicit primary, secondary, and tertiary session state
+- apply the framework to Knowledge first so search handoff can restore the correct workspace branch deterministically
+- keep the implementation reusable for future workspace surfaces rather than hard-coding Knowledge-only behavior
+- preserve existing Knowledge entity workflows and routing contracts
 
 Explicitly out of scope:
 

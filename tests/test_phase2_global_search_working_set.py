@@ -691,6 +691,24 @@ def test_top_navigation_highlights_knowledge_and_reports_workspaces() -> None:
     assert reports_call["type"] == "primary"
 
 
+def test_knowledge_navigation_defaults_seed_secondary_and_tertiary_state() -> None:
+    st = _FakeStreamlit(session_state={})
+
+    app._knowledge_navigation_defaults(st)
+
+    assert st.session_state["atlas_knowledge_secondary_group"] == "Knowledge Overview"
+    assert st.session_state["atlas_knowledge_tertiary_page"] == "Summary"
+
+
+def test_knowledge_navigation_selection_maps_entity_kinds() -> None:
+    st = _FakeStreamlit(session_state={})
+
+    app._set_knowledge_navigation_selection(st, kind="manufacturer")
+
+    assert st.session_state["atlas_knowledge_secondary_group"] == "Reusable Entities"
+    assert st.session_state["atlas_knowledge_tertiary_page"] == "Manufacturers"
+
+
 def test_header_search_control_uses_simple_search_placeholder() -> None:
     st = _HomeContractStreamlit()
 
@@ -1067,6 +1085,26 @@ def test_open_search_reference_routes_to_target_page() -> None:
 
     assert st.session_state["atlas_active_page"] == "Drawings"
     assert st.session_state["atlas_context_selection"]["kind"] == "drawing"
+    assert st.rerun_called is True
+
+
+def test_open_search_reference_sets_knowledge_navigation_state() -> None:
+    st = _FakeStreamlit(session_state={})
+    service = _FakeWorkspaceService(records=[])
+    reference = {
+        "route": "Knowledge",
+        "selection_kind": "vendor",
+        "selection_data": {"vendor_id": "vendor-1"},
+        "object_id": "vendor-1",
+        "object_type": "Vendor",
+    }
+
+    app._open_search_reference(st, service, reference)
+
+    assert st.session_state["atlas_active_page"] == "Knowledge"
+    assert st.session_state["atlas_knowledge_secondary_group"] == "Reusable Entities"
+    assert st.session_state["atlas_knowledge_tertiary_page"] == "Vendors"
+    assert st.session_state["atlas_context_selection"]["kind"] == "vendor"
     assert st.rerun_called is True
 
 

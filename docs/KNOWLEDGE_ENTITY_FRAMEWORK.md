@@ -85,6 +85,10 @@ The Knowledge workspace now supports:
 - service create/list/archive/restore
 - existing manufacturer/vendor/product operational workflows
 - global search object references for customer/service entity records
+- reusable Knowledge secondary and tertiary navigation state for deterministic search handoff and future workspace reuse
+
+X-12 navigation note:
+- Knowledge is the first workspace to use the reusable three-level navigation contract while preserving the existing entity workflows and deterministic state model.
 
 ## Validation
 K-03 validation baseline:

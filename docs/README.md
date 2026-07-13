@@ -2,9 +2,9 @@
 
 Atlas documentation defines the product vision, architecture, lifecycle roadmap, UX posture, and implementation status for Atlas, the Intelligent Lifecycle Solutions Management Platform for AV and lighting systems integrators.
 
-Current implementation focus remains Phase 2 Bid Intelligence and the associated hardening/documentation workstream. Epic X remains open for further product-hardening work, and Epic E has not started.
+Current implementation focus remains Phase 2 Bid Intelligence and the associated hardening/documentation workstream. Epic X includes the reusable Knowledge navigation framework delivered in X-12, and Epic E has not started.
 
-Current UX stream: Epic X Product Hardening continuation (X-01 through X-08 closed; the next Epic X sprint has not yet been formally started).
+Current UX stream: Epic X Product Hardening continuation (X-01 through X-12 closed; no active Epic X sprint).
 Scope: controlled hardening for onboarding, stakeholder linkage, identity workflows, navigation, search, and visual consistency in already-implemented capabilities only.
 
 These documents are intended to be used as a cohesive reference library, not isolated notes.
@@ -160,6 +160,11 @@ Future releases should follow this structure.
 - Purpose: Defines deterministic search and future retrieval architecture.
 - Audience: Search, workspace, AI, and platform contributors.
 - When to reference: When changing object discovery or retrieval behavior.
+
+### [NAVIGATION_ARCHITECTURE.md](NAVIGATION_ARCHITECTURE.md)
+- Purpose: Defines the reusable primary, secondary, and tertiary navigation contract used by Atlas workspace surfaces.
+- Audience: Workspace, search, UI, and platform contributors.
+- When to reference: When changing navigation state, breadcrumbs, or search-to-workspace handoff behavior.
 
 ### [IMPORT_PIPELINE.md](IMPORT_PIPELINE.md)
 - Purpose: Defines the common ingestion and validation architecture for documents and data.

@@ -46,14 +46,16 @@ Sprint X-05 continues shell hardening with header-based primary navigation, publ
 Sprint X-06 continues shell hardening with Atlas-only Home action, compact Search/menu controls, removal of the History dropdown, and centered responsive shell width.
 Sprint X-07 continues shell hardening with fixed-width navigation, compact Home actions, meaningful search-query gating, and focused search results that replace the page body while active.
 Sprint X-08 completed product hardening with visual-system consistency (#FAFAF9 workspace background, #004225 primary accent, neutralized surfaces) and a runtime-safe clear-search state model that separates widget input from submitted query state.
+Sprint X-12 implements a reusable secondary and tertiary navigation framework for Knowledge, including deterministic Knowledge navigation state, search-handoff restoration, and reusable navigation contract modeling for future workspace reuse.
 
-X-01 through X-11 are closed.
+X-01 through X-12 are closed.
 
 Epic X is completed and formally closed.
 
 X-09 Design System Foundation is complete and formally closed.
 X-10 Workspace Consistency and Information Density is complete and formally closed.
 X-11 Typography System and Visual Polish is complete and closed.
+X-12 Secondary and Tertiary Navigation Framework is complete and closed.
 
 X-09 scope remains behavior-preserving and does not start Epic E.
 X-10 scope remains behavior-preserving and does not start Epic E.
@@ -65,7 +67,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1190 tests)
+- pytest: full suite passing (1198 tests)
 
 ## Manual UI Validation (X-11)
 - viewport checks passed at widths 820, 980, 1180, 1366, and large desktop
@@ -79,7 +81,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
   - .pre-commit-config.yaml
 
 ## Active Focus
-Sprint K-02 implementation and validation for Core Knowledge Entities and Operational Workflows.
+Sprint X-12 navigation implementation and validation for reusable secondary/tertiary workspace routing.
 
 Broader product direction remains aligned to the lifecycle-platform roadmap, while current implementation priority is deterministic knowledge-entity foundation hardening within Phase 2 boundaries.
 
@@ -89,6 +91,7 @@ Secondary active focus:
 - Epic E readiness assessment only (architecture review and sprint approval required; Epic E not started).
 - K-01 follow-through validation for entity relationships, import/export compatibility, and search behavior.
 - K-02 workflow completion for customer, service, manufacturer, vendor, and product entity operations.
+- X-12 follow-through validation for Knowledge navigation reuse, breadcrumb/search state restoration, and future workspace adoption.
 
 Current implementation scope note:
 - no Epic E implementation has started in this refinement pass
