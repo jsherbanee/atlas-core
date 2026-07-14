@@ -22,6 +22,7 @@ Examples include:
 - Service
 - Contact
 - Location
+- Transaction
 - Drawing
 - Specification
 - Equipment
@@ -171,6 +172,27 @@ Initial event classes include:
 - future permission-aware action gating should reuse the action contract without moving business logic into the registry layer
 - activity/history depth remains source-dependent and should continue expanding through existing deterministic audit/history repositories
 - full migration of additional lifecycle object families (for example systems, rooms, risks, RFIs, and evidence) remains deferred to future W-series hardening
+
+## Future Transactions Object Scope
+
+Transaction families are expected to become future first-class Atlas objects and eventual Universal Object Workspace candidates.
+
+Representative future transaction object families include:
+- Estimate
+- Proposal
+- Sales Order
+- Purchase Order
+- RFQ
+- Vendor Quote
+- Change Order
+- Receiving Record
+- Vendor Bill
+- Customer Invoice
+- Subcontract
+
+Sprint A-07 does not implement these object routes or views.
+
+It only defines the architecture direction.
 
 ## L-01 Project Lifecycle Context
 

@@ -42,14 +42,22 @@ For implementation planning and epic IDs, see [EPICS.md](EPICS.md).
 - clearer document intake and diagnostics
 - more robust report export and workspace navigation
 - broader tenant-aware architecture foundations
+- commercial transactions and document-operations architecture
 
 ### Lifecycle Expansion
+- commercial document operations across customer-side and vendor-side workflows
 - engineering maturity beyond bid review
 - procurement readiness
 - field execution support
 - commissioning and closeout support
 - service and warranty tracking
 - asset lifecycle continuity from project to installed-system history
+
+## Transactions Architecture Note
+
+Sprint A-07 defines the future Transactions workspace and commercial-document ownership model as architecture only.
+
+This roadmap step means Atlas is expected to own operational transaction creation and workflow before financial sync, while QuickBooks remains the Financial System of Record after sync.
 
 ### SaaS Commercialization
 - multi-tenant administration

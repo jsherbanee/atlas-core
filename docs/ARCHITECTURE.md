@@ -85,6 +85,21 @@ Platform behavior should remain deterministic, tenant-scoped, and backward compa
 - CLI
   - Local execution entry point for running workflows against project inputs.
 
+## Transactions Workspace Architecture Direction
+
+Sprint A-07 defines Transactions as a future primary workspace and commercial-document architecture domain.
+
+Architecture posture:
+- Transactions is a workspace-level operational domain, not an accounting subsystem
+- transaction objects are first-class Atlas objects with stable identity, relationships, approvals, activity, lifecycle, and sync metadata
+- transaction families may link to Projects but do not require a Project to exist
+- transaction workflows must remain tenant-scoped, auditable, and compatible with external financial-system synchronization
+
+Boundary rules:
+- Atlas owns operational document creation and workflow
+- QuickBooks Online remains the Financial System of Record
+- Atlas must not implement GL, tax, banking, reconciliation, or payment-processing behavior as part of Transactions architecture
+
 ## Core Principle
 Business logic should live once in the Atlas engine and be reused by all callers:
 - CLI

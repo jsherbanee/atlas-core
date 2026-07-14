@@ -27,6 +27,48 @@ This document defines the reusable navigation contract used by the shell and wor
 - Knowledge search results restore the active secondary group and tertiary page selection context
 - The framework is intended to be extended to additional workspaces without changing the contract shape
 
+## Transactions Navigation Direction
+
+Sprint A-07 defines the future Transactions workspace navigation contract.
+
+Primary navigation target model:
+- Atlas
+- Projects
+- Knowledge
+- Transactions
+- Reports
+- Search
+- Settings
+
+Transactions secondary navigation should include:
+- Overview
+- Estimates
+- Proposals
+- Sales Orders
+- Purchase Orders
+- RFQs
+- Vendor Quotes
+- Receiving
+- Vendor Bills
+- Customer Invoices
+- Change Orders
+
+Transactions tertiary actions should remain action-oriented, for example:
+- Add
+- Browse
+- Edit
+- Approvals
+- Related Transactions
+- Receiving
+- Billing
+- Sync Status
+- Activity
+- Export
+
+This sprint defines the contract only.
+
+No routes or production navigation implementation are introduced here.
+
 W-03 implementation note:
 - Object Workspace is now a shared route that owns object-level tertiary navigation for migrated object families
 - object tertiary navigation is contract-driven and limited to supported views (Summary, Details, Relationships, Activity, Documents, History)

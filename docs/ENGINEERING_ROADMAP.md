@@ -101,6 +101,12 @@ Epic E must not be started from this roadmap.
 - prepare service, asset, and lifecycle subsystems for future implementation
 - preserve current Phase 2 focus while documenting downstream architecture
 
+### 9. Transactions And Commercial Operations Readiness
+- define first-class transaction domain boundaries before implementation
+- preserve separation between operational document workflows and financial-system ownership
+- document optional Project linkage, transaction identity, approvals, sync metadata, and closeout expectations before code starts
+- keep QuickBooks integration architecture explicit before any sync implementation begins
+
 ## Cross-Epic Dependencies
 - Epic A provides workspace and shell foundations used by later engineering surfaces.
 - Epic B provides intelligence and relationship-analysis primitives.
@@ -147,6 +153,7 @@ Production readiness should require:
 - formalize rule-engine and diagnostics contracts
 - prepare cloud, observability, and recovery documentation
 - support future lifecycle-expansion subsystems without starting Epic E
+- define Transactions workspace and commercial-operations architecture before implementation
 
 ## Release Engineering
 Release engineering should emphasize:

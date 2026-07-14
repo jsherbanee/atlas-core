@@ -220,3 +220,13 @@ Still deferred in L-02:
 - automatic advancement
 - workflow automation
 - downstream departmental execution modules
+
+## Transactions Boundary Note
+
+Project lifecycle and transaction lifecycle are separate concerns.
+
+- the AV lifecycle engine is currently authoritative for Project lifecycle state
+- future commercial-document transaction lifecycles should not be silently folded into Project lifecycle stages
+- transaction families may participate in Project progress, but they require their own document-state models, approvals, sync metadata, and closeout semantics
+
+Sprint A-07 defines that architecture boundary but does not introduce a transaction lifecycle engine implementation.

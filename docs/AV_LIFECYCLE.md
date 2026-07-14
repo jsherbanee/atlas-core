@@ -136,6 +136,9 @@ The lifecycle applies to both commercial and residential integration contexts an
 - Future Atlas capabilities: proposal assembly, pricing narrative, controlled redlines.
 - Explicit boundaries: Atlas should support proposals without displacing dedicated document-assembly tools where they remain appropriate.
 
+Transaction-architecture note:
+- Proposal is a first-class commercial document family and should eventually participate in the Transactions workspace as a transaction object, not only as a project artifact.
+
 ### 8. Award and Contract Handoff
 - Purpose: move from pursuit to executed project authority.
 - Primary stakeholders: sales, project executives, operations, legal, customer.
@@ -206,6 +209,9 @@ The lifecycle applies to both commercial and residential integration contexts an
 - Future Atlas capabilities: procurement tracking, vendor communications, order-status visibility.
 - Explicit boundaries: Atlas should not duplicate full accounting or inventory systems.
 
+Transaction-architecture note:
+- Purchase Orders, RFQs, Vendor Quotes, Receiving Records, Vendor Bills, and related closeout state belong to the commercial-operations transaction domain even when linked to a Project lifecycle stage.
+
 ### 13. Logistics and Receiving
 - Purpose: track movement and receipt of ordered equipment and materials.
 - Primary stakeholders: purchasing, warehouse, installers, project managers.
@@ -237,6 +243,16 @@ Still deferred in L-01:
 - billing/accounting/ERP execution behavior
 
 See [LIFECYCLE_ENGINE.md](LIFECYCLE_ENGINE.md) for the implementation-facing authority.
+
+## Transactions Architecture Note
+
+Atlas lifecycle and transaction architecture are related but distinct.
+
+- lifecycle stages describe business progression across the full project/service journey
+- transaction families describe operational commercial documents that may participate in those stages
+- transactions may be linked to Projects, Customers, Vendors, and other transactions, but may also exist with no Project linkage
+
+See [TRANSACTIONS_ARCHITECTURE.md](TRANSACTIONS_ARCHITECTURE.md) for the commercial-document ownership model.
 - Explicit boundaries: Atlas should coordinate logistics state without becoming a warehouse management system.
 
 ### 14. Project Management

@@ -47,6 +47,8 @@ QuickBooks Online is the Financial System of Record.
 
 Atlas should synchronize data rather than duplicate accounting functionality.
 
+Atlas should also originate and manage operational commercial documents before financial sync where configured.
+
 Accounting functions that remain outside Atlas include:
 - General Ledger
 - Payroll
@@ -60,6 +62,10 @@ Atlas will synchronize shared business entities where appropriate, including:
 - purchase orders
 - invoices
 
+Commercial-document operating boundary:
+- Atlas should eventually own operational creation, review, approval, fulfillment, receiving, and pre-sync readiness for commercial documents such as estimates, proposals, sales orders, purchase orders, receiving records, vendor bills, and customer invoices.
+- QuickBooks Online remains authoritative after sync for payable/receivable accounting, payment state, GL, taxes, banking, reconciliation, and statutory reporting.
+
 ## Product Scope
 Phase 2 Bid Intelligence remains the current active development target.
 
@@ -71,14 +77,15 @@ The long-term roadmap expands Atlas from bid intelligence into a complete lifecy
 1. CRM / Opportunity Management
 2. Bid Intelligence
 3. Estimating
-4. Engineering
-5. Procurement
-6. Project Management
-7. Field Installation
-8. Commissioning
-9. Service & Warranty
-10. Asset Lifecycle Management
-11. Executive Reporting & Business Intelligence
+4. Commercial Transactions and Document Operations
+5. Engineering
+6. Procurement
+7. Project Management
+8. Field Installation
+9. Commissioning
+10. Service & Warranty
+11. Asset Lifecycle Management
+12. Executive Reporting & Business Intelligence
 
 ## Platform Philosophy
 Atlas should feel like purpose-built software for professional systems integrators.

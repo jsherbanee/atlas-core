@@ -77,6 +77,11 @@ Atlas must not duplicate general ledger, payroll, banking, tax, or statutory acc
 
 Shared entities may include customers, vendors, purchase orders, bills, invoices, payment status, cost codes, and financial summaries.
 
+Transactions architecture note:
+- Atlas should eventually originate and manage operational commercial documents such as estimates, proposals, sales orders, purchase orders, receiving records, vendor bills, and customer invoices before sync.
+- QuickBooks should own the post-sync financial state for payables, receivables, payments, ledger, and statutory reporting.
+- payment status may return from QuickBooks into Atlas as synchronized financial reference state.
+
 Exact future synchronization ownership should remain explicitly documented and configurable.
 
 ## Stripe Principles

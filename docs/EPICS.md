@@ -28,6 +28,24 @@ Status: Active
 - A-04 Engineering Workstation UX Consolidation
 - A-05 End-to-End GUI Validation and Workflow Refinement
 - A-06 Quality Gates, CI, and Regression Baseline
+- A-07 Transactions and Commercial Operations Architecture
+
+### A-07 Scope
+
+- define the Transactions workspace architecture before implementation
+- define first-class commercial-document ownership and transaction-family boundaries
+- define customer-side and vendor-side document flows
+- define optional Project linkage and standalone transaction validity
+- define future navigation model for Transactions as a primary workspace
+- document Atlas versus QuickBooks ownership boundaries
+
+Explicitly out of scope:
+- transaction code
+- QuickBooks integration implementation
+- accounting ledger behavior
+- payment processing
+- procurement execution
+- Epic E implementation
 
 ## Epic L: Lifecycle Engine
 

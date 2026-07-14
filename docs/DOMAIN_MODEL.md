@@ -179,6 +179,43 @@ X-03 implementation note:
 - Relationships: linked to Organization, Contact, Bid Package, Estimate, Proposal.
 - Lifecycle Role: Commercial entry point prior to award.
 
+### Transaction
+- Purpose: Canonical commercial-document container for customer-side, vendor-side, and standalone operational transactions.
+- Relationships: may link to Project, Opportunity, Organization, Contact, other Transaction records, receiving records, bills, invoices, and supporting documents.
+- Lifecycle Role: Operational commercial document that may progress independently of Project lifecycle.
+
+### Transaction Line Item
+- Purpose: Normalized line-level commercial record within a transaction.
+- Relationships: belongs to Transaction; may reference Product, Equipment, Service, Cost Code, or external financial identifiers.
+- Lifecycle Role: Detail-level source for review, matching, fulfillment, billing, and sync readiness.
+
+### Transaction Approval
+- Purpose: Structured approval record for commercial document review.
+- Relationships: belongs to Transaction and approving User/Role context.
+- Lifecycle Role: Approval-gate evidence for issue, fulfillment, billing, and sync readiness.
+
+### Transaction Sync Record
+- Purpose: External-system synchronization envelope for operational transaction records.
+- Relationships: belongs to Transaction; references integration credential, external identifier, sync status, and failure state.
+- Lifecycle Role: Bridges Atlas operational truth to external financial truth without turning Atlas into the accounting system.
+
+### Transaction Family Expectations
+- Estimate
+- Proposal
+- Sales Order
+- Purchase Order
+- RFQ
+- Vendor Quote
+- Change Order
+- Receiving Record
+- Vendor Bill
+- Customer Invoice
+- Subcontract
+
+Architecture note:
+- these are future first-class Atlas objects even when created without a Project reference
+- optional Project linkage and optional Project Code must be preserved as independent fields rather than required ownership rules
+
 ### Project
 - Purpose: Post-award execution container.
 - Relationships: derived from Opportunity; owns Project Phase, Contract, Budget, Forecast, Asset.

@@ -93,6 +93,11 @@ Future releases should follow this structure.
 - Audience: Engineers, architects, workspace contributors, and lifecycle-planning stakeholders.
 - When to reference: When implementing or validating lifecycle-engine behavior and project lifecycle compatibility.
 
+### [TRANSACTIONS_ARCHITECTURE.md](TRANSACTIONS_ARCHITECTURE.md)
+- Purpose: Defines the future Transactions workspace, commercial-document ownership boundaries, transaction families, optional Project linkage model, and Atlas versus QuickBooks responsibilities.
+- Audience: Product, architecture, integrations, commercial-operations, and platform contributors.
+- When to reference: When planning transaction objects, document workflows, sync boundaries, or Transactions navigation.
+
 ### [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md)
 - Purpose: Defines engineering execution sequencing, technical milestones, and production-readiness gates.
 - Audience: Engineering, platform, architecture, and release stakeholders.
