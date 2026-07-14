@@ -8,6 +8,7 @@ It describes capability horizons without implementation-level sprint detail.
 For lifecycle sequencing, see [AV_LIFECYCLE.md](AV_LIFECYCLE.md).
 For engineering execution, see [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md).
 For implementation planning and epic IDs, see [EPICS.md](EPICS.md).
+For work-selection governance, see [PRODUCT_GOVERNANCE.md](PRODUCT_GOVERNANCE.md).
 
 ## Related Documents
 - [ROADMAP.md](ROADMAP.md)
@@ -28,6 +29,30 @@ For implementation planning and epic IDs, see [EPICS.md](EPICS.md).
 - Document future value without claiming implementation that does not yet exist.
 - Keep business milestones separate from technical sprint detail.
 - Treat SaaS readiness, multi-tenant administration, integrations, and enterprise readiness as progressive horizons.
+- Ideas do not become scheduled work merely because they are documented.
+- Active work must be traceable to an approved roadmap item.
+
+## Document Responsibility
+- This document defines approved customer-facing capability horizons.
+- [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md) defines technical sequencing and engineering gates.
+- [EPICS.md](EPICS.md) defines epic and sprint status.
+- [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md) defines current implementation status.
+- [RELEASE_NOTES.md](RELEASE_NOTES.md) remains historical.
+
+## Atlas 1.0 Capability Map
+Approved 1.0 major areas:
+- Projects and lifecycle
+- Knowledge
+- Transactions
+- Commercial documents
+- Settings and tenant configuration
+- Search and object navigation
+- Reporting
+- Security and tenant isolation
+- Auditability
+- Integrations foundation
+- User and role administration
+- Required operational workflows
 
 ## Capability Horizons
 
@@ -52,6 +77,9 @@ For implementation planning and epic IDs, see [EPICS.md](EPICS.md).
 - commissioning and closeout support
 - service and warranty tracking
 - asset lifecycle continuity from project to installed-system history
+
+Inventory note:
+- inventory remains on pause as a visible roadmap concern and is not active implementation work
 
 ## Transactions Architecture Note
 
@@ -78,6 +106,22 @@ This means Atlas now has a documented common contract for transaction-family doc
 - enterprise access controls and delegated administration
 - tenant-specific policies and configuration
 - public API and ecosystem readiness where appropriate
+
+## Product Hardening Candidates
+Required for 1.0:
+- permissions and roles
+- audit engine
+- attachments
+
+Candidate for 1.0:
+- background jobs
+- notifications
+- document generation
+- search refinement
+- settings refinement
+
+Post-1.0:
+- deeper inventory execution beyond currently documented receiving hooks
 
 ### Long-Term Intelligence Platform
 - AI-assisted guidance grounded in authorized organizational context

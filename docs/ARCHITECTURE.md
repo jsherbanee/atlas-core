@@ -28,9 +28,9 @@ Atlas documentation should be interpreted in this order when there is overlap:
 2. [MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md), [DOMAIN_MODEL.md](DOMAIN_MODEL.md), and this document define durable platform structure.
 3. [USER_MANAGEMENT.md](USER_MANAGEMENT.md), [INTEGRATIONS.md](INTEGRATIONS.md), [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md), [SECURITY.md](SECURITY.md), and [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) define operational boundaries, access, storage, and integrations.
 4. [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md), [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md), and [RELEASE_NOTES.md](RELEASE_NOTES.md) define sequencing and history.
-5. [DESIGN_LANGUAGE.md](DESIGN_LANGUAGE.md) and [AI_FOUNDATIONAL_KNOWLEDGE.md](AI_FOUNDATIONAL_KNOWLEDGE.md) define the long-term experience and AI guidance posture.
-
-6. [TRUST_CHARTER.md](TRUST_CHARTER.md) defines the permanent trust commitments that span all other documents.
+5. [PRODUCT_GOVERNANCE.md](PRODUCT_GOVERNANCE.md) and [SCRUM_PROCESS.md](SCRUM_PROCESS.md) define work-selection discipline and Scrum execution rules.
+6. [DESIGN_LANGUAGE.md](DESIGN_LANGUAGE.md) and [AI_FOUNDATIONAL_KNOWLEDGE.md](AI_FOUNDATIONAL_KNOWLEDGE.md) define the long-term experience and AI guidance posture.
+7. [TRUST_CHARTER.md](TRUST_CHARTER.md) defines the permanent trust commitments that span all other documents.
 
 ## Platform Boundaries
 Atlas is a multi-tenant SaaS platform for AV and lighting systems integrators.
@@ -68,6 +68,10 @@ Atlas is the deterministic engine layer for the platform.
 Application surfaces, future API layers, and cloud adapters should call Atlas services and contracts rather than duplicating business logic in separate code paths.
 
 Platform behavior should remain deterministic, tenant-scoped, and backward compatible.
+
+Governance note:
+- architecture direction does not activate implementation work by itself
+- major scope changes, persistence changes, tenancy changes, system-of-record changes, or security-boundary changes require explicit governance and ADR review before sprint execution
 
 ## Layers
 - domain

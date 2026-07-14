@@ -29,6 +29,8 @@ Read the following documentation before making implementation decisions.
 ```
 docs/README.md
 docs/PRODUCT_VISION.md
+docs/PRODUCT_GOVERNANCE.md
+docs/SCRUM_PROCESS.md
 docs/TRUST_CHARTER.md
 docs/PRODUCT_ROADMAP.md
 docs/AV_LIFECYCLE.md
@@ -227,6 +229,11 @@ If implementation differs from documentation:
 - if the documentation is outdated, update it as part of the same change
 
 Never knowingly leave documentation inconsistent with implementation.
+
+Work-selection governance note:
+- new ideas do not automatically become active work
+- roadmap approval governs sprint selection
+- [PRODUCT_GOVERNANCE.md](PRODUCT_GOVERNANCE.md) and [SCRUM_PROCESS.md](SCRUM_PROCESS.md) should be read before activating or executing a new sprint
 
 ---
 

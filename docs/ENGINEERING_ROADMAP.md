@@ -32,10 +32,14 @@ EPICS.md owns the implementation plan and sprint stream IDs.
 
 This document summarizes the technical sequencing that supports those epics and identifies architectural gates that must be satisfied before broader platform expansion.
 
+It does not activate work by itself; sprint selection is governed by approved roadmap items and [PRODUCT_GOVERNANCE.md](PRODUCT_GOVERNANCE.md).
+
 Use this document when planning engineering dependencies, infrastructure work, refactoring, migrations, test strategy, release engineering, and production-readiness gates.
 
 ## Current Position
 Phase 2 Bid Intelligence remains active.
+
+No new feature sprint is activated by the G-01 governance pass.
 
 Epic X is complete and formally closed.
 
@@ -55,6 +59,11 @@ Epic E remains the next candidate epic only after architecture review and explic
 Epic E must not be started from this roadmap.
 
 ## Engineering Sequence
+
+Progressive refinement principle:
+- Atlas develops breadth before depth.
+- Engineering should establish stable foundations across approved 1.0 areas before driving one subsystem to disproportionate depth.
+- This does not weaken security, tenant isolation, deterministic behavior, auditability, or backward compatibility requirements.
 
 ### 1. Foundation Hardening
 - preserve deterministic Phase 2 behavior
@@ -100,6 +109,7 @@ Epic E must not be started from this roadmap.
 ### 8. Lifecycle Expansion Readiness
 - prepare service, asset, and lifecycle subsystems for future implementation
 - preserve current Phase 2 focus while documenting downstream architecture
+- keep inventory-related execution paused until roadmap and architecture review explicitly reactivate it
 
 ### 9. Transactions And Commercial Operations Readiness
 - define first-class transaction domain boundaries before implementation
@@ -160,6 +170,7 @@ Production readiness should require:
 - support future lifecycle-expansion subsystems without starting Epic E
 - define Transactions workspace and commercial-operations architecture before implementation
 - define the shared commercial document framework before transaction-family implementation
+- keep active work traceable to approved roadmap items and one explicit sprint objective
 
 ## Release Engineering
 Release engineering should emphasize:

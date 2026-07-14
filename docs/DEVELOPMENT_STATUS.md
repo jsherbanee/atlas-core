@@ -63,6 +63,7 @@ Sprint T-05 amendment implements tenant Terms and Conditions settings blocks and
 Sprint T-05 amendment now also implements estimate and sales-order duplication, explicit revision lineage metadata, archive/restore revision-safe behavior, deterministic PDF export, and future email-delivery metadata hooks (non-executing).
 Sprint T-06 implements Return Orders and Credit Memos, including customer-side return workflow, deterministic credit calculation, linked Credit Memo generation, and QuickBooks-boundary-safe sync metadata.
 Sprint T-07 implements line presentation controls for commercial documents, including grouping, comment/spacer rows, explicit display ordering, presentation-aware sorting, and PDF layout preservation without changing authoritative totals.
+Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 
 X-01 through X-13 are closed.
 
@@ -129,9 +130,14 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
   - .pre-commit-config.yaml
 
 ## Active Focus
-Post-W-03 migration validation and broader object-family rollout planning.
+Phase 2 implementation remains the active product baseline.
 
-Broader product direction remains aligned to the lifecycle-platform roadmap, while current implementation priority is deterministic knowledge-entity foundation hardening within Phase 2 boundaries.
+Current governance posture:
+- approved roadmap items govern future sprint selection
+- no new feature sprint is activated by G-01
+- inventory remains visible but paused
+
+Broader product direction remains aligned to the lifecycle-platform roadmap, while implementation sequencing should follow the approved roadmap and progressive refinement model.
 
 Secondary active focus:
 - closeout regression monitoring and remaining page-migration debt triage for lower-priority advanced and object-detail surfaces.

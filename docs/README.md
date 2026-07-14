@@ -78,6 +78,11 @@ Future releases should follow this structure.
 - Audience: Product, leadership, customer-success, and implementation stakeholders.
 - When to reference: When discussing roadmap value, packaging, or launch readiness.
 
+### [PRODUCT_GOVERNANCE.md](PRODUCT_GOVERNANCE.md)
+- Purpose: Defines work-item states, roadmap discipline, progressive refinement, ADR triggers, and Atlas 1.0 governance rules.
+- Audience: Product, architecture, engineering, and planning stakeholders.
+- When to reference: Before selecting, activating, or materially reframing work.
+
 ### [DOMAIN_MODEL.md](DOMAIN_MODEL.md)
 - Purpose: Defines enduring business entities, lifecycle relationships, and boundaries.
 - Audience: Architects, domain owners, engine developers.
@@ -107,6 +112,11 @@ Future releases should follow this structure.
 - Purpose: Defines engineering execution sequencing, technical milestones, and production-readiness gates.
 - Audience: Engineering, platform, architecture, and release stakeholders.
 - When to reference: When planning implementation dependencies or readiness work.
+
+### [SCRUM_PROCESS.md](SCRUM_PROCESS.md)
+- Purpose: Defines Product Backlog, Sprint Backlog, sprint objective, Definition of Ready, Definition of Done, and review/refinement practices.
+- Audience: Product, engineering, architecture, and release stakeholders.
+- When to reference: During backlog refinement, sprint planning, sprint review, retrospective, and release review.
 
 ### [AI_FOUNDATIONAL_KNOWLEDGE.md](AI_FOUNDATIONAL_KNOWLEDGE.md)
 - Purpose: Defines the permitted industry-knowledge foundation, source hierarchy, versioning, neutrality, and human-authority limits for future AI features.
@@ -340,13 +350,23 @@ Future releases should follow this structure.
 - Audience: Product, leadership, customer-success, and implementation stakeholders.
 - When to reference: During product planning, launch readiness, or customer messaging.
 
+### [PRODUCT_GOVERNANCE.md](PRODUCT_GOVERNANCE.md)
+- Purpose: Defines work-item states, roadmap discipline, progressive refinement, ADR triggers, and Atlas 1.0 governance rules.
+- Audience: Product, architecture, engineering, and planning stakeholders.
+- When to reference: Before selecting, activating, or materially reframing work.
+
+### [SCRUM_PROCESS.md](SCRUM_PROCESS.md)
+- Purpose: Defines Product Backlog, Sprint Backlog, sprint objective, Definition of Ready, Definition of Done, and review/refinement practices.
+- Audience: Product, engineering, architecture, and release stakeholders.
+- When to reference: During backlog refinement, sprint planning, sprint review, retrospective, and release review.
+
 ### [ASSEMBLIES_AND_LABOR.md](ASSEMBLIES_AND_LABOR.md)
 - Purpose: Defines D-03 architecture and implementation boundaries for deterministic assemblies, accessories, and labor rollups.
 - Audience: Estimating architecture, service, and workspace contributors.
 - When to reference: Before implementing D-03 composition, rollup, and revision-integration behavior.
 
 ### [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)
-- Purpose: Captures the current implementation state and active focus.
+- Purpose: Captures the current implementation state only.
 - Audience: Product, engineering, design, and operations stakeholders.
 - When to reference: To answer where Atlas is today.
 

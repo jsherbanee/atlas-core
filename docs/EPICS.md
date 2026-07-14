@@ -68,6 +68,24 @@ Explicitly out of scope:
 - UI implementation
 - Epic E implementation
 
+## Epic G: Product Governance And Delivery Discipline
+
+Status: Implemented
+
+- G-01 Product Governance and Progressive Refinement
+
+### G-01 Scope
+
+- define product-governance rules for work selection and refinement
+- define Scrum process terminology, Definition of Ready, and Definition of Done
+- clarify roadmap, status, and release-document responsibilities
+- correct sprint-ID conflicts and paused-work visibility where needed
+
+Explicitly out of scope:
+- production feature implementation
+- roadmap expansion beyond approved 1.0 areas
+- activation of a new feature sprint
+
 ## Epic L: Lifecycle Engine
 
 Status: Active
@@ -479,13 +497,17 @@ Explicitly out of scope:
 - F-03 Deterministic Regression Snapshot Expansion
 - F-04 Documentation Consistency and Architecture Compliance
 
-## Epic G: Procurement Domain Separation Readiness
+## Epic P: Procurement Domain Separation Readiness
 
 Status: Deferred (Post-Phase 2)
 
-- G-01 Procurement Workflow Boundaries (Non-ERP)
-- G-02 Vendor Offering Lifecycle Extensions
-- G-03 Receiving and Inventory Integration Hooks
+- P-01 Procurement Workflow Boundaries (Non-ERP)
+- P-02 Vendor Offering Lifecycle Extensions
+- P-03 Receiving and Inventory Integration Hooks
+
+Inventory note:
+- P-03 remains visible but paused
+- P-03 is not active work and must not be treated as an active sprint
 
 ## Epic H: Construction and Closeout Readiness
 
