@@ -262,6 +262,39 @@ def test_open_search_reference_routes_supported_kind_to_object_workspace() -> No
     assert st.rerun_called is True
 
 
+def test_open_search_reference_routes_transaction_kind_to_object_workspace() -> None:
+    st = _FakeSt(
+        session_state={
+            "atlas_active_page": "Transactions",
+            "atlas_tenant_scope": "local",
+            "atlas_context_selection": {},
+            "atlas_active_workspace_id": "",
+            "atlas_active_project_name": "",
+            "atlas_navigation_history": [],
+        }
+    )
+    workspace_service = _FakeWorkspaceService([])
+    reference = {
+        "route": "Transactions",
+        "selection_kind": "estimate",
+        "selection_data": {
+            "document_id": "doc-1",
+            "document_number": "EST-0001",
+            "project_code": "P-01",
+        },
+        "display_name": "EST-0001",
+        "object_type": "Estimate",
+        "object_id": "doc-1",
+    }
+
+    app._open_search_reference(st, workspace_service, reference)
+
+    assert st.session_state["atlas_active_page"] == "Object Workspace"
+    assert st.session_state["atlas_context_selection"]["kind"] == "estimate"
+    assert st.session_state["atlas_active_primary_workspace"] == "Transactions"
+    assert st.session_state["atlas_active_secondary_section"] == "estimates"
+
+
 def test_open_search_reference_keeps_legacy_route_for_unsupported_kind() -> None:
     st = _FakeSt(
         session_state={

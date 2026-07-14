@@ -24,6 +24,7 @@ Atlas Workspace UI Sprint X-09 establishes a reusable design-system foundation (
 Atlas Workspace UI Sprint X-10 completes consistency migration for remaining primary project workspaces using existing shared wrappers and deterministic behavior-preserving UI hardening.
 Atlas Workspace UI Sprint X-12 introduces a reusable secondary and tertiary navigation framework for Knowledge and Projects modes, with deterministic state restore and search-handoff routing.
 Atlas Workspace UI Sprint X-13 completes navigation clarity and UX refinement, removing production-facing implementation artifacts and consolidating contextual navigation into the shared shell.
+Atlas Workspace Sprint T-02 adds the first Transactions workspace UI/navigation foundation with sectioned transaction families, action-oriented tertiary controls, and search/object-workspace handoff for commercial-document records.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.

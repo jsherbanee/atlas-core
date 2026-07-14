@@ -25,6 +25,12 @@ from atlas_core.domain import (
     Project,
     ProjectStatus,
 )
+from atlas_core.domain.commercial_document import (
+    ApprovalState,
+    CommercialDocumentLifecycleState,
+    CommercialDocumentType,
+    SyncStatus,
+)
 from atlas_core.services.phase2_review_context_service import (
     DEFAULT_MAW_REFERENCE_PACKAGE,
     build_intake_review_context,
@@ -61,6 +67,9 @@ from atlas_core.services.estimate_service import DeterministicEstimateService
 from atlas_core.services.estimate_engine_service import EstimateEngineService
 from atlas_core.services.assembly_expansion_service import AssemblyExpansionService
 from atlas_core.services.commercial_knowledge_service import CommercialKnowledgeService
+from atlas_core.services.transactions_workspace_service import (
+    TransactionsWorkspaceService,
+)
 from atlas_core.services.cost_engine_service import DeterministicCostEngine
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
@@ -102,6 +111,10 @@ WORKFLOW_PAGES = [
     "Engineering Review",
     "Product Resolution",
     "Reports",
+]
+
+TRANSACTIONS_PAGES = [
+    "Transactions",
 ]
 
 NAV_DROPDOWN_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
@@ -269,6 +282,7 @@ ALL_ACTIVE_PAGES = (
     + [
         "Object Workspace",
         "Knowledge",
+        "Transactions",
         "Administration",
         "Product Resolution",
         "Estimate",
@@ -295,6 +309,17 @@ OBJECT_WORKSPACE_MIGRATED_KINDS = {
     "location",
     "project",
     "project_record",
+    "commercial_document",
+    "estimate",
+    "proposal",
+    "sales_order",
+    "purchase_order",
+    "request_for_quote",
+    "vendor_quote",
+    "receiving",
+    "vendor_bill",
+    "customer_invoice",
+    "change_order",
 }
 
 OBJECT_WORKSPACE_READ_ONLY_KINDS = {
@@ -314,6 +339,7 @@ APPLICATION_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("Home", "Mission Control"),
             ("Projects", "Projects"),
             ("Knowledge", "Knowledge"),
+            ("Transactions", "Transactions"),
             ("Reports", "Reports"),
         ],
     )
@@ -481,6 +507,32 @@ PROJECTS_ACTIVE_PAGES = {
     "Project Metadata",
     "Repository",
     "Workspace Settings",
+}
+
+TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE: dict[str, CommercialDocumentType] = {
+    "estimates": CommercialDocumentType.ESTIMATE,
+    "proposals": CommercialDocumentType.PROPOSAL,
+    "sales_orders": CommercialDocumentType.SALES_ORDER,
+    "purchase_orders": CommercialDocumentType.PURCHASE_ORDER,
+    "rfqs": CommercialDocumentType.RFQ,
+    "vendor_quotes": CommercialDocumentType.VENDOR_QUOTE,
+    "receiving": CommercialDocumentType.RECEIVING_RECORD,
+    "vendor_bills": CommercialDocumentType.VENDOR_BILL,
+    "customer_invoices": CommercialDocumentType.CUSTOMER_INVOICE,
+    "change_orders": CommercialDocumentType.CHANGE_ORDER,
+}
+
+TRANSACTION_TYPE_TO_KIND: dict[CommercialDocumentType, str] = {
+    CommercialDocumentType.ESTIMATE: "estimate",
+    CommercialDocumentType.PROPOSAL: "proposal",
+    CommercialDocumentType.SALES_ORDER: "sales_order",
+    CommercialDocumentType.PURCHASE_ORDER: "purchase_order",
+    CommercialDocumentType.RFQ: "request_for_quote",
+    CommercialDocumentType.VENDOR_QUOTE: "vendor_quote",
+    CommercialDocumentType.RECEIVING_RECORD: "receiving",
+    CommercialDocumentType.VENDOR_BILL: "vendor_bill",
+    CommercialDocumentType.CUSTOMER_INVOICE: "customer_invoice",
+    CommercialDocumentType.CHANGE_ORDER: "change_order",
 }
 
 KNOWLEDGE_NAVIGATION_CONTRACT: list[dict[str, Any]] = [
@@ -1247,6 +1299,24 @@ def _navigation_section_group(primary: str, mode: str, secondary_key: str) -> st
         if secondary_key in {"price_lists", "imports", "assemblies"}:
             return "Operations"
         return "Summary"
+    if primary == "Transactions":
+        if secondary_key in {
+            "estimates",
+            "proposals",
+            "sales_orders",
+            "change_orders",
+        }:
+            return "Sales"
+        if secondary_key in {
+            "purchase_orders",
+            "rfqs",
+            "vendor_quotes",
+            "receiving",
+        }:
+            return "Procurement"
+        if secondary_key in {"vendor_bills", "customer_invoices"}:
+            return "Settlement"
+        return "Overview"
     if primary != "Projects":
         return "Workspace"
     if mode == "library":
@@ -3382,6 +3452,39 @@ def _save_commercial_product_state(st: Any, service: CommercialProductService) -
     st.session_state["atlas_price_list_library"] = library
 
 
+def _default_transactions_workspace_state() -> dict[str, Any]:
+    return {
+        "documents": [],
+        "tenant_id": "local",
+        "organization_id": "atlas",
+    }
+
+
+def _transactions_workspace_state(st: Any) -> dict[str, Any]:
+    state = st.session_state.get("atlas_transactions_workspace")
+    if isinstance(state, dict):
+        return dict(state)
+    default_state = _default_transactions_workspace_state()
+    st.session_state["atlas_transactions_workspace"] = default_state
+    return default_state
+
+
+def _transactions_workspace_service(st: Any) -> TransactionsWorkspaceService:
+    state = _transactions_workspace_state(st)
+    return TransactionsWorkspaceService(
+        serialized_documents=list(state.get("documents") or []),
+    )
+
+
+def _save_transactions_workspace_state(
+    st: Any,
+    service: TransactionsWorkspaceService,
+) -> None:
+    state = _transactions_workspace_state(st)
+    state["documents"] = service.to_payload()
+    st.session_state["atlas_transactions_workspace"] = state
+
+
 def _ensure_commercial_seed_data(st: Any) -> CommercialProductService:
     service = _commercial_product_service(st)
     if service.list_manufacturers() and service.list_vendors():
@@ -3923,6 +4026,10 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault(
         "atlas_price_list_library", _default_price_list_library_state()
     )
+    st.session_state.setdefault(
+        "atlas_transactions_workspace", _default_transactions_workspace_state()
+    )
+    st.session_state.setdefault("atlas_transactions_selected_document_id", "")
     st.session_state.setdefault("atlas_price_list_signature", "")
     st.session_state.setdefault("atlas_review_flags", {})
     st.session_state.setdefault("atlas_equipment_origin", {})
@@ -5082,6 +5189,8 @@ def _universal_object_adapter_key(kind: str) -> str:
     mapping = {
         "master_product": "product",
         "project_record": "project",
+        "request_for_quote": "rfq",
+        "receiving": "receiving_record",
     }
     return mapping.get(kind, kind)
 
@@ -5096,22 +5205,35 @@ def _universal_identity_payload(
     tenant_id: str | None = None,
 ) -> dict[str, Any]:
     adapter_key = _universal_object_adapter_key(kind)
-    owning_workspace = (
-        "Knowledge"
-        if adapter_key
-        in {
-            "customer",
-            "vendor",
-            "manufacturer",
-            "product",
-            "service",
-            "contact",
-            "location",
-            "organization",
-            "price_list",
-        }
-        else "Projects"
-    )
+    transaction_adapter_kinds = {
+        "commercial_document",
+        "estimate",
+        "proposal",
+        "sales_order",
+        "purchase_order",
+        "rfq",
+        "vendor_quote",
+        "receiving_record",
+        "vendor_bill",
+        "customer_invoice",
+        "change_order",
+    }
+    if adapter_key in transaction_adapter_kinds:
+        owning_workspace = "Transactions"
+    elif adapter_key in {
+        "customer",
+        "vendor",
+        "manufacturer",
+        "product",
+        "service",
+        "contact",
+        "location",
+        "organization",
+        "price_list",
+    }:
+        owning_workspace = "Knowledge"
+    else:
+        owning_workspace = "Projects"
     payload = dict(data)
     payload.setdefault("display_name", _object_display_name(kind, data))
     payload.setdefault("canonical_name", _object_display_name(kind, data))
@@ -5178,6 +5300,22 @@ def _knowledge_selection_kinds() -> set[str]:
         "project",
         "master_product",
         "price_list",
+    }
+
+
+def _transaction_selection_kinds() -> set[str]:
+    return {
+        "commercial_document",
+        "estimate",
+        "proposal",
+        "sales_order",
+        "purchase_order",
+        "request_for_quote",
+        "vendor_quote",
+        "receiving",
+        "vendor_bill",
+        "customer_invoice",
+        "change_order",
     }
 
 
@@ -6064,6 +6202,77 @@ def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
     }
 
 
+def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
+    actions = {
+        "overview": [
+            {
+                "tertiary_key": "summary",
+                "label": "Summary",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+    }
+    for secondary_key in TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE:
+        actions[secondary_key] = [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "related_documents",
+                "label": "Related Documents",
+                "action_type": "relationship_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "approvals",
+                "label": "Approvals",
+                "action_type": "operational_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "sync_status",
+                "label": "Sync Status",
+                "action_type": "operational_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "export",
+                "label": "Export",
+                "action_type": "export_action",
+                "required_selection": "entity",
+            },
+        ]
+    return actions
+
+
 def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, Any]]:
     if primary == "Knowledge":
         templates = _knowledge_secondary_templates()
@@ -6080,7 +6289,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             ("imports", "Imports"),
             ("assemblies", "Assemblies"),
         ]
-        built: list[dict[str, Any]] = []
+        transaction_sections: list[dict[str, Any]] = []
         for secondary_key, label in sections:
             actions = templates.get(secondary_key, [])
             default_action = next(
@@ -6095,7 +6304,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                     else "browse"
                 ),
             )
-            built.append(
+            transaction_sections.append(
                 {
                     "workspace": "Knowledge",
                     "workspace_mode": "application",
@@ -6125,6 +6334,74 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                             "deterministic_fallback": "browse",
                         }
                         for action in actions
+                    ],
+                    "selected_record_requirement": False,
+                    "selected_project_requirement": False,
+                    "responsive_behavior": "persistent",
+                }
+            )
+        return transaction_sections
+
+    if primary == "Transactions":
+        templates = _transactions_secondary_templates()
+        sections = [
+            ("overview", "Overview"),
+            ("estimates", "Estimates"),
+            ("proposals", "Proposals"),
+            ("sales_orders", "Sales Orders"),
+            ("purchase_orders", "Purchase Orders"),
+            ("rfqs", "RFQs"),
+            ("vendor_quotes", "Vendor Quotes"),
+            ("receiving", "Receiving"),
+            ("vendor_bills", "Vendor Bills"),
+            ("customer_invoices", "Customer Invoices"),
+            ("change_orders", "Change Orders"),
+        ]
+        built: list[dict[str, Any]] = []
+        for secondary_key, label in sections:
+            section_actions = templates.get(secondary_key, [])
+            default_action = next(
+                (
+                    _safe_text(action.get("tertiary_key"), "browse")
+                    for action in section_actions
+                    if _safe_text(action.get("tertiary_key"), "") == "browse"
+                ),
+                (
+                    _safe_text(section_actions[0].get("tertiary_key"), "browse")
+                    if section_actions
+                    else "browse"
+                ),
+            )
+            built.append(
+                {
+                    "workspace": "Transactions",
+                    "workspace_mode": "application",
+                    "secondary_key": secondary_key,
+                    "label": label,
+                    "icon": None,
+                    "route": "Transactions",
+                    "visibility": True,
+                    "enabled": True,
+                    "required_context": None,
+                    "default_tertiary_action": default_action,
+                    "supported_tertiary_actions": [
+                        {
+                            "tertiary_key": _safe_text(
+                                action.get("tertiary_key"), "browse"
+                            ),
+                            "label": _safe_text(action.get("label"), "Browse"),
+                            "route": "Transactions",
+                            "action_type": _safe_text(
+                                action.get("action_type"), "collection_view"
+                            ),
+                            "visibility": True,
+                            "enabled": True,
+                            "required_selection": action.get("required_selection"),
+                            "empty_state_behavior": "Use Browse to select a transaction draft before record-level actions.",
+                            "permission_hook": "future_permission_check",
+                            "deterministic_fallback": "browse",
+                        }
+                        for action in section_actions
                     ],
                     "selected_record_requirement": False,
                     "selected_project_requirement": False,
@@ -6390,6 +6667,8 @@ def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
         return page_map.get(page, "overview")
 
     if primary != "Projects":
+        if primary == "Transactions":
+            return "overview" if page == "Transactions" else None
         return None
     if mode == "library":
         page_map = {
@@ -6428,6 +6707,8 @@ def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
 def _active_primary_workspace(page: str, record: ProjectWorkspaceRecord | None) -> str:
     if page == "Knowledge":
         return "Knowledge"
+    if page == "Transactions":
+        return "Transactions"
     if page in PROJECTS_LIBRARY_PAGES or page in PROJECTS_ACTIVE_PAGES:
         return "Projects"
     if record is not None and page not in {"Mission Control", "Administration"}:
@@ -6441,6 +6722,8 @@ def _active_primary_workspace(page: str, record: ProjectWorkspaceRecord | None) 
 
 def _active_workspace_mode(page: str, record: ProjectWorkspaceRecord | None) -> str:
     if page == "Knowledge":
+        return "application"
+    if page == "Transactions":
         return "application"
     if page in PROJECTS_LIBRARY_PAGES:
         return "library"
@@ -6470,7 +6753,7 @@ def _sync_workspace_navigation_state(
         "",
     )
 
-    if primary not in {"Knowledge", "Projects"}:
+    if primary not in {"Knowledge", "Projects", "Transactions"}:
         return
 
     sections = _workspace_navigation_contract(primary, mode)
@@ -6495,7 +6778,7 @@ def _sync_workspace_navigation_state(
             ),
             derived_secondary,
         )
-    if derived_secondary:
+    if derived_secondary and not (primary == "Transactions" and page == "Transactions"):
         active_secondary = derived_secondary
 
     section = next(
@@ -6724,6 +7007,7 @@ def _render_top_navigation(
     nav_items = [
         ("Projects", "Projects"),
         ("Knowledge", "Knowledge"),
+        ("Transactions", "Transactions"),
         ("Reports", "Reports"),
     ]
 
@@ -6736,6 +7020,8 @@ def _render_top_navigation(
         ):
             is_active = True
         elif label == "Knowledge" and active_page in KNOWLEDGE_PAGES:
+            is_active = True
+        elif label == "Transactions" and active_page == "Transactions":
             is_active = True
         if column.button(
             label,
@@ -6765,7 +7051,7 @@ def _render_header(
 ) -> None:
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
 
-    header_cols = st.columns([1.05, 2.4, 4.4, 0.55])
+    header_cols = st.columns([1.05, 3.2, 3.6, 0.55])
     if header_cols[0].button(
         "Atlas",
         key="atlas_header_nav_Atlas",
@@ -6773,7 +7059,7 @@ def _render_header(
         type="primary" if current_page == "Mission Control" else "secondary",
     ):
         _open_page(st, "Mission Control")
-    nav_cols = header_cols[1].columns([0.95, 1.15, 0.95])
+    nav_cols = header_cols[1].columns([0.85, 1.0, 1.3, 0.85])
     _render_top_navigation(st, nav_cols, record)
     _render_global_search_control(st, header_cols[2])
     _render_header_menu(st, header_cols[3])
@@ -6938,6 +7224,17 @@ def _object_type_label(kind: str) -> str:
         "notebook_entry": "Notebook Entry",
         "master_product": "Product",
         "model": "Product",
+        "commercial_document": "Commercial Document",
+        "estimate": "Estimate",
+        "proposal": "Proposal",
+        "sales_order": "Sales Order",
+        "purchase_order": "Purchase Order",
+        "request_for_quote": "RFQ",
+        "vendor_quote": "Vendor Quote",
+        "receiving": "Receiving",
+        "vendor_bill": "Vendor Bill",
+        "customer_invoice": "Customer Invoice",
+        "change_order": "Change Order",
     }
     return mapping.get(kind, kind.replace("_", " ").title())
 
@@ -7003,6 +7300,10 @@ def _object_id_for_selection(kind: str, data: dict[str, Any]) -> str:
             data.get("atlas_product_uuid"),
             _safe_text(data.get("product_id"), _safe_text(data.get("model"), "")),
         )
+    if kind in _transaction_selection_kinds():
+        return _safe_text(
+            data.get("document_id"), _safe_text(data.get("object_id"), "")
+        )
     return _safe_text(data.get("object_id"), "")
 
 
@@ -7051,6 +7352,11 @@ def _object_display_name(kind: str, data: dict[str, Any]) -> str:
         return (
             " ".join([item for item in [manufacturer, model] if item]).strip()
             or "Product"
+        )
+    if kind in _transaction_selection_kinds():
+        return _safe_text(
+            data.get("document_number"),
+            _safe_text(data.get("document_id"), "Commercial Document"),
         )
     return _safe_text(data.get("title"), _safe_text(data.get("object_id"), "Object"))
 
@@ -7176,6 +7482,23 @@ def _object_secondary_label(kind: str, data: dict[str, Any]) -> str:
         )
     if kind == "notebook_entry":
         return _safe_text(data.get("entry_type"), "")
+    if kind in _transaction_selection_kinds():
+        return " | ".join(
+            [
+                item
+                for item in [
+                    _safe_text(
+                        data.get("project_code"), _safe_text(data.get("project_id"), "")
+                    ),
+                    _safe_text(
+                        data.get("lifecycle_state"), _safe_text(data.get("status"), "")
+                    ),
+                    _safe_text(data.get("approval_state"), ""),
+                    _safe_text(data.get("sync_status"), ""),
+                ]
+                if item
+            ]
+        )
     return ""
 
 
@@ -7202,6 +7525,17 @@ def _selection_route(kind: str) -> str:
         "project_record": "Overview",
         "notebook_entry": "Notebook",
         "master_product": "Knowledge",
+        "commercial_document": "Object Workspace",
+        "estimate": "Object Workspace",
+        "proposal": "Object Workspace",
+        "sales_order": "Object Workspace",
+        "purchase_order": "Object Workspace",
+        "request_for_quote": "Object Workspace",
+        "vendor_quote": "Object Workspace",
+        "receiving": "Object Workspace",
+        "vendor_bill": "Object Workspace",
+        "customer_invoice": "Object Workspace",
+        "change_order": "Object Workspace",
     }
     return mapping.get(kind, "Overview")
 
@@ -7688,6 +8022,17 @@ def _object_workspace_authoritative_route(kind: str) -> str:
         "drawing": "Drawings",
         "specification": "Specifications",
         "equipment": "Equipment",
+        "commercial_document": "Transactions",
+        "estimate": "Transactions",
+        "proposal": "Transactions",
+        "sales_order": "Transactions",
+        "purchase_order": "Transactions",
+        "request_for_quote": "Transactions",
+        "vendor_quote": "Transactions",
+        "receiving": "Transactions",
+        "vendor_bill": "Transactions",
+        "customer_invoice": "Transactions",
+        "change_order": "Transactions",
     }
     return mapping.get(kind, "Overview")
 
@@ -8523,6 +8868,18 @@ def _open_search_reference(
             st.session_state[_navigation_mode_state_key()] = "active"
             st.session_state[_navigation_secondary_state_key()] = "overview"
             st.session_state[_navigation_tertiary_state_key()] = "summary"
+        elif selection_kind in _transaction_selection_kinds():
+            st.session_state[_navigation_primary_state_key()] = "Transactions"
+            st.session_state[_navigation_mode_state_key()] = "application"
+            st.session_state[_navigation_secondary_state_key()] = next(
+                (
+                    key
+                    for key, doc_type in TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE.items()
+                    if TRANSACTION_TYPE_TO_KIND.get(doc_type) == selection_kind
+                ),
+                "overview",
+            )
+            st.session_state[_navigation_tertiary_state_key()] = "browse"
         else:
             st.session_state[_navigation_primary_state_key()] = "Projects"
             st.session_state[_navigation_mode_state_key()] = "active"
@@ -8618,6 +8975,7 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
         ),
         "review_flags": dict(st.session_state.get("atlas_review_flags") or {}),
         "price_list_library": dict(_price_list_library_state(st)),
+        "transactions_workspace": dict(_transactions_workspace_state(st)),
         "product_resolution_overrides": dict(
             st.session_state.get("atlas_product_resolution_overrides") or {}
         ),
@@ -8767,6 +9125,10 @@ def _restore_workspace_state(
     price_list_library = state.get("price_list_library")
     if isinstance(price_list_library, dict):
         st.session_state["atlas_price_list_library"] = dict(price_list_library)
+
+    transactions_workspace = state.get("transactions_workspace")
+    if isinstance(transactions_workspace, dict):
+        st.session_state["atlas_transactions_workspace"] = dict(transactions_workspace)
 
     product_resolution_overrides = state.get("product_resolution_overrides")
     if isinstance(product_resolution_overrides, dict):
@@ -11650,6 +12012,335 @@ def _render_application_knowledge_page(
                         )
                 except Exception as exc:
                     st.warning(f"Preview unavailable: {exc}")
+
+
+def _transaction_document_type_for_secondary(
+    secondary_key: str,
+) -> CommercialDocumentType | None:
+    return TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE.get(secondary_key)
+
+
+def _transaction_kind_for_document_type(document_type: CommercialDocumentType) -> str:
+    return TRANSACTION_TYPE_TO_KIND.get(document_type, "commercial_document")
+
+
+def _transaction_row(document: Any) -> dict[str, Any]:
+    return {
+        "Document Number": _safe_text(document.document_number, "n/a"),
+        "Type": _safe_text(document.document_type.value, "n/a"),
+        "Lifecycle": _safe_text(document.lifecycle_state.value, "n/a"),
+        "Approval": _safe_text(document.approval_state.value, "n/a"),
+        "Sync": _safe_text(document.sync_metadata.status.value, "n/a"),
+        "Project": _safe_text(
+            document.project_code, _safe_text(document.project_id, "")
+        ),
+        "Customer": _safe_text(document.customer_id, ""),
+        "Vendor": _safe_text(document.vendor_id, ""),
+        "Updated": _safe_text(document.updated_at, "n/a"),
+    }
+
+
+def _render_transactions_workspace_page(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    _ = workspace_service
+    _render_page_header(st, "Transactions", "")
+    service = _transactions_workspace_service(st)
+    metrics = service.overview_metrics()
+
+    cards = st.columns(8)
+    _metric_card(cards[0], "Drafts", str(metrics.draft_documents))
+    _metric_card(cards[1], "Pending Approval", str(metrics.pending_approval))
+    _metric_card(cards[2], "Issued", str(metrics.issued_documents))
+    _metric_card(cards[3], "Open POs", str(metrics.open_purchase_orders))
+    _metric_card(
+        cards[4],
+        "Partially Received",
+        str(metrics.partially_received_purchase_orders),
+    )
+    _metric_card(
+        cards[5],
+        "Vendor Bills Pending Sync",
+        str(metrics.vendor_bills_pending_sync),
+    )
+    _metric_card(
+        cards[6],
+        "Customer Invoices Pending Sync",
+        str(metrics.customer_invoices_pending_sync),
+    )
+    _metric_card(cards[7], "Sync Failures", str(metrics.sync_failures))
+
+    secondary = _safe_text(
+        st.session_state.get(_navigation_secondary_state_key()),
+        "overview",
+    )
+    tertiary = _safe_text(
+        st.session_state.get(_navigation_tertiary_state_key()),
+        "summary",
+    )
+    document_type = _transaction_document_type_for_secondary(secondary)
+
+    if secondary == "overview":
+        recent = service.list_documents(include_archived=True)[:30]
+        if not recent:
+            _render_guided_empty_state(
+                st,
+                why_empty="No commercial transactions have been created.",
+                action_to_populate="Open any transaction family and use Add to create your first draft.",
+                next_location="Start with Estimates, Proposals, or Purchase Orders.",
+            )
+            return
+        _render_data_table(st, [_transaction_row(item) for item in recent])
+        return
+
+    if document_type is None:
+        _render_empty_state(st, "Transactions section is not available.")
+        return
+
+    prefix = f"atlas_transactions_{secondary}_{tertiary}"
+    filters = st.columns([3, 2])
+    search_query = filters[0].text_input(
+        "Search Transactions",
+        key=f"{prefix}_search",
+        placeholder="document number, project, customer, vendor",
+    )
+    include_archived = filters[1].checkbox(
+        "Include Archived",
+        key=f"{prefix}_include_archived",
+        value=False,
+    )
+
+    rows = service.list_documents(
+        query=search_query,
+        document_type=document_type,
+        include_archived=include_archived,
+    )
+
+    if tertiary == "add":
+        create_cols = st.columns(4)
+        project_id = create_cols[0].text_input("Project ID", key=f"{prefix}_project_id")
+        project_code = create_cols[1].text_input(
+            "Project Code", key=f"{prefix}_project_code"
+        )
+        customer_id = create_cols[2].text_input(
+            "Customer ID", key=f"{prefix}_customer_id"
+        )
+        vendor_id = create_cols[3].text_input("Vendor ID", key=f"{prefix}_vendor_id")
+        if st.button("Create Draft", key=f"{prefix}_create", width="stretch"):
+            created = service.create_draft(
+                tenant_id="local",
+                organization_id="atlas",
+                document_type=document_type,
+                project_id=project_id,
+                project_code=project_code,
+                customer_id=customer_id,
+                vendor_id=vendor_id,
+            )
+            st.session_state["atlas_transactions_selected_document_id"] = (
+                created.document_id
+            )
+            _save_transactions_workspace_state(st, service)
+            st.success(
+                f"Draft created: {_safe_text(created.document_number, created.document_id)}"
+            )
+            st.rerun()
+
+    if not rows:
+        _render_guided_empty_state(
+            st,
+            why_empty="No transactions match the current filter.",
+            action_to_populate="Use Add to create a draft or broaden filters.",
+            next_location="Use Browse in this section to review transaction documents.",
+        )
+        return
+
+    st.dataframe(
+        [_transaction_row(item) for item in rows], width="stretch", hide_index=True
+    )
+
+    labels = [
+        f"{_safe_text(item.document_number, item.document_id)} · {_safe_text(item.document_id, '')}"
+        for item in rows
+    ]
+    selected_label = st.selectbox(
+        "Selected Document",
+        options=labels,
+        key=f"{prefix}_selected_document",
+    )
+    selected_document = rows[labels.index(selected_label)]
+    st.session_state["atlas_transactions_selected_document_id"] = (
+        selected_document.document_id
+    )
+    selected_kind = _transaction_kind_for_document_type(selected_document.document_type)
+    selection_payload = {
+        **selected_document.to_dict(),
+        "sync_status": selected_document.sync_metadata.status.value,
+    }
+    _set_context_selection(st, selected_kind, selection_payload)
+
+    action_cols = st.columns([1.2, 1.2, 1.4, 2.2])
+    if action_cols[0].button(
+        "Open Object Workspace", key=f"{prefix}_open_workspace", width="stretch"
+    ):
+        st.session_state["atlas_active_page"] = "Object Workspace"
+        st.rerun()
+    if action_cols[1].button(
+        (
+            "Archive"
+            if selected_document.lifecycle_state
+            != CommercialDocumentLifecycleState.ARCHIVED
+            else "Restore"
+        ),
+        key=f"{prefix}_archive_restore",
+        width="stretch",
+    ):
+        if (
+            selected_document.lifecycle_state
+            == CommercialDocumentLifecycleState.ARCHIVED
+        ):
+            service.restore_document(selected_document.document_id)
+        else:
+            service.archive_document(selected_document.document_id)
+        _save_transactions_workspace_state(st, service)
+        st.rerun()
+
+    if tertiary == "edit":
+        edit_cols = st.columns(4)
+        next_project_id = edit_cols[0].text_input(
+            "Project ID",
+            key=f"{prefix}_edit_project_id",
+            value=_safe_text(selected_document.project_id, ""),
+        )
+        next_project_code = edit_cols[1].text_input(
+            "Project Code",
+            key=f"{prefix}_edit_project_code",
+            value=_safe_text(selected_document.project_code, ""),
+        )
+        next_customer_id = edit_cols[2].text_input(
+            "Customer ID",
+            key=f"{prefix}_edit_customer_id",
+            value=_safe_text(selected_document.customer_id, ""),
+        )
+        next_vendor_id = edit_cols[3].text_input(
+            "Vendor ID",
+            key=f"{prefix}_edit_vendor_id",
+            value=_safe_text(selected_document.vendor_id, ""),
+        )
+        if st.button("Save Metadata", key=f"{prefix}_save_edit", width="stretch"):
+            try:
+                service.update_draft_metadata(
+                    document_id=selected_document.document_id,
+                    project_id=next_project_id,
+                    project_code=next_project_code,
+                    customer_id=next_customer_id,
+                    vendor_id=next_vendor_id,
+                )
+                _save_transactions_workspace_state(st, service)
+                st.success("Draft metadata updated.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to update draft: {exc}")
+
+    if tertiary == "approvals":
+        selected_approval = st.selectbox(
+            "Approval State",
+            options=[item.value for item in ApprovalState],
+            index=[item.value for item in ApprovalState].index(
+                selected_document.approval_state.value
+            ),
+            key=f"{prefix}_approval_state",
+        )
+        if st.button("Apply Approval", key=f"{prefix}_apply_approval", width="stretch"):
+            service.set_approval_state(
+                document_id=selected_document.document_id,
+                approval_state=ApprovalState(selected_approval),
+            )
+            _save_transactions_workspace_state(st, service)
+            st.rerun()
+
+    if tertiary == "sync_status":
+        selected_sync = st.selectbox(
+            "Sync Status",
+            options=[item.value for item in SyncStatus],
+            index=[item.value for item in SyncStatus].index(
+                selected_document.sync_metadata.status.value
+            ),
+            key=f"{prefix}_sync_state",
+        )
+        failure_code = st.text_input(
+            "Failure Code",
+            key=f"{prefix}_sync_failure_code",
+            value=_safe_text(selected_document.sync_metadata.failure_code, ""),
+        )
+        failure_message = st.text_input(
+            "Failure Message",
+            key=f"{prefix}_sync_failure_message",
+            value=_safe_text(selected_document.sync_metadata.failure_message, ""),
+        )
+        if st.button("Apply Sync Status", key=f"{prefix}_apply_sync", width="stretch"):
+            service.set_sync_status(
+                document_id=selected_document.document_id,
+                sync_status=SyncStatus(selected_sync),
+                failure_code=failure_code or None,
+                failure_message=failure_message or None,
+            )
+            _save_transactions_workspace_state(st, service)
+            st.rerun()
+
+    if tertiary == "activity":
+        _render_data_table(
+            st,
+            [
+                {
+                    "Created": _safe_text(selected_document.created_at, "n/a"),
+                    "Updated": _safe_text(selected_document.updated_at, "n/a"),
+                    "Revision": selected_document.revision_number,
+                    "Lifecycle": _safe_text(
+                        selected_document.lifecycle_state.value, "n/a"
+                    ),
+                    "Approval": _safe_text(
+                        selected_document.approval_state.value, "n/a"
+                    ),
+                    "Sync": _safe_text(
+                        selected_document.sync_metadata.status.value, "n/a"
+                    ),
+                }
+            ],
+        )
+
+    if tertiary == "related_documents":
+        relationships = list(selected_document.relationships or [])
+        if not relationships:
+            _render_guided_empty_state(
+                st,
+                why_empty="No related documents are linked to this record.",
+                action_to_populate="Use relationship workflows when line-items and revisions are connected.",
+                next_location="Object Workspace and future transaction relationship tools.",
+            )
+        else:
+            _render_data_table(
+                st,
+                [
+                    {
+                        "Relation": _safe_text(item.relationship_type, "related"),
+                        "Target Type": "commercial_document",
+                        "Target ID": _safe_text(item.related_document_id, "n/a"),
+                        "Reason": _safe_text(item.relationship_type, ""),
+                    }
+                    for item in relationships
+                ],
+            )
+
+    if tertiary == "export":
+        st.download_button(
+            "Download Document JSON",
+            data=json.dumps(selected_document.to_dict(), indent=2, sort_keys=True),
+            file_name=f"{selected_document.document_id}.json",
+            mime="application/json",
+            key=f"{prefix}_export_json",
+            width="stretch",
+        )
 
 
 def _render_application_reports_page(
@@ -18848,6 +19539,39 @@ def _application_search_entries(
             _safe_text(item.get("source_file"), ""),
             _safe_text(item.get("manufacturer"), ""),
             _safe_text(item.get("vendor"), ""),
+        ]
+        references.append(reference)
+
+    transactions_service = _transactions_workspace_service(st)
+    for document in transactions_service.list_documents(include_archived=True):
+        document_payload = document.to_dict()
+        kind = TRANSACTION_TYPE_TO_KIND.get(
+            document.document_type,
+            "commercial_document",
+        )
+        route = _selection_route(kind)
+        reference = _build_object_reference(
+            kind=kind,
+            data={
+                **document_payload,
+                "sync_status": document.sync_metadata.status.value,
+            },
+            project_id=_safe_text(document.project_id, "transactions"),
+            route=route,
+            relationship_count=len(list(document.relationships or [])),
+            warning_count=0,
+        )
+        reference["project_name"] = "Transactions"
+        reference["scope"] = "application"
+        reference["match_fields"] = [
+            _safe_text(document.document_id, ""),
+            _safe_text(document.document_number, ""),
+            _safe_text(document.document_type.value, ""),
+            _safe_text(document.lifecycle_state.value, ""),
+            _safe_text(document.project_id, ""),
+            _safe_text(document.project_code, ""),
+            _safe_text(document.customer_id, ""),
+            _safe_text(document.vendor_id, ""),
         ]
         references.append(reference)
 
@@ -27370,6 +28094,10 @@ def _render_main_content(
         _render_application_knowledge_page(st, workspace_service)
         return
 
+    if page == "Transactions":
+        _render_transactions_workspace_page(st, workspace_service)
+        return
+
     if page == "Object Workspace":
         _render_universal_object_workspace_page(
             st,
@@ -27638,6 +28366,7 @@ def main() -> None:
         "Create New Project",
         "Open Existing Project",
         "Knowledge",
+        "Transactions",
         "Reports",
         "Administration",
     }:

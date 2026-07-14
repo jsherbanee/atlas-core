@@ -40,6 +40,19 @@ Not implemented in T-01:
 - approval UI
 - automatic document conversion
 
+## T-02 Implementation Status
+
+Sprint T-02 implements the first transactions UI/navigation layer using the T-01 shared contract.
+
+Implemented in T-02:
+- reusable transaction workspace service behavior for draft create/list/edit/archive/restore and overview metrics
+- first application transactions workspace shell with section/action-oriented navigation
+- transaction-family global search indexing and Object Workspace handoff for commercial-document kinds
+
+Deferred in T-02:
+- external financial transport integrations
+- accounting/payment/ledger workflows
+
 Related documents:
 - [TRANSACTIONS_ARCHITECTURE.md](TRANSACTIONS_ARCHITECTURE.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)

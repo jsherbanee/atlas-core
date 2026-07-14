@@ -196,6 +196,19 @@ Sprint A-07 does not implement these object routes or views.
 
 It only defines the architecture direction.
 
+## T-02 Transactions Object Workspace Handoff
+
+Sprint T-02 adds first production handoff for commercial-document families through search and transactions selection context.
+
+Implemented in T-02:
+- transaction-family kinds are now supported Object Workspace selection kinds
+- global search open routes transaction objects into Object Workspace
+- authoritative open for transaction object kinds routes back to Transactions workspace
+
+Scope boundaries remain:
+- no replacement of authoritative transaction workflows
+- no financial-system behavior introduced in Object Workspace
+
 ## L-01 Project Lifecycle Context
 
 Sprint L-01 extends Project Object Workspace compatibility by projecting lifecycle-engine context through the shared object shell.

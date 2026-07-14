@@ -638,12 +638,13 @@ def test_atlas_button_routes_back_home() -> None:
 def test_top_navigation_renders_primary_header_buttons() -> None:
     st = _HomeContractStreamlit(pressed={"Projects"})
 
-    app._render_top_navigation(st, st.columns(3))
+    app._render_top_navigation(st, st.columns(4))
 
     assert st.session_state["atlas_active_page"] == "Projects"
     assert [call["label"] for call in st.button_calls] == [
         "Projects",
         "Knowledge",
+        "Transactions",
         "Reports",
     ]
     assert all(call["use_container_width"] is False for call in st.button_calls)
@@ -653,7 +654,7 @@ def test_top_navigation_hides_public_home_button() -> None:
     st = _HomeContractStreamlit(pressed={"Home"})
     st.session_state["atlas_active_page"] = "Projects"
 
-    app._render_top_navigation(st, st.columns(3))
+    app._render_top_navigation(st, st.columns(4))
 
     assert st.session_state["atlas_active_page"] == "Projects"
     assert all(call["label"] != "Home" for call in st.button_calls)
@@ -665,7 +666,7 @@ def test_top_navigation_highlights_projects_in_project_workspace() -> None:
 
     app._render_top_navigation(
         st,
-        st.columns(3),
+        st.columns(4),
         _project_record("project-a", "Project A"),
     )
 
@@ -679,7 +680,7 @@ def test_top_navigation_highlights_knowledge_and_reports_workspaces() -> None:
     knowledge = _HomeContractStreamlit()
     knowledge.session_state["atlas_active_page"] = "Evidence"
 
-    app._render_top_navigation(knowledge, knowledge.columns(3))
+    app._render_top_navigation(knowledge, knowledge.columns(4))
 
     knowledge_call = next(
         call for call in knowledge.button_calls if call["label"] == "Knowledge"
@@ -689,7 +690,7 @@ def test_top_navigation_highlights_knowledge_and_reports_workspaces() -> None:
     reports = _HomeContractStreamlit()
     reports.session_state["atlas_active_page"] = "Reports"
 
-    app._render_top_navigation(reports, reports.columns(3))
+    app._render_top_navigation(reports, reports.columns(4))
 
     reports_call = next(
         call for call in reports.button_calls if call["label"] == "Reports"
@@ -811,7 +812,7 @@ def test_header_uses_compact_responsive_column_contract() -> None:
 
     app._render_header(st, _FakeWorkspaceService([]), None, None)
 
-    assert st.column_specs[:2] == [[1.05, 2.4, 4.4, 0.55], [0.95, 1.15, 0.95]]
+    assert st.column_specs[:2] == [[1.05, 3.2, 3.6, 0.55], [0.85, 1.0, 1.3, 0.85]]
 
 
 def test_group_for_page_keeps_internal_mission_control_compatibility() -> None:

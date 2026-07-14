@@ -30,6 +30,8 @@ Status: Active
 - A-06 Quality Gates, CI, and Regression Baseline
 - A-07 Transactions and Commercial Operations Architecture
 - A-08 Commercial Document Framework
+- T-01 Commercial Document Domain Foundation
+- T-02 Transactions Workspace Foundation
 
 ### A-07 Scope
 

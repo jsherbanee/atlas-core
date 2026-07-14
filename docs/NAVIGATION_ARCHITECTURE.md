@@ -69,6 +69,17 @@ This sprint defines the contract only.
 
 No routes or production navigation implementation are introduced here.
 
+## Transactions Navigation Implementation (T-02)
+
+Sprint T-02 implements the first production Transactions navigation surface.
+
+Implemented behavior:
+- Transactions added to top-level primary header navigation
+- Transactions workspace uses the shared secondary/tertiary navigation contract model
+- secondary sections: Overview, Estimates, Proposals, Sales Orders, Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills, Customer Invoices, Change Orders
+- tertiary actions: Add, Browse, Edit, Related Documents, Approvals, Sync Status, Activity, Export
+- navigation continuity/state persistence uses existing shell state keys and workspace-state snapshot behavior
+
 W-03 implementation note:
 - Object Workspace is now a shared route that owns object-level tertiary navigation for migrated object families
 - object tertiary navigation is contract-driven and limited to supported views (Summary, Details, Relationships, Activity, Documents, History)

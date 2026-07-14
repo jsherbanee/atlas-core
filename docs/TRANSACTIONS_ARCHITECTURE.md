@@ -69,6 +69,22 @@ Primary navigation target model:
 
 Transactions is intended to be workspace-scoped, not project-scoped.
 
+## T-02 Implementation Note
+
+Sprint T-02 implements the first Transactions workspace UI and navigation foundation.
+
+Implemented in T-02:
+- Transactions is now a primary application workspace in the shell navigation
+- secondary sections are implemented for Overview, Estimates, Proposals, Sales Orders, Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills, Customer Invoices, and Change Orders
+- tertiary actions are implemented as reusable transaction controls (Add, Browse, Edit, Related Documents, Approvals, Sync Status, Activity, Export)
+- session-backed transaction draft management is implemented on top of the T-01 commercial-document backend foundation
+- transactions are indexed in global search and route to Object Workspace for supported commercial-document kinds
+
+Still deferred:
+- QuickBooks transport and sync execution APIs
+- accounting ledger, payments, and reconciliation behavior
+- automatic document conversion workflows
+
 It must support documents that are:
 - linked to a Project
 - linked to a Customer or Vendor

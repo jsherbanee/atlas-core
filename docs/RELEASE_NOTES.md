@@ -21,6 +21,22 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic W Sprint W-03 Universal Object Workspace)
 
+## Unreleased (Epic T Sprint T-02 Transactions Workspace Foundation)
+
+### Improved
+
+- Atlas now includes a first Transactions primary workspace in header navigation.
+- Transactions workspace now provides sectioned navigation for Overview, Estimates, Proposals, Sales Orders, Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills, Customer Invoices, and Change Orders.
+- Transactions tertiary actions now provide reusable Add, Browse, Edit, Related Documents, Approvals, Sync Status, Activity, and Export controls.
+- A reusable transactions workspace service now supports in-session draft create/list/edit/archive/restore behavior and overview metrics.
+- Global object search now indexes transaction-family commercial documents and opens supported transaction kinds in Object Workspace.
+
+### Scope Notes
+
+- transactions UI/navigation foundation only
+- no QuickBooks API transport implementation
+- no accounting/payment/ledger behavior
+
 ## Unreleased (Epic T Sprint T-01 Commercial Document Domain Foundation)
 
 ### Improved
