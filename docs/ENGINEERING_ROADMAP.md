@@ -162,3 +162,17 @@ Release engineering should emphasize:
 - final graph persistence model remains open
 - final observability vendor/tooling remains open
 - final production deployment topology remains open
+
+## L-01 Engineering Note
+
+Sprint L-01 completes the first lifecycle-engine readiness gate for future lifecycle expansion.
+
+Technical milestone achieved:
+- deterministic lifecycle engine added at the domain layer
+- compatibility-safe repository/service/UI integration established for project lifecycle state
+- lifecycle history and transition payloads are now auditable through existing repository history infrastructure
+
+Next lifecycle-engine engineering debt:
+- richer readiness requirements by stage
+- manifest/search/report projections beyond compatibility fields
+- downstream workflow modules for deferred lifecycle stages

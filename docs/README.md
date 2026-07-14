@@ -88,6 +88,11 @@ Future releases should follow this structure.
 - Audience: Product, operations, lifecycle-planning, and implementation stakeholders.
 - When to reference: When planning roadmap sequencing or lifecycle-stage coverage.
 
+### [LIFECYCLE_ENGINE.md](LIFECYCLE_ENGINE.md)
+- Purpose: Defines the deterministic lifecycle-engine implementation authority for canonical stages, statuses, transitions, readiness, history, tenant enforcement, and compatibility behavior.
+- Audience: Engineers, architects, workspace contributors, and lifecycle-planning stakeholders.
+- When to reference: When implementing or validating lifecycle-engine behavior and project lifecycle compatibility.
+
 ### [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md)
 - Purpose: Defines engineering execution sequencing, technical milestones, and production-readiness gates.
 - Audience: Engineering, platform, architecture, and release stakeholders.

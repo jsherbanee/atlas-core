@@ -29,6 +29,24 @@ Status: Active
 - A-05 End-to-End GUI Validation and Workflow Refinement
 - A-06 Quality Gates, CI, and Regression Baseline
 
+## Epic L: Lifecycle Engine
+
+Status: Active
+
+- L-01 AV Lifecycle Engine Foundation
+
+### L-01 Scope
+
+- create deterministic lifecycle authority for project-stage sequencing
+- define canonical lifecycle stages, stage-status model, transition contracts, readiness contracts, and lifecycle history model
+- preserve backward compatibility with existing `ProjectStatus`, project serialization, repository manifests, search metadata, and settings flows
+- expose lifecycle context through workspace services, project-facing UI, and project universal-object projections
+
+Explicitly out of scope:
+- procurement, installation, commissioning, training, warranty, service, and asset-lifecycle execution workflows
+- accounting/ERP lifecycle workflows
+- broad non-project object lifecycle migration
+
 ## Epic W: Workspace Intelligence
 
 Status: Active (W-01, W-02, and W-03 completed; no active Epic W sprint)

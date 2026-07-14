@@ -189,6 +189,12 @@ X-03 implementation note:
 - Relationships: belongs to Project; references phase records in engineering, procurement, construction, and closeout.
 - Lifecycle Role: Governs stage progression and controls.
 
+### L-01 Lifecycle Engine Note
+- Sprint L-01 formalizes Project Phase behavior through a deterministic lifecycle engine rather than only the coarse `ProjectStatus` enum.
+- Canonical lifecycle state now lives in a persisted lifecycle plan snapshot while `Project.status` remains the legacy compatibility field.
+- Core lifecycle entities now include lifecycle definition, stage definition, stage state, transition, readiness, diagnostics, and immutable lifecycle history event contracts.
+- Later downstream workflow modules remain deferred; the engine currently provides lifecycle authority and compatibility, not full execution-domain automation.
+
 ### Project Workspace
 - Purpose: User-facing project context for review and operations.
 - Relationships: linked to Project, Bid Package, Document, Evidence, Estimate.

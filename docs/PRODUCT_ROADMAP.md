@@ -94,3 +94,11 @@ The roadmap should emphasize balanced progression across sales, engineering, del
 - exact sequencing of later lifecycle capabilities remains flexible
 - commercial launch packaging may evolve as customer validation continues
 - enterprise readiness milestones will depend on architecture and support maturity
+
+## L-01 Roadmap Note
+
+Sprint L-01 establishes the lifecycle-engine foundation that future lifecycle-expansion milestones will rely on.
+
+Business meaning:
+- Atlas now has one canonical lifecycle vocabulary and deterministic transition model for project records
+- downstream lifecycle workflows remain intentionally staged behind this foundation rather than shipping as partial execution tools

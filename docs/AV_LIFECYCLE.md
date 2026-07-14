@@ -218,6 +218,25 @@ The lifecycle applies to both commercial and residential integration contexts an
 - Upstream and downstream dependencies: upstream from procurement; downstream to installation.
 - Current implementation status: future.
 - Future Atlas capabilities: receiving workflows, shipment traceability, exception handling.
+
+## Sprint L-01 Lifecycle Engine Foundation
+
+Sprint L-01 introduces the first deterministic lifecycle-engine implementation for Atlas.
+
+Implemented in L-01:
+- one canonical lifecycle authority for stage definitions and sequencing
+- deterministic stage-status model separate from legacy `ProjectStatus`
+- deterministic transition contracts with required reason and tenant enforcement
+- lifecycle readiness, diagnostics, and history event contracts
+- project compatibility mapping between canonical lifecycle stages and legacy project statuses
+- lifecycle-plan persistence in project metadata and compatibility-safe UI/search/repository projections
+
+Still deferred in L-01:
+- procurement, installation, commissioning, training, warranty, service, and asset-lifecycle workflow execution
+- downstream departmental automation beyond lifecycle-state modeling
+- billing/accounting/ERP execution behavior
+
+See [LIFECYCLE_ENGINE.md](LIFECYCLE_ENGINE.md) for the implementation-facing authority.
 - Explicit boundaries: Atlas should coordinate logistics state without becoming a warehouse management system.
 
 ### 14. Project Management

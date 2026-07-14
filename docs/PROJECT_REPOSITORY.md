@@ -218,6 +218,24 @@ X-03 onboarding behavior:
 
 X-03 introduces durable shared stakeholder records without replacing project metadata files:
 - `AtlasProjects/.atlas_organizations.json`: canonical shared organizations directory.
+
+## L-01 Lifecycle Persistence
+
+Sprint L-01 keeps repository compatibility while adding deterministic lifecycle-engine persistence.
+
+Persisted lifecycle fields now include:
+- `status`: legacy compatibility status
+- `lifecycle_stage`: canonical lifecycle stage projection
+- `lifecycle_plan`: persisted lifecycle-engine snapshot with stage state, readiness, and history
+- `lifecycle_definition_key`
+- `lifecycle_schema_version`
+
+History behavior:
+- repository history continues writing `history/events.jsonl`
+- lifecycle transitions append `project_lifecycle_transitioned` events with actor, reason, source stage, destination stage, and legacy status context
+
+Safety rule:
+- legacy project records without lifecycle-plan data remain readable and are upgraded in-memory through compatibility plan construction
 - `AtlasProjects/.atlas_project_stakeholders.json`: project-to-organization role relationships.
 
 Compatibility note:

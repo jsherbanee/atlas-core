@@ -12,6 +12,7 @@ from atlas_core.contracts.universal_object_contract import (
     UniversalObjectRelationship,
 )
 from atlas_core.domain import Project, ProjectStatus
+from atlas_core.domain.av_lifecycle import build_default_lifecycle_plan
 from atlas_core.services.universal_object_registry import (
     UniversalObjectRegistry,
     build_default_universal_object_registry,
@@ -258,6 +259,37 @@ def test_registry_identity_resolution_and_presentation_helpers() -> None:
     assert presentation.primary_label == "ADI"
     assert any(action.action_key == "open" for action in actions)
     assert "Related Products" in relationship_groups
+
+
+def test_project_payload_lifecycle_plan_drives_universal_object_state() -> None:
+    registry = build_default_universal_object_registry()
+    lifecycle_plan = build_default_lifecycle_plan(
+        project_id="BID-2026-0002",
+        tenant_id="local",
+        current_stage_key="project_management",
+    )
+
+    universal_object = registry.adapt(
+        "project",
+        {
+            "workspace_id": "BID-2026-0002",
+            "project_name": "Lifecycle Project",
+            "status": "active",
+            "lifecycle_stage": "project_management",
+            "lifecycle_plan": lifecycle_plan.to_dict(),
+        },
+        tenant_id="local",
+        owning_workspace="Projects",
+        owning_project_id="BID-2026-0002",
+    )
+
+    assert universal_object.identity.status == "active"
+    assert universal_object.identity.lifecycle_state == "project_management"
+    assert universal_object.lifecycle is not None
+    assert any(
+        transition.state == "field_installation"
+        for transition in universal_object.lifecycle.allowed_transitions
+    )
 
 
 def test_build_object_reference_exposes_universal_identity() -> None:

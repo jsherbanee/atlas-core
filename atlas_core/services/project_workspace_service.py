@@ -8,8 +8,16 @@ from pathlib import Path
 from typing import Any
 
 from atlas_core import __version__
-from atlas_core.domain import Project, ProjectStatus
+from atlas_core.domain import Project, ProjectLifecycleEvent, ProjectStatus
 from atlas_core.domain import OrganizationRole, ProjectStakeholder
+from atlas_core.domain.av_lifecycle import (
+    AVLifecycleEngine,
+    LifecycleHistoryEvent,
+    LifecyclePlan,
+    legacy_status_for_stage,
+    normalize_stage_key,
+    project_lifecycle_from_legacy,
+)
 from atlas_core.repository import AtlasProjectManager
 from atlas_core.services.document_intake_service import (
     DocumentIntakeService,
@@ -169,6 +177,7 @@ class ProjectWorkspaceService:
         self.workspace_root = Path(workspace_root)
         self.manager = AtlasProjectManager(str(self.workspace_root))
         self.organization_directory = OrganizationDirectoryService(self.workspace_root)
+        self.lifecycle_engine = AVLifecycleEngine.default()
 
     def list_recent_workspaces(self, limit: int = 10) -> list[ProjectWorkspaceRecord]:
         records = self.list_workspaces(include_archived=False)
@@ -228,6 +237,7 @@ class ProjectWorkspaceService:
 
     def save_record(self, record: ProjectWorkspaceRecord) -> Path:
         record.touch()
+        self._update_lifecycle_snapshot(record)
         project_root = Path(
             self.manager.project_repository.project_location(record.workspace_id)
         )
@@ -304,7 +314,12 @@ class ProjectWorkspaceService:
         atlas_bid_id = (
             self.manager.allocate_bid_id() if project_id is None else project_id
         )
-        lifecycle = status or ProjectStatus.INTAKE
+        lifecycle_stage_value = normalize_stage_key(lifecycle_stage)
+        legacy_status = status or (
+            ProjectStatus(legacy_status_for_stage(lifecycle_stage_value))
+            if lifecycle_stage_value
+            else ProjectStatus.INTAKE
+        )
         project = Project(
             project_id=atlas_bid_id,
             name=name,
@@ -313,7 +328,7 @@ class ProjectWorkspaceService:
             internal_project_number=internal_project_number,
             location=location,
             bid_date=bid_date,
-            status=lifecycle,
+            status=legacy_status,
         )
         return ProjectWorkspaceRecord(
             workspace_id=project.project_id,
@@ -335,8 +350,8 @@ class ProjectWorkspaceService:
                 "project_number": atlas_bid_id,
                 "issue_date": issue_date,
                 "bid_date": bid_date,
-                "status": lifecycle.value,
-                "lifecycle_stage": lifecycle_stage or lifecycle.value,
+                "status": legacy_status.value,
+                "lifecycle_stage": lifecycle_stage_value or legacy_status.value,
                 "atlas_version": __version__,
             },
         )
@@ -456,6 +471,8 @@ class ProjectWorkspaceService:
         *,
         owner: str | None = None,
         lifecycle_stage: str | None = None,
+        lifecycle_reason: str | None = None,
+        lifecycle_actor: str | None = None,
         client_project_number: str | None = None,
         internal_project_number: str | None = None,
         consultant: str | None = None,
@@ -475,9 +492,23 @@ class ProjectWorkspaceService:
         if lifecycle_stage is not None:
             normalized_stage = lifecycle_stage.strip()
             if normalized_stage:
-                record.metadata["lifecycle_stage"] = normalized_stage
-                record.metadata["status"] = normalized_stage
-                record.project.status = ProjectStatus(normalized_stage)
+                lifecycle_key = normalize_stage_key(normalized_stage)
+                current_plan = self._lifecycle_plan_for_record(record)
+                if lifecycle_key != current_plan.current_stage_key and lifecycle_reason:
+                    record = self._transition_record_lifecycle(
+                        record,
+                        target_stage_key=lifecycle_key,
+                        reason=lifecycle_reason,
+                        actor=lifecycle_actor or "atlas-ui",
+                    )
+                else:
+                    record.metadata["lifecycle_stage"] = lifecycle_key
+                    legacy_status_value = legacy_status_for_stage(lifecycle_key)
+                    record.metadata["status"] = legacy_status_value
+                    record.project.status = ProjectStatus(legacy_status_value)
+                    self._update_lifecycle_snapshot(record, rebuild=True)
+        else:
+            self._update_lifecycle_snapshot(record)
         if client_project_number is not None:
             normalized_client_number = client_project_number.strip() or None
             record.metadata["client_project_number"] = normalized_client_number
@@ -523,6 +554,43 @@ class ProjectWorkspaceService:
                 "lifecycle_stage": record.metadata.get("lifecycle_stage"),
             },
         )
+        return self.load_record(workspace_id)
+
+    def lifecycle_plan_for_record(
+        self, record: ProjectWorkspaceRecord
+    ) -> LifecyclePlan:
+        return self._lifecycle_plan_for_record(record)
+
+    def lifecycle_plan(self, workspace_id: str) -> LifecyclePlan:
+        return self._lifecycle_plan_for_record(self.load_record(workspace_id))
+
+    def available_project_lifecycle_transitions(
+        self, workspace_id: str
+    ) -> list[dict[str, Any]]:
+        plan = self.lifecycle_plan(workspace_id)
+        return [
+            transition.to_dict()
+            for transition in self.lifecycle_engine.available_transitions(plan)
+        ]
+
+    def transition_project_lifecycle(
+        self,
+        workspace_id: str,
+        *,
+        target_stage_key: str,
+        reason: str,
+        actor: str = "atlas-ui",
+        tenant_id: str | None = None,
+    ) -> ProjectWorkspaceRecord:
+        record = self.load_record(workspace_id)
+        record = self._transition_record_lifecycle(
+            record,
+            target_stage_key=target_stage_key,
+            reason=reason,
+            actor=actor,
+            tenant_id=tenant_id,
+        )
+        self.save_record(record)
         return self.load_record(workspace_id)
 
     def rename_project(
@@ -708,7 +776,7 @@ class ProjectWorkspaceService:
             or record.project.internal_project_number
         )
         now = datetime.now(UTC).isoformat()
-        return {
+        payload = {
             "project_name": str(meta.get("project_name") or record.project.name),
             "owner": str(meta.get("owner") or record.project.client),
             "owner_client": str(meta.get("owner") or record.project.client),
@@ -727,6 +795,13 @@ class ProjectWorkspaceService:
             "lifecycle_stage": str(
                 meta.get("lifecycle_stage") or record.project.status.value
             ),
+            "lifecycle_plan": dict(meta.get("lifecycle_plan") or {}),
+            "lifecycle_definition_key": str(
+                meta.get("lifecycle_definition_key") or "atlas.av.lifecycle"
+            ),
+            "lifecycle_schema_version": str(
+                meta.get("lifecycle_schema_version") or "1.0"
+            ),
             "created_at": str(meta.get("created_at") or record.created_at),
             "last_opened": record.last_opened_at,
             "last_modified": now,
@@ -735,6 +810,7 @@ class ProjectWorkspaceService:
             "reference": record.is_reference,
             "archived": record.archived,
         }
+        return payload
 
     @classmethod
     def _from_repository_payloads(
@@ -767,6 +843,9 @@ class ProjectWorkspaceService:
             **dict(payload.get("metadata") or {}),
             **normalized_meta,
         }
+        lifecycle_plan_payload = normalized_meta.get("lifecycle_plan")
+        if isinstance(lifecycle_plan_payload, dict) and lifecycle_plan_payload:
+            payload["metadata"]["lifecycle_plan"] = lifecycle_plan_payload
         payload["workspace_state"] = dict(payload.get("workspace_state") or {})
         payload["pinned"] = bool(
             metadata_payload.get("pinned", payload.get("pinned", False))
@@ -831,7 +910,130 @@ class ProjectWorkspaceService:
                 normalized[field_name] = None
         if "engineers" not in normalized:
             normalized["engineers"] = []
+        if "lifecycle_plan" not in normalized:
+            normalized["lifecycle_plan"] = {}
+        if "lifecycle_definition_key" not in normalized:
+            normalized["lifecycle_definition_key"] = "atlas.av.lifecycle"
+        if "lifecycle_schema_version" not in normalized:
+            normalized["lifecycle_schema_version"] = "1.0"
         return normalized
+
+    def _update_lifecycle_snapshot(
+        self,
+        record: ProjectWorkspaceRecord,
+        *,
+        rebuild: bool = False,
+    ) -> None:
+        lifecycle_plan = self._build_lifecycle_plan(record, rebuild=rebuild)
+        self._apply_lifecycle_plan(record, lifecycle_plan)
+
+    def _build_lifecycle_plan(
+        self,
+        record: ProjectWorkspaceRecord,
+        *,
+        rebuild: bool = False,
+    ) -> LifecyclePlan:
+        if not rebuild:
+            existing_payload = record.metadata.get("lifecycle_plan")
+            if isinstance(existing_payload, dict) and existing_payload.get(
+                "current_stage_key"
+            ):
+                return LifecyclePlan.from_dict(existing_payload)
+
+        lifecycle_stage = str(
+            record.metadata.get("lifecycle_stage")
+            or record.metadata.get("status")
+            or record.project.status.value
+        )
+        existing_payload = record.metadata.get("lifecycle_plan")
+        history_events: list[LifecycleHistoryEvent] = []
+        if isinstance(existing_payload, dict):
+            history_events = [
+                LifecycleHistoryEvent.from_dict(dict(item))
+                for item in list(existing_payload.get("history_events") or [])
+                if isinstance(item, dict)
+            ]
+        return project_lifecycle_from_legacy(
+            record.project.project_id,
+            record.metadata.get("tenant_id") or "default",
+            legacy_status=record.project.status,
+            lifecycle_stage=lifecycle_stage,
+            history_events=history_events,
+            resume_stage_key=(
+                existing_payload.get("resume_stage_key")
+                if isinstance(existing_payload, dict)
+                else None
+            ),
+        )
+
+    def _lifecycle_plan_for_record(
+        self, record: ProjectWorkspaceRecord
+    ) -> LifecyclePlan:
+        return self._build_lifecycle_plan(record, rebuild=False)
+
+    def _apply_lifecycle_plan(
+        self,
+        record: ProjectWorkspaceRecord,
+        lifecycle_plan: LifecyclePlan,
+    ) -> None:
+        record.metadata["lifecycle_plan"] = lifecycle_plan.to_dict()
+        record.metadata["lifecycle_definition_key"] = lifecycle_plan.definition_key
+        record.metadata["lifecycle_schema_version"] = lifecycle_plan.schema_version
+        record.metadata["lifecycle_stage"] = lifecycle_plan.current_stage_key
+        legacy_status_value = (
+            lifecycle_plan.legacy_project_status or record.project.status.value
+        )
+        record.metadata["status"] = legacy_status_value
+        if record.project.status.value != legacy_status_value:
+            record.project.status = ProjectStatus(legacy_status_value)
+
+    def _transition_record_lifecycle(
+        self,
+        record: ProjectWorkspaceRecord,
+        *,
+        target_stage_key: str,
+        reason: str,
+        actor: str,
+        tenant_id: str | None = None,
+    ) -> ProjectWorkspaceRecord:
+        current_plan = self._lifecycle_plan_for_record(record)
+        tenant_scope = str(tenant_id or record.metadata.get("tenant_id") or "default")
+        updated_plan, event = self.lifecycle_engine.set_stage(
+            current_plan,
+            target_stage_key,
+            actor=actor,
+            reason=reason,
+            tenant_id=tenant_scope,
+        )
+        previous_status = record.project.status
+        self._apply_lifecycle_plan(record, updated_plan)
+        new_status = ProjectStatus(
+            updated_plan.legacy_project_status or previous_status.value
+        )
+        if previous_status != new_status:
+            record.project.lifecycle_events.append(
+                ProjectLifecycleEvent(
+                    from_status=previous_status,
+                    to_status=new_status,
+                    note=reason,
+                    changed_by=actor,
+                )
+            )
+        record.project.status = new_status
+        self.manager.log(
+            record.workspace_id,
+            "project_lifecycle_transitioned",
+            {
+                "actor": actor,
+                "reason": reason,
+                "source_stage": event.source_stage,
+                "destination_stage": event.destination_stage,
+                "source_status": event.source_status,
+                "destination_status": event.destination_status,
+                "event_id": event.event_id,
+            },
+        )
+        return record
 
     @staticmethod
     def _sort_key(record: ProjectWorkspaceRecord) -> tuple[str, str]:

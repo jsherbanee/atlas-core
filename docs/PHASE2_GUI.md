@@ -219,6 +219,19 @@ Advanced behavior:
 - an advanced expander provides Open from local path for development/recovery use only
 - manual path entry is no longer the default workflow
 
+## Sprint L-01 Lifecycle UI
+
+L-01 adds lifecycle-engine awareness to existing project-facing GUI surfaces without introducing downstream execution workflows.
+
+Current GUI behavior:
+- Create New Project now uses canonical lifecycle stage options instead of only legacy project statuses
+- Project Settings now shows lifecycle-engine summary context, applicable-stage sequence, available transitions, and recent lifecycle history
+- lifecycle stage changes in Project Settings require a transition reason when the selected stage changes
+- Project Object Workspace can display lifecycle context through shared universal object projection paths
+
+Still deferred:
+- dedicated lifecycle workspace pages for procurement, installation, commissioning, service, or asset-lifecycle operations
+
 ## Projects Library
 Projects is the primary project library.
 

@@ -142,3 +142,12 @@ W-03 Working Set handoff note:
 - deeper coverage for vendor and service project-backlinks depends on stronger deterministic relationship surfacing in existing repository artifacts
 - additional object-detail pages can adopt the same return-context affordance in future W-series hardening
 - broader object-family migration beyond W-03 controlled scope remains deferred
+
+## L-01 Lifecycle Continuity Extension
+
+Sprint L-01 keeps Workspace Intelligence deterministic while adding lifecycle-engine continuity for project records.
+
+Current behavior:
+- project workspace state now persists lifecycle-engine snapshot data through existing repository-backed metadata
+- project object selection and Object Workspace handoff preserve canonical lifecycle stage and legacy-compatible status together
+- lifecycle history and recommended next action are available to shared project-facing workspace surfaces without introducing a second continuity store

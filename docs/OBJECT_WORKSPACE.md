@@ -171,3 +171,16 @@ Initial event classes include:
 - future permission-aware action gating should reuse the action contract without moving business logic into the registry layer
 - activity/history depth remains source-dependent and should continue expanding through existing deterministic audit/history repositories
 - full migration of additional lifecycle object families (for example systems, rooms, risks, RFIs, and evidence) remains deferred to future W-series hardening
+
+## L-01 Project Lifecycle Context
+
+Sprint L-01 extends Project Object Workspace compatibility by projecting lifecycle-engine context through the shared object shell.
+
+Implemented in L-01:
+- project object identity now preserves canonical lifecycle stage via shared lifecycle-state fields
+- project activity/history can render lifecycle transition payloads with reason and before/after stage context
+- project object routing continues using the shared object workspace without replacing authoritative project settings/actions
+
+Deferred in L-01:
+- generalized lifecycle-engine rendering for all object families
+- object-specific lifecycle workflow controls outside Project

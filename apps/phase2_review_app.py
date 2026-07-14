@@ -14,7 +14,12 @@ import subprocess
 from typing import Any
 
 from atlas_core import __version__
-from atlas_core.domain import OrganizationRole, Project, ProjectStatus
+from atlas_core.domain import (
+    AVLifecycleEngine,
+    OrganizationRole,
+    Project,
+    ProjectStatus,
+)
 from atlas_core.services.phase2_review_context_service import (
     DEFAULT_MAW_REFERENCE_PACKAGE,
     build_intake_review_context,
@@ -79,6 +84,8 @@ PROJECT_MANAGER_PAGES = [
     "Create New Project",
     "Open Existing Project",
 ]
+
+_AV_LIFECYCLE_ENGINE = AVLifecycleEngine.default()
 
 WORKFLOW_PAGES = [
     "Project Summary",
@@ -3957,10 +3964,25 @@ def _init_session_state(st: Any) -> None:
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
-    status = record.project.status
-    if isinstance(status, ProjectStatus):
-        return status.value.replace("_", " ").title()
-    return str(status).replace("_", " ").title()
+    lifecycle_stage = _safe_text(
+        record.metadata.get("lifecycle_stage"),
+        getattr(record.project.status, "value", record.project.status),
+    )
+    return lifecycle_stage.replace("_", " ").title()
+
+
+def _lifecycle_stage_options() -> list[str]:
+    return [stage.key for stage in _AV_LIFECYCLE_ENGINE.definition.stages]
+
+
+def _lifecycle_stage_label(stage_key: str) -> str:
+    normalized = _safe_text(stage_key, "")
+    if not normalized:
+        return "Unknown"
+    try:
+        return _AV_LIFECYCLE_ENGINE.stage_label(normalized)
+    except Exception:
+        return normalized.replace("_", " ").title()
 
 
 def _atlas_bid_id(record: ProjectWorkspaceRecord) -> str:
@@ -3988,10 +4010,24 @@ def _is_awarded_or_execution_stage(value: Any) -> bool:
     normalized = _safe_text(value, "").strip().lower().replace("_", " ")
     return normalized in {
         "awarded",
+        "award",
+        "project initialization",
         "engineering",
+        "submittals",
         "procurement",
+        "logistics and receiving",
+        "project management",
+        "field installation",
+        "programming and configuration",
+        "testing and commissioning",
+        "training",
+        "punch and completion",
         "active",
         "closeout",
+        "warranty",
+        "service and support",
+        "asset lifecycle",
+        "upgrade or replacement",
         "archived",
     }
 
@@ -7630,17 +7666,34 @@ def _object_workspace_activity_rows(
         except Exception:
             history_rows = []
         for item in history_rows:
+            item_payload = (
+                dict(item.get("payload") or {})
+                if isinstance(item.get("payload"), dict)
+                else {}
+            )
             rows.append(
                 {
                     "timestamp": _safe_text(item.get("timestamp"), "n/a"),
                     "activity": _safe_text(item.get("event_type"), "event"),
-                    "actor": _safe_text(item.get("actor"), "system"),
-                    "summary": _safe_text(item.get("event_type"), "project event")
-                    .replace("_", " ")
-                    .title(),
+                    "actor": _safe_text(
+                        item_payload.get("actor"),
+                        _safe_text(item.get("actor"), "system"),
+                    ),
+                    "summary": _safe_text(
+                        item_payload.get("reason"),
+                        _safe_text(item.get("event_type"), "project event")
+                        .replace("_", " ")
+                        .title(),
+                    ),
                     "source": "project_history",
-                    "before": "",
-                    "after": "",
+                    "before": _safe_text(
+                        item_payload.get("source_stage"),
+                        _safe_text(item_payload.get("source_status"), ""),
+                    ),
+                    "after": _safe_text(
+                        item_payload.get("destination_stage"),
+                        _safe_text(item_payload.get("destination_status"), ""),
+                    ),
                 }
             )
 
@@ -7823,9 +7876,27 @@ def _render_universal_object_workspace_page(
     _ensure_object_workspace_view_state(st)
     kind, data, adapter_key, selected_project_id = _selection_for_object_workspace(st)
     try:
+        payload = dict(data)
+        if kind in {"project", "project_record"} and record is not None:
+            payload = {
+                **record.metadata,
+                **payload,
+                "workspace_id": record.workspace_id,
+                "project_id": record.project.project_id,
+                "project_name": record.project.name,
+                "client_project_number": _client_project_number(record),
+                "internal_project_number": _internal_project_number(record),
+                "status": _safe_text(
+                    record.metadata.get("status"), record.project.status.value
+                ),
+                "lifecycle_stage": _safe_text(
+                    record.metadata.get("lifecycle_stage"), _project_stage(record)
+                ),
+                "lifecycle_plan": dict(record.metadata.get("lifecycle_plan") or {}),
+            }
         universal_object = _universal_object_registry().adapt(
             adapter_key,
-            dict(data),
+            payload,
             tenant_id=_safe_text(st.session_state.get(_tenant_scope_key()), "local"),
             owning_workspace=(
                 "Knowledge" if kind in _knowledge_selection_kinds() else "Projects"
@@ -8071,6 +8142,9 @@ def _open_search_reference(
     workspace_service: ProjectWorkspaceService,
     reference: dict[str, Any],
 ) -> None:
+    route = _safe_text(reference.get("route"), "Overview")
+    selection_kind = _safe_text(reference.get("selection_kind"), "project")
+    selection_data = dict(reference.get("selection_data") or {})
     _record_return_context(
         st,
         source_label=_safe_text(
@@ -8078,10 +8152,12 @@ def _open_search_reference(
             _safe_text(reference.get("route"), "Object"),
         ),
     )
-    selection_kind = _safe_text(reference.get("selection_kind"), "project")
-    selection_data = dict(reference.get("selection_data") or {})
+
     if selection_kind == "project_record":
-        workspace_id = _safe_text(selection_data.get("workspace_id"), "")
+        workspace_id = _safe_text(
+            selection_data.get("workspace_id"),
+            _safe_text(reference.get("object_id"), ""),
+        )
         if workspace_id:
             records = {
                 item.workspace_id: item
@@ -8096,9 +8172,6 @@ def _open_search_reference(
                 _open_project_record(st, selected_record, workspace_service)
                 return
 
-    route = _safe_text(reference.get("route"), "Overview")
-    selection_kind = _safe_text(reference.get("selection_kind"), "project")
-    selection_data = dict(reference.get("selection_data") or {})
     if selection_kind in OBJECT_WORKSPACE_SUPPORTED_KINDS:
         st.session_state["atlas_active_page"] = "Object Workspace"
         _set_context_selection(st, selection_kind, selection_data)
@@ -8188,9 +8261,6 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
         ],
         "filters": {
             "file_search": str(st.session_state.get("atlas_file_search") or ""),
-            "equipment_search": str(
-                st.session_state.get("atlas_equipment_search") or ""
-            ),
             "search_type_filters": list(
                 st.session_state.get("atlas_search_type_filters") or []
             ),
@@ -13576,8 +13646,9 @@ def _render_create_project_page(
         )
         lifecycle_stage = st.selectbox(
             "Lifecycle Stage",
-            options=[status.value for status in ProjectStatus],
+            options=_lifecycle_stage_options(),
             index=1,
+            format_func=_lifecycle_stage_label,
         )
         with st.expander("Optional Project Details", expanded=False):
             client_project_number = st.text_input("Client Project Number")
@@ -13625,7 +13696,6 @@ def _render_create_project_page(
         issue_date=issue_date.strip() or None,
         location=location.strip() or None,
         bid_date=bid_date.strip() or None,
-        status=ProjectStatus(lifecycle_stage),
         lifecycle_stage=lifecycle_stage,
     )
     workspace_service.save_record(record)
@@ -26082,7 +26152,68 @@ def _render_settings_page(
                 "Lifecycle stage is awarded/execution and Internal Project Number is not set. Assign it below when available."
             )
 
-        stage_options = [status.value for status in ProjectStatus]
+        lifecycle_plan = workspace_service.lifecycle_plan_for_record(record)
+        stage_options = _lifecycle_stage_options()
+        available_transitions = (
+            workspace_service.available_project_lifecycle_transitions(
+                record.workspace_id
+            )
+        )
+        st.markdown("### Lifecycle Engine")
+        st.dataframe(
+            [
+                {
+                    "Current Stage": _lifecycle_stage_label(
+                        lifecycle_plan.current_stage_key
+                    ),
+                    "Stage Status": lifecycle_plan.current_stage_status.value,
+                    "Legacy Status": _safe_text(
+                        lifecycle_plan.legacy_project_status,
+                        record.project.status.value,
+                    ),
+                    "Next Action": _safe_text(
+                        getattr(
+                            lifecycle_plan.readiness, "recommended_next_action", None
+                        ),
+                        "n/a",
+                    ),
+                    "History Events": len(lifecycle_plan.history_events),
+                }
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+        st.caption(
+            "Applicable sequence: "
+            + " -> ".join(
+                _lifecycle_stage_label(stage_key)
+                for stage_key in lifecycle_plan.applicable_stage_keys
+            )
+        )
+        if available_transitions:
+            st.caption(
+                "Available transitions: "
+                + ", ".join(
+                    _lifecycle_stage_label(_safe_text(item.get("to_stage_key"), ""))
+                    for item in available_transitions
+                )
+            )
+        if lifecycle_plan.history_events:
+            st.dataframe(
+                [
+                    {
+                        "Timestamp": item.timestamp,
+                        "From": _lifecycle_stage_label(item.source_stage),
+                        "To": _lifecycle_stage_label(item.destination_stage),
+                        "Reason": item.reason,
+                        "Actor": item.actor,
+                    }
+                    for item in reversed(lifecycle_plan.history_events[-10:])
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
         with st.expander("Edit Project Metadata", expanded=False):
             owner_input = st.text_input(
                 "Owner / Client",
@@ -26094,12 +26225,19 @@ def _render_settings_page(
                 options=stage_options,
                 index=(
                     stage_options.index(
-                        _safe_text(lifecycle_stage, ProjectStatus.INTAKE.value)
+                        _safe_text(lifecycle_plan.current_stage_key, lifecycle_stage)
                     )
-                    if _safe_text(lifecycle_stage, "") in stage_options
-                    else stage_options.index(ProjectStatus.INTAKE.value)
+                    if _safe_text(lifecycle_plan.current_stage_key, "") in stage_options
+                    else stage_options.index("bid_intake")
                 ),
+                format_func=_lifecycle_stage_label,
                 key=f"atlas_settings_lifecycle_{record.workspace_id}",
+            )
+            lifecycle_reason_input = st.text_input(
+                "Lifecycle Transition Reason",
+                value="",
+                key=f"atlas_settings_lifecycle_reason_{record.workspace_id}",
+                help="Required when changing the lifecycle stage through the engine.",
             )
             client_project_number_input = st.text_input(
                 "Client Project Number",
@@ -26170,29 +26308,35 @@ def _render_settings_page(
                 key=f"atlas_settings_save_metadata_{record.workspace_id}",
                 width="stretch",
             ):
-                updated = workspace_service.update_project_identity_metadata(
-                    record.workspace_id,
-                    owner=owner_input,
-                    lifecycle_stage=lifecycle_input,
-                    client_project_number=client_project_number_input,
-                    internal_project_number=(
-                        internal_project_number_input
-                        if not internal_disabled
-                        else _internal_project_number(record)
-                    ),
-                    consultant=consultant_input,
-                    general_contractor=general_contractor_input,
-                    electrical_contractor=electrical_contractor_input,
-                    architect=architect_input,
-                    engineers=[
-                        item.strip()
-                        for item in engineers_input.split(",")
-                        if isinstance(item, str) and item.strip()
-                    ],
-                    issue_date=issue_date_input,
-                    location=location_input,
-                    bid_date=bid_date_input,
-                )
+                try:
+                    updated = workspace_service.update_project_identity_metadata(
+                        record.workspace_id,
+                        owner=owner_input,
+                        lifecycle_stage=lifecycle_input,
+                        lifecycle_reason=lifecycle_reason_input,
+                        lifecycle_actor="atlas-ui",
+                        client_project_number=client_project_number_input,
+                        internal_project_number=(
+                            internal_project_number_input
+                            if not internal_disabled
+                            else _internal_project_number(record)
+                        ),
+                        consultant=consultant_input,
+                        general_contractor=general_contractor_input,
+                        electrical_contractor=electrical_contractor_input,
+                        architect=architect_input,
+                        engineers=[
+                            item.strip()
+                            for item in engineers_input.split(",")
+                            if isinstance(item, str) and item.strip()
+                        ],
+                        issue_date=issue_date_input,
+                        location=location_input,
+                        bid_date=bid_date_input,
+                    )
+                except ValueError as exc:
+                    st.error(str(exc))
+                    return
                 st.session_state["atlas_active_workspace_id"] = updated.workspace_id
                 st.success("Project metadata updated.")
                 st.rerun()

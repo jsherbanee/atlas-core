@@ -21,6 +21,32 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic W Sprint W-03 Universal Object Workspace)
 
+## Unreleased (Epic L Sprint L-01 AV Lifecycle Engine Foundation)
+
+### Improved
+
+- Atlas now includes a deterministic AV Lifecycle Engine with canonical lifecycle stages from lead through archived
+- lifecycle state is now persisted through a compatibility-safe lifecycle plan snapshot while preserving legacy project status and lifecycle stage fields
+- Project Settings now shows lifecycle-engine context, available transitions, applicable sequence, and recent lifecycle history
+- project lifecycle transitions now require a reason and are auditable through repository history
+- Project Object Workspace and shared universal-object projection paths now carry canonical lifecycle context for project records
+
+### Scope Notes
+
+- lifecycle foundation only
+- no procurement, installation, commissioning, service, or asset-lifecycle execution workflows
+- no Epic E start
+
+### Validation
+
+- focused lifecycle, project workspace, universal object, and object workspace tests passed for the new L-01 behavior
+- full quality gates passed (`black`, `ruff`, `mypy`, `pytest`) with full-suite regression count at 1254 tests
+- targeted validation confirmed compatibility-safe legacy project loading, deterministic invalid-transition blocking, required transition reasons, lifecycle history rendering, and no unexpected project-file rewrites in the validated service paths
+
+### Deferred Lifecycle Notes
+
+- downstream workflow modules remain intentionally deferred behind the new lifecycle-engine contracts
+
 ### Improved
 
 - Atlas now includes a reusable Universal Object Workspace UI inside the existing shell, backed by the W-02 universal object contract and registry

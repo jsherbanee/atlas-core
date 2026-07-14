@@ -6,6 +6,7 @@ import sys
 from typing import Any
 
 from atlas_core.domain import Project, ProjectStatus
+from atlas_core.domain.av_lifecycle import build_default_lifecycle_plan
 from atlas_core.services.project_workspace_service import ProjectWorkspaceRecord
 
 _MODULE_PATH = Path(__file__).resolve().parents[1] / "apps" / "phase2_review_app.py"
@@ -52,6 +53,24 @@ class _FakeWorkspaceService:
             if record.workspace_id == workspace_id:
                 return record
         raise ValueError("workspace not found")
+
+    def lifecycle_plan_for_record(self, record: ProjectWorkspaceRecord) -> Any:
+        return build_default_lifecycle_plan(
+            project_id=record.workspace_id,
+            tenant_id="local",
+            current_stage_key="project_management",
+        )
+
+    def available_project_lifecycle_transitions(
+        self, workspace_id: str
+    ) -> list[dict[str, Any]]:
+        _ = workspace_id
+        return [
+            {
+                "to_stage_key": "field_installation",
+                "label": "Advance to Field Installation",
+            }
+        ]
 
 
 class _FakeSt:
@@ -157,6 +176,11 @@ class _FakeSt:
 
 
 def _record() -> ProjectWorkspaceRecord:
+    lifecycle_plan = build_default_lifecycle_plan(
+        project_id="maw-demo",
+        tenant_id="local",
+        current_stage_key="project_management",
+    )
     return ProjectWorkspaceRecord(
         workspace_id="maw-demo",
         project=Project(
@@ -165,6 +189,11 @@ def _record() -> ProjectWorkspaceRecord:
             client="MAW",
             status=ProjectStatus.INTAKE,
         ),
+        metadata={
+            "status": "active",
+            "lifecycle_stage": "project_management",
+            "lifecycle_plan": lifecycle_plan.to_dict(),
+        },
     )
 
 
@@ -382,3 +411,4 @@ def test_object_workspace_project_compatibility_uses_record_context() -> None:
     flattened = "\n".join(str(item) for item in st.dataframes)
     assert "MAW" in flattened
     assert "project" in flattened.lower()
+    assert "project_management" in flattened.lower()

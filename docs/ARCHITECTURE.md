@@ -218,6 +218,27 @@ This remains a UI-shell refinement only:
 
 ## Sprint X-07 Focused Search and Navigation Constraints (Closed)
 
+## Sprint L-01 Lifecycle Engine Foundation
+
+L-01 adds a deterministic lifecycle engine at the engine layer.
+
+Architecture rules:
+- lifecycle stage definitions, transition rules, readiness contracts, and lifecycle history logic live in the domain layer
+- workspace services orchestrate persistence and compatibility projections but do not redefine lifecycle rules
+- UI surfaces consume lifecycle-engine outputs and preserve legacy project status compatibility
+- universal object projections expose lifecycle context through shared contracts rather than separate lifecycle-specific adapters
+
+Persistence posture:
+- `Project.status` remains compatibility status
+- `metadata["lifecycle_stage"]` remains compatibility stage projection
+- `metadata["lifecycle_plan"]` is the persisted engine snapshot
+- `history/events.jsonl` carries explicit lifecycle transition events for repository-wide auditability
+
+Explicit non-goals for L-01:
+- no procurement, installation, commissioning, or service workflow modules
+- no accounting or ERP lifecycle execution
+- no replacement of authoritative project repository contracts
+
 X-07 continues product hardening without architecture expansion:
 
 - no new domain capability

@@ -18,7 +18,10 @@ from atlas_core.contracts.universal_object_contract import (
     UniversalObjectPresentation,
     UniversalObjectRelationship,
 )
+from atlas_core.domain.av_lifecycle import AVLifecycleEngine, LifecyclePlan
 from atlas_core.domain import Project
+
+_LIFECYCLE_ENGINE = AVLifecycleEngine.default()
 
 UniversalObjectBuilder = Callable[..., UniversalObject]
 
@@ -66,6 +69,17 @@ def _status_and_lifecycle(source: Any) -> tuple[str | None, str | None, bool]:
             _safe_text(payload.get("lifecycle_stage"), status),
         ),
     )
+    lifecycle_plan_payload = payload.get("lifecycle_plan")
+    if isinstance(lifecycle_plan_payload, dict) and lifecycle_plan_payload.get(
+        "current_stage_key"
+    ):
+        lifecycle = _safe_text(
+            lifecycle_plan_payload.get("current_stage_key"), lifecycle
+        )
+        status = _safe_text(
+            lifecycle_plan_payload.get("legacy_project_status"),
+            _safe_text(lifecycle_plan_payload.get("current_stage_status"), status),
+        )
     return (status or None, lifecycle or None, archived)
 
 
@@ -114,13 +128,29 @@ def _default_actions(
 
 
 def _default_lifecycle(
-    *, state: str | None, archived: bool
+    *, state: str | None, archived: bool, source: dict[str, Any] | None = None
 ) -> UniversalObjectLifecycle:
     current_state = state or ("archived" if archived else "active")
     transitions = [
         UniversalObjectLifecycleTransition(state="archived", reason="archive"),
         UniversalObjectLifecycleTransition(state="active", reason="restore"),
     ]
+    if source is not None:
+        lifecycle_plan_payload = source.get("lifecycle_plan")
+        if isinstance(lifecycle_plan_payload, dict) and lifecycle_plan_payload.get(
+            "current_stage_key"
+        ):
+            try:
+                plan = LifecyclePlan.from_dict(lifecycle_plan_payload)
+                transitions = [
+                    UniversalObjectLifecycleTransition(
+                        state=item.to_stage_key,
+                        reason=item.label,
+                    )
+                    for item in _LIFECYCLE_ENGINE.available_transitions(plan)
+                ]
+            except Exception:
+                transitions = transitions
     return UniversalObjectLifecycle(
         current_state=current_state,
         allowed_transitions=transitions,
@@ -553,7 +583,11 @@ def _dict_object(
         actions=_default_actions(
             archived=archived, document_available=document_available
         ),
-        lifecycle=_default_lifecycle(state=lifecycle_state, archived=archived),
+        lifecycle=_default_lifecycle(
+            state=lifecycle_state,
+            archived=archived,
+            source=source,
+        ),
         presentation=_presentation(
             identity,
             secondary_label=secondary_label,
