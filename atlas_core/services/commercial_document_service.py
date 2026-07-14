@@ -256,9 +256,22 @@ class CommercialDocumentService:
         line_metadata: dict[str, Any] | None = None,
     ) -> CommercialDocumentLineItem:
         self._assert_mutable(document)
+        resolved_sequence = sequence or len(document.lines) + 1
+        resolved_line_metadata = dict(line_metadata or {})
+        presentation = dict(resolved_line_metadata.get("presentation") or {})
+        if "line_type" not in presentation:
+            root_line_type = str(resolved_line_metadata.get("line_type") or "").strip()
+            presentation["line_type"] = (
+                "service" if root_line_type.lower() == "service" else "item"
+            )
+        if "display_sequence" not in presentation:
+            presentation["display_sequence"] = resolved_sequence
+        if "manual_display_sequence" not in presentation:
+            presentation["manual_display_sequence"] = resolved_sequence
+        resolved_line_metadata["presentation"] = presentation
         line = CommercialDocumentLineItem(
             line_id=self.generate_line_id(document),
-            sequence=sequence or len(document.lines) + 1,
+            sequence=resolved_sequence,
             description=description,
             quantity=quantity,
             unit_price=unit_price,
@@ -272,7 +285,7 @@ class CommercialDocumentService:
             source_line_id=source_line_id,
             related_document_id=related_document_id,
             related_line_id=related_line_id,
-            line_metadata=line_metadata,
+            line_metadata=resolved_line_metadata,
         )
         document.lines.append(line)
         self.recompute_totals(document)
@@ -325,6 +338,29 @@ class CommercialDocumentService:
         current = dict(document.document_metadata or {}) if merge else {}
         current.update(dict(metadata))
         document.document_metadata = current
+        document.updated_at = _utc_now()
+        self._sync_current_revision_snapshot(document)
+
+    def set_line_metadata(
+        self,
+        document: CommercialDocument,
+        *,
+        line_id: str,
+        metadata: dict[str, Any],
+        merge: bool = True,
+        force: bool = False,
+    ) -> None:
+        if not force:
+            self._assert_mutable(document)
+        target_line = next(
+            (line for line in document.lines if line.line_id == line_id),
+            None,
+        )
+        if target_line is None:
+            raise ValueError("line was not found")
+        current = dict(target_line.line_metadata or {}) if merge else {}
+        current.update(dict(metadata))
+        target_line.line_metadata = current
         document.updated_at = _utc_now()
         self._sync_current_revision_snapshot(document)
 

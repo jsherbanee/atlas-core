@@ -346,6 +346,37 @@ class CommercialDocumentLineItem:
     def total_amount(self) -> Decimal:
         return self.extended_amount + self.tax_amount
 
+    @property
+    def presentation_metadata(self) -> dict[str, Any]:
+        payload = dict(self.line_metadata or {})
+        nested = payload.get("presentation")
+        if isinstance(nested, dict):
+            return dict(nested)
+        return {}
+
+    @property
+    def presentation_line_type(self) -> str:
+        presentation = self.presentation_metadata
+        nested_type = _optional_text(presentation.get("line_type"))
+        if nested_type:
+            return nested_type.lower()
+        root_type = _optional_text((self.line_metadata or {}).get("line_type"))
+        if root_type and root_type.lower() == "service":
+            return "service"
+        return "item"
+
+    @property
+    def display_sequence(self) -> int:
+        presentation = self.presentation_metadata
+        try:
+            return int(presentation.get("display_sequence") or self.sequence)
+        except TypeError, ValueError:
+            return self.sequence
+
+    @property
+    def contributes_to_totals(self) -> bool:
+        return self.presentation_line_type in {"item", "service"}
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "line_id": self.line_id,
@@ -433,10 +464,21 @@ class CommercialDocumentTotals:
         currency: str = "USD",
     ) -> "CommercialDocumentTotals":
         subtotal = sum(
-            (line.quantity * line.unit_price for line in lines), Decimal("0")
+            (
+                line.quantity * line.unit_price
+                for line in lines
+                if line.contributes_to_totals
+            ),
+            Decimal("0"),
         )
-        discount_total = sum((line.discount for line in lines), Decimal("0"))
-        tax_total = sum((line.tax_amount for line in lines), Decimal("0"))
+        discount_total = sum(
+            (line.discount for line in lines if line.contributes_to_totals),
+            Decimal("0"),
+        )
+        tax_total = sum(
+            (line.tax_amount for line in lines if line.contributes_to_totals),
+            Decimal("0"),
+        )
         grand_total = (subtotal - discount_total) + tax_total
         return cls(
             currency=currency,

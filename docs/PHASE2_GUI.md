@@ -808,6 +808,15 @@ Credit Memo actions:
 - Activity
 - Export PDF
 
+## Transactions GUI: T-07 Line Presentation Controls
+
+Line-based transaction views now expose presentation controls for:
+- group creation and subtotal visibility
+- comment and blank spacer rows
+- manual order updates through explicit line-order lists
+- preview sort, apply sort, and restore manual order
+- visible-column selection for PDF output
+
 Default sections:
 - Project Overview
 - Documents Reviewed

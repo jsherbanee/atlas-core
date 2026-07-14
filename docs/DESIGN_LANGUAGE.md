@@ -259,6 +259,16 @@ The lifecycle timeline should feel like an engineering control surface:
 
 X-11 continues product hardening without architecture expansion:
 
+## T-07 Line Presentation UX Posture
+
+Commercial document line presentation controls should feel like precise document-layout tools, not spreadsheets.
+
+Rules:
+- preserve dense but readable line presentation for grouped commercial documents
+- keep reorder, grouping, sorting, and visible-column controls explicit and deterministic
+- separate financial authority from layout controls visually and conceptually
+- comment and spacer rows should feel lightweight and editorial, not financially authoritative
+
 - no new product capabilities
 - no Epic E implementation start
 - no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows

@@ -30,30 +30,24 @@ from atlas_core.domain.commercial_document import (
     ApprovalState,
     CommercialDocument,
     CommercialDocumentLifecycleState,
-    CommercialNumberingPolicy,
     CommercialDocumentType,
+    CommercialNumberingPolicy,
     SyncStatus,
 )
-from atlas_core.services.phase2_review_context_service import (
-    DEFAULT_MAW_REFERENCE_PACKAGE,
-    build_intake_review_context,
-    build_reference_project_context,
+from atlas_core.services.assembly_expansion_service import AssemblyExpansionService
+from atlas_core.services.bom_review_service import BomReviewService
+from atlas_core.services.commercial_knowledge_service import (
+    CommercialKnowledgeService,
 )
-from atlas_core.services.project_workspace_service import (
-    ProjectWorkspaceRecord,
-    ProjectWorkspaceService,
-)
+from atlas_core.services.coordination_intelligence import CoordinationIntelligenceEngine
+from atlas_core.services.cost_engine_service import DeterministicCostEngine
+from atlas_core.services.drawing_intelligence import DrawingIntelligenceEngine
 from atlas_core.services.engineering_insights_service import (
     EngineeringIntelligenceResult,
     EngineeringInsightsService,
 )
-from atlas_core.services.drawing_intelligence import DrawingIntelligenceEngine
-from atlas_core.services.specification_intelligence import (
-    SpecificationIntelligenceEngine,
-    SpecificationReferenceType,
-)
-from atlas_core.services.coordination_intelligence import CoordinationIntelligenceEngine
-from atlas_core.services.resolver import EngineeringResolver, ResolverContext
+from atlas_core.services.estimate_engine_service import EstimateEngineService
+from atlas_core.services.estimate_service import DeterministicEstimateService
 from atlas_core.services.master_library import (
     CommercialProductService,
     MasterLibraryService,
@@ -61,28 +55,36 @@ from atlas_core.services.master_library import (
 from atlas_core.services.master_library.commercial_product_service import (
     ALLOWED_PURCHASING_CHANNELS,
 )
-from atlas_core.services.product_resolution_service import ProductResolutionService
-from atlas_core.services.bom_review_service import BomReviewService
+from atlas_core.services.phase2_review_context_service import (
+    DEFAULT_MAW_REFERENCE_PACKAGE,
+    build_intake_review_context,
+    build_reference_project_context,
+)
 from atlas_core.services.pricing_service import PricingService
+from atlas_core.services.product_resolution_service import ProductResolutionService
+from atlas_core.services.project_workspace_service import (
+    ProjectWorkspaceRecord,
+    ProjectWorkspaceService,
+)
+from atlas_core.services.resolver import EngineeringResolver, ResolverContext
+from atlas_core.services.runtime_workspace import ensure_runtime_workspace_root
 from atlas_core.services.sales_design_review_service import SalesDesignReviewService
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
-from atlas_core.services.estimate_service import DeterministicEstimateService
-from atlas_core.services.estimate_engine_service import EstimateEngineService
-from atlas_core.services.assembly_expansion_service import AssemblyExpansionService
-from atlas_core.services.commercial_knowledge_service import CommercialKnowledgeService
+from atlas_core.services.settings_service import SettingsService
+from atlas_core.services.specification_intelligence import (
+    SpecificationIntelligenceEngine,
+    SpecificationReferenceType,
+)
 from atlas_core.services.transactions_workspace_service import (
     TransactionsWorkspaceService,
 )
-from atlas_core.services.settings_service import SettingsService
-from atlas_core.services.cost_engine_service import DeterministicCostEngine
-from atlas_core.registry import ManufacturerRegistry
-from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
-from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
-from atlas_core.services.runtime_workspace import ensure_runtime_workspace_root
 from atlas_core.services.universal_object_registry import (
     UniversalObjectRegistry,
     build_default_universal_object_registry,
 )
+from atlas_core.registry import ManufacturerRegistry
+from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
+from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
 from atlas_core.ui.design_system import (
     atlas_stylesheet,
     render_empty_state_html,
@@ -6325,6 +6327,12 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": "entity",
             },
             {
+                "tertiary_key": "lines",
+                "label": "Lines",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
                 "tertiary_key": "customer_view",
                 "label": "Customer View",
                 "action_type": "detail_view",
@@ -12538,6 +12546,248 @@ def _transaction_row(document: Any) -> dict[str, Any]:
     }
 
 
+def _render_transaction_line_presentation_controls(
+    st: Any,
+    *,
+    service: TransactionsWorkspaceService,
+    document: CommercialDocument,
+    prefix: str,
+) -> None:
+    try:
+        snapshot = service.line_presentation_snapshot(document_id=document.document_id)
+    except Exception as exc:
+        st.info(f"Presentation controls unavailable: {exc}")
+        return
+
+    with st.expander("Line Presentation Controls", expanded=False):
+        rows = list(snapshot.get("rows") or [])
+        groups = list(snapshot.get("groups") or [])
+        st.dataframe(rows, width="stretch", hide_index=True)
+
+        group_cols = st.columns(4)
+        group_name = group_cols[0].text_input(
+            "New Group Name",
+            key=f"{prefix}_presentation_group_name",
+        )
+        group_show_subtotal = group_cols[1].checkbox(
+            "Show Group Subtotal",
+            key=f"{prefix}_presentation_group_show_subtotal",
+            value=True,
+        )
+        if group_cols[2].button(
+            "Create Group",
+            key=f"{prefix}_presentation_group_create",
+            width="stretch",
+        ):
+            try:
+                service.create_named_group(
+                    document_id=document.document_id,
+                    name=group_name or "New Group",
+                    show_subtotal=group_show_subtotal,
+                )
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to create group: {exc}")
+
+        line_options = [row["line_id"] for row in rows if row.get("line_id")]
+        group_options = [""] + [
+            _safe_text(group.get("group_id"), "")
+            for group in groups
+            if group.get("group_id")
+        ]
+        if line_options:
+            assign_cols = st.columns(3)
+            selected_line_id = assign_cols[0].selectbox(
+                "Assign Line",
+                options=line_options,
+                key=f"{prefix}_presentation_assign_line",
+            )
+            selected_group_id = assign_cols[1].selectbox(
+                "Target Group",
+                options=group_options,
+                key=f"{prefix}_presentation_assign_group",
+            )
+            if assign_cols[2].button(
+                "Move Line",
+                key=f"{prefix}_presentation_assign_apply",
+                width="stretch",
+            ):
+                try:
+                    service.assign_line_to_group(
+                        document_id=document.document_id,
+                        line_id=selected_line_id,
+                        group_id=selected_group_id or None,
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to move line: {exc}")
+
+            presentation_cols = st.columns(4)
+            presentation_text = presentation_cols[0].text_input(
+                "Comment Text",
+                key=f"{prefix}_presentation_comment_text",
+            )
+            presentation_line_type = presentation_cols[1].selectbox(
+                "Presentation Line Type",
+                options=["comment", "blank_spacer"],
+                key=f"{prefix}_presentation_line_type",
+            )
+            parent_line_id = presentation_cols[2].selectbox(
+                "Reference Line",
+                options=[""] + line_options,
+                key=f"{prefix}_presentation_parent_line",
+            )
+            presentation_group_id = presentation_cols[3].selectbox(
+                "Presentation Group",
+                options=group_options,
+                key=f"{prefix}_presentation_group_for_line",
+            )
+            if st.button(
+                "Add Presentation Line",
+                key=f"{prefix}_presentation_add_line",
+                width="stretch",
+            ):
+                try:
+                    service.add_presentation_line(
+                        document_id=document.document_id,
+                        line_type=presentation_line_type,
+                        text=presentation_text,
+                        group_id=presentation_group_id or None,
+                        parent_line_id=parent_line_id or None,
+                        comment_reference_line_id=parent_line_id or None,
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to add presentation line: {exc}")
+
+            reorder_value = st.text_area(
+                "Manual Order (comma-separated line IDs)",
+                value=",".join(line_options),
+                key=f"{prefix}_presentation_manual_order",
+                height=80,
+            )
+            reorder_cols = st.columns(4)
+            if reorder_cols[0].button(
+                "Apply Manual Order",
+                key=f"{prefix}_presentation_reorder_apply",
+                width="stretch",
+            ):
+                try:
+                    service.reorder_lines(
+                        document_id=document.document_id,
+                        ordered_line_ids=[
+                            item.strip()
+                            for item in reorder_value.split(",")
+                            if item.strip()
+                        ],
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to apply manual order: {exc}")
+
+            sort_column = reorder_cols[1].selectbox(
+                "Sort Column",
+                options=[
+                    "sku_or_part_number",
+                    "manufacturer",
+                    "description",
+                    "item_type",
+                    "quantity",
+                    "unit_price",
+                    "extended_price",
+                ],
+                key=f"{prefix}_presentation_sort_column",
+            )
+            sort_direction = reorder_cols[2].selectbox(
+                "Sort Direction",
+                options=["asc", "desc"],
+                key=f"{prefix}_presentation_sort_direction",
+            )
+            if reorder_cols[3].button(
+                "Preview Sort",
+                key=f"{prefix}_presentation_sort_preview",
+                width="stretch",
+            ):
+                preview = service.sort_lines(
+                    document_id=document.document_id,
+                    column=sort_column,
+                    direction=sort_direction,
+                    apply=False,
+                )
+                st.session_state[f"{prefix}_presentation_sort_preview_payload"] = (
+                    preview
+                )
+
+            sort_action_cols = st.columns(3)
+            if sort_action_cols[0].button(
+                "Apply Sort",
+                key=f"{prefix}_presentation_sort_apply",
+                width="stretch",
+            ):
+                try:
+                    service.sort_lines(
+                        document_id=document.document_id,
+                        column=sort_column,
+                        direction=sort_direction,
+                        apply=True,
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to apply sort: {exc}")
+            if sort_action_cols[1].button(
+                "Restore Manual Order",
+                key=f"{prefix}_presentation_restore_manual_order",
+                width="stretch",
+            ):
+                try:
+                    service.restore_manual_line_order(document_id=document.document_id)
+                    _save_transactions_workspace_state(st, service)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to restore manual order: {exc}")
+            visible_columns = st.multiselect(
+                "Visible Columns",
+                options=[
+                    "description",
+                    "quantity",
+                    "unit_price",
+                    "extended_price",
+                    "sku_or_part_number",
+                    "manufacturer",
+                    "item_type",
+                ],
+                default=list(snapshot.get("visible_columns") or []),
+                key=f"{prefix}_presentation_visible_columns",
+            )
+            if sort_action_cols[2].button(
+                "Save Visible Columns",
+                key=f"{prefix}_presentation_save_visible_columns",
+                width="stretch",
+            ):
+                try:
+                    service.set_visible_columns(
+                        document_id=document.document_id,
+                        visible_columns=visible_columns,
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to save visible columns: {exc}")
+
+            preview_rows = list(
+                st.session_state.get(f"{prefix}_presentation_sort_preview_payload")
+                or []
+            )
+            if preview_rows:
+                st.caption("Sort Preview")
+                st.dataframe(preview_rows, width="stretch", hide_index=True)
+
+
 def _render_transactions_workspace_page(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -13185,6 +13435,12 @@ def _render_transactions_workspace_page(
         tertiary == "lines"
         and selected_document.document_type == CommercialDocumentType.ESTIMATE
     ):
+        _render_transaction_line_presentation_controls(
+            st,
+            service=service,
+            document=selected_document,
+            prefix=prefix,
+        )
         if estimate_engine is None or not selected_revision:
             st.info("Estimate revision is not available yet.")
         else:
@@ -13609,6 +13865,12 @@ def _render_transactions_workspace_page(
         tertiary == "lines"
         and selected_document.document_type == CommercialDocumentType.SALES_ORDER
     ):
+        _render_transaction_line_presentation_controls(
+            st,
+            service=service,
+            document=selected_document,
+            prefix=prefix,
+        )
         st.dataframe(
             [
                 {
@@ -13630,6 +13892,12 @@ def _render_transactions_workspace_page(
         tertiary == "lines"
         and selected_document.document_type == CommercialDocumentType.RETURN_ORDER
     ):
+        _render_transaction_line_presentation_controls(
+            st,
+            service=service,
+            document=selected_document,
+            prefix=prefix,
+        )
         st.dataframe(
             [
                 {
@@ -13962,6 +14230,12 @@ def _render_transactions_workspace_page(
         tertiary == "details"
         and selected_document.document_type == CommercialDocumentType.CREDIT_MEMO
     ):
+        _render_transaction_line_presentation_controls(
+            st,
+            service=service,
+            document=selected_document,
+            prefix=prefix,
+        )
         st.dataframe(
             [service.detail_credit_memo(document_id=selected_document.document_id)],
             width="stretch",

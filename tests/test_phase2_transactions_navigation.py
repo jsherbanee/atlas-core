@@ -50,6 +50,7 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "revision_history",
         "archive",
         "restore",
+        "lines",
         "customer_view",
         "internal_view",
         "revisions",

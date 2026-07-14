@@ -46,6 +46,28 @@ class TransactionsOverviewMetrics:
 class TransactionsWorkspaceService:
     """Reusable transactions workspace behavior across all document families."""
 
+    _PRESENTATION_DOCUMENT_TYPES = {
+        CommercialDocumentType.ESTIMATE,
+        CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.RETURN_ORDER,
+        CommercialDocumentType.CREDIT_MEMO,
+    }
+    _DEFAULT_VISIBLE_COLUMNS = [
+        "description",
+        "quantity",
+        "unit_price",
+        "extended_price",
+    ]
+    _SORTABLE_COLUMNS = {
+        "sku_or_part_number",
+        "manufacturer",
+        "description",
+        "item_type",
+        "quantity",
+        "unit_price",
+        "extended_price",
+    }
+
     def __init__(
         self,
         *,
@@ -665,6 +687,7 @@ class TransactionsWorkspaceService:
                 source_line_id=line.line_id,
                 related_document_id=estimate.document_id,
                 related_line_id=line.line_id,
+                line_metadata=deepcopy(line.line_metadata),
             )
 
         self._commercial_service.add_relationship(
@@ -772,8 +795,12 @@ class TransactionsWorkspaceService:
         if source.document_type not in {
             CommercialDocumentType.ESTIMATE,
             CommercialDocumentType.SALES_ORDER,
+            CommercialDocumentType.RETURN_ORDER,
+            CommercialDocumentType.CREDIT_MEMO,
         }:
-            raise ValueError("only estimates and sales orders are supported")
+            raise ValueError(
+                "only estimates, sales orders, return orders, and credit memos are supported"
+            )
 
         duplicate = self.create_draft(
             tenant_id=source.tenant_id,
@@ -798,6 +825,11 @@ class TransactionsWorkspaceService:
                 unit_cost=line.unit_cost,
                 project_code=line.project_code,
                 product_or_service_reference=line.product_or_service_reference,
+                source_document_id=line.source_document_id,
+                source_line_id=line.source_line_id,
+                related_document_id=line.related_document_id,
+                related_line_id=line.related_line_id,
+                line_metadata=deepcopy(line.line_metadata),
             )
 
         if source.terms_and_conditions_snapshot:
@@ -816,6 +848,10 @@ class TransactionsWorkspaceService:
         duplicate.duplicated_by = actor
         duplicate.duplicated_at = _utc_now()
         duplicate.numbering_policy_snapshot = deepcopy(source.numbering_policy_snapshot)
+        duplicate.attachments = deepcopy(list(source.attachments or []))
+        duplicate.document_metadata = deepcopy(dict(source.document_metadata or {}))
+        duplicate.source_sales_order_id = source.source_sales_order_id
+        duplicate.source_invoice_id = source.source_invoice_id
 
         self._commercial_service.add_relationship(
             duplicate,
@@ -861,6 +897,260 @@ class TransactionsWorkspaceService:
         ]
         rows.sort(key=lambda item: int(item.get("revision_number") or 0))
         return rows
+
+    def line_presentation_snapshot(self, *, document_id: str) -> dict[str, Any]:
+        document = self._required_document(document_id)
+        self._assert_presentation_supported(document)
+        groups = self._presentation_groups(document)
+        subtotals = self._group_subtotals(document)
+        return {
+            "groups": groups,
+            "rows": [
+                self._line_presentation_row(line, groups, subtotals)
+                for line in self._ordered_lines(document)
+            ],
+            "visible_columns": self._visible_columns(document),
+            "active_sort": self._active_sort(document),
+        }
+
+    def create_named_group(
+        self,
+        *,
+        document_id: str,
+        name: str,
+        show_subtotal: bool = True,
+    ) -> dict[str, Any]:
+        document = self._required_document(document_id)
+        self._assert_presentation_supported(document)
+        self._commercial_service._assert_mutable(document)
+        groups = self._presentation_groups(document)
+        group_id = f"group-{len(groups) + 1}"
+        next_sequence = len(document.lines) + 1
+        header = self._commercial_service.add_line(
+            document,
+            description=name,
+            quantity=Decimal("0"),
+            unit_price=Decimal("0"),
+            sequence=next_sequence,
+            line_metadata={
+                "presentation": {
+                    "line_type": "group_header",
+                    "group_id": group_id,
+                    "display_sequence": next_sequence,
+                    "manual_display_sequence": next_sequence,
+                }
+            },
+        )
+        subtotal = self._commercial_service.add_line(
+            document,
+            description=f"{name} subtotal",
+            quantity=Decimal("0"),
+            unit_price=Decimal("0"),
+            sequence=next_sequence + 1,
+            line_metadata={
+                "presentation": {
+                    "line_type": "subtotal",
+                    "group_id": group_id,
+                    "display_sequence": next_sequence + 1,
+                    "manual_display_sequence": next_sequence + 1,
+                }
+            },
+        )
+        groups.append(
+            {
+                "group_id": group_id,
+                "name": name.strip(),
+                "collapsed": False,
+                "show_subtotal": bool(show_subtotal),
+                "header_line_id": header.line_id,
+                "subtotal_line_id": subtotal.line_id,
+            }
+        )
+        self._save_presentation_groups(document, groups)
+        self._capture_manual_order(document)
+        return dict(groups[-1])
+
+    def add_presentation_line(
+        self,
+        *,
+        document_id: str,
+        line_type: str,
+        text: str = "",
+        group_id: str | None = None,
+        parent_line_id: str | None = None,
+        comment_reference_line_id: str | None = None,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        self._assert_presentation_supported(document)
+        self._commercial_service._assert_mutable(document)
+        normalized_line_type = line_type.strip().lower()
+        if normalized_line_type not in {"comment", "blank_spacer"}:
+            raise ValueError("unsupported presentation line type")
+        next_sequence = len(document.lines) + 1
+        description = text if normalized_line_type != "blank_spacer" else "Spacer"
+        self._commercial_service.add_line(
+            document,
+            description=description or normalized_line_type,
+            quantity=Decimal("0"),
+            unit_price=Decimal("0"),
+            sequence=next_sequence,
+            line_metadata={
+                "presentation": {
+                    "line_type": normalized_line_type,
+                    "group_id": group_id,
+                    "parent_line_id": parent_line_id,
+                    "comment_reference_line_id": comment_reference_line_id,
+                    "display_sequence": next_sequence,
+                    "manual_display_sequence": next_sequence,
+                }
+            },
+        )
+        self._capture_manual_order(document)
+        return document
+
+    def assign_line_to_group(
+        self,
+        *,
+        document_id: str,
+        line_id: str,
+        group_id: str | None,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        self._assert_presentation_supported(document)
+        self._commercial_service._assert_mutable(document)
+        line = self._required_line(document, line_id)
+        presentation = dict(line.presentation_metadata)
+        presentation["group_id"] = group_id
+        self._commercial_service.set_line_metadata(
+            document,
+            line_id=line_id,
+            metadata={"presentation": presentation},
+        )
+        self._capture_manual_order(document)
+        return document
+
+    def reorder_lines(
+        self,
+        *,
+        document_id: str,
+        ordered_line_ids: list[str],
+        capture_manual_order: bool = True,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        self._assert_presentation_supported(document)
+        self._commercial_service._assert_mutable(document)
+        normalized_ids = [
+            line_id.strip() for line_id in ordered_line_ids if line_id.strip()
+        ]
+        expected_ids = {line.line_id for line in document.lines}
+        if set(normalized_ids) != expected_ids:
+            raise ValueError("ordered_line_ids must include every document line")
+        for index, line_id in enumerate(normalized_ids, start=1):
+            line = self._required_line(document, line_id)
+            presentation = dict(line.presentation_metadata)
+            presentation["display_sequence"] = index
+            presentation["manual_display_sequence"] = index
+            self._commercial_service.set_line_metadata(
+                document,
+                line_id=line_id,
+                metadata={"presentation": presentation},
+            )
+        if capture_manual_order:
+            self._capture_manual_order(document)
+        self._save_active_sort(document, None)
+        return document
+
+    def sort_lines(
+        self,
+        *,
+        document_id: str,
+        column: str,
+        direction: str,
+        apply: bool = False,
+    ) -> list[dict[str, Any]]:
+        document = self._required_document(document_id)
+        self._assert_presentation_supported(document)
+        normalized_column = column.strip().lower()
+        normalized_direction = direction.strip().lower()
+        if normalized_column not in self._SORTABLE_COLUMNS:
+            raise ValueError("unsupported sort column")
+        if normalized_direction not in {"asc", "desc"}:
+            raise ValueError("unsupported sort direction")
+        sorted_lines = self._sorted_presentation_lines(
+            document,
+            column=normalized_column,
+            direction=normalized_direction,
+        )
+        if apply:
+            if not self._manual_order(document):
+                self._capture_manual_order(document)
+            self.reorder_lines(
+                document_id=document_id,
+                ordered_line_ids=[line.line_id for line in sorted_lines],
+                capture_manual_order=False,
+            )
+            self._save_active_sort(
+                document,
+                {"column": normalized_column, "direction": normalized_direction},
+            )
+        groups = self._presentation_groups(document)
+        subtotals = self._group_subtotals(document)
+        return [
+            self._line_presentation_row(line, groups, subtotals)
+            for line in sorted_lines
+        ]
+
+    def restore_manual_line_order(self, *, document_id: str) -> CommercialDocument:
+        document = self._required_document(document_id)
+        self._assert_presentation_supported(document)
+        manual_order = self._manual_order(document)
+        if not manual_order:
+            manual_order = [line.line_id for line in self._ordered_lines(document)]
+        self.reorder_lines(document_id=document_id, ordered_line_ids=manual_order)
+        self._save_active_sort(document, None)
+        return document
+
+    def set_group_options(
+        self,
+        *,
+        document_id: str,
+        group_id: str,
+        show_subtotal: bool | None = None,
+        collapsed: bool | None = None,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        self._assert_presentation_supported(document)
+        self._commercial_service._assert_mutable(document)
+        groups = self._presentation_groups(document)
+        found = False
+        for group in groups:
+            if _safe_text(group.get("group_id"), "") != group_id:
+                continue
+            if show_subtotal is not None:
+                group["show_subtotal"] = bool(show_subtotal)
+            if collapsed is not None:
+                group["collapsed"] = bool(collapsed)
+            found = True
+        if not found:
+            raise ValueError("group was not found")
+        self._save_presentation_groups(document, groups)
+        return document
+
+    def set_visible_columns(
+        self,
+        *,
+        document_id: str,
+        visible_columns: list[str],
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        self._assert_presentation_supported(document)
+        metadata, presentation = self._presentation_document_metadata(document)
+        presentation["visible_columns"] = [
+            _safe_text(item, "") for item in visible_columns if _safe_text(item, "")
+        ] or list(self._DEFAULT_VISIBLE_COLUMNS)
+        metadata["presentation"] = presentation
+        self._commercial_service.set_document_metadata(document, metadata=metadata)
+        return document
 
     def export_document_pdf(
         self,
@@ -1175,6 +1465,8 @@ class TransactionsWorkspaceService:
         tax_total = Decimal("0")
         for line in list(document.lines or []):
             metadata = dict(line.line_metadata or {})
+            if line.presentation_line_type not in {"item", "service"}:
+                continue
             approved_quantity = Decimal(
                 str(metadata.get("approved_return_quantity") or line.quantity)
             )
@@ -1219,6 +1511,8 @@ class TransactionsWorkspaceService:
         approved_credit_total = Decimal("0")
         for line in list(document.lines or []):
             metadata = dict(line.line_metadata or {})
+            if line.presentation_line_type not in {"item", "service"}:
+                continue
             line_type = _safe_text(metadata.get("line_type"), "")
             if line_type not in {"product", "service"}:
                 raise ValueError("return order lines must declare product or service")
@@ -1341,6 +1635,242 @@ class TransactionsWorkspaceService:
             ),
         )
         return credit_memo
+
+    def _required_line(self, document: CommercialDocument, line_id: str) -> Any:
+        line = next((item for item in document.lines if item.line_id == line_id), None)
+        if line is None:
+            raise ValueError("line was not found")
+        return line
+
+    def _assert_presentation_supported(self, document: CommercialDocument) -> None:
+        if document.document_type not in self._PRESENTATION_DOCUMENT_TYPES:
+            raise ValueError("document type does not support line presentation")
+
+    def _presentation_document_metadata(
+        self,
+        document: CommercialDocument,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        metadata = dict(document.document_metadata or {})
+        presentation = dict(metadata.get("presentation") or {})
+        metadata["presentation"] = presentation
+        return metadata, presentation
+
+    def _presentation_groups(
+        self, document: CommercialDocument
+    ) -> list[dict[str, Any]]:
+        _, presentation = self._presentation_document_metadata(document)
+        return [
+            dict(item)
+            for item in list(presentation.get("groups") or [])
+            if isinstance(item, dict)
+        ]
+
+    def _save_presentation_groups(
+        self,
+        document: CommercialDocument,
+        groups: list[dict[str, Any]],
+    ) -> None:
+        metadata, presentation = self._presentation_document_metadata(document)
+        presentation["groups"] = [dict(item) for item in groups]
+        metadata["presentation"] = presentation
+        self._commercial_service.set_document_metadata(document, metadata=metadata)
+
+    def _visible_columns(self, document: CommercialDocument) -> list[str]:
+        _, presentation = self._presentation_document_metadata(document)
+        values = [
+            _safe_text(item, "")
+            for item in list(
+                presentation.get("visible_columns") or self._DEFAULT_VISIBLE_COLUMNS
+            )
+            if _safe_text(item, "")
+        ]
+        return values or list(self._DEFAULT_VISIBLE_COLUMNS)
+
+    def _manual_order(self, document: CommercialDocument) -> list[str]:
+        _, presentation = self._presentation_document_metadata(document)
+        return [
+            _safe_text(item, "")
+            for item in list(presentation.get("manual_order") or [])
+            if _safe_text(item, "")
+        ]
+
+    def _capture_manual_order(self, document: CommercialDocument) -> None:
+        metadata, presentation = self._presentation_document_metadata(document)
+        presentation["manual_order"] = [
+            line.line_id for line in self._ordered_lines(document)
+        ]
+        metadata["presentation"] = presentation
+        self._commercial_service.set_document_metadata(document, metadata=metadata)
+
+    def _active_sort(self, document: CommercialDocument) -> dict[str, Any] | None:
+        _, presentation = self._presentation_document_metadata(document)
+        value = presentation.get("active_sort")
+        return dict(value) if isinstance(value, dict) else None
+
+    def _save_active_sort(
+        self,
+        document: CommercialDocument,
+        active_sort: dict[str, Any] | None,
+    ) -> None:
+        metadata, presentation = self._presentation_document_metadata(document)
+        presentation["active_sort"] = dict(active_sort) if active_sort else None
+        metadata["presentation"] = presentation
+        self._commercial_service.set_document_metadata(document, metadata=metadata)
+
+    def _ordered_lines(self, document: CommercialDocument) -> list[Any]:
+        return sorted(
+            list(document.lines or []),
+            key=lambda line: (line.display_sequence, line.sequence, line.line_id),
+        )
+
+    def _group_subtotals(self, document: CommercialDocument) -> dict[str, Decimal]:
+        subtotals: dict[str, Decimal] = {}
+        for line in list(document.lines or []):
+            group_id = _safe_text(line.presentation_metadata.get("group_id"), "")
+            if not group_id or not line.contributes_to_totals:
+                continue
+            subtotals[group_id] = (
+                subtotals.get(group_id, Decimal("0")) + line.extended_amount
+            )
+        return subtotals
+
+    def _line_presentation_row(
+        self,
+        line: Any,
+        groups: list[dict[str, Any]],
+        subtotals: dict[str, Decimal],
+    ) -> dict[str, Any]:
+        group_id = _safe_text(line.presentation_metadata.get("group_id"), "") or None
+        group = next(
+            (
+                item
+                for item in groups
+                if _safe_text(item.get("group_id"), "") == (group_id or "")
+            ),
+            None,
+        )
+        return {
+            "line_id": line.line_id,
+            "line_type": line.presentation_line_type,
+            "description": line.description,
+            "display_sequence": line.display_sequence,
+            "group_id": group_id,
+            "group_name": _safe_text((group or {}).get("name"), ""),
+            "show_subtotal": (group or {}).get("show_subtotal"),
+            "parent_line_id": line.presentation_metadata.get("parent_line_id"),
+            "comment_reference_line_id": line.presentation_metadata.get(
+                "comment_reference_line_id"
+            ),
+            "quantity": str(line.quantity),
+            "unit_price": str(line.unit_price),
+            "extended_price": str(line.extended_amount),
+            "group_subtotal": str(subtotals.get(group_id or "", Decimal("0"))),
+        }
+
+    def _sort_value(self, line: Any, column: str) -> Any:
+        metadata = dict(line.line_metadata or {})
+        if column == "sku_or_part_number":
+            return _safe_text(line.product_or_service_reference, "")
+        if column == "manufacturer":
+            return _safe_text(metadata.get("manufacturer"), "")
+        if column == "description":
+            return _safe_text(line.description, "")
+        if column == "item_type":
+            return line.presentation_line_type
+        if column == "quantity":
+            return line.quantity
+        if column == "unit_price":
+            return line.unit_price
+        if column == "extended_price":
+            return line.extended_amount
+        return _safe_text(line.description, "")
+
+    def _sorted_presentation_lines(
+        self,
+        document: CommercialDocument,
+        *,
+        column: str,
+        direction: str,
+    ) -> list[Any]:
+        ordered = self._ordered_lines(document)
+        reverse = direction == "desc"
+
+        def sort_segment(lines: list[Any]) -> list[Any]:
+            anchored_children: dict[str, list[Any]] = {}
+            anchors: list[Any] = []
+            unattached: list[Any] = []
+            for line in lines:
+                if line.presentation_line_type in {"item", "service"}:
+                    anchors.append(line)
+                    continue
+                parent_id = _safe_text(
+                    line.presentation_metadata.get("parent_line_id")
+                    or line.presentation_metadata.get("comment_reference_line_id"),
+                    "",
+                )
+                if parent_id:
+                    anchored_children.setdefault(parent_id, []).append(line)
+                else:
+                    unattached.append(line)
+            sorted_anchors = sorted(
+                anchors,
+                key=lambda line: (
+                    self._sort_value(line, column),
+                    line.display_sequence,
+                ),
+                reverse=reverse,
+            )
+            output: list[Any] = []
+            for anchor in sorted_anchors:
+                output.append(anchor)
+                output.extend(
+                    sorted(
+                        anchored_children.get(anchor.line_id, []),
+                        key=lambda item: item.display_sequence,
+                    )
+                )
+            output.extend(sorted(unattached, key=lambda item: item.display_sequence))
+            return output
+
+        result: list[Any] = []
+        groups = self._presentation_groups(document)
+        grouped_ids = [
+            _safe_text(group.get("group_id"), "")
+            for group in groups
+            if _safe_text(group.get("group_id"), "")
+        ]
+        top_level = [
+            line
+            for line in ordered
+            if not _safe_text(line.presentation_metadata.get("group_id"), "")
+        ]
+        result.extend(sort_segment(top_level))
+        for group_id in grouped_ids:
+            group_lines = [
+                line
+                for line in ordered
+                if _safe_text(line.presentation_metadata.get("group_id"), "")
+                == group_id
+            ]
+            headers = [
+                line
+                for line in group_lines
+                if line.presentation_line_type == "group_header"
+            ]
+            subtotals = [
+                line
+                for line in group_lines
+                if line.presentation_line_type == "subtotal"
+            ]
+            members = [
+                line
+                for line in group_lines
+                if line.presentation_line_type not in {"group_header", "subtotal"}
+            ]
+            result.extend(sorted(headers, key=lambda line: line.display_sequence))
+            result.extend(sort_segment(members))
+            result.extend(sorted(subtotals, key=lambda line: line.display_sequence))
+        return result
 
 
 def _safe_text(value: Any, default: str = "") -> str:

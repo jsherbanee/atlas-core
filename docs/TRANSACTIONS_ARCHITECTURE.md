@@ -409,6 +409,21 @@ Credit Memo behavior:
 - retains QuickBooks sync metadata without implementing transport
 - remains immutable once issued
 - remains exportable through deterministic PDF export
+
+## T-07 Implementation: Commercial Document Line Presentation
+
+Line-based transaction families now support reusable presentation controls for:
+- Estimates
+- Sales Orders
+- Return Orders
+- Credit Memos where applicable
+
+Behavior:
+- line grouping and subgroup subtotal display are presentation-only
+- manual reordering persists explicit display sequence
+- temporary sort preview does not mutate authoritative order
+- applied sort updates presentation order without changing financial calculations
+- blank spacer and comment rows are stored as presentation metadata on shared line records
 - Open Sales Orders
 - Open Purchase Orders
 - Partially Received POs

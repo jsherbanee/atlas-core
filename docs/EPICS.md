@@ -37,6 +37,7 @@ Status: Active
 - T-05 Amendment Terms and Conditions Settings Integration
 - T-05 Amendment Estimate and Sales Order Versioning, Duplication, and PDF Export
 - T-06 Return Orders and Credit Memos
+- T-07 Commercial Document Line Layout and Presentation
 
 ### A-07 Scope
 

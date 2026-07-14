@@ -57,6 +57,22 @@ This document tracks product-facing changes for Atlas Preview releases.
 - no automated inventory disposition execution
 - no vendor return workflow
 
+## Unreleased (Epic T Sprint T-07 Commercial Document Line Layout and Presentation)
+
+### Improved
+
+- Line-based commercial documents now support named groups, group subtotals, comment lines, and blank spacer rows as presentation metadata.
+- Presentation order is now explicitly persisted and can be updated independently of authoritative commercial values.
+- Users can preview sort, apply sort to presentation order, and restore manual order.
+- Commercial PDFs now preserve line order, group headings, optional subtotals, blank spacing, comment placement, and selected visible columns.
+
+### Scope Notes
+
+- no change to grand-total calculations
+- no spreadsheet-style formulas
+- no pricing or tax logic changes
+- no automatic regrouping
+
 ### Improved
 
 - Organization Settings now supports tenant-scoped Terms and Conditions content blocks for Estimates and Sales Orders.

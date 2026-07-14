@@ -205,6 +205,16 @@ Every commercial document line item should support a shared line-level contract:
 - related transaction line
 - accounting sync reference
 
+T-07 presentation contract additions:
+- line type (`item`, `service`, `group_header`, `subtotal`, `blank_spacer`, `comment`)
+- display sequence
+- manual display sequence snapshot
+- optional group ID
+- optional parent-line reference
+- optional comment reference line
+- visible-column configuration at document scope
+- active sort configuration at document scope
+
 ### Line-Item Principles
 
 - line identity should be stable inside the document revision it belongs to
@@ -507,6 +517,22 @@ Credit Memo notes:
 - references Return Order and original customer-side source document where available
 - uses tenant numbering settings and QuickBooks-oriented sync metadata only
 - remains immutable once issued
+
+## T-07 Implementation: Line Layout and Presentation
+
+Commercial value fields remain separate from presentation metadata.
+
+Implemented T-07 scope:
+- named groups
+- group subtotals as presentation-only derived values
+- blank spacer and comment rows without separate financial-record models
+- explicit display-sequence persistence
+- manual reorder and sortable preview/apply behavior
+- duplicate/revision preservation of presentation metadata
+
+Guardrails:
+- only item and service lines contribute to authoritative totals
+- presentation changes do not alter quantity, price, tax, surcharge, traceability, or grand totals
 
 Still intentionally unresolved:
 - final canonical status taxonomies by document family

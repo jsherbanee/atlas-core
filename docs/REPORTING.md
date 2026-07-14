@@ -86,3 +86,15 @@ Export guarantees:
 - issued and archived revisions remain exportable
 - export activity metadata is recorded
 - export generation does not mutate revision commercial content
+
+## T-07 Implementation: Presentation-Aware Commercial PDFs
+
+Commercial document PDFs now preserve presentation metadata where present:
+- line order
+- group headings
+- optional group subtotals
+- blank spacing rows
+- comment rows
+- selected visible columns
+
+Grand totals remain sourced from authoritative commercial calculations rather than presentation rows.

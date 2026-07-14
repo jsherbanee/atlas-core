@@ -14,10 +14,11 @@ from atlas_core.domain.commercial_document import (
 )
 
 
-def _safe_text(value: Any) -> str:
+def _safe_text(value: Any, default: str = "") -> str:
     if value is None:
-        return ""
-    return str(value).strip()
+        return default
+    normalized = str(value).strip()
+    return normalized or default
 
 
 def _escape_pdf_text(value: str) -> str:
@@ -172,23 +173,57 @@ class CommercialDocumentPdfExportService:
 
         sorted_lines = sorted(
             list(revision.lines or []),
-            key=lambda item: (item.sequence, item.line_id),
+            key=lambda item: (item.display_sequence, item.sequence, item.line_id),
         )
+        visible_columns = self._visible_columns(document)
+        group_index = self._group_index(document)
+        group_subtotals = self._group_subtotals(sorted_lines)
         if section_config.include_line_items:
             lines.append("Line Items")
             for item in sorted_lines:
-                lines.append(
-                    " - "
-                    + " | ".join(
-                        [
-                            f"Seq {item.sequence}",
-                            f"Desc {_safe_text(item.description)}",
-                            f"Qty {_format_decimal(item.quantity)}",
-                            f"Unit {_format_decimal(item.unit_price)}",
-                            f"Ext {_format_decimal(item.extended_amount)}",
-                        ]
-                    )
-                )
+                presentation_metadata = item.presentation_metadata
+                line_type = item.presentation_line_type
+                group_id = _safe_text(presentation_metadata.get("group_id"), "")
+                if line_type == "blank_spacer":
+                    lines.append("")
+                    continue
+                if line_type == "comment":
+                    lines.append(f"Comment: {_safe_text(item.description)}")
+                    continue
+                if line_type == "group_header":
+                    lines.append(f"Group: {_safe_text(item.description)}")
+                    continue
+                if line_type == "subtotal":
+                    group_payload: dict[str, Any] = dict(group_index.get(group_id, {}))
+                    if bool(group_payload.get("show_subtotal", True)):
+                        subtotal_value = group_subtotals.get(group_id, Decimal("0"))
+                        lines.append(
+                            f"Subtotal {_safe_text(group_payload.get('name'), _safe_text(item.description))}: {_format_decimal(subtotal_value)}"
+                        )
+                    continue
+                row_parts = []
+                for column in visible_columns:
+                    if column == "description":
+                        row_parts.append(f"Desc {_safe_text(item.description)}")
+                    elif column == "quantity":
+                        row_parts.append(f"Qty {_format_decimal(item.quantity)}")
+                    elif column == "unit_price":
+                        row_parts.append(f"Unit {_format_decimal(item.unit_price)}")
+                    elif column == "extended_price":
+                        row_parts.append(f"Ext {_format_decimal(item.extended_amount)}")
+                    elif column == "sku_or_part_number":
+                        row_parts.append(
+                            f"SKU {_safe_text(item.product_or_service_reference)}"
+                        )
+                    elif column == "manufacturer":
+                        row_parts.append(
+                            f"Mfr {_safe_text((item.line_metadata or {}).get('manufacturer'))}"
+                        )
+                    elif column == "item_type":
+                        row_parts.append(f"Type {line_type}")
+                if not row_parts:
+                    row_parts.append(f"Desc {_safe_text(item.description)}")
+                lines.append(" - " + " | ".join(row_parts))
             if not sorted_lines:
                 lines.append(" - none")
             lines.append("")
@@ -245,6 +280,41 @@ class CommercialDocumentPdfExportService:
             lines.append(f"Approval: {document.approval_state.value}")
 
         return lines
+
+    def _group_index(self, document: CommercialDocument) -> dict[str, dict[str, Any]]:
+        metadata = dict(document.document_metadata or {})
+        presentation = dict(metadata.get("presentation") or {})
+        groups = [
+            dict(item)
+            for item in list(presentation.get("groups") or [])
+            if isinstance(item, dict)
+        ]
+        return {
+            _safe_text(group.get("group_id"), ""): group
+            for group in groups
+            if _safe_text(group.get("group_id"), "")
+        }
+
+    def _group_subtotals(self, lines: list[Any]) -> dict[str, Decimal]:
+        subtotals: dict[str, Decimal] = {}
+        for line in lines:
+            group_id = _safe_text(line.presentation_metadata.get("group_id"), "")
+            if not group_id or not line.contributes_to_totals:
+                continue
+            subtotals[group_id] = (
+                subtotals.get(group_id, Decimal("0")) + line.extended_amount
+            )
+        return subtotals
+
+    def _visible_columns(self, document: CommercialDocument) -> list[str]:
+        metadata = dict(document.document_metadata or {})
+        presentation = dict(metadata.get("presentation") or {})
+        values = [
+            _safe_text(item, "")
+            for item in list(presentation.get("visible_columns") or [])
+            if _safe_text(item, "")
+        ]
+        return values or ["description", "quantity", "unit_price", "extended_price"]
 
     def _build_pdf_from_lines(self, lines: list[str]) -> bytes:
         lines_per_page = 52
