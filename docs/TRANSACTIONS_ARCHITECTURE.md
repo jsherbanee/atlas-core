@@ -23,6 +23,7 @@ Related documents:
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [INTEGRATIONS.md](INTEGRATIONS.md)
 - [NAVIGATION_ARCHITECTURE.md](NAVIGATION_ARCHITECTURE.md)
+- [COMMERCIAL_DOCUMENT_FRAMEWORK.md](COMMERCIAL_DOCUMENT_FRAMEWORK.md)
 
 ## Architectural Position
 
@@ -238,51 +239,19 @@ Design implication:
 
 ## Universal Object Model For Transactions
 
-Each transaction family should be defined as a first-class Atlas object with:
-- stable ID
-- transaction type
-- status
-- customer or vendor
-- optional Project
-- optional Project Code
-- line items
-- totals
-- approvals
-- relationships
-- activity
-- documents
-- lifecycle
-- sync metadata
-- external QuickBooks identifiers
+The shared commercial-document contract is defined in [COMMERCIAL_DOCUMENT_FRAMEWORK.md](COMMERCIAL_DOCUMENT_FRAMEWORK.md).
 
-This keeps transaction records compatible with Atlas object philosophy:
-- stable identity
-- explicit provenance
-- relationship-aware navigation
-- auditability
-- tenant-safe integration behavior
+Transactions should consume that common framework rather than invent family-specific object envelopes.
 
 ## Lifecycle Expectations For Transactions
 
-Transaction lifecycle is separate from Project lifecycle.
+Transaction lifecycle remains separate from Project lifecycle.
 
-Project lifecycle tracks end-to-end project progress.
+The shared commercial-document lifecycle vocabulary is defined in [COMMERCIAL_DOCUMENT_FRAMEWORK.md](COMMERCIAL_DOCUMENT_FRAMEWORK.md).
 
-Transaction lifecycle should eventually track commercial-document state such as:
-- draft
-- under review
-- approved
-- issued
-- partially fulfilled
-- received
-- billed
-- synced
-- closed
-- canceled
+Sprint A-07 defined the separation.
 
-Sprint A-07 does not define a transaction engine implementation.
-
-It only establishes that transaction lifecycle must exist as a separate but compatible domain concern.
+Sprint A-08 defines the common commercial-document lifecycle contract.
 
 ## Transactions Navigation Model
 

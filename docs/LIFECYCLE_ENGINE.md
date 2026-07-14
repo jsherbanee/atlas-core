@@ -230,3 +230,21 @@ Project lifecycle and transaction lifecycle are separate concerns.
 - transaction families may participate in Project progress, but they require their own document-state models, approvals, sync metadata, and closeout semantics
 
 Sprint A-07 defines that architecture boundary but does not introduce a transaction lifecycle engine implementation.
+
+## A-08 Commercial Document Lifecycle Alignment
+
+Sprint A-08 defines a common commercial-document lifecycle vocabulary:
+
+Draft
+→ Review
+→ Approved
+→ Issued
+→ Partially Fulfilled
+→ Fulfilled
+→ Closed
+→ Archived
+
+Alignment rule:
+- this lifecycle is deterministic and explicit like the Project lifecycle engine
+- it is not the same as the Project lifecycle stage model
+- A-08 does not imply the existing Project lifecycle engine already implements commercial-document lifecycles

@@ -98,6 +98,11 @@ Future releases should follow this structure.
 - Audience: Product, architecture, integrations, commercial-operations, and platform contributors.
 - When to reference: When planning transaction objects, document workflows, sync boundaries, or Transactions navigation.
 
+### [COMMERCIAL_DOCUMENT_FRAMEWORK.md](COMMERCIAL_DOCUMENT_FRAMEWORK.md)
+- Purpose: Defines the common contract, lifecycle, revision model, approval model, numbering philosophy, relationship rules, and sync metadata architecture for all future commercial documents.
+- Audience: Product, architecture, integrations, commercial-operations, and platform contributors.
+- When to reference: When planning any commercial document family or shared transaction-document behavior.
+
 ### [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md)
 - Purpose: Defines engineering execution sequencing, technical milestones, and production-readiness gates.
 - Audience: Engineering, platform, architecture, and release stakeholders.

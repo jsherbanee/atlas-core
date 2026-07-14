@@ -190,6 +190,8 @@ Representative future transaction object families include:
 - Customer Invoice
 - Subcontract
 
+These future transaction object families should share the common contract defined in [COMMERCIAL_DOCUMENT_FRAMEWORK.md](COMMERCIAL_DOCUMENT_FRAMEWORK.md).
+
 Sprint A-07 does not implement these object routes or views.
 
 It only defines the architecture direction.

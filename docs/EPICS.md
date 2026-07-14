@@ -29,6 +29,7 @@ Status: Active
 - A-05 End-to-End GUI Validation and Workflow Refinement
 - A-06 Quality Gates, CI, and Regression Baseline
 - A-07 Transactions and Commercial Operations Architecture
+- A-08 Commercial Document Framework
 
 ### A-07 Scope
 
@@ -45,6 +46,18 @@ Explicitly out of scope:
 - accounting ledger behavior
 - payment processing
 - procurement execution
+- Epic E implementation
+
+### A-08 Scope
+
+- define one common framework for all commercial documents
+- define shared contract fields, relationship rules, lifecycle model, revision philosophy, numbering philosophy, approval architecture, and sync metadata architecture
+- keep Atlas as the operational owner and QuickBooks as the financial owner
+
+Explicitly out of scope:
+- production code
+- QuickBooks implementation
+- UI implementation
 - Epic E implementation
 
 ## Epic L: Lifecycle Engine

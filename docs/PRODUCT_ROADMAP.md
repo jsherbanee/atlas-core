@@ -59,6 +59,12 @@ Sprint A-07 defines the future Transactions workspace and commercial-document ow
 
 This roadmap step means Atlas is expected to own operational transaction creation and workflow before financial sync, while QuickBooks remains the Financial System of Record after sync.
 
+## Commercial Document Framework Note
+
+Sprint A-08 adds the shared framework for commercial documents as architecture only.
+
+This means Atlas now has a documented common contract for transaction-family document identity, revision philosophy, lifecycle, approvals, relationships, numbering, and sync metadata before implementation begins.
+
 ### SaaS Commercialization
 - multi-tenant administration
 - organization and seat management

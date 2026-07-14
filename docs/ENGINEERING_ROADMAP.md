@@ -107,6 +107,11 @@ Epic E must not be started from this roadmap.
 - document optional Project linkage, transaction identity, approvals, sync metadata, and closeout expectations before code starts
 - keep QuickBooks integration architecture explicit before any sync implementation begins
 
+### 10. Commercial Document Framework Readiness
+- define one shared commercial-document contract before family-specific implementation begins
+- align revision, numbering, approval, relationship, and sync-metadata patterns across all transaction families
+- preserve deterministic lifecycle terminology without conflating transaction lifecycle with Project lifecycle
+
 ## Cross-Epic Dependencies
 - Epic A provides workspace and shell foundations used by later engineering surfaces.
 - Epic B provides intelligence and relationship-analysis primitives.
@@ -154,6 +159,7 @@ Production readiness should require:
 - prepare cloud, observability, and recovery documentation
 - support future lifecycle-expansion subsystems without starting Epic E
 - define Transactions workspace and commercial-operations architecture before implementation
+- define the shared commercial document framework before transaction-family implementation
 
 ## Release Engineering
 Release engineering should emphasize:

@@ -199,6 +199,16 @@ X-03 implementation note:
 - Relationships: belongs to Transaction; references integration credential, external identifier, sync status, and failure state.
 - Lifecycle Role: Bridges Atlas operational truth to external financial truth without turning Atlas into the accounting system.
 
+### Commercial Document Revision
+- Purpose: Immutable revision record for an issued or superseded commercial document state.
+- Relationships: belongs to Transaction and links predecessor/successor revisions.
+- Lifecycle Role: Preserves historically reproducible issued commercial records.
+
+### Commercial Document Number
+- Purpose: Human-facing numbering reference independent of internal document identity.
+- Relationships: belongs to Transaction and may include tenant, family, Project, or revision conventions.
+- Lifecycle Role: Operational lookup and external-facing reference.
+
 ### Transaction Family Expectations
 - Estimate
 - Proposal
@@ -215,6 +225,7 @@ X-03 implementation note:
 Architecture note:
 - these are future first-class Atlas objects even when created without a Project reference
 - optional Project linkage and optional Project Code must be preserved as independent fields rather than required ownership rules
+- shared commercial-document contract, revision rules, numbering philosophy, approval envelope, and sync metadata architecture are defined in [COMMERCIAL_DOCUMENT_FRAMEWORK.md](COMMERCIAL_DOCUMENT_FRAMEWORK.md)
 
 ### Project
 - Purpose: Post-award execution container.

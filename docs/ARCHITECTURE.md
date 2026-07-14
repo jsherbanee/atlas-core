@@ -100,6 +100,16 @@ Boundary rules:
 - QuickBooks Online remains the Financial System of Record
 - Atlas must not implement GL, tax, banking, reconciliation, or payment-processing behavior as part of Transactions architecture
 
+## Commercial Document Framework Direction
+
+Sprint A-08 defines one shared commercial-document architecture rather than separate document models for each transaction family.
+
+Architecture posture:
+- all commercial document families should inherit one common contract for identity, numbering, status, revision, approvals, lifecycle, activity, sync metadata, and external accounting references
+- family-specific behavior should be additive, not a reason to break the shared contract
+- issued revisions must be historically reproducible and immutable
+- sync metadata must preserve operational ownership in Atlas while respecting QuickBooks financial ownership after sync
+
 ## Core Principle
 Business logic should live once in the Atlas engine and be reused by all callers:
 - CLI

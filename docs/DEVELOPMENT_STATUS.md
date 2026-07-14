@@ -54,6 +54,7 @@ Sprint W-03 introduces the reusable Universal Object Workspace UI and controlled
 Sprint L-01 introduces the deterministic AV Lifecycle Engine foundation, including canonical lifecycle stages, transition/history/readiness contracts, compatibility-safe project persistence, and project-facing lifecycle UI integration without starting downstream execution workflows.
 Sprint L-02 introduces the first Project Lifecycle Dashboard inside Universal Object Workspace, using the L-01 lifecycle engine as the single lifecycle authority.
 Sprint A-07 defines the Transactions workspace and commercial-operations ownership model as architecture only, with no production implementation in this sprint.
+Sprint A-08 defines the shared Commercial Document Framework for all future commercial documents as architecture only, with no production implementation in this sprint.
 
 X-01 through X-13 are closed.
 
@@ -148,6 +149,7 @@ Current implementation scope note:
 - no Epic E implementation has started in X-10
 - X-03 remains workflow hardening only and does not introduce new estimating/commercial/procurement/execution capabilities
 - A-07 is documentation-only and does not introduce transaction code, QuickBooks integration, routing, or accounting behavior
+- A-08 is documentation-only and does not introduce commercial-document code, UI, routing, or QuickBooks implementation
 
 ## A-07 Architecture Validation Note
 - Transactions and commercial-operations architecture are documented, not implemented
