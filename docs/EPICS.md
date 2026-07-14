@@ -32,6 +32,7 @@ Status: Active
 - A-08 Commercial Document Framework
 - T-01 Commercial Document Domain Foundation
 - T-02 Transactions Workspace Foundation
+- T-03 Estimate Transaction Integration
 
 ### A-07 Scope
 

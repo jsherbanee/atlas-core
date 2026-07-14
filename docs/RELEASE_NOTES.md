@@ -21,6 +21,21 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic W Sprint W-03 Universal Object Workspace)
 
+## Unreleased (Epic T Sprint T-03 Estimate Transaction Integration)
+
+### Improved
+
+- Transactions > Estimates now operates as the first fully functional transaction family with estimate-specific tertiary actions: Add, Browse, Edit, Lines, Revisions, Issue, Approvals, Related Documents, Activity, and Export.
+- Estimate transaction workflows now reuse the existing deterministic estimate engine for line-item updates, revision lifecycle, validation, and readiness checks.
+- Estimate issue flow now enforces approval-before-issue and lock-ready revision behavior while preserving issued immutability.
+- Standalone estimate transaction creation/editing now requires customer identity when no project link is provided.
+
+### Scope Notes
+
+- estimate transaction family operationalization only
+- no external financial transport execution
+- no accounting/payment/ledger behavior
+
 ## Unreleased (Epic T Sprint T-02 Transactions Workspace Foundation)
 
 ### Improved

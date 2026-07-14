@@ -94,6 +94,12 @@ class TransactionsWorkspaceService:
         customer_id: str | None = None,
         vendor_id: str | None = None,
     ) -> CommercialDocument:
+        if (
+            document_type == CommercialDocumentType.ESTIMATE
+            and not (project_id or "").strip()
+            and not (customer_id or "").strip()
+        ):
+            raise ValueError("standalone estimates require customer_id")
         document = self._commercial_service.create_document(
             tenant_id=tenant_id,
             organization_id=organization_id,
@@ -104,6 +110,46 @@ class TransactionsWorkspaceService:
             vendor_id=vendor_id,
         )
         self._documents.append(document)
+        return document
+
+    def preview_number(self, document_id: str) -> str:
+        document = self._required_document(document_id)
+        return self._commercial_service.preview_number(document).preview_number
+
+    def issue_document(self, *, document_id: str, reason: str) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.lifecycle_state == CommercialDocumentLifecycleState.DRAFT:
+            self._commercial_service.transition_lifecycle(
+                document,
+                CommercialDocumentLifecycleState.IN_REVIEW,
+                reason=reason,
+            )
+        if document.lifecycle_state == CommercialDocumentLifecycleState.IN_REVIEW:
+            self._commercial_service.transition_lifecycle(
+                document,
+                CommercialDocumentLifecycleState.APPROVED,
+                reason=reason,
+            )
+        self._commercial_service.transition_lifecycle(
+            document,
+            CommercialDocumentLifecycleState.ISSUED,
+            reason=reason,
+        )
+        return document
+
+    def create_draft_revision(
+        self,
+        *,
+        document_id: str,
+        reason: str,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.lifecycle_state == CommercialDocumentLifecycleState.ISSUED:
+            document.lifecycle_state = CommercialDocumentLifecycleState.DRAFT
+            document.approval_state = ApprovalState.NOT_REQUESTED
+            self._commercial_service.start_new_revision(document, reason=reason)
+            return document
+        self._commercial_service.start_new_revision(document, reason=reason)
         return document
 
     def get_document(self, document_id: str) -> CommercialDocument | None:
@@ -125,9 +171,17 @@ class TransactionsWorkspaceService:
         document = self._required_document(document_id)
         if not document.is_mutable:
             raise ValueError("only mutable drafts/review documents can be edited")
-        document.project_id = project_id.strip() or None if project_id else None
+        normalized_project_id = project_id.strip() or None if project_id else None
+        normalized_customer_id = customer_id.strip() or None if customer_id else None
+        if (
+            document.document_type == CommercialDocumentType.ESTIMATE
+            and not normalized_project_id
+            and not normalized_customer_id
+        ):
+            raise ValueError("standalone estimates require customer_id")
+        document.project_id = normalized_project_id
         document.project_code = project_code.strip() or None if project_code else None
-        document.customer_id = customer_id.strip() or None if customer_id else None
+        document.customer_id = normalized_customer_id
         document.vendor_id = vendor_id.strip() or None if vendor_id else None
         return document
 

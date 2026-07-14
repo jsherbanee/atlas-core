@@ -53,6 +53,21 @@ Deferred in T-02:
 - external financial transport integrations
 - accounting/payment/ledger workflows
 
+## T-03 Implementation Status
+
+Sprint T-03 makes Estimates the first fully operational transaction family inside Transactions.
+
+Implemented in T-03:
+- estimate-specific tertiary actions for Add, Browse, Edit, Lines, Revisions, Issue, Approvals, Related Documents, Activity, and Export
+- standalone estimate enforcement requiring customer identity when no project link is provided
+- issue flow that preserves commercial-document lifecycle rules (approval required before issue and issued revision immutability)
+- revision workflow support for post-issue estimate updates through explicit draft revision start behavior
+- deterministic estimate-engine integration for transaction estimates without introducing a second estimate model
+
+Deferred in T-03:
+- external financial sync execution
+- accounting/payment/ledger workflows
+
 Related documents:
 - [TRANSACTIONS_ARCHITECTURE.md](TRANSACTIONS_ARCHITECTURE.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)

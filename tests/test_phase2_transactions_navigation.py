@@ -44,9 +44,11 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "add",
         "browse",
         "edit",
-        "related_documents",
+        "lines",
+        "revisions",
+        "issue",
         "approvals",
-        "sync_status",
+        "related_documents",
         "activity",
         "export",
     ]

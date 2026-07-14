@@ -57,6 +57,7 @@ Sprint A-07 defines the Transactions workspace and commercial-operations ownersh
 Sprint A-08 defines the shared Commercial Document Framework for all future commercial documents as architecture only, with no production implementation in this sprint.
 Sprint T-01 implements the Commercial Document Domain Foundation backend contracts/services, including lifecycle/revision rules, decimal-safe totals, organization-scoped numbering preview/allocation, commercial-document universal-object registry adapters, and compatibility-safe serialization behavior.
 Sprint T-02 implements the Transactions Workspace Foundation UI/navigation layer, reusable transaction workspace service behavior, transaction-family search integration, and Object Workspace handoff for commercial-document kinds.
+Sprint T-03 implements Estimate Transaction Integration, making Transactions > Estimates the first fully operational transaction family using the existing deterministic estimate engine for lines/revisions/issue workflows.
 
 X-01 through X-13 are closed.
 

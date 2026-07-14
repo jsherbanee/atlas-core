@@ -27,6 +27,7 @@ from atlas_core.domain import (
 )
 from atlas_core.domain.commercial_document import (
     ApprovalState,
+    CommercialDocument,
     CommercialDocumentLifecycleState,
     CommercialDocumentType,
     SyncStatus,
@@ -4029,6 +4030,7 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault(
         "atlas_transactions_workspace", _default_transactions_workspace_state()
     )
+    st.session_state.setdefault("atlas_transaction_estimate_engine_states", {})
     st.session_state.setdefault("atlas_transactions_selected_document_id", "")
     st.session_state.setdefault("atlas_price_list_signature", "")
     st.session_state.setdefault("atlas_review_flags", {})
@@ -6203,7 +6205,7 @@ def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
 
 
 def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
-    actions = {
+    actions: dict[str, list[dict[str, Any]]] = {
         "overview": [
             {
                 "tertiary_key": "summary",
@@ -6218,8 +6220,72 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": None,
             },
         ],
+        "estimates": [
+            {
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "edit",
+                "label": "Edit",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "lines",
+                "label": "Lines",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "revisions",
+                "label": "Revisions",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "issue",
+                "label": "Issue",
+                "action_type": "operational_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "approvals",
+                "label": "Approvals",
+                "action_type": "operational_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "related_documents",
+                "label": "Related Documents",
+                "action_type": "relationship_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "activity",
+                "label": "Activity",
+                "action_type": "history_activity_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "export",
+                "label": "Export",
+                "action_type": "export_action",
+                "required_selection": "entity",
+            },
+        ],
     }
     for secondary_key in TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE:
+        if secondary_key == "estimates":
+            continue
         actions[secondary_key] = [
             {
                 "tertiary_key": "add",
@@ -12179,6 +12245,52 @@ def _render_transactions_workspace_page(
     }
     _set_context_selection(st, selected_kind, selection_payload)
 
+    estimate_engine: EstimateEngineService | None = None
+    estimate_row: dict[str, Any] = {}
+    selected_revision_id = ""
+    selected_revision: dict[str, Any] = {}
+    revision_options: list[str] = []
+    if selected_document.document_type == CommercialDocumentType.ESTIMATE:
+        estimate_engine = _transaction_estimate_engine_service(
+            st,
+            selected_document.document_id,
+        )
+        estimate_row, fallback_revision = _ensure_transaction_estimate_revision(
+            estimate_engine,
+            document=selected_document,
+        )
+        revision_history = estimate_engine.list_revision_history(
+            estimate_id=_safe_text(estimate_row.get("estimate_id"), "")
+        )
+        revision_options = [
+            _safe_text(item.get("revision_id"), "")
+            for item in revision_history
+            if _safe_text(item.get("revision_id"), "")
+        ]
+        selected_revision_id = _safe_text(
+            st.session_state.get(
+                f"atlas_transactions_estimate_revision_{selected_document.document_id}"
+            ),
+            _safe_text(fallback_revision.get("revision_id"), ""),
+        )
+        if selected_revision_id not in revision_options and revision_options:
+            selected_revision_id = revision_options[-1]
+        if revision_options:
+            selected_revision_id = st.selectbox(
+                "Estimate Revision",
+                options=revision_options,
+                index=revision_options.index(selected_revision_id),
+                key=f"atlas_transactions_estimate_revision_{selected_document.document_id}",
+            )
+        selected_revision = dict(
+            estimate_engine.state.get("revisions", {}).get(selected_revision_id) or {}
+        )
+        _save_transaction_estimate_engine_service(
+            st,
+            document_id=selected_document.document_id,
+            service=estimate_engine,
+        )
+
     action_cols = st.columns([1.2, 1.2, 1.4, 2.2])
     if action_cols[0].button(
         "Open Object Workspace", key=f"{prefix}_open_workspace", width="stretch"
@@ -12241,6 +12353,400 @@ def _render_transactions_workspace_page(
                 st.rerun()
             except Exception as exc:
                 st.error(f"Unable to update draft: {exc}")
+
+    if (
+        tertiary == "lines"
+        and selected_document.document_type == CommercialDocumentType.ESTIMATE
+    ):
+        if estimate_engine is None or not selected_revision:
+            st.info("Estimate revision is not available yet.")
+        else:
+            mutable_revision = _safe_text(selected_revision.get("state"), "") in {
+                "draft",
+                "validating",
+                "ready",
+            }
+            line_items = list(selected_revision.get("line_items") or [])
+            st.dataframe(
+                [
+                    {
+                        "Line Item": _safe_text(item.get("line_item_id"), ""),
+                        "Source Object": _safe_text(item.get("source_object_id"), ""),
+                        "Product": _safe_text(item.get("product_id"), ""),
+                        "Description": _safe_text(item.get("description"), ""),
+                        "Qty": item.get("requested_quantity"),
+                        "State": _safe_text(item.get("source_selection_status"), ""),
+                        "Snapshot": _safe_text(
+                            item.get("selected_cost_snapshot_id"), ""
+                        ),
+                    }
+                    for item in line_items
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
+            with st.expander("Add Estimate Line", expanded=False):
+                add_cols = st.columns(5)
+                add_source_object = add_cols[0].text_input(
+                    "Source Object",
+                    key=f"{prefix}_line_add_source_object",
+                )
+                add_product_id = add_cols[1].text_input(
+                    "Product ID",
+                    key=f"{prefix}_line_add_product_id",
+                )
+                add_manufacturer = add_cols[2].text_input(
+                    "Manufacturer",
+                    key=f"{prefix}_line_add_manufacturer",
+                )
+                add_model = add_cols[3].text_input(
+                    "Model",
+                    key=f"{prefix}_line_add_model",
+                )
+                add_quantity = add_cols[4].number_input(
+                    "Quantity",
+                    min_value=0.0,
+                    value=1.0,
+                    step=1.0,
+                    key=f"{prefix}_line_add_quantity",
+                )
+                add_description = st.text_input(
+                    "Description",
+                    key=f"{prefix}_line_add_description",
+                )
+                if st.button(
+                    "Add Line",
+                    key=f"{prefix}_line_add",
+                    disabled=not mutable_revision,
+                    width="stretch",
+                ):
+                    try:
+                        created_line = estimate_engine.add_line_item(
+                            revision_id=selected_revision_id,
+                            actor="atlas-ui",
+                            line={
+                                "source_object_id": add_source_object,
+                                "product_id": add_product_id,
+                                "manufacturer": add_manufacturer,
+                                "model": add_model,
+                                "description": add_description,
+                                "requested_quantity": float(add_quantity),
+                                "engineering_quantity": float(add_quantity),
+                                "procurement_quantity": float(add_quantity),
+                            },
+                        )
+                        if _safe_text(add_product_id, "").count("::") == 1:
+                            estimate_engine.select_line_cost(
+                                revision_id=selected_revision_id,
+                                line_item_id=_safe_text(
+                                    created_line.get("line_item_id"), ""
+                                ),
+                                commercial_state=_commercial_knowledge_state(st),
+                                actor="atlas-ui",
+                            )
+                        estimate_engine.validate_revision(
+                            revision_id=selected_revision_id
+                        )
+                        _save_transaction_estimate_engine_service(
+                            st,
+                            document_id=selected_document.document_id,
+                            service=estimate_engine,
+                        )
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to add estimate line: {exc}")
+
+            line_ids = [
+                _safe_text(item.get("line_item_id"), "")
+                for item in line_items
+                if _safe_text(item.get("line_item_id"), "")
+            ]
+            if line_ids:
+                selected_line_id = st.selectbox(
+                    "Edit Line",
+                    options=line_ids,
+                    key=f"{prefix}_line_selected",
+                )
+                selected_line = next(
+                    item
+                    for item in line_items
+                    if _safe_text(item.get("line_item_id"), "") == selected_line_id
+                )
+                edit_cols = st.columns(4)
+                edit_product = edit_cols[0].text_input(
+                    "Product",
+                    value=_safe_text(selected_line.get("product_id"), ""),
+                    key=f"{prefix}_line_edit_product",
+                )
+                edit_source = edit_cols[1].text_input(
+                    "Source Object",
+                    value=_safe_text(selected_line.get("source_object_id"), ""),
+                    key=f"{prefix}_line_edit_source",
+                )
+                edit_qty = edit_cols[2].number_input(
+                    "Requested Quantity",
+                    min_value=0.0,
+                    value=float(selected_line.get("requested_quantity") or 0.0),
+                    step=1.0,
+                    key=f"{prefix}_line_edit_qty",
+                )
+                edit_description = edit_cols[3].text_input(
+                    "Description",
+                    value=_safe_text(selected_line.get("description"), ""),
+                    key=f"{prefix}_line_edit_description",
+                )
+                line_actions = st.columns(3)
+                if line_actions[0].button(
+                    "Save Line",
+                    key=f"{prefix}_line_save",
+                    disabled=not mutable_revision,
+                    width="stretch",
+                ):
+                    try:
+                        estimate_engine.update_draft_line_item(
+                            revision_id=selected_revision_id,
+                            line_item_id=selected_line_id,
+                            actor="atlas-ui",
+                            updates={
+                                "product_id": edit_product,
+                                "source_object_id": edit_source,
+                                "requested_quantity": float(edit_qty),
+                                "description": edit_description,
+                            },
+                        )
+                        estimate_engine.validate_revision(
+                            revision_id=selected_revision_id
+                        )
+                        _save_transaction_estimate_engine_service(
+                            st,
+                            document_id=selected_document.document_id,
+                            service=estimate_engine,
+                        )
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to update estimate line: {exc}")
+                if line_actions[1].button(
+                    "Remove Line",
+                    key=f"{prefix}_line_remove",
+                    disabled=not mutable_revision,
+                    width="stretch",
+                ):
+                    try:
+                        estimate_engine.remove_draft_line_item(
+                            revision_id=selected_revision_id,
+                            line_item_id=selected_line_id,
+                            actor="atlas-ui",
+                        )
+                        estimate_engine.validate_revision(
+                            revision_id=selected_revision_id
+                        )
+                        _save_transaction_estimate_engine_service(
+                            st,
+                            document_id=selected_document.document_id,
+                            service=estimate_engine,
+                        )
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to remove estimate line: {exc}")
+                if line_actions[2].button(
+                    "Refresh Line Cost",
+                    key=f"{prefix}_line_refresh",
+                    width="stretch",
+                ):
+                    try:
+                        estimate_engine.refresh_line_cost(
+                            revision_id=selected_revision_id,
+                            line_item_id=selected_line_id,
+                            commercial_state=_commercial_knowledge_state(st),
+                            actor="atlas-ui",
+                            accept=True,
+                        )
+                        estimate_engine.validate_revision(
+                            revision_id=selected_revision_id
+                        )
+                        _save_transaction_estimate_engine_service(
+                            st,
+                            document_id=selected_document.document_id,
+                            service=estimate_engine,
+                        )
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to refresh line cost: {exc}")
+
+    if (
+        tertiary == "revisions"
+        and selected_document.document_type == CommercialDocumentType.ESTIMATE
+    ):
+        if estimate_engine is None:
+            st.info("Estimate revision history is not available yet.")
+        else:
+            history_rows = estimate_engine.list_revision_history(
+                estimate_id=_safe_text(estimate_row.get("estimate_id"), "")
+            )
+            st.dataframe(
+                [
+                    {
+                        "Revision": item.get("revision_number"),
+                        "Revision ID": _safe_text(item.get("revision_id"), ""),
+                        "State": _safe_text(item.get("state"), ""),
+                        "Reason": _safe_text(item.get("revision_reason"), ""),
+                        "Updated": _safe_text(item.get("updated_at"), ""),
+                    }
+                    for item in history_rows
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            revision_actions = st.columns(3)
+            if revision_actions[0].button(
+                "Validate Revision",
+                key=f"{prefix}_revision_validate",
+                width="stretch",
+            ):
+                estimate_engine.validate_revision(revision_id=selected_revision_id)
+                _save_transaction_estimate_engine_service(
+                    st,
+                    document_id=selected_document.document_id,
+                    service=estimate_engine,
+                )
+                st.rerun()
+            if revision_actions[1].button(
+                "Clone Revision",
+                key=f"{prefix}_revision_clone",
+                width="stretch",
+            ):
+                estimate_engine.clone_revision(
+                    source_revision_id=selected_revision_id,
+                    created_by="atlas-ui",
+                    reason="Draft revision from Transactions workspace",
+                )
+                _save_transaction_estimate_engine_service(
+                    st,
+                    document_id=selected_document.document_id,
+                    service=estimate_engine,
+                )
+                st.rerun()
+            baseline_options = [
+                _safe_text(item.get("revision_id"), "")
+                for item in history_rows
+                if _safe_text(item.get("revision_id"), "")
+            ]
+            if len(baseline_options) > 1:
+                baseline_revision = st.selectbox(
+                    "Baseline Revision",
+                    options=baseline_options,
+                    index=max(0, len(baseline_options) - 2),
+                    key=f"{prefix}_revision_baseline",
+                )
+                if revision_actions[2].button(
+                    "Compare Revisions",
+                    key=f"{prefix}_revision_compare",
+                    width="stretch",
+                ):
+                    comparison = estimate_engine.compare_revisions(
+                        baseline_revision_id=baseline_revision,
+                        comparison_revision_id=selected_revision_id,
+                    )
+                    st.session_state[f"{prefix}_revision_compare_payload"] = comparison
+            comparison_payload = dict(
+                st.session_state.get(f"{prefix}_revision_compare_payload") or {}
+            )
+            if comparison_payload:
+                st.dataframe([comparison_payload], width="stretch", hide_index=True)
+
+    if (
+        tertiary == "issue"
+        and selected_document.document_type == CommercialDocumentType.ESTIMATE
+    ):
+        if estimate_engine is None:
+            st.info("Estimate issue controls are not available yet.")
+        else:
+            preview_number = service.preview_number(selected_document.document_id)
+            st.dataframe(
+                [
+                    {
+                        "Lifecycle": _safe_text(
+                            selected_document.lifecycle_state.value, ""
+                        ),
+                        "Approval": _safe_text(
+                            selected_document.approval_state.value, ""
+                        ),
+                        "Current Number": _safe_text(
+                            selected_document.document_number, "draft"
+                        ),
+                        "Next Number": preview_number,
+                        "Revision": selected_document.revision_number,
+                    }
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            issue_reason = st.text_input(
+                "Issue Reason",
+                value="Issue estimate revision",
+                key=f"{prefix}_issue_reason",
+            )
+            issue_cols = st.columns(2)
+            if issue_cols[0].button(
+                "Issue Estimate",
+                key=f"{prefix}_issue_estimate",
+                width="stretch",
+            ):
+                if selected_document.approval_state != ApprovalState.APPROVED:
+                    st.warning("Estimate must be approved before issuing.")
+                else:
+                    validation = estimate_engine.validate_revision(
+                        revision_id=selected_revision_id
+                    )
+                    if not bool(validation.get("ready")):
+                        st.warning(
+                            "Revision has blocking diagnostics and cannot be issued."
+                        )
+                    else:
+                        try:
+                            estimate_engine.lock_revision(
+                                revision_id=selected_revision_id,
+                                actor="atlas-ui",
+                            )
+                            service.issue_document(
+                                document_id=selected_document.document_id,
+                                reason=issue_reason,
+                            )
+                            _save_transactions_workspace_state(st, service)
+                            _save_transaction_estimate_engine_service(
+                                st,
+                                document_id=selected_document.document_id,
+                                service=estimate_engine,
+                            )
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to issue estimate: {exc}")
+
+            if issue_cols[1].button(
+                "Create Draft Revision",
+                key=f"{prefix}_issue_create_revision",
+                width="stretch",
+            ):
+                try:
+                    service.create_draft_revision(
+                        document_id=selected_document.document_id,
+                        reason="Post-issue estimate revision",
+                    )
+                    estimate_engine.clone_revision(
+                        source_revision_id=selected_revision_id,
+                        created_by="atlas-ui",
+                        reason="Post-issue estimate revision",
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    _save_transaction_estimate_engine_service(
+                        st,
+                        document_id=selected_document.document_id,
+                        service=estimate_engine,
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create draft revision: {exc}")
 
     if tertiary == "approvals":
         selected_approval = st.selectbox(
@@ -12903,6 +13409,69 @@ def _estimate_engine_service(st: Any) -> EstimateEngineService:
 
 def _save_estimate_engine_service(st: Any, service: EstimateEngineService) -> None:
     st.session_state["atlas_estimate_engine_state"] = service.to_dict()
+
+
+def _transaction_estimate_engine_state(st: Any, document_id: str) -> dict[str, Any]:
+    states = st.session_state.get("atlas_transaction_estimate_engine_states")
+    if not isinstance(states, dict):
+        states = {}
+    state = states.get(document_id)
+    if not isinstance(state, dict):
+        state = EstimateEngineService.empty_state()
+    states[document_id] = state
+    st.session_state["atlas_transaction_estimate_engine_states"] = states
+    return state
+
+
+def _transaction_estimate_engine_service(
+    st: Any, document_id: str
+) -> EstimateEngineService:
+    return EstimateEngineService(
+        state=_transaction_estimate_engine_state(st, document_id)
+    )
+
+
+def _save_transaction_estimate_engine_service(
+    st: Any,
+    *,
+    document_id: str,
+    service: EstimateEngineService,
+) -> None:
+    states = st.session_state.get("atlas_transaction_estimate_engine_states")
+    if not isinstance(states, dict):
+        states = {}
+    states[document_id] = service.to_dict()
+    st.session_state["atlas_transaction_estimate_engine_states"] = states
+
+
+def _ensure_transaction_estimate_revision(
+    service: EstimateEngineService,
+    *,
+    document: CommercialDocument,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    estimate_id = f"estimate:transaction:{document.document_id}"
+    estimate = dict(service.state.get("estimates", {}).get(estimate_id) or {})
+    if not estimate:
+        project_id = _safe_text(document.project_id, "")
+        if not project_id:
+            project_id = f"standalone:{document.document_id}"
+        created = service.create_estimate(
+            project_id=project_id,
+            name=f"{_safe_text(document.document_number, document.document_id)} Estimate",
+            created_by="atlas-ui",
+            estimate_id=estimate_id,
+        )
+        estimate = dict(created.get("estimate") or {})
+
+    active_revision_id = _safe_text(estimate.get("active_draft_revision_id"), "")
+    if not active_revision_id:
+        history = service.list_revision_history(
+            estimate_id=_safe_text(estimate.get("estimate_id"), "")
+        )
+        if history:
+            active_revision_id = _safe_text(history[-1].get("revision_id"), "")
+    revision = dict(service.state.get("revisions", {}).get(active_revision_id) or {})
+    return estimate, revision
 
 
 def _ensure_estimate_engine_project(

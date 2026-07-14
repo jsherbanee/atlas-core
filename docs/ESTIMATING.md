@@ -40,6 +40,8 @@ D-02 explicit non-goals:
 
 D-03 implementation is complete for assemblies, accessories, and labor rollups. D-03 composes deterministic generated lines and labor snapshots through D-02 revision APIs while preserving D-01 cost-selection authority.
 
+Sprint T-03 reuses this same deterministic estimate engine inside Transactions for the Estimates family. Transactions estimate line edits, revision workflows, validation, lock readiness, and issue controls compose the existing D-02/D-03 estimate model without introducing a separate estimate data model.
+
 ## 3. D-01 Dependency Contract
 D-02 consumes D-01 outputs and contracts:
 - CostSelectionRequest

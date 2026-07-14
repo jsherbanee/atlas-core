@@ -85,6 +85,21 @@ Still deferred:
 - accounting ledger, payments, and reconciliation behavior
 - automatic document conversion workflows
 
+## T-03 Implementation Note
+
+Sprint T-03 operationalizes Estimates as the first full transaction family.
+
+Implemented in T-03:
+- estimate-specific tertiary workflow actions: Add, Browse, Edit, Lines, Revisions, Issue, Approvals, Related Documents, Activity, Export
+- deterministic reuse of the existing estimate engine for estimate line editing, validation, revision history, and issue readiness
+- issue gating that requires approval and lock-ready revision state before commercial-document issue transition
+- post-issue draft revision support for estimate updates while preserving issued revision immutability
+- standalone estimate creation/editing guardrails requiring customer identity when no project is linked
+
+Still deferred:
+- non-estimate transaction-family deep operational workflows
+- external sync transport execution and financial posting behavior
+
 It must support documents that are:
 - linked to a Project
 - linked to a Customer or Vendor

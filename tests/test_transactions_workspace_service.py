@@ -1,3 +1,5 @@
+import pytest
+
 from atlas_core.domain.commercial_document import (
     ApprovalState,
     CommercialDocumentLifecycleState,
@@ -129,3 +131,67 @@ def test_overview_metrics_and_sync_status() -> None:
     assert metrics.vendor_bills_pending_sync == 1
     assert metrics.customer_invoices_pending_sync == 0
     assert metrics.sync_failures == 1
+
+
+def test_estimate_standalone_requires_customer() -> None:
+    service = _service()
+
+    with pytest.raises(ValueError, match="standalone estimates require customer_id"):
+        service.create_draft(
+            tenant_id="tenant-1",
+            organization_id="org-1",
+            document_type=CommercialDocumentType.ESTIMATE,
+        )
+
+
+def test_issue_document_allocates_number() -> None:
+    service = _service()
+    estimate = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.ESTIMATE,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service.set_approval_state(
+        document_id=estimate.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+
+    preview = service.preview_number(estimate.document_id)
+    issued = service.issue_document(
+        document_id=estimate.document_id,
+        reason="Issue estimate for review",
+    )
+
+    assert issued.lifecycle_state == CommercialDocumentLifecycleState.ISSUED
+    assert issued.document_number == preview
+
+
+def test_create_draft_revision_from_issued_estimate_returns_to_review() -> None:
+    service = _service()
+    estimate = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.ESTIMATE,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service.set_approval_state(
+        document_id=estimate.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+    issued = service.issue_document(
+        document_id=estimate.document_id,
+        reason="Issue estimate for review",
+    )
+    issued_revision = issued.revision_number
+
+    revised = service.create_draft_revision(
+        document_id=estimate.document_id,
+        reason="Post-issue change",
+    )
+
+    assert revised.lifecycle_state == CommercialDocumentLifecycleState.DRAFT
+    assert revised.revision_number == issued_revision + 1
+    assert revised.approval_state == ApprovalState.NOT_REQUESTED

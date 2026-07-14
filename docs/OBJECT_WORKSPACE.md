@@ -100,6 +100,10 @@ Read-only object-workspace compatibility families:
 - search and Working Set compatibility must preserve W-01 return context and existing route safety checks
 - object adapters must remain deterministic and backward compatible with older search and Working Set records
 
+## T-03 Transactions Compatibility Note
+
+Sprint T-03 extends Object Workspace continuity for transaction estimates by preserving estimate-record selection identity and route handoff from Transactions browse/actions into the shared Object Workspace shell.
+
 ## Universal Object Workspace Shape
 Future workspace surfaces should be able to render a stable object shell using shared contract data for:
 - breadcrumb
