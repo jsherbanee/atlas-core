@@ -227,6 +227,10 @@ Architecture note:
 - optional Project linkage and optional Project Code must be preserved as independent fields rather than required ownership rules
 - shared commercial-document contract, revision rules, numbering philosophy, approval envelope, and sync metadata architecture are defined in [COMMERCIAL_DOCUMENT_FRAMEWORK.md](COMMERCIAL_DOCUMENT_FRAMEWORK.md)
 
+T-01 implementation note:
+- Atlas now includes backend shared domain/service contracts for these transaction families with stable document/line IDs, revision history, explicit lifecycle transitions, decimal-safe totals, related-document/related-line traceability, and tenant/organization-scoped numbering preview/allocation behavior.
+- T-01 remains backend-foundation scope only and does not implement transactions UI, QuickBooks API synchronization, or accounting-ledger behavior.
+
 ### Project
 - Purpose: Post-award execution container.
 - Relationships: derived from Opportunity; owns Project Phase, Contract, Budget, Forecast, Asset.

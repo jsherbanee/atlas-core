@@ -16,6 +16,21 @@ This document exists to define:
 - universal object expectations for transaction records
 - future navigation model for the Transactions workspace
 
+## T-01 Implementation Note
+
+Sprint T-01 implements shared backend commercial-document foundation contracts/services for transaction-family objects.
+
+Implemented in T-01:
+- shared object contract behavior for document identity, line identity, lifecycle, revision, relationships, approval state, numbering policy, diagnostics, totals, and sync metadata
+- tenant- and organization-scoped numbering preview/allocation semantics with no reuse
+- mutable draft and immutable issued revision behavior through explicit lifecycle transitions
+- universal-object registry integration for initial transaction families
+
+Still deferred:
+- transactions workspace UI pages
+- QuickBooks transport APIs
+- accounting/payment/ledger workflows
+
 Related documents:
 - [PRODUCT_VISION.md](PRODUCT_VISION.md)
 - [AV_LIFECYCLE.md](AV_LIFECYCLE.md)

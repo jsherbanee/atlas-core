@@ -780,6 +780,102 @@ def build_default_universal_object_registry() -> UniversalObjectRegistry:
         ),
     )
 
+    registry.register(
+        "commercial_document",
+        lambda source, *, tenant_id, owning_workspace, owning_project_id=None: _dict_object(
+            "commercial_document",
+            dict(source),
+            tenant_id=tenant_id,
+            owning_workspace=owning_workspace,
+            owning_project_id=_project_scope(source, owning_project_id),
+            object_id_keys=["document_id", "object_id", "entity_id"],
+            display_name_keys=[
+                "document_number",
+                "display_name",
+                "title",
+                "document_id",
+            ],
+            secondary_identifier_keys=["document_number", "project_code"],
+            source_authority="commercial_document",
+            secondary_label=(
+                _safe_text(dict(source).get("project_code"), "")
+                or _safe_text(dict(source).get("project_id"), "")
+                or _safe_text(dict(source).get("customer_id"), "")
+                or _safe_text(dict(source).get("vendor_id"), "")
+                or None
+            ),
+            supported_views=[
+                "summary",
+                "details",
+                "relationships",
+                "activity",
+                "history",
+                "lifecycle",
+            ],
+            relationship_groups=[
+                "Related Documents",
+                "Related Projects",
+                "Related Customers",
+                "Related Vendors",
+            ],
+            document_available=True,
+        ),
+    )
+
+    for commercial_type in [
+        "estimate",
+        "proposal",
+        "sales_order",
+        "purchase_order",
+        "rfq",
+        "vendor_quote",
+        "receiving_record",
+        "vendor_bill",
+        "customer_invoice",
+        "change_order",
+    ]:
+        registry.register(
+            commercial_type,
+            lambda source, *, tenant_id, owning_workspace, owning_project_id=None, commercial_type=commercial_type: _dict_object(
+                commercial_type,
+                dict(source),
+                tenant_id=tenant_id,
+                owning_workspace=owning_workspace,
+                owning_project_id=_project_scope(source, owning_project_id),
+                object_id_keys=["document_id", "object_id", "entity_id"],
+                display_name_keys=[
+                    "document_number",
+                    "display_name",
+                    "title",
+                    "document_id",
+                ],
+                secondary_identifier_keys=["document_number", "project_code"],
+                source_authority="commercial_document",
+                secondary_label=(
+                    _safe_text(dict(source).get("project_code"), "")
+                    or _safe_text(dict(source).get("project_id"), "")
+                    or _safe_text(dict(source).get("customer_id"), "")
+                    or _safe_text(dict(source).get("vendor_id"), "")
+                    or None
+                ),
+                supported_views=[
+                    "summary",
+                    "details",
+                    "relationships",
+                    "activity",
+                    "history",
+                    "lifecycle",
+                ],
+                relationship_groups=[
+                    "Related Documents",
+                    "Related Projects",
+                    "Related Customers",
+                    "Related Vendors",
+                ],
+                document_available=True,
+            ),
+        )
+
     for (
         object_type,
         object_id_keys,

@@ -127,6 +127,33 @@ class DocumentRepository(ABC):
     ) -> JsonDict:
         raise NotImplementedError
 
+    def save_commercial_document(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        payload: JsonDict,
+    ) -> None:
+        """Optional hook for commercial-document persistence using existing repositories."""
+        raise NotImplementedError
+
+    def load_commercial_document(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        document_id: str,
+    ) -> JsonDict | None:
+        """Optional hook for loading a commercial-document payload by identity."""
+        return None
+
+    def list_commercial_documents(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        document_type: str | None = None,
+    ) -> list[JsonDict]:
+        """Optional hook for listing commercial-document payloads by scope."""
+        return []
+
 
 class ReviewRepository(ABC):
     """Persistence contract for review result artifacts."""

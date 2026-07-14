@@ -132,6 +132,8 @@ def test_registry_reports_registered_types_in_deterministic_order() -> None:
     assert "project" in types
     assert "product" in types
     assert "drawing" in types
+    assert "commercial_document" in types
+    assert "estimate" in types
 
 
 def test_project_adapter_preserves_existing_id() -> None:
@@ -195,6 +197,15 @@ def test_project_adapter_preserves_existing_id() -> None:
             "equipment",
             {"equipment_id": "EQ-1", "manufacturer": "QSC", "model": "Core"},
             "EQ-1",
+        ),
+        (
+            "estimate",
+            {
+                "document_id": "doc-est-1",
+                "document_number": "EST-00001",
+                "project_id": "BID-2026-0001",
+            },
+            "doc-est-1",
         ),
     ],
 )

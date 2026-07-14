@@ -258,6 +258,27 @@ Status: Implemented and Closed for current roadmap baseline
 - D-02 Estimate Engine and Cost Snapshot Architecture (Implemented)
 - D-03 Assemblies, Accessories, and Labor Rollups (Implemented, Closed)
 - D-03 Scope and Risk Diagnostics (Implemented through D-03 validation/readiness diagnostics)
+
+## Epic T: Transactions Foundation
+
+Status: Active
+
+- T-01 Commercial Document Domain Foundation
+
+### T-01 Scope
+
+- implement shared backend domain/contracts/services for commercial documents
+- support initial transaction families: Estimate, Proposal, Sales Order, Purchase Order, RFQ, Vendor Quote, Receiving Record, Vendor Bill, Customer Invoice, Change Order
+- implement stable document and line identity, optional project/project-code linkage, explicit lifecycle transitions, revision history, immutable issued revisions, decimal-safe totals, relationship traceability, and tenant/organization numbering preview/allocation behavior
+- register commercial documents in the universal object registry and keep persistence compatibility through existing repository contracts
+
+Explicitly out of scope:
+
+- transactions UI
+- QuickBooks API implementation
+- payments, accounting ledger, or ERP behavior
+- approval UI
+- automatic document conversion
 - D-04 Bid Completeness and Readiness Scoring
 - D-05 Estimator Brief and Final Estimator Review
 - D-06 Estimate Workflow Integration and Exports

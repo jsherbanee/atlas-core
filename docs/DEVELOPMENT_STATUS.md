@@ -55,6 +55,7 @@ Sprint L-01 introduces the deterministic AV Lifecycle Engine foundation, includi
 Sprint L-02 introduces the first Project Lifecycle Dashboard inside Universal Object Workspace, using the L-01 lifecycle engine as the single lifecycle authority.
 Sprint A-07 defines the Transactions workspace and commercial-operations ownership model as architecture only, with no production implementation in this sprint.
 Sprint A-08 defines the shared Commercial Document Framework for all future commercial documents as architecture only, with no production implementation in this sprint.
+Sprint T-01 implements the Commercial Document Domain Foundation backend contracts/services, including lifecycle/revision rules, decimal-safe totals, organization-scoped numbering preview/allocation, commercial-document universal-object registry adapters, and compatibility-safe serialization behavior.
 
 X-01 through X-13 are closed.
 
@@ -150,6 +151,7 @@ Current implementation scope note:
 - X-03 remains workflow hardening only and does not introduce new estimating/commercial/procurement/execution capabilities
 - A-07 is documentation-only and does not introduce transaction code, QuickBooks integration, routing, or accounting behavior
 - A-08 is documentation-only and does not introduce commercial-document code, UI, routing, or QuickBooks implementation
+- T-01 implements backend commercial-document foundation only and does not introduce transactions UI, QuickBooks API transport, payments, or accounting-ledger behavior
 
 ## A-07 Architecture Validation Note
 - Transactions and commercial-operations architecture are documented, not implemented

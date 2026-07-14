@@ -21,6 +21,25 @@ This framework is the shared foundation for:
 - Change Orders
 - Subcontracts
 
+## T-01 Implementation Status
+
+Sprint T-01 implements the backend commercial-document foundation in the Atlas engine layer.
+
+Implemented in T-01:
+- shared commercial-document domain models and contracts for identity, lines, relationships, revisions, lifecycle, approval, sync metadata, diagnostics, totals, and numbering policy
+- explicit lifecycle transition rules for Draft -> In Review -> Approved -> Issued -> Partially Fulfilled -> Fulfilled -> Closed -> Archived
+- immutable issued revision snapshots and mutable pre-issue working revisions
+- organization-scoped, tenant-scoped numbering preview/allocation with no number reuse
+- decimal-safe totals behavior
+- universal-object registry adapter coverage for commercial documents and initial transaction families
+
+Not implemented in T-01:
+- transactions UI flows
+- QuickBooks API operations
+- accounting, payments, or ledger behavior
+- approval UI
+- automatic document conversion
+
 Related documents:
 - [TRANSACTIONS_ARCHITECTURE.md](TRANSACTIONS_ARCHITECTURE.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)

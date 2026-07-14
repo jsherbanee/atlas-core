@@ -21,6 +21,23 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic W Sprint W-03 Universal Object Workspace)
 
+## Unreleased (Epic T Sprint T-01 Commercial Document Domain Foundation)
+
+### Improved
+
+- Atlas now includes shared commercial-document backend domain models and contracts for identity, revisions, line items, relationships, approval state, sync metadata, totals, diagnostics, and numbering policy.
+- Initial transaction-family support is available for Estimate, Proposal, Sales Order, Purchase Order, RFQ, Vendor Quote, Receiving Record, Vendor Bill, Customer Invoice, and Change Order.
+- Commercial-document lifecycle now uses explicit transition rules from Draft through Archived with immutable issued revision snapshots and revision history preservation.
+- Numbering now supports tenant-scoped and organization-scoped preview/allocation semantics with no number reuse.
+- Universal Object registry now includes commercial-document adapter registration for transaction-family identities.
+
+### Scope Notes
+
+- backend foundation only
+- no transactions UI implementation
+- no QuickBooks API implementation
+- no accounting/payment/ledger subsystem behavior
+
 ## Unreleased (Epic L Sprint L-01 AV Lifecycle Engine Foundation)
 
 ## Unreleased (Epic L Sprint L-02 Lifecycle Dashboard)

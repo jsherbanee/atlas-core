@@ -110,6 +110,15 @@ Architecture posture:
 - issued revisions must be historically reproducible and immutable
 - sync metadata must preserve operational ownership in Atlas while respecting QuickBooks financial ownership after sync
 
+Sprint T-01 status:
+- shared backend commercial-document domain/contracts/services are implemented in the engine layer for initial transaction families
+- universal-object registry now includes commercial document adapter coverage for transaction-family object identities
+
+T-01 boundary posture remains unchanged:
+- no transactions UI implementation
+- no QuickBooks API implementation
+- no payment/ledger/accounting subsystem behavior
+
 ## Core Principle
 Business logic should live once in the Atlas engine and be reused by all callers:
 - CLI
