@@ -11,12 +11,14 @@ No production code, UI, QuickBooks integration, routing, or workflow implementat
 This framework is the shared foundation for:
 - Estimates
 - Sales Orders
+- Return Orders
 - Purchase Orders
 - RFQs
 - Vendor Quotes
 - Receiving Records
 - Vendor Bills
 - Customer Invoices
+- Credit Memos
 - Change Orders
 - Subcontracts
 
@@ -274,6 +276,7 @@ The framework defines deterministic relationship rules for common commercial-doc
 
 Required canonical relationships:
 - Estimate → Sales Order
+- Return Order → Credit Memo
 - Sales Order → Invoice
 - RFQ → Vendor Quote
 - Vendor Quote → Purchase Order
@@ -483,6 +486,27 @@ Export guarantees:
 - export filename includes document number and revision
 - issued and archived revisions remain exportable
 - export activity is recorded as document activity metadata
+
+## T-06 Implementation: Return Orders and Credit Memos
+
+Implemented scope for customer-side return workflows:
+- Return Order transaction family
+- Credit Memo transaction family
+- source Sales Order and source Invoice traceability
+- partial-return and service-adjustment handling
+- deterministic approved-credit calculations with restocking-fee and tax-adjustment support
+- duplicate Credit Memo prevention from the same Return Order
+
+Return Order notes:
+- may be standalone or linked to Sales Order/Invoice/Project
+- processed revisions are immutable
+- product-return inspection and inventory-disposition hooks are metadata only in this sprint
+
+Credit Memo notes:
+- generated from processed Return Orders
+- references Return Order and original customer-side source document where available
+- uses tenant numbering settings and QuickBooks-oriented sync metadata only
+- remains immutable once issued
 
 Still intentionally unresolved:
 - final canonical status taxonomies by document family

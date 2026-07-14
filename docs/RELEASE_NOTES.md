@@ -41,6 +41,22 @@ This document tracks product-facing changes for Atlas Preview releases.
 - no QuickBooks API transport implementation
 - no automatic revision creation without explicit user intent
 
+## Unreleased (Epic T Sprint T-06 Return Orders and Credit Memos)
+
+### Improved
+
+- Transactions now supports Return Orders for standalone or linked customer returns.
+- Return Orders now support product and service return lines, partial approvals, restocking fees, and tax adjustments.
+- Processing a Return Order now generates one linked Credit Memo with preserved source-document and source-line traceability.
+- Credit Memos now use tenant numbering settings, preserve QuickBooks sync metadata boundaries, and support PDF export.
+
+### Scope Notes
+
+- no live QuickBooks sync
+- no customer refund or payment-processing behavior
+- no automated inventory disposition execution
+- no vendor return workflow
+
 ### Improved
 
 - Organization Settings now supports tenant-scoped Terms and Conditions content blocks for Estimates and Sales Orders.

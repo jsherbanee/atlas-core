@@ -784,6 +784,30 @@ Sales-order export presentation:
 
 Export workflows include non-executing future email metadata capture (provider/recipient/template/revision) and do not send email in this sprint.
 
+## Transactions GUI: T-06 Return Orders and Credit Memos
+
+Transactions now includes secondary sections for Return Orders and Credit Memos.
+
+Return Order actions:
+- Add
+- Browse
+- Edit
+- Lines
+- Approvals
+- Receiving
+- Inspection
+- Process
+- Activity
+- Export
+
+Credit Memo actions:
+- Browse
+- Details
+- Related Documents
+- Sync Status
+- Activity
+- Export PDF
+
 Default sections:
 - Project Overview
 - Documents Reviewed

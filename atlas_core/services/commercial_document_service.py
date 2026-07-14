@@ -253,6 +253,7 @@ class CommercialDocumentService:
         source_line_id: str | None = None,
         related_document_id: str | None = None,
         related_line_id: str | None = None,
+        line_metadata: dict[str, Any] | None = None,
     ) -> CommercialDocumentLineItem:
         self._assert_mutable(document)
         line = CommercialDocumentLineItem(
@@ -271,6 +272,7 @@ class CommercialDocumentService:
             source_line_id=source_line_id,
             related_document_id=related_document_id,
             related_line_id=related_line_id,
+            line_metadata=line_metadata,
         )
         document.lines.append(line)
         self.recompute_totals(document)
@@ -308,6 +310,60 @@ class CommercialDocumentService:
             state = ApprovalState(state)
         document.approval_state = state
         document.updated_at = _utc_now()
+        self._sync_current_revision_snapshot(document)
+
+    def set_document_metadata(
+        self,
+        document: CommercialDocument,
+        *,
+        metadata: dict[str, Any],
+        merge: bool = True,
+        force: bool = False,
+    ) -> None:
+        if not force:
+            self._assert_mutable(document)
+        current = dict(document.document_metadata or {}) if merge else {}
+        current.update(dict(metadata))
+        document.document_metadata = current
+        document.updated_at = _utc_now()
+        self._sync_current_revision_snapshot(document)
+
+    def add_attachment(
+        self,
+        document: CommercialDocument,
+        *,
+        attachment: dict[str, Any],
+        force: bool = False,
+    ) -> None:
+        if not force:
+            self._assert_mutable(document)
+        document.attachments.append(dict(attachment))
+        document.updated_at = _utc_now()
+        self._sync_current_revision_snapshot(document)
+
+    def set_totals(
+        self,
+        document: CommercialDocument,
+        *,
+        subtotal: Decimal,
+        discount_total: Decimal,
+        tax_total: Decimal,
+        grand_total: Decimal,
+        currency: str = "USD",
+        force: bool = False,
+    ) -> CommercialDocumentTotals:
+        if not force:
+            self._assert_mutable(document)
+        document.totals = CommercialDocumentTotals(
+            currency=currency,
+            subtotal=subtotal,
+            discount_total=discount_total,
+            tax_total=tax_total,
+            grand_total=grand_total,
+        )
+        document.updated_at = _utc_now()
+        self._sync_current_revision_snapshot(document)
+        return document.totals
 
     def recompute_totals(
         self, document: CommercialDocument
@@ -371,6 +427,8 @@ class CommercialDocumentService:
             if document.approval_state != ApprovalState.APPROVED:
                 raise ValueError("document must be approved before issuing")
             self.allocate_number(document)
+            self._freeze_current_revision(document, reason=reason)
+        elif target_state == CommercialDocumentLifecycleState.PROCESSED:
             self._freeze_current_revision(document, reason=reason)
         elif (
             previous_state == CommercialDocumentLifecycleState.ISSUED

@@ -547,3 +547,252 @@ def test_duplicate_and_export_preserve_tenant_isolation() -> None:
     assert untouched.tenant_id == "tenant-b"
     assert untouched.export_activity == []
     assert untouched.future_email_metadata == []
+
+
+def test_create_standalone_and_linked_return_orders() -> None:
+    service = _service()
+    standalone = service.create_return_order(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        project_id=None,
+        project_code=None,
+        return_reason="damaged",
+        return_type="product",
+        requested_date="2026-07-13",
+    )
+    assert standalone.document_type == CommercialDocumentType.RETURN_ORDER
+    assert standalone.customer_id == "customer-a"
+
+    sales_order = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        project_code="P-A",
+        customer_id="customer-a",
+    )
+    linked = service.create_return_order(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id=None,
+        source_sales_order_id=sales_order.document_id,
+        return_reason="incorrect item",
+        return_type="service",
+    )
+    assert linked.source_sales_order_id == sales_order.document_id
+    assert linked.customer_id == sales_order.customer_id
+
+
+def test_process_product_and_service_return_orders_generates_credit_memo() -> None:
+    service = _service()
+    return_order = service.create_return_order(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        project_id="project-a",
+        project_code="P-A",
+        return_reason="service adjustment",
+        return_type="mixed",
+    )
+    service.add_return_order_line(
+        return_order_document_id=return_order.document_id,
+        description="Returned amplifier",
+        quantity=Decimal("2"),
+        original_unit_price=Decimal("100.00"),
+        approved_return_quantity=Decimal("1"),
+        line_type="product",
+        restocking_fee=Decimal("10.00"),
+        tax_adjustment=Decimal("5.00"),
+        product_or_service_reference="amp-1",
+        source_document_id="so-1",
+        source_line_id="so-line-1",
+        inventory_disposition_hook="restock",
+    )
+    service.add_return_order_line(
+        return_order_document_id=return_order.document_id,
+        description="Cancelled programming",
+        quantity=Decimal("3"),
+        original_unit_price=Decimal("50.00"),
+        approved_return_quantity=Decimal("2"),
+        line_type="service",
+        restocking_fee=Decimal("0"),
+        tax_adjustment=Decimal("2.50"),
+        product_or_service_reference="svc-1",
+        source_document_id="inv-1",
+        source_line_id="inv-line-2",
+    )
+
+    service.request_return_order(
+        document_id=return_order.document_id, reason="Requested"
+    )
+    service.approve_return_order(
+        document_id=return_order.document_id, reason="Approved"
+    )
+    service.receive_return_order(
+        document_id=return_order.document_id,
+        partial=False,
+        received_date="2026-07-14",
+        inventory_disposition="restock",
+    )
+    service.inspect_return_order(
+        document_id=return_order.document_id,
+        inspection_status="accepted",
+    )
+
+    credit_memo = service.process_return_order(
+        document_id=return_order.document_id,
+        actor="qa",
+    )
+
+    assert credit_memo.document_type == CommercialDocumentType.CREDIT_MEMO
+    assert credit_memo.lifecycle_state == CommercialDocumentLifecycleState.ISSUED
+    assert credit_memo.document_number is not None
+    assert credit_memo.source_document_id == return_order.document_id
+    assert len(credit_memo.lines) == 2
+    assert credit_memo.lines[0].source_document_id == return_order.document_id
+    assert credit_memo.lines[0].line_metadata is not None
+    assert credit_memo.lines[0].line_metadata["original_source_document_id"] == "so-1"
+    assert return_order.lifecycle_state == CommercialDocumentLifecycleState.PROCESSED
+    assert return_order.revisions[-1].immutable is True
+
+
+def test_partial_returns_restocking_fees_and_tax_adjustments_are_deterministic() -> (
+    None
+):
+    service = _service()
+    return_order = service.create_return_order(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        return_reason="over-shipment",
+        return_type="product",
+    )
+    service.add_return_order_line(
+        return_order_document_id=return_order.document_id,
+        description="Returned fixture",
+        quantity=Decimal("4"),
+        original_unit_price=Decimal("25.00"),
+        approved_return_quantity=Decimal("3"),
+        line_type="product",
+        restocking_fee=Decimal("7.50"),
+        tax_adjustment=Decimal("3.25"),
+    )
+
+    metadata = return_order.document_metadata or {}
+    assert metadata["approved_credit_amount"] == "70.75"
+    assert metadata["restocking_fee"] == "7.50"
+    assert metadata["tax_adjustment"] == "3.25"
+    assert return_order.totals.grand_total == Decimal("70.75")
+
+
+def test_return_order_duplicate_credit_memo_generation_is_prevented() -> None:
+    service = _service()
+    return_order = service.create_return_order(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        return_reason="defective",
+        return_type="product",
+    )
+    service.add_return_order_line(
+        return_order_document_id=return_order.document_id,
+        description="Defective device",
+        quantity=Decimal("1"),
+        original_unit_price=Decimal("120.00"),
+        line_type="product",
+    )
+    service.request_return_order(
+        document_id=return_order.document_id, reason="Requested"
+    )
+    service.approve_return_order(
+        document_id=return_order.document_id, reason="Approved"
+    )
+    service.inspect_return_order(
+        document_id=return_order.document_id,
+        inspection_status="accepted",
+    )
+    service.process_return_order(document_id=return_order.document_id, actor="qa")
+
+    with pytest.raises(ValueError, match="credit memo already generated"):
+        service.process_return_order(document_id=return_order.document_id, actor="qa")
+
+
+def test_credit_memo_pdf_export_and_quickbooks_sync_metadata() -> None:
+    service = _service()
+    return_order = service.create_return_order(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        return_reason="goodwill",
+        return_type="service",
+    )
+    service.add_return_order_line(
+        return_order_document_id=return_order.document_id,
+        description="Service credit",
+        quantity=Decimal("1"),
+        original_unit_price=Decimal("80.00"),
+        line_type="service",
+    )
+    service.request_return_order(
+        document_id=return_order.document_id, reason="Requested"
+    )
+    service.approve_return_order(
+        document_id=return_order.document_id, reason="Approved"
+    )
+    credit_memo = service.process_return_order(
+        document_id=return_order.document_id, actor="qa"
+    )
+
+    export_result = service.export_document_pdf(
+        document_id=credit_memo.document_id,
+        presentation="credit_memo",
+        actor="qa",
+    )
+    assert export_result["file_name"].endswith(".pdf")
+    assert export_result["payload"].startswith(b"%PDF-1.4")
+    assert credit_memo.sync_metadata.integration == "quickbooks"
+    assert credit_memo.sync_metadata.status == SyncStatus.NOT_READY
+
+
+def test_return_order_tenant_isolation_preserved_through_credit_generation() -> None:
+    service = _service()
+    tenant_a = service.create_return_order(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        customer_id="customer-a",
+        return_reason="warranty",
+        return_type="product",
+    )
+    service.add_return_order_line(
+        return_order_document_id=tenant_a.document_id,
+        description="Returned unit",
+        quantity=Decimal("1"),
+        original_unit_price=Decimal("40.00"),
+        line_type="product",
+    )
+    tenant_b = service.create_return_order(
+        tenant_id="tenant-b",
+        organization_id="org-1",
+        customer_id="customer-b",
+        return_reason="other",
+        return_type="service",
+    )
+    service.add_return_order_line(
+        return_order_document_id=tenant_b.document_id,
+        description="Service reversal",
+        quantity=Decimal("1"),
+        original_unit_price=Decimal("15.00"),
+        line_type="service",
+    )
+    service.request_return_order(document_id=tenant_a.document_id, reason="Requested")
+    service.approve_return_order(document_id=tenant_a.document_id, reason="Approved")
+    credit_memo = service.process_return_order(
+        document_id=tenant_a.document_id, actor="qa"
+    )
+
+    assert credit_memo.tenant_id == "tenant-a"
+    untouched = service.get_document(tenant_b.document_id)
+    assert untouched is not None
+    assert untouched.document_metadata is not None
+    assert untouched.document_metadata.get("generated_credit_memo_id") is None

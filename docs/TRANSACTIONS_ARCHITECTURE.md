@@ -111,6 +111,7 @@ It must support documents that are:
 Initial transaction families:
 - Estimates
 - Sales Orders
+- Return Orders
 - Purchase Orders
 - RFQs
 - Vendor Quotes
@@ -118,6 +119,7 @@ Initial transaction families:
 - Receiving Records
 - Vendor Bills
 - Customer Invoices
+- Credit Memos
 - Subcontracts
 
 Each family should be modeled as a first-class business object rather than a one-off page artifact.
@@ -217,6 +219,13 @@ Estimate
 → Invoice
 → Sync to QuickBooks
 → Payment status returns to Atlas
+
+Extended customer-return flow:
+
+Sales Order or Invoice
+→ Return Order
+→ Credit Memo
+→ Sync to QuickBooks
 
 Ownership interpretation:
 - Atlas owns the operational authoring and approval path through Invoice sync readiness
@@ -380,6 +389,26 @@ PDF export support:
 Future delivery hooks:
 - non-executing metadata capture for Microsoft 365, Google Workspace, SMTP, and approved future providers
 - no mail-provider transport implementation in this sprint
+
+## T-06 Implementation: Return Orders and Credit Memos
+
+Transactions now supports customer-return workflows through:
+- Return Orders
+- Credit Memos
+
+Return Order behavior:
+- supports standalone or linked return initiation
+- preserves source-document and source-line traceability
+- supports product and service return lines
+- supports partial returns
+- supports deterministic restocking-fee and tax-adjustment calculations
+- supports processing into one linked Credit Memo only
+
+Credit Memo behavior:
+- generated from processed Return Orders
+- retains QuickBooks sync metadata without implementing transport
+- remains immutable once issued
+- remains exportable through deterministic PDF export
 - Open Sales Orders
 - Open Purchase Orders
 - Partially Received POs

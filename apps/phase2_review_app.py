@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from decimal import Decimal
 import hashlib
 from html import escape
 import json
@@ -316,6 +317,8 @@ OBJECT_WORKSPACE_MIGRATED_KINDS = {
     "estimate",
     "proposal",
     "sales_order",
+    "return_order",
+    "credit_memo",
     "purchase_order",
     "request_for_quote",
     "vendor_quote",
@@ -515,6 +518,8 @@ PROJECTS_ACTIVE_PAGES = {
 TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE: dict[str, CommercialDocumentType] = {
     "estimates": CommercialDocumentType.ESTIMATE,
     "sales_orders": CommercialDocumentType.SALES_ORDER,
+    "return_orders": CommercialDocumentType.RETURN_ORDER,
+    "credit_memos": CommercialDocumentType.CREDIT_MEMO,
     "purchase_orders": CommercialDocumentType.PURCHASE_ORDER,
     "rfqs": CommercialDocumentType.RFQ,
     "vendor_quotes": CommercialDocumentType.VENDOR_QUOTE,
@@ -527,6 +532,8 @@ TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE: dict[str, CommercialDocumentType] = {
 TRANSACTION_TYPE_TO_KIND: dict[CommercialDocumentType, str] = {
     CommercialDocumentType.ESTIMATE: "estimate",
     CommercialDocumentType.SALES_ORDER: "sales_order",
+    CommercialDocumentType.RETURN_ORDER: "return_order",
+    CommercialDocumentType.CREDIT_MEMO: "credit_memo",
     CommercialDocumentType.PURCHASE_ORDER: "purchase_order",
     CommercialDocumentType.RFQ: "request_for_quote",
     CommercialDocumentType.VENDOR_QUOTE: "vendor_quote",
@@ -6376,6 +6383,110 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
     for secondary_key in TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE:
         if secondary_key == "estimates":
             continue
+        if secondary_key == "return_orders":
+            actions[secondary_key] = [
+                {
+                    "tertiary_key": "add",
+                    "label": "Add",
+                    "action_type": "create_action",
+                    "required_selection": None,
+                },
+                {
+                    "tertiary_key": "browse",
+                    "label": "Browse",
+                    "action_type": "collection_view",
+                    "required_selection": None,
+                },
+                {
+                    "tertiary_key": "edit",
+                    "label": "Edit",
+                    "action_type": "edit_action",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "lines",
+                    "label": "Lines",
+                    "action_type": "detail_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "approvals",
+                    "label": "Approvals",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "receiving",
+                    "label": "Receiving",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "inspection",
+                    "label": "Inspection",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "process",
+                    "label": "Process",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "activity",
+                    "label": "Activity",
+                    "action_type": "history_activity_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "export",
+                    "label": "Export",
+                    "action_type": "export_action",
+                    "required_selection": "entity",
+                },
+            ]
+            continue
+        if secondary_key == "credit_memos":
+            actions[secondary_key] = [
+                {
+                    "tertiary_key": "browse",
+                    "label": "Browse",
+                    "action_type": "collection_view",
+                    "required_selection": None,
+                },
+                {
+                    "tertiary_key": "details",
+                    "label": "Details",
+                    "action_type": "detail_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "related_documents",
+                    "label": "Related Documents",
+                    "action_type": "relationship_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "sync_status",
+                    "label": "Sync Status",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "activity",
+                    "label": "Activity",
+                    "action_type": "history_activity_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "export_pdf",
+                    "label": "Export PDF",
+                    "action_type": "export_action",
+                    "required_selection": "entity",
+                },
+            ]
+            continue
         if secondary_key == "sales_orders":
             actions[secondary_key] = [
                 {
@@ -6669,6 +6780,8 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             ("overview", "Overview"),
             ("estimates", "Estimates"),
             ("sales_orders", "Sales Orders"),
+            ("return_orders", "Return Orders"),
+            ("credit_memos", "Credit Memos"),
             ("purchase_orders", "Purchase Orders"),
             ("rfqs", "RFQs"),
             ("vendor_quotes", "Vendor Quotes"),
@@ -12503,33 +12616,107 @@ def _render_transactions_workspace_page(
     )
 
     if tertiary == "add":
-        create_cols = st.columns(4)
-        project_id = create_cols[0].text_input("Project ID", key=f"{prefix}_project_id")
-        project_code = create_cols[1].text_input(
-            "Project Code", key=f"{prefix}_project_code"
-        )
-        customer_id = create_cols[2].text_input(
-            "Customer ID", key=f"{prefix}_customer_id"
-        )
-        vendor_id = create_cols[3].text_input("Vendor ID", key=f"{prefix}_vendor_id")
-        if st.button("Create Draft", key=f"{prefix}_create", width="stretch"):
-            created = service.create_draft(
-                tenant_id="local",
-                organization_id="atlas",
-                document_type=document_type,
-                project_id=project_id,
-                project_code=project_code,
-                customer_id=customer_id,
-                vendor_id=vendor_id,
+        if document_type == CommercialDocumentType.RETURN_ORDER:
+            create_cols = st.columns(4)
+            project_id = create_cols[0].text_input(
+                "Project ID", key=f"{prefix}_project_id"
             )
-            st.session_state["atlas_transactions_selected_document_id"] = (
-                created.document_id
+            project_code = create_cols[1].text_input(
+                "Project Code", key=f"{prefix}_project_code"
             )
-            _save_transactions_workspace_state(st, service)
-            st.success(
-                f"Draft created: {_safe_text(created.document_number, created.document_id)}"
+            customer_id = create_cols[2].text_input(
+                "Customer ID", key=f"{prefix}_customer_id"
             )
-            st.rerun()
+            return_reason = create_cols[3].selectbox(
+                "Return Reason",
+                options=[
+                    "incorrect item",
+                    "damaged",
+                    "defective",
+                    "customer cancellation",
+                    "over-shipment",
+                    "service adjustment",
+                    "warranty",
+                    "goodwill",
+                    "other",
+                ],
+                key=f"{prefix}_return_reason",
+            )
+            create_cols_2 = st.columns(4)
+            return_type = create_cols_2[0].selectbox(
+                "Return Type",
+                options=["product", "service", "mixed"],
+                key=f"{prefix}_return_type",
+            )
+            requested_date = create_cols_2[1].text_input(
+                "Requested Date",
+                key=f"{prefix}_requested_date",
+                value=_now_iso()[:10],
+            )
+            source_sales_order_id = create_cols_2[2].text_input(
+                "Source Sales Order",
+                key=f"{prefix}_source_sales_order_id",
+            )
+            source_invoice_id = create_cols_2[3].text_input(
+                "Source Invoice",
+                key=f"{prefix}_source_invoice_id",
+            )
+            if st.button(
+                "Create Return Order", key=f"{prefix}_create", width="stretch"
+            ):
+                try:
+                    created = service.create_return_order(
+                        tenant_id="local",
+                        organization_id="atlas",
+                        customer_id=customer_id or None,
+                        project_id=project_id or None,
+                        project_code=project_code or None,
+                        source_sales_order_id=source_sales_order_id or None,
+                        source_invoice_id=source_invoice_id or None,
+                        return_reason=return_reason,
+                        return_type=return_type,
+                        requested_date=requested_date or None,
+                    )
+                    st.session_state["atlas_transactions_selected_document_id"] = (
+                        created.document_id
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.success("Return order draft created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create return order: {exc}")
+        else:
+            create_cols = st.columns(4)
+            project_id = create_cols[0].text_input(
+                "Project ID", key=f"{prefix}_project_id"
+            )
+            project_code = create_cols[1].text_input(
+                "Project Code", key=f"{prefix}_project_code"
+            )
+            customer_id = create_cols[2].text_input(
+                "Customer ID", key=f"{prefix}_customer_id"
+            )
+            vendor_id = create_cols[3].text_input(
+                "Vendor ID", key=f"{prefix}_vendor_id"
+            )
+            if st.button("Create Draft", key=f"{prefix}_create", width="stretch"):
+                created = service.create_draft(
+                    tenant_id="local",
+                    organization_id="atlas",
+                    document_type=document_type,
+                    project_id=project_id,
+                    project_code=project_code,
+                    customer_id=customer_id,
+                    vendor_id=vendor_id,
+                )
+                st.session_state["atlas_transactions_selected_document_id"] = (
+                    created.document_id
+                )
+                _save_transactions_workspace_state(st, service)
+                st.success(
+                    f"Draft created: {_safe_text(created.document_number, created.document_id)}"
+                )
+                st.rerun()
 
     if not rows:
         _render_guided_empty_state(
@@ -12786,6 +12973,9 @@ def _render_transactions_workspace_page(
                 options=["internal_estimate", "customer_estimate"],
                 key=f"{prefix}_pdf_presentation",
             )
+        elif selected_document.document_type == CommercialDocumentType.CREDIT_MEMO:
+            presentation = "credit_memo"
+            st.caption("Credit Memo presentation is fixed to credit_memo.")
         else:
             presentation = "sales_order"
             st.caption("Sales Order presentation is fixed to sales_order.")
@@ -13437,6 +13627,159 @@ def _render_transactions_workspace_page(
         )
 
     if (
+        tertiary == "lines"
+        and selected_document.document_type == CommercialDocumentType.RETURN_ORDER
+    ):
+        st.dataframe(
+            [
+                {
+                    "Line": line.sequence,
+                    "Description": line.description,
+                    "Requested Qty": str(line.quantity),
+                    "Original Price": str(line.unit_price),
+                    "Approved Qty": _safe_text(
+                        (line.line_metadata or {}).get("approved_return_quantity"),
+                        str(line.quantity),
+                    ),
+                    "Type": _safe_text((line.line_metadata or {}).get("line_type"), ""),
+                    "Restocking Fee": _safe_text(
+                        (line.line_metadata or {}).get("restocking_fee"), "0"
+                    ),
+                    "Tax Adjustment": _safe_text(
+                        (line.line_metadata or {}).get("tax_adjustment"), "0"
+                    ),
+                }
+                for line in list(selected_document.lines or [])
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+        with st.expander("Add Return Order Line", expanded=False):
+            add_cols = st.columns(5)
+            add_description = add_cols[0].text_input(
+                "Description",
+                key=f"{prefix}_return_line_description",
+            )
+            add_quantity = Decimal(
+                str(
+                    add_cols[1].number_input(
+                        "Requested Qty",
+                        min_value=0.0,
+                        value=1.0,
+                        step=1.0,
+                        key=f"{prefix}_return_line_qty",
+                    )
+                )
+            )
+            add_original_price = Decimal(
+                str(
+                    add_cols[2].number_input(
+                        "Original Price",
+                        min_value=0.0,
+                        value=0.0,
+                        step=1.0,
+                        key=f"{prefix}_return_line_original_price",
+                    )
+                )
+            )
+            add_approved_qty = Decimal(
+                str(
+                    add_cols[3].number_input(
+                        "Approved Qty",
+                        min_value=0.0,
+                        value=1.0,
+                        step=1.0,
+                        key=f"{prefix}_return_line_approved_qty",
+                    )
+                )
+            )
+            add_line_type = add_cols[4].selectbox(
+                "Line Type",
+                options=["product", "service"],
+                key=f"{prefix}_return_line_type",
+            )
+            fee_cols = st.columns(4)
+            add_restocking_fee = Decimal(
+                str(
+                    fee_cols[0].number_input(
+                        "Restocking Fee",
+                        min_value=0.0,
+                        value=0.0,
+                        step=1.0,
+                        key=f"{prefix}_return_line_restocking_fee",
+                    )
+                )
+            )
+            add_tax_adjustment = Decimal(
+                str(
+                    fee_cols[1].number_input(
+                        "Tax Adjustment",
+                        min_value=0.0,
+                        value=0.0,
+                        step=1.0,
+                        key=f"{prefix}_return_line_tax_adjustment",
+                    )
+                )
+            )
+            add_product_ref = fee_cols[2].text_input(
+                "Product/Service Ref",
+                key=f"{prefix}_return_line_ref",
+            )
+            add_inventory_hook = fee_cols[3].selectbox(
+                "Inventory Hook",
+                options=[
+                    "",
+                    "restock",
+                    "quarantine",
+                    "damaged",
+                    "scrap",
+                    "vendor_return",
+                ],
+                key=f"{prefix}_return_line_inventory_hook",
+            )
+            source_cols = st.columns(4)
+            add_source_document = source_cols[0].text_input(
+                "Source Document",
+                key=f"{prefix}_return_line_source_document",
+            )
+            add_source_line = source_cols[1].text_input(
+                "Source Line",
+                key=f"{prefix}_return_line_source_line",
+            )
+            add_related_document = source_cols[2].text_input(
+                "Related Document",
+                key=f"{prefix}_return_line_related_document",
+            )
+            add_related_line = source_cols[3].text_input(
+                "Related Line",
+                key=f"{prefix}_return_line_related_line",
+            )
+            if st.button(
+                "Add Return Line", key=f"{prefix}_return_line_add", width="stretch"
+            ):
+                try:
+                    service.add_return_order_line(
+                        return_order_document_id=selected_document.document_id,
+                        description=add_description,
+                        quantity=add_quantity,
+                        original_unit_price=add_original_price,
+                        approved_return_quantity=add_approved_qty,
+                        line_type=add_line_type,
+                        restocking_fee=add_restocking_fee,
+                        tax_adjustment=add_tax_adjustment,
+                        product_or_service_reference=add_product_ref or None,
+                        source_document_id=add_source_document or None,
+                        source_line_id=add_source_line or None,
+                        related_document_id=add_related_document or None,
+                        related_line_id=add_related_line or None,
+                        inventory_disposition_hook=add_inventory_hook or None,
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to add return order line: {exc}")
+
+    if (
         tertiary == "demand"
         and selected_document.document_type == CommercialDocumentType.SALES_ORDER
     ):
@@ -13474,21 +13817,156 @@ def _render_transactions_workspace_page(
         )
 
     if tertiary == "approvals":
-        selected_approval = st.selectbox(
-            "Approval State",
-            options=[item.value for item in ApprovalState],
-            index=[item.value for item in ApprovalState].index(
-                selected_document.approval_state.value
-            ),
-            key=f"{prefix}_approval_state",
-        )
-        if st.button("Apply Approval", key=f"{prefix}_apply_approval", width="stretch"):
-            service.set_approval_state(
-                document_id=selected_document.document_id,
-                approval_state=ApprovalState(selected_approval),
+        if selected_document.document_type == CommercialDocumentType.RETURN_ORDER:
+            approval_cols = st.columns(3)
+            if approval_cols[0].button(
+                "Request Return",
+                key=f"{prefix}_request_return_order",
+                width="stretch",
+            ):
+                service.request_return_order(
+                    document_id=selected_document.document_id,
+                    reason="Requested from Transactions workspace",
+                )
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
+            if approval_cols[1].button(
+                "Approve Return",
+                key=f"{prefix}_approve_return_order",
+                width="stretch",
+            ):
+                service.approve_return_order(
+                    document_id=selected_document.document_id,
+                    reason="Approved from Transactions workspace",
+                )
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
+            if approval_cols[2].button(
+                "Reject Return",
+                key=f"{prefix}_reject_return_order",
+                width="stretch",
+            ):
+                service.set_approval_state(
+                    document_id=selected_document.document_id,
+                    approval_state=ApprovalState.REJECTED,
+                )
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
+        else:
+            selected_approval = st.selectbox(
+                "Approval State",
+                options=[item.value for item in ApprovalState],
+                index=[item.value for item in ApprovalState].index(
+                    selected_document.approval_state.value
+                ),
+                key=f"{prefix}_approval_state",
             )
-            _save_transactions_workspace_state(st, service)
-            st.rerun()
+            if st.button(
+                "Apply Approval", key=f"{prefix}_apply_approval", width="stretch"
+            ):
+                service.set_approval_state(
+                    document_id=selected_document.document_id,
+                    approval_state=ApprovalState(selected_approval),
+                )
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
+
+    if (
+        tertiary == "receiving"
+        and selected_document.document_type == CommercialDocumentType.RETURN_ORDER
+    ):
+        receiving_cols = st.columns(3)
+        partial_received = receiving_cols[0].checkbox(
+            "Partial Return",
+            key=f"{prefix}_partial_receive",
+            value=False,
+        )
+        received_date = receiving_cols[1].text_input(
+            "Received Date",
+            key=f"{prefix}_received_date",
+            value=_now_iso()[:10],
+        )
+        inventory_disposition = receiving_cols[2].selectbox(
+            "Inventory Disposition",
+            options=["", "restock", "quarantine", "damaged", "scrap", "vendor_return"],
+            key=f"{prefix}_inventory_disposition",
+        )
+        if st.button("Record Receipt", key=f"{prefix}_record_receipt", width="stretch"):
+            try:
+                service.receive_return_order(
+                    document_id=selected_document.document_id,
+                    partial=bool(partial_received),
+                    received_date=received_date or None,
+                    inventory_disposition=inventory_disposition or None,
+                )
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to record return receipt: {exc}")
+
+    if (
+        tertiary == "inspection"
+        and selected_document.document_type == CommercialDocumentType.RETURN_ORDER
+    ):
+        inspection_status = st.selectbox(
+            "Inspection Status",
+            options=[
+                "accepted",
+                "restock",
+                "quarantine",
+                "damaged",
+                "scrap",
+                "vendor_return",
+            ],
+            key=f"{prefix}_inspection_status",
+        )
+        if st.button(
+            "Apply Inspection", key=f"{prefix}_apply_inspection", width="stretch"
+        ):
+            try:
+                service.inspect_return_order(
+                    document_id=selected_document.document_id,
+                    inspection_status=inspection_status,
+                )
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to apply inspection: {exc}")
+
+    if (
+        tertiary == "process"
+        and selected_document.document_type == CommercialDocumentType.RETURN_ORDER
+    ):
+        if st.button(
+            "Process Return Order",
+            key=f"{prefix}_process_return_order",
+            width="stretch",
+        ):
+            try:
+                credit_memo = service.process_return_order(
+                    document_id=selected_document.document_id,
+                    actor="atlas-ui",
+                )
+                st.session_state["atlas_transactions_selected_document_id"] = (
+                    credit_memo.document_id
+                )
+                st.session_state[_navigation_secondary_state_key()] = "credit_memos"
+                st.session_state[_navigation_tertiary_state_key()] = "details"
+                _save_transactions_workspace_state(st, service)
+                st.success("Return order processed and credit memo generated.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to process return order: {exc}")
+
+    if (
+        tertiary == "details"
+        and selected_document.document_type == CommercialDocumentType.CREDIT_MEMO
+    ):
+        st.dataframe(
+            [service.detail_credit_memo(document_id=selected_document.document_id)],
+            width="stretch",
+            hide_index=True,
+        )
 
     if tertiary == "sync_status":
         selected_sync = st.selectbox(
@@ -13564,14 +14042,47 @@ def _render_transactions_workspace_page(
             )
 
     if tertiary == "export":
-        st.download_button(
-            "Download Document JSON",
-            data=json.dumps(selected_document.to_dict(), indent=2, sort_keys=True),
-            file_name=f"{selected_document.document_id}.json",
-            mime="application/json",
-            key=f"{prefix}_export_json",
-            width="stretch",
-        )
+        if selected_document.document_type == CommercialDocumentType.RETURN_ORDER:
+            if st.button(
+                "Generate Return Order PDF",
+                key=f"{prefix}_generate_return_order_pdf",
+                width="stretch",
+            ):
+                try:
+                    export_result = service.export_document_pdf(
+                        document_id=selected_document.document_id,
+                        presentation="return_order",
+                        actor="atlas-ui",
+                    )
+                    st.session_state[f"{prefix}_return_order_export_payload"] = (
+                        export_result
+                    )
+                    _save_transactions_workspace_state(st, service)
+                except Exception as exc:
+                    st.error(f"Unable to generate return order PDF: {exc}")
+            return_order_export = dict(
+                st.session_state.get(f"{prefix}_return_order_export_payload") or {}
+            )
+            if return_order_export:
+                st.download_button(
+                    "Download Return Order PDF",
+                    data=return_order_export.get("payload", b""),
+                    file_name=_safe_text(
+                        return_order_export.get("file_name"), "return-order.pdf"
+                    ),
+                    mime="application/pdf",
+                    key=f"{prefix}_download_return_order_pdf",
+                    width="stretch",
+                )
+        else:
+            st.download_button(
+                "Download Document JSON",
+                data=json.dumps(selected_document.to_dict(), indent=2, sort_keys=True),
+                file_name=f"{selected_document.document_id}.json",
+                mime="application/json",
+                key=f"{prefix}_export_json",
+                width="stretch",
+            )
 
 
 def _render_application_reports_page(

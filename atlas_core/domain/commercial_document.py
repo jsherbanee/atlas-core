@@ -69,20 +69,31 @@ class CommercialDocumentType(str, Enum):
     ESTIMATE = "estimate"
     PROPOSAL = "proposal"
     SALES_ORDER = "sales_order"
+    RETURN_ORDER = "return_order"
     PURCHASE_ORDER = "purchase_order"
     RFQ = "rfq"
     VENDOR_QUOTE = "vendor_quote"
     RECEIVING_RECORD = "receiving_record"
     VENDOR_BILL = "vendor_bill"
     CUSTOMER_INVOICE = "customer_invoice"
+    CREDIT_MEMO = "credit_memo"
     CHANGE_ORDER = "change_order"
 
 
 class CommercialDocumentLifecycleState(str, Enum):
     DRAFT = "draft"
+    REQUESTED = "requested"
     IN_REVIEW = "in_review"
     APPROVED = "approved"
+    REJECTED = "rejected"
+    AWAITING_RETURN = "awaiting_return"
+    PARTIALLY_RECEIVED = "partially_received"
+    RECEIVED = "received"
+    INSPECTED = "inspected"
+    PROCESSED = "processed"
     ISSUED = "issued"
+    SYNCED = "synced"
+    APPLIED = "applied"
     PARTIALLY_FULFILLED = "partially_fulfilled"
     FULFILLED = "fulfilled"
     CLOSED = "closed"
@@ -118,22 +129,69 @@ COMMERCIAL_DOCUMENT_LIFECYCLE_TRANSITIONS: dict[
     CommercialDocumentLifecycleState, set[CommercialDocumentLifecycleState]
 ] = {
     CommercialDocumentLifecycleState.DRAFT: {
+        CommercialDocumentLifecycleState.REQUESTED,
         CommercialDocumentLifecycleState.IN_REVIEW,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.REQUESTED: {
+        CommercialDocumentLifecycleState.APPROVED,
+        CommercialDocumentLifecycleState.REJECTED,
         CommercialDocumentLifecycleState.ARCHIVED,
     },
     CommercialDocumentLifecycleState.IN_REVIEW: {
         CommercialDocumentLifecycleState.DRAFT,
         CommercialDocumentLifecycleState.APPROVED,
+        CommercialDocumentLifecycleState.REJECTED,
         CommercialDocumentLifecycleState.ARCHIVED,
     },
     CommercialDocumentLifecycleState.APPROVED: {
         CommercialDocumentLifecycleState.IN_REVIEW,
+        CommercialDocumentLifecycleState.AWAITING_RETURN,
+        CommercialDocumentLifecycleState.PROCESSED,
         CommercialDocumentLifecycleState.ISSUED,
         CommercialDocumentLifecycleState.ARCHIVED,
     },
+    CommercialDocumentLifecycleState.REJECTED: {
+        CommercialDocumentLifecycleState.DRAFT,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.AWAITING_RETURN: {
+        CommercialDocumentLifecycleState.PARTIALLY_RECEIVED,
+        CommercialDocumentLifecycleState.RECEIVED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.PARTIALLY_RECEIVED: {
+        CommercialDocumentLifecycleState.RECEIVED,
+        CommercialDocumentLifecycleState.INSPECTED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.RECEIVED: {
+        CommercialDocumentLifecycleState.INSPECTED,
+        CommercialDocumentLifecycleState.PROCESSED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.INSPECTED: {
+        CommercialDocumentLifecycleState.PROCESSED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.PROCESSED: {
+        CommercialDocumentLifecycleState.CLOSED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
     CommercialDocumentLifecycleState.ISSUED: {
+        CommercialDocumentLifecycleState.SYNCED,
+        CommercialDocumentLifecycleState.APPLIED,
         CommercialDocumentLifecycleState.PARTIALLY_FULFILLED,
         CommercialDocumentLifecycleState.FULFILLED,
+        CommercialDocumentLifecycleState.CLOSED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.SYNCED: {
+        CommercialDocumentLifecycleState.APPLIED,
+        CommercialDocumentLifecycleState.CLOSED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.APPLIED: {
         CommercialDocumentLifecycleState.CLOSED,
         CommercialDocumentLifecycleState.ARCHIVED,
     },
@@ -250,6 +308,7 @@ class CommercialDocumentLineItem:
     product_or_service_reference: str | None = None
     fulfillment_state: str | None = None
     accounting_sync_reference: str | None = None
+    line_metadata: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         self.line_id = _required_text("line_id", self.line_id)
@@ -273,6 +332,7 @@ class CommercialDocumentLineItem:
         )
         self.fulfillment_state = _optional_text(self.fulfillment_state)
         self.accounting_sync_reference = _optional_text(self.accounting_sync_reference)
+        self.line_metadata = _optional_dict(self.line_metadata)
 
     @property
     def extended_amount(self) -> Decimal:
@@ -306,6 +366,7 @@ class CommercialDocumentLineItem:
             "product_or_service_reference": self.product_or_service_reference,
             "fulfillment_state": self.fulfillment_state,
             "accounting_sync_reference": self.accounting_sync_reference,
+            "line_metadata": self.line_metadata,
         }
 
 
@@ -658,9 +719,13 @@ class CommercialDocument:
     duplicated_from_document_id: str | None = None
     duplicated_by: str | None = None
     duplicated_at: str | None = None
+    source_sales_order_id: str | None = None
+    source_invoice_id: str | None = None
     terms_and_conditions_reference: dict[str, Any] | None = None
     terms_and_conditions_snapshot: dict[str, Any] | None = None
     numbering_policy_snapshot: dict[str, Any] | None = None
+    attachments: list[dict[str, Any]] = field(default_factory=list)
+    document_metadata: dict[str, Any] | None = None
     revision_number: int = 1
     lines: list[CommercialDocumentLineItem] = field(default_factory=list)
     relationships: list[CommercialDocumentRelationship] = field(default_factory=list)
@@ -699,6 +764,8 @@ class CommercialDocument:
         )
         self.duplicated_by = _optional_text(self.duplicated_by)
         self.duplicated_at = _optional_text(self.duplicated_at)
+        self.source_sales_order_id = _optional_text(self.source_sales_order_id)
+        self.source_invoice_id = _optional_text(self.source_invoice_id)
         self.terms_and_conditions_reference = _optional_dict(
             self.terms_and_conditions_reference
         )
@@ -706,6 +773,8 @@ class CommercialDocument:
             self.terms_and_conditions_snapshot
         )
         self.numbering_policy_snapshot = _optional_dict(self.numbering_policy_snapshot)
+        self.attachments = _list_of_dicts(self.attachments)
+        self.document_metadata = _optional_dict(self.document_metadata)
 
         self.revision_number = int(self.revision_number)
         if self.revision_number <= 0:
@@ -794,9 +863,13 @@ class CommercialDocument:
             "duplicated_from_document_id": self.duplicated_from_document_id,
             "duplicated_by": self.duplicated_by,
             "duplicated_at": self.duplicated_at,
+            "source_sales_order_id": self.source_sales_order_id,
+            "source_invoice_id": self.source_invoice_id,
             "terms_and_conditions_reference": self.terms_and_conditions_reference,
             "terms_and_conditions_snapshot": self.terms_and_conditions_snapshot,
             "numbering_policy_snapshot": self.numbering_policy_snapshot,
+            "attachments": [dict(item) for item in self.attachments],
+            "document_metadata": self.document_metadata,
             "lines": [line.to_dict() for line in self.lines],
             "relationships": [
                 relationship.to_dict() for relationship in self.relationships
@@ -842,8 +915,16 @@ class CommercialDocument:
             normalized["duplicated_by"] = None
         if "duplicated_at" not in normalized:
             normalized["duplicated_at"] = None
+        if "source_sales_order_id" not in normalized:
+            normalized["source_sales_order_id"] = None
+        if "source_invoice_id" not in normalized:
+            normalized["source_invoice_id"] = None
         if "numbering_policy_snapshot" not in normalized:
             normalized["numbering_policy_snapshot"] = None
+        if "attachments" not in normalized:
+            normalized["attachments"] = []
+        if "document_metadata" not in normalized:
+            normalized["document_metadata"] = None
         if "export_activity" not in normalized:
             normalized["export_activity"] = []
         if "future_email_metadata" not in normalized:

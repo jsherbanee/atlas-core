@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from hashlib import sha1
 from typing import Any
 
@@ -299,6 +300,295 @@ class TransactionsWorkspaceService:
         self._documents.append(document)
         return document
 
+    def create_return_order(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        customer_id: str | None,
+        project_id: str | None = None,
+        project_code: str | None = None,
+        source_sales_order_id: str | None = None,
+        source_invoice_id: str | None = None,
+        return_reason: str = "other",
+        return_type: str = "product",
+        requested_date: str | None = None,
+        notes: str | None = None,
+    ) -> CommercialDocument:
+        source_sales_order = (
+            self._required_document(source_sales_order_id)
+            if source_sales_order_id
+            else None
+        )
+        source_invoice = (
+            self._required_document(source_invoice_id) if source_invoice_id else None
+        )
+        derived_customer_id = (
+            customer_id
+            or (source_sales_order.customer_id if source_sales_order else None)
+            or (source_invoice.customer_id if source_invoice else None)
+        )
+        if not (derived_customer_id or "").strip():
+            raise ValueError(
+                "return orders require customer_id or linked source document"
+            )
+
+        document = self.create_draft(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            document_type=CommercialDocumentType.RETURN_ORDER,
+            project_id=project_id
+            or (source_sales_order.project_id if source_sales_order else None)
+            or (source_invoice.project_id if source_invoice else None),
+            project_code=project_code
+            or (source_sales_order.project_code if source_sales_order else None)
+            or (source_invoice.project_code if source_invoice else None),
+            customer_id=derived_customer_id,
+        )
+        document.source_sales_order_id = (
+            source_sales_order.document_id if source_sales_order else None
+        )
+        document.source_invoice_id = (
+            source_invoice.document_id if source_invoice else None
+        )
+        self._commercial_service.set_document_metadata(
+            document,
+            metadata={
+                "return_reason": return_reason.strip().lower(),
+                "return_type": return_type.strip().lower(),
+                "requested_date": requested_date,
+                "received_date": None,
+                "approved_credit_amount": "0",
+                "restocking_fee": "0",
+                "tax_adjustment": "0",
+                "notes": notes,
+                "generated_credit_memo_id": None,
+            },
+        )
+        if source_sales_order is not None:
+            self._commercial_service.add_relationship(
+                document,
+                relationship_type="source_sales_order",
+                related_document_id=source_sales_order.document_id,
+            )
+        if source_invoice is not None:
+            self._commercial_service.add_relationship(
+                document,
+                relationship_type="source_invoice",
+                related_document_id=source_invoice.document_id,
+            )
+        return document
+
+    def add_return_order_line(
+        self,
+        *,
+        return_order_document_id: str,
+        description: str,
+        quantity: Decimal,
+        original_unit_price: Decimal,
+        line_type: str,
+        approved_return_quantity: Decimal | None = None,
+        restocking_fee: Decimal = Decimal("0"),
+        tax_adjustment: Decimal = Decimal("0"),
+        product_or_service_reference: str | None = None,
+        source_document_id: str | None = None,
+        source_line_id: str | None = None,
+        related_document_id: str | None = None,
+        related_line_id: str | None = None,
+        inventory_disposition_hook: str | None = None,
+    ) -> CommercialDocument:
+        document = self._required_document(return_order_document_id)
+        if document.document_type != CommercialDocumentType.RETURN_ORDER:
+            raise ValueError("document must be a return order")
+        approved_quantity = approved_return_quantity or quantity
+        approved_credit_amount = approved_quantity * original_unit_price
+        self._commercial_service.add_line(
+            document,
+            description=description,
+            quantity=quantity,
+            unit_price=original_unit_price,
+            unit_cost=Decimal("0"),
+            product_or_service_reference=product_or_service_reference,
+            source_document_id=source_document_id,
+            source_line_id=source_line_id,
+            related_document_id=related_document_id,
+            related_line_id=related_line_id,
+            line_metadata={
+                "line_type": line_type.strip().lower(),
+                "requested_return_quantity": str(quantity),
+                "approved_return_quantity": str(approved_quantity),
+                "original_unit_price": str(original_unit_price),
+                "approved_credit_amount": str(approved_credit_amount),
+                "restocking_fee": str(restocking_fee),
+                "tax_adjustment": str(tax_adjustment),
+                "inspection_status": None,
+                "inventory_disposition_hook": inventory_disposition_hook,
+            },
+        )
+        self._recalculate_return_order_financials(document)
+        return document
+
+    def request_return_order(
+        self, *, document_id: str, reason: str
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.document_type != CommercialDocumentType.RETURN_ORDER:
+            raise ValueError("document must be a return order")
+        self._commercial_service.transition_lifecycle(
+            document,
+            CommercialDocumentLifecycleState.REQUESTED,
+            reason=reason,
+        )
+        return document
+
+    def approve_return_order(
+        self, *, document_id: str, reason: str
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.document_type != CommercialDocumentType.RETURN_ORDER:
+            raise ValueError("document must be a return order")
+        if document.lifecycle_state == CommercialDocumentLifecycleState.DRAFT:
+            self.request_return_order(document_id=document_id, reason=reason)
+        self._commercial_service.set_approval_state(document, ApprovalState.APPROVED)
+        self._commercial_service.transition_lifecycle(
+            document,
+            CommercialDocumentLifecycleState.APPROVED,
+            reason=reason,
+        )
+        return document
+
+    def receive_return_order(
+        self,
+        *,
+        document_id: str,
+        partial: bool,
+        received_date: str | None,
+        inventory_disposition: str | None = None,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.document_type != CommercialDocumentType.RETURN_ORDER:
+            raise ValueError("document must be a return order")
+        if document.lifecycle_state == CommercialDocumentLifecycleState.APPROVED:
+            self._commercial_service.transition_lifecycle(
+                document,
+                CommercialDocumentLifecycleState.AWAITING_RETURN,
+                reason="Awaiting customer return",
+            )
+        target_state = (
+            CommercialDocumentLifecycleState.PARTIALLY_RECEIVED
+            if partial
+            else CommercialDocumentLifecycleState.RECEIVED
+        )
+        self._commercial_service.transition_lifecycle(
+            document,
+            target_state,
+            reason="Return received",
+        )
+        metadata = dict(document.document_metadata or {})
+        metadata["received_date"] = received_date
+        if inventory_disposition:
+            metadata["inventory_disposition"] = inventory_disposition
+        self._commercial_service.set_document_metadata(
+            document,
+            metadata=metadata,
+            force=True,
+        )
+        return document
+
+    def inspect_return_order(
+        self,
+        *,
+        document_id: str,
+        inspection_status: str,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.document_type != CommercialDocumentType.RETURN_ORDER:
+            raise ValueError("document must be a return order")
+        if document.lifecycle_state in {
+            CommercialDocumentLifecycleState.APPROVED,
+            CommercialDocumentLifecycleState.AWAITING_RETURN,
+        }:
+            if document.lifecycle_state == CommercialDocumentLifecycleState.APPROVED:
+                self._commercial_service.transition_lifecycle(
+                    document,
+                    CommercialDocumentLifecycleState.AWAITING_RETURN,
+                    reason="Inspection initiated",
+                )
+            self._commercial_service.transition_lifecycle(
+                document,
+                CommercialDocumentLifecycleState.RECEIVED,
+                reason="Inspection initiated",
+            )
+        self._commercial_service.transition_lifecycle(
+            document,
+            CommercialDocumentLifecycleState.INSPECTED,
+            reason="Return inspected",
+        )
+        for line in document.lines:
+            metadata = dict(line.line_metadata or {})
+            metadata["inspection_status"] = inspection_status
+            line.line_metadata = metadata
+        self._commercial_service.set_document_metadata(
+            document,
+            metadata={"inspection_status": inspection_status},
+            force=True,
+        )
+        return document
+
+    def process_return_order(
+        self,
+        *,
+        document_id: str,
+        actor: str,
+        reason: str = "Return order processed",
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.document_type != CommercialDocumentType.RETURN_ORDER:
+            raise ValueError("document must be a return order")
+        existing_credit_memo_id = _safe_text(
+            (document.document_metadata or {}).get("generated_credit_memo_id"), ""
+        )
+        if existing_credit_memo_id:
+            raise ValueError("credit memo already generated for return order")
+        self._validate_return_order(document)
+        self._recalculate_return_order_financials(document, force=True)
+
+        credit_memo = self._generate_credit_memo_for_return_order(
+            return_order=document,
+            actor=actor,
+        )
+        self._commercial_service.set_document_metadata(
+            document,
+            metadata={
+                "generated_credit_memo_id": credit_memo.document_id,
+                "processed_at": _utc_now(),
+                "processed_by": actor,
+            },
+            force=True,
+        )
+        self._commercial_service.add_relationship(
+            document,
+            relationship_type="generated_credit_memo",
+            related_document_id=credit_memo.document_id,
+        )
+        self._commercial_service.transition_lifecycle(
+            document,
+            CommercialDocumentLifecycleState.PROCESSED,
+            reason=reason,
+        )
+        self._commercial_service.add_diagnostic(
+            document,
+            CommercialDocumentDiagnostic(
+                code="return_order_processed",
+                message="Return order processed into credit memo",
+                details={
+                    "credit_memo_id": credit_memo.document_id,
+                    "credit_memo_number": credit_memo.document_number,
+                },
+            ),
+        )
+        return credit_memo
+
     def refresh_draft_terms(
         self,
         *,
@@ -588,6 +878,8 @@ class TransactionsWorkspaceService:
             "internal_estimate",
             "customer_estimate",
             "sales_order",
+            "return_order",
+            "credit_memo",
         }:
             raise ValueError("unsupported presentation")
 
@@ -737,6 +1029,28 @@ class TransactionsWorkspaceService:
         document.sync_metadata.failure_message = failure_message
         return document
 
+    def detail_credit_memo(self, *, document_id: str) -> dict[str, Any]:
+        document = self._required_document(document_id)
+        if document.document_type != CommercialDocumentType.CREDIT_MEMO:
+            raise ValueError("document must be a credit memo")
+        return {
+            "document_id": document.document_id,
+            "document_number": document.document_number,
+            "customer_id": document.customer_id,
+            "project_id": document.project_id,
+            "project_code": document.project_code,
+            "source_return_order_id": document.source_document_id,
+            "source_sales_order_id": document.source_sales_order_id,
+            "source_invoice_id": document.source_invoice_id,
+            "lifecycle_state": document.lifecycle_state.value,
+            "sync_status": document.sync_metadata.status.value,
+            "approved_credit_amount": (document.document_metadata or {}).get(
+                "approved_credit_amount"
+            ),
+            "restocking_fee": (document.document_metadata or {}).get("restocking_fee"),
+            "tax_adjustment": (document.document_metadata or {}).get("tax_adjustment"),
+        }
+
     def archive_document(self, document_id: str) -> CommercialDocument:
         document = self._required_document(document_id)
         if document.lifecycle_state != CommercialDocumentLifecycleState.ARCHIVED:
@@ -850,3 +1164,189 @@ class TransactionsWorkspaceService:
         if document is None:
             raise ValueError("document was not found")
         return document
+
+    def _recalculate_return_order_financials(
+        self,
+        document: CommercialDocument,
+        force: bool = False,
+    ) -> CommercialDocument:
+        subtotal = Decimal("0")
+        restocking_total = Decimal("0")
+        tax_total = Decimal("0")
+        for line in list(document.lines or []):
+            metadata = dict(line.line_metadata or {})
+            approved_quantity = Decimal(
+                str(metadata.get("approved_return_quantity") or line.quantity)
+            )
+            original_unit_price = Decimal(
+                str(metadata.get("original_unit_price") or line.unit_price)
+            )
+            approved_credit_amount = approved_quantity * original_unit_price
+            metadata["approved_credit_amount"] = str(approved_credit_amount)
+            line.line_metadata = metadata
+            subtotal += approved_credit_amount
+            restocking_total += Decimal(str(metadata.get("restocking_fee") or "0"))
+            tax_total += Decimal(str(metadata.get("tax_adjustment") or "0"))
+
+        metadata = dict(document.document_metadata or {})
+        restocking_total += Decimal(str(metadata.get("restocking_fee") or "0"))
+        tax_total += Decimal(str(metadata.get("tax_adjustment") or "0"))
+        approved_credit_amount = subtotal - restocking_total + tax_total
+        self._commercial_service.set_totals(
+            document,
+            subtotal=subtotal,
+            discount_total=restocking_total,
+            tax_total=tax_total,
+            grand_total=approved_credit_amount,
+            force=force,
+        )
+        self._commercial_service.set_document_metadata(
+            document,
+            metadata={
+                "approved_credit_amount": str(approved_credit_amount),
+                "restocking_fee": str(restocking_total),
+                "tax_adjustment": str(tax_total),
+            },
+            force=force,
+        )
+        return document
+
+    def _validate_return_order(self, document: CommercialDocument) -> None:
+        if not (document.customer_id or "").strip():
+            raise ValueError("return order requires customer_id")
+        if not document.lines:
+            raise ValueError("return order requires at least one line")
+        approved_credit_total = Decimal("0")
+        for line in list(document.lines or []):
+            metadata = dict(line.line_metadata or {})
+            line_type = _safe_text(metadata.get("line_type"), "")
+            if line_type not in {"product", "service"}:
+                raise ValueError("return order lines must declare product or service")
+            requested_quantity = Decimal(
+                str(metadata.get("requested_return_quantity") or line.quantity)
+            )
+            approved_quantity = Decimal(
+                str(metadata.get("approved_return_quantity") or line.quantity)
+            )
+            if approved_quantity < Decimal("0"):
+                raise ValueError("approved return quantity cannot be negative")
+            if approved_quantity > requested_quantity:
+                raise ValueError(
+                    "approved return quantity cannot exceed requested quantity"
+                )
+            approved_credit_total += Decimal(
+                str(metadata.get("approved_credit_amount") or "0")
+            )
+        if approved_credit_total <= Decimal("0"):
+            raise ValueError("return order must produce a positive approved credit")
+
+    def _generate_credit_memo_for_return_order(
+        self,
+        *,
+        return_order: CommercialDocument,
+        actor: str,
+    ) -> CommercialDocument:
+        credit_memo = self.create_draft(
+            tenant_id=return_order.tenant_id,
+            organization_id=return_order.organization_id,
+            document_type=CommercialDocumentType.CREDIT_MEMO,
+            project_id=return_order.project_id,
+            project_code=return_order.project_code,
+            customer_id=return_order.customer_id,
+        )
+        credit_memo.source_document_id = return_order.document_id
+        credit_memo.source_relationship_type = "generated_from_return_order"
+        credit_memo.source_sales_order_id = return_order.source_sales_order_id
+        credit_memo.source_invoice_id = return_order.source_invoice_id
+        for line in list(return_order.lines or []):
+            metadata = dict(line.line_metadata or {})
+            approved_quantity = Decimal(
+                str(metadata.get("approved_return_quantity") or line.quantity)
+            )
+            self._commercial_service.add_line(
+                credit_memo,
+                description=line.description,
+                quantity=approved_quantity,
+                unit_price=Decimal(
+                    str(metadata.get("original_unit_price") or line.unit_price)
+                ),
+                sequence=line.sequence,
+                unit_of_measure=line.unit_of_measure,
+                discount=Decimal(str(metadata.get("restocking_fee") or "0")),
+                tax_rate=Decimal("0"),
+                product_or_service_reference=line.product_or_service_reference,
+                source_document_id=return_order.document_id,
+                source_line_id=line.line_id,
+                related_document_id=line.related_document_id
+                or return_order.document_id,
+                related_line_id=line.related_line_id or line.line_id,
+                line_metadata={
+                    **metadata,
+                    "original_return_order_id": return_order.document_id,
+                    "original_source_document_id": line.source_document_id,
+                    "original_source_line_id": line.source_line_id,
+                },
+            )
+        self._recalculate_return_order_financials(credit_memo)
+        self._commercial_service.set_document_metadata(
+            credit_memo,
+            metadata={
+                "approved_credit_amount": (return_order.document_metadata or {}).get(
+                    "approved_credit_amount", "0"
+                ),
+                "restocking_fee": (return_order.document_metadata or {}).get(
+                    "restocking_fee", "0"
+                ),
+                "tax_adjustment": (return_order.document_metadata or {}).get(
+                    "tax_adjustment", "0"
+                ),
+                "created_from_return_order_id": return_order.document_id,
+            },
+        )
+        self._commercial_service.add_relationship(
+            credit_memo,
+            relationship_type="source_return_order",
+            related_document_id=return_order.document_id,
+        )
+        if return_order.source_sales_order_id:
+            self._commercial_service.add_relationship(
+                credit_memo,
+                relationship_type="source_sales_order",
+                related_document_id=return_order.source_sales_order_id,
+            )
+        if return_order.source_invoice_id:
+            self._commercial_service.add_relationship(
+                credit_memo,
+                relationship_type="source_invoice",
+                related_document_id=return_order.source_invoice_id,
+            )
+        self._commercial_service.allocate_number(credit_memo)
+        self._commercial_service.set_approval_state(
+            credit_memo,
+            ApprovalState.APPROVED,
+        )
+        self.issue_document(
+            document_id=credit_memo.document_id,
+            reason="Credit memo generated from return order",
+        )
+        self._commercial_service.add_diagnostic(
+            credit_memo,
+            CommercialDocumentDiagnostic(
+                code="credit_memo_generated",
+                message="Credit memo generated from processed return order",
+                details={
+                    "return_order_id": return_order.document_id,
+                    "generated_by": actor,
+                },
+            ),
+        )
+        return credit_memo
+
+
+def _safe_text(value: Any, default: str = "") -> str:
+    if value is None:
+        return default
+    if not isinstance(value, str):
+        value = str(value)
+    normalized = value.strip()
+    return normalized or default

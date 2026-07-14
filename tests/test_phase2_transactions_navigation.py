@@ -23,6 +23,8 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "overview",
         "estimates",
         "sales_orders",
+        "return_orders",
+        "credit_memos",
         "purchase_orders",
         "rfqs",
         "vendor_quotes",
@@ -79,6 +81,42 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "demand",
         "fulfillment",
         "related_documents",
+        "activity",
+        "export_pdf",
+    ]
+
+    return_order_section = next(
+        item for item in contract if item["secondary_key"] == "return_orders"
+    )
+    return_order_actions = [
+        entry["tertiary_key"]
+        for entry in return_order_section.get("supported_tertiary_actions", [])
+    ]
+    assert return_order_actions == [
+        "add",
+        "browse",
+        "edit",
+        "lines",
+        "approvals",
+        "receiving",
+        "inspection",
+        "process",
+        "activity",
+        "export",
+    ]
+
+    credit_memo_section = next(
+        item for item in contract if item["secondary_key"] == "credit_memos"
+    )
+    credit_memo_actions = [
+        entry["tertiary_key"]
+        for entry in credit_memo_section.get("supported_tertiary_actions", [])
+    ]
+    assert credit_memo_actions == [
+        "browse",
+        "details",
+        "related_documents",
+        "sync_status",
         "activity",
         "export_pdf",
     ]

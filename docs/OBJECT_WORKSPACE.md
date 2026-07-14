@@ -185,6 +185,7 @@ Representative future transaction object families include:
 - Estimate
 - Proposal
 - Sales Order
+- Return Order
 - Purchase Order
 - RFQ
 - Vendor Quote
@@ -192,6 +193,7 @@ Representative future transaction object families include:
 - Receiving Record
 - Vendor Bill
 - Customer Invoice
+- Credit Memo
 - Subcontract
 
 These future transaction object families should share the common contract defined in [COMMERCIAL_DOCUMENT_FRAMEWORK.md](COMMERCIAL_DOCUMENT_FRAMEWORK.md).
@@ -208,6 +210,9 @@ Implemented in T-02:
 - transaction-family kinds are now supported Object Workspace selection kinds
 - global search open routes transaction objects into Object Workspace
 - authoritative open for transaction object kinds routes back to Transactions workspace
+
+Implemented in T-06:
+- Return Order and Credit Memo kinds are now included in the commercial-document object-workspace compatibility set
 
 Scope boundaries remain:
 - no replacement of authoritative transaction workflows
