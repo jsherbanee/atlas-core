@@ -39,7 +39,12 @@ def test_settings_workspace_contract_has_expected_sections() -> None:
         item["tertiary_key"]
         for item in org_section.get("supported_tertiary_actions", [])
     ]
-    assert org_tertiary == ["overview", "commercial_numbering", "audit"]
+    assert org_tertiary == [
+        "overview",
+        "commercial_numbering",
+        "terms_and_conditions",
+        "audit",
+    ]
 
 
 def test_administration_routes_to_settings_primary() -> None:

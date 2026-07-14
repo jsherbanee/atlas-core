@@ -397,6 +397,20 @@ class CommercialDocumentService:
         document.diagnostics.append(diagnostic)
         document.updated_at = _utc_now()
 
+    def assign_terms_and_conditions(
+        self,
+        document: CommercialDocument,
+        *,
+        reference: dict[str, Any],
+        snapshot: dict[str, Any],
+        force: bool = False,
+    ) -> None:
+        if not force:
+            self._assert_mutable(document)
+        document.terms_and_conditions_reference = dict(reference)
+        document.terms_and_conditions_snapshot = dict(snapshot)
+        document.updated_at = _utc_now()
+
     @staticmethod
     def assert_same_tenant(*documents: CommercialDocument) -> None:
         tenant_ids = {document.tenant_id for document in documents}

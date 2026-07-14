@@ -180,7 +180,7 @@ def test_tenant_isolation_for_settings() -> None:
     service.update_numbering_policy(
         tenant_id="tenant-a",
         organization_id="org-1",
-        document_type=CommercialDocumentType.PROPOSAL,
+        document_type=CommercialDocumentType.SALES_ORDER,
         actor="tester",
         syntax_template="{PREFIX}-{SEQUENCE}",
         prefix="A-PROP",
@@ -197,10 +197,10 @@ def test_tenant_isolation_for_settings() -> None:
     other_preview = service.preview_number(
         tenant_id="tenant-b",
         organization_id="org-1",
-        document_type=CommercialDocumentType.PROPOSAL,
+        document_type=CommercialDocumentType.SALES_ORDER,
     )
 
-    assert other_preview.startswith("ORG-1-PROPOSAL-")
+    assert other_preview.startswith("ORG-1-SALES-ORDER-")
 
 
 def test_settings_serialization_round_trip() -> None:
@@ -282,7 +282,7 @@ def test_duplicate_policy_validation_requires_type_token_for_shared_template() -
         service.update_numbering_policy(
             tenant_id="tenant-a",
             organization_id="org-1",
-            document_type=CommercialDocumentType.PROPOSAL,
+            document_type=CommercialDocumentType.SALES_ORDER,
             actor="tester",
             syntax_template="{PREFIX}-{SEQUENCE}",
             prefix="SHARED",
@@ -295,3 +295,212 @@ def test_duplicate_policy_validation_requires_type_token_for_shared_template() -
             include_month_token=False,
             include_project_code_token=False,
         )
+
+
+def test_terms_default_assignment_and_single_default_enforcement() -> None:
+    service = _service()
+    estimate_default = service.create_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Estimate Terms A",
+        document_family="estimate",
+        status="active",
+        content="Estimate terms content A",
+        effective_date=None,
+        expiration_date=None,
+        is_default=True,
+    )
+    estimate_default_b = service.create_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Estimate Terms B",
+        document_family="estimate",
+        status="active",
+        content="Estimate terms content B",
+        effective_date=None,
+        expiration_date=None,
+        is_default=False,
+    )
+
+    service.assign_default_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        block_id=estimate_default_b.block_id,
+        actor="tester",
+    )
+    rows = service.list_terms_and_conditions_blocks(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_family="estimate",
+        include_archived=True,
+    )
+    defaults = [item for item in rows if item.is_default and not item.archived]
+    assert len(defaults) == 1
+    assert defaults[0].block_id == estimate_default_b.block_id
+    assert estimate_default.block_id != estimate_default_b.block_id
+
+
+def test_terms_version_creation_increments_version_and_lineage() -> None:
+    service = _service()
+    created = service.create_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Sales Order Terms",
+        document_family="sales_order",
+        status="active",
+        content="v1",
+        effective_date=None,
+        expiration_date=None,
+        is_default=True,
+    )
+    version2 = service.create_terms_and_conditions_version(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        block_id=created.block_id,
+        actor="tester",
+        content="v2",
+    )
+
+    assert version2.version == 2
+    assert version2.previous_block_id == created.block_id
+    assert version2.content == "v2"
+
+
+def test_terms_override_precedence_transaction_project_customer_default() -> None:
+    service = _service()
+    default_block = service.create_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Default",
+        document_family="estimate",
+        status="active",
+        content="default",
+        effective_date=None,
+        expiration_date=None,
+        is_default=True,
+    )
+    customer_block = service.create_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Customer",
+        document_family="estimate",
+        status="active",
+        content="customer",
+        effective_date=None,
+        expiration_date=None,
+        is_default=False,
+        customer_id="customer-1",
+    )
+    project_block = service.create_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Project",
+        document_family="estimate",
+        status="active",
+        content="project",
+        effective_date=None,
+        expiration_date=None,
+        is_default=False,
+        project_id="project-1",
+    )
+    transaction_block = service.create_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Transaction",
+        document_family="estimate",
+        status="active",
+        content="transaction",
+        effective_date=None,
+        expiration_date=None,
+        is_default=False,
+        transaction_id="doc-1",
+    )
+
+    resolved = service.resolve_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_family="estimate",
+        customer_id="customer-1",
+        project_id="project-1",
+        transaction_id="doc-1",
+    )
+    assert resolved is not None
+    assert resolved.block_id == transaction_block.block_id
+    assert customer_block.block_id != default_block.block_id
+    assert project_block.block_id != customer_block.block_id
+
+
+def test_terms_archive_restore_and_tenant_isolation() -> None:
+    service = _service()
+    block = service.create_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Archive Me",
+        document_family="sales_order",
+        status="active",
+        content="archive",
+        effective_date=None,
+        expiration_date=None,
+        is_default=True,
+    )
+    service.archive_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        block_id=block.block_id,
+        actor="tester",
+    )
+    assert (
+        service.resolve_terms_and_conditions_block(
+            tenant_id="tenant-a",
+            organization_id="org-1",
+            document_family="sales_order",
+        )
+        is None
+    )
+
+    service.restore_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        block_id=block.block_id,
+        actor="tester",
+    )
+    assert (
+        service.resolve_terms_and_conditions_block(
+            tenant_id="tenant-a",
+            organization_id="org-1",
+            document_family="sales_order",
+        )
+        is not None
+    )
+    assert (
+        service.resolve_terms_and_conditions_block(
+            tenant_id="tenant-b",
+            organization_id="org-1",
+            document_family="sales_order",
+        )
+        is None
+    )
+
+
+def test_terms_backward_compatible_reads_without_terms_state() -> None:
+    service = SettingsService(
+        state={
+            "organization_settings": {},
+            "personal_preferences": {},
+            "audit_events": [],
+        }
+    )
+    rows = service.list_terms_and_conditions_blocks(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_family="estimate",
+    )
+    assert rows == []

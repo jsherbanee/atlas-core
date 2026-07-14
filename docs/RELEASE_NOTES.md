@@ -21,6 +21,22 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic W Sprint W-03 Universal Object Workspace)
 
+## Unreleased (Epic T Sprint T-05 Amendment Terms and Conditions Settings)
+
+### Improved
+
+- Organization Settings now supports tenant-scoped Terms and Conditions content blocks for Estimates and Sales Orders.
+- Terms blocks now support create/edit/version/archive/restore/default-assignment behavior with audit metadata.
+- Transactions estimates now support explicit Terms snapshot refresh for mutable drafts only.
+- Sales Orders can now be created from approved estimates with preserved line-level source traceability and terms source/snapshot continuity.
+- Estimate presentation now includes Internal and Customer views over the same estimate revision identity.
+
+### Scope Notes
+
+- safe formatted text content only for terms blocks
+- no signature workflow, legal advice, auto-acceptance, or contract approval engine
+- no QuickBooks integration and no Epic E scope
+
 ## Unreleased (Epic T Sprint T-04 Settings Foundation and Numbering Preferences)
 
 ### Improved
@@ -57,7 +73,7 @@ This document tracks product-facing changes for Atlas Preview releases.
 ### Improved
 
 - Atlas now includes a first Transactions primary workspace in header navigation.
-- Transactions workspace now provides sectioned navigation for Overview, Estimates, Proposals, Sales Orders, Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills, Customer Invoices, and Change Orders.
+- Transactions workspace now provides sectioned navigation for Overview, Estimates, Sales Orders, Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills, Customer Invoices, and Change Orders.
 - Transactions tertiary actions now provide reusable Add, Browse, Edit, Related Documents, Approvals, Sync Status, Activity, and Export controls.
 - A reusable transactions workspace service now supports in-session draft create/list/edit/archive/restore behavior and overview metrics.
 - Global object search now indexes transaction-family commercial documents and opens supported transaction kinds in Object Workspace.
@@ -73,7 +89,7 @@ This document tracks product-facing changes for Atlas Preview releases.
 ### Improved
 
 - Atlas now includes shared commercial-document backend domain models and contracts for identity, revisions, line items, relationships, approval state, sync metadata, totals, diagnostics, and numbering policy.
-- Initial transaction-family support is available for Estimate, Proposal, Sales Order, Purchase Order, RFQ, Vendor Quote, Receiving Record, Vendor Bill, Customer Invoice, and Change Order.
+- Initial transaction-family support is available for Estimate, Sales Order, Purchase Order, RFQ, Vendor Quote, Receiving Record, Vendor Bill, Customer Invoice, and Change Order.
 - Commercial-document lifecycle now uses explicit transition rules from Draft through Archived with immutable issued revision snapshots and revision history preservation.
 - Numbering now supports tenant-scoped and organization-scoped preview/allocation semantics with no number reuse.
 - Universal Object registry now includes commercial-document adapter registration for transaction-family identities.
@@ -382,7 +398,7 @@ Completion status:
 
 - product hardening only for existing Home/header/search workflows
 - no Epic E start
-- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or separate customer-document generation workflows
 
 ## Unreleased (Epic X Sprint X-07 Fixed-Width Navigation and Focused Search Results)
 
@@ -410,7 +426,7 @@ Completion status:
 
 - product hardening only for existing Home/header/navigation workflows
 - no Epic E start
-- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or separate customer-document generation workflows
 
 ## Unreleased (Epic X Sprint X-05 Top-Header Navigation and Recent Projects)
 
@@ -424,7 +440,7 @@ Completion status:
 
 - product hardening only for existing Home/header/navigation workflows
 - no Epic E start
-- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or separate customer-document generation workflows
 
 ## Unreleased (Epic X Sprint X-04 Home Page Simplification and Global Search Refinement)
 
@@ -442,7 +458,7 @@ Completion status:
 
 - product hardening only for existing Home/header/search workflows
 - no Epic E start
-- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or separate customer-document generation workflows
 
 ### Improved
 
@@ -459,7 +475,7 @@ Completion status:
 
 - workflow hardening only for existing create/settings/documents flows
 - no Epic E start
-- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or separate customer-document generation workflows
 
 ## Unreleased (Epic X Sprint X-02 Project Creation and Bid Identity Refinement) (Closed)
 
@@ -479,7 +495,7 @@ Completion status:
 
 - product-hardening and project identity refinement only for existing capabilities
 - no Epic E start
-- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation workflows
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or separate customer-document generation workflows
 
 ## Unreleased (Epic X Sprint X-01 Pilot Readiness and Application Walkthrough)
 
@@ -492,7 +508,7 @@ Completion status:
 ### Scope Notes
 
 - product-hardening and usability refinement only for existing capabilities
-- no Commercial Intelligence, Sell Pricing, Proposal Generation, or post-D architecture expansion
+- no Commercial Intelligence, Sell Pricing, separate customer-document generation, or post-D architecture expansion
 
 ## Unreleased (Epic A Sprint A-05 End-to-End GUI Validation and Workflow Refinement)
 
@@ -505,7 +521,7 @@ Completion status:
 ### Scope Notes
 
 - usability and workflow refinement only across existing capabilities
-- no Epic E start and no Commercial Intelligence/Sell Pricing/Proposal Generation implementation
+- no Epic E start and no Commercial Intelligence/Sell Pricing/separate customer-document generation implementation
 
 ## Unreleased (Sprint D-03 Assemblies, Accessories, and Labor Rollups)
 

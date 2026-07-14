@@ -34,13 +34,27 @@ D-02 explicit non-goals:
 - fuzzy matching
 - assemblies and inferred accessories
 - labor rollups
-- sell pricing, margin, proposal generation
+- sell pricing and margin packaging outside estimate/customer presentation controls
 - freight, escalation, currency conversion calculations
 - procurement, POs, accounting, ERP
 
 D-03 implementation is complete for assemblies, accessories, and labor rollups. D-03 composes deterministic generated lines and labor snapshots through D-02 revision APIs while preserving D-01 cost-selection authority.
 
 Sprint T-03 reuses this same deterministic estimate engine inside Transactions for the Estimates family. Transactions estimate line edits, revision workflows, validation, lock readiness, and issue controls compose the existing D-02/D-03 estimate model without introducing a separate estimate data model.
+
+Sprint T-05 extends Transactions estimates with presentation controls for Internal Estimate and Customer Estimate views over the same revision identity, preserving one estimate source of truth.
+
+## 3.1 Estimate Presentation and Terms (T-05)
+
+Estimate presentation behavior:
+- Internal Estimate and Customer Estimate views reference the same estimate and revision
+- no duplicate estimate line model is created for presentation variants
+- customer view is a selective projection of shared estimate data
+
+Terms and Conditions behavior:
+- estimate drafts can capture tenant-scoped terms snapshots from explicit default/override resolution
+- draft terms refresh requires explicit action
+- issued estimate revisions preserve captured terms content and version immutably
 
 ## 3. D-01 Dependency Contract
 D-02 consumes D-01 outputs and contracts:

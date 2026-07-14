@@ -24,6 +24,14 @@ def _optional_text(value: Any) -> str | None:
     return normalized or None
 
 
+def _optional_dict(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("value must be a dictionary when provided")
+    return dict(value)
+
+
 def _decimal(field_name: str, value: Any) -> Decimal:
     if isinstance(value, Decimal):
         return value
@@ -600,6 +608,8 @@ class CommercialDocument:
     project_code: str | None = None
     customer_id: str | None = None
     vendor_id: str | None = None
+    terms_and_conditions_reference: dict[str, Any] | None = None
+    terms_and_conditions_snapshot: dict[str, Any] | None = None
     revision_number: int = 1
     lines: list[CommercialDocumentLineItem] = field(default_factory=list)
     relationships: list[CommercialDocumentRelationship] = field(default_factory=list)
@@ -629,6 +639,12 @@ class CommercialDocument:
         self.project_code = _optional_text(self.project_code)
         self.customer_id = _optional_text(self.customer_id)
         self.vendor_id = _optional_text(self.vendor_id)
+        self.terms_and_conditions_reference = _optional_dict(
+            self.terms_and_conditions_reference
+        )
+        self.terms_and_conditions_snapshot = _optional_dict(
+            self.terms_and_conditions_snapshot
+        )
 
         self.revision_number = int(self.revision_number)
         if self.revision_number <= 0:
@@ -710,6 +726,8 @@ class CommercialDocument:
             "project_code": self.project_code,
             "customer_id": self.customer_id,
             "vendor_id": self.vendor_id,
+            "terms_and_conditions_reference": self.terms_and_conditions_reference,
+            "terms_and_conditions_snapshot": self.terms_and_conditions_snapshot,
             "lines": [line.to_dict() for line in self.lines],
             "relationships": [
                 relationship.to_dict() for relationship in self.relationships
@@ -737,4 +755,8 @@ class CommercialDocument:
             normalized["totals"] = {}
         if "revisions" not in normalized:
             normalized["revisions"] = []
+        if "terms_and_conditions_reference" not in normalized:
+            normalized["terms_and_conditions_reference"] = None
+        if "terms_and_conditions_snapshot" not in normalized:
+            normalized["terms_and_conditions_snapshot"] = None
         return cls(**normalized)

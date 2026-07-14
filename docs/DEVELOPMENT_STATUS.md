@@ -59,6 +59,7 @@ Sprint T-01 implements the Commercial Document Domain Foundation backend contrac
 Sprint T-02 implements the Transactions Workspace Foundation UI/navigation layer, reusable transaction workspace service behavior, transaction-family search integration, and Object Workspace handoff for commercial-document kinds.
 Sprint T-03 implements Estimate Transaction Integration, making Transactions > Estimates the first fully operational transaction family using the existing deterministic estimate engine for lines/revisions/issue workflows.
 Sprint T-04 implements Settings Foundation and Document Numbering Preferences, including tenant-level commercial numbering policy configuration and user-level personal preferences boundaries.
+Sprint T-05 amendment implements tenant Terms and Conditions settings blocks and integrates explicit terms snapshot behavior into Estimates and Sales Orders, including sales-order-from-estimate terms inheritance/default resolution and draft-only refresh controls.
 
 X-01 through X-13 are closed.
 
@@ -80,7 +81,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1287 tests)
+- pytest: full suite passing (1295 tests)
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces
@@ -142,7 +143,7 @@ Secondary active focus:
 
 Current implementation scope note:
 - no Epic E implementation has started in this refinement pass
-- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or proposal-generation features were introduced in X-02
+- no new estimating, commercial intelligence, procurement, execution, accounting, ERP, or customer-estimate packaging features were introduced in X-02
 - no Epic E implementation has started in X-03
 - no Epic E implementation has started in X-04
 - no Epic E implementation has started in X-05

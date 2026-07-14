@@ -43,6 +43,7 @@ Secondary sections:
 Organization tertiary actions:
 - `overview`
 - `commercial_numbering`
+- `terms_and_conditions`
 - `audit`
 
 Personal tertiary actions:
@@ -120,6 +121,7 @@ Settings state participates in workspace snapshot and restore so navigation and 
 Persisted areas:
 - settings workspace navigation state
 - organization numbering policies
+- organization terms and conditions blocks
 - personal preference values
 - settings audit events
 
@@ -127,6 +129,7 @@ Persisted areas:
 
 `SettingsService` is the authority for:
 - organization numbering policy list/update/replace/export
+- organization terms and conditions block create/edit/version/assign-default/archive/restore/resolve/export
 - numbering previews
 - personal preference defaults and updates
 - settings audit event recording
@@ -144,3 +147,31 @@ T-04 validation includes:
 - tenant/user isolation boundaries
 - personal preference restriction enforcement
 - settings navigation contract and state-default behavior
+
+## Terms and Conditions Settings (T-05 Amendment)
+
+Tenant-scoped Terms and Conditions content blocks are now supported for:
+- `estimate`
+- `sales_order`
+
+Block fields:
+- title
+- document family
+- status (`draft` or `active`)
+- content (safe formatted text)
+- version
+- effective date
+- expiration date
+- default flag
+- optional customer override scope
+- optional project override scope
+- optional transaction override scope
+- created/updated audit fields
+- archived state
+
+Behavior:
+- one active tenant-level default block is enforced per document family
+- overrides are explicit and scope-aware (transaction > project > customer > tenant default)
+- settings updates do not silently replace document snapshots
+- issued documents retain captured terms snapshots immutably
+- draft documents refresh terms only via explicit user action

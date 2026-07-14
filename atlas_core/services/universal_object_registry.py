@@ -824,7 +824,6 @@ def build_default_universal_object_registry() -> UniversalObjectRegistry:
 
     for commercial_type in [
         "estimate",
-        "proposal",
         "sales_order",
         "purchase_order",
         "rfq",

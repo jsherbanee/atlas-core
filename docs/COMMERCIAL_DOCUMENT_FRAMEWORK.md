@@ -10,7 +10,6 @@ No production code, UI, QuickBooks integration, routing, or workflow implementat
 
 This framework is the shared foundation for:
 - Estimates
-- Proposals
 - Sales Orders
 - Purchase Orders
 - RFQs
@@ -141,7 +140,7 @@ Document Number:
 - must remain stable once issued for a specific revision
 
 Document Type:
-- explicit family identity such as estimate, proposal, purchase_order, or customer_invoice
+- explicit family identity such as estimate, sales_order, purchase_order, or customer_invoice
 
 Status:
 - current business state for the active revision of the document
@@ -274,8 +273,7 @@ Alignment rules:
 The framework defines deterministic relationship rules for common commercial-document progressions.
 
 Required canonical relationships:
-- Estimate → Proposal
-- Proposal → Sales Order
+- Estimate → Sales Order
 - Sales Order → Invoice
 - RFQ → Vendor Quote
 - Vendor Quote → Purchase Order
@@ -292,7 +290,7 @@ Required canonical relationships:
 - sync relationships to QuickBooks should be modeled as external-system relationships, not as ownership transfer inside Atlas
 
 Examples:
-- one Proposal may generate one or more Sales Orders
+- one Estimate may generate one or more Sales Orders
 - one Sales Order may generate multiple invoices over time
 - one Purchase Order may map to multiple receiving events and one or more vendor bills
 - source-document and source-line traceability must be preserved when a successor document is created from a predecessor document
@@ -317,6 +315,27 @@ Principles:
 - linked revision chains must support deterministic audit and relationship traversal
 
 ## Document Numbering Philosophy
+
+## Estimate Presentation Views (T-05)
+
+Estimate presentation supports two views over the same estimate revision:
+- Internal Estimate
+- Customer Estimate
+
+Rules:
+- both views reference the same estimate identity and revision identity
+- no duplicate estimate data model is introduced for view rendering
+- view differences are presentation/output controls only
+
+## Terms and Conditions Snapshot Model (T-05 Amendment)
+
+Commercial documents can carry a Terms and Conditions reference and immutable content snapshot.
+
+Snapshot rules:
+- draft/review documents may capture or refresh snapshots only through explicit user actions
+- issued documents preserve captured Terms and Conditions content and version immutably
+- changing tenant defaults does not retroactively mutate issued document snapshots
+- override resolution is explicit and scope-aware (`transaction > project > customer > tenant default`)
 
 Document numbering is operational, human-facing, and tenant-aware.
 

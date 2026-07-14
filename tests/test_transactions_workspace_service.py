@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 
 from atlas_core.domain.commercial_document import (
@@ -15,6 +17,51 @@ def _service() -> TransactionsWorkspaceService:
     return TransactionsWorkspaceService()
 
 
+def _terms_blocks(default_content: str, *, version: int = 1) -> list[dict[str, object]]:
+    return [
+        {
+            "block_id": f"terms-estimate-v{version}",
+            "title": "Estimate Terms",
+            "document_family": "estimate",
+            "status": "active",
+            "content": default_content,
+            "version": version,
+            "effective_date": None,
+            "expiration_date": None,
+            "is_default": True,
+            "customer_id": None,
+            "project_id": None,
+            "transaction_id": None,
+            "archived": False,
+            "created_at": "2026-07-13T00:00:00+00:00",
+            "created_by": "tester",
+            "updated_at": "2026-07-13T00:00:00+00:00",
+            "updated_by": "tester",
+            "previous_block_id": None,
+        },
+        {
+            "block_id": f"terms-sales-order-v{version}",
+            "title": "Sales Order Terms",
+            "document_family": "sales_order",
+            "status": "active",
+            "content": f"SO {default_content}",
+            "version": version,
+            "effective_date": None,
+            "expiration_date": None,
+            "is_default": True,
+            "customer_id": None,
+            "project_id": None,
+            "transaction_id": None,
+            "archived": False,
+            "created_at": "2026-07-13T00:00:00+00:00",
+            "created_by": "tester",
+            "updated_at": "2026-07-13T00:00:00+00:00",
+            "updated_by": "tester",
+            "previous_block_id": None,
+        },
+    ]
+
+
 def test_create_and_filter_documents() -> None:
     service = _service()
 
@@ -26,17 +73,17 @@ def test_create_and_filter_documents() -> None:
         project_code="P-A",
         customer_id="customer-a",
     )
-    proposal = service.create_draft(
+    sales_order = service.create_draft(
         tenant_id="tenant-1",
         organization_id="org-1",
-        document_type=CommercialDocumentType.PROPOSAL,
+        document_type=CommercialDocumentType.SALES_ORDER,
         project_id="project-b",
         project_code="P-B",
         customer_id="customer-b",
     )
 
     assert estimate.document_type == CommercialDocumentType.ESTIMATE
-    assert proposal.document_type == CommercialDocumentType.PROPOSAL
+    assert sales_order.document_type == CommercialDocumentType.SALES_ORDER
 
     filtered = service.list_documents(document_type=CommercialDocumentType.ESTIMATE)
     assert len(filtered) == 1
@@ -44,7 +91,7 @@ def test_create_and_filter_documents() -> None:
 
     searched = service.list_documents(query="project-b")
     assert len(searched) == 1
-    assert searched[0].document_id == proposal.document_id
+    assert searched[0].document_id == sales_order.document_id
 
 
 def test_edit_archive_restore() -> None:
@@ -195,3 +242,82 @@ def test_create_draft_revision_from_issued_estimate_returns_to_review() -> None:
     assert revised.lifecycle_state == CommercialDocumentLifecycleState.DRAFT
     assert revised.revision_number == issued_revision + 1
     assert revised.approval_state == ApprovalState.NOT_REQUESTED
+
+
+def test_explicit_draft_terms_refresh_and_issued_snapshot_immutability() -> None:
+    service = TransactionsWorkspaceService(serialized_terms_blocks=_terms_blocks("v1"))
+    estimate = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.ESTIMATE,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    assert (estimate.terms_and_conditions_snapshot or {}).get("content") == "v1"
+
+    service_v2 = TransactionsWorkspaceService(
+        serialized_documents=service.to_payload(),
+        serialized_terms_blocks=_terms_blocks("v2", version=2),
+    )
+    refreshed = service_v2.refresh_draft_terms(document_id=estimate.document_id)
+    assert (refreshed.terms_and_conditions_snapshot or {}).get("content") == "v2"
+
+    service_v2.set_approval_state(
+        document_id=estimate.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+    issued = service_v2.issue_document(
+        document_id=estimate.document_id,
+        reason="issue",
+    )
+    assert issued.lifecycle_state == CommercialDocumentLifecycleState.ISSUED
+    with pytest.raises(ValueError, match="terms can only be refreshed"):
+        service_v2.refresh_draft_terms(document_id=estimate.document_id)
+
+    service_v3 = TransactionsWorkspaceService(
+        serialized_documents=service_v2.to_payload(),
+        serialized_terms_blocks=_terms_blocks("v3", version=3),
+    )
+    preserved = service_v3.get_document(estimate.document_id)
+    assert preserved is not None
+    assert (preserved.terms_and_conditions_snapshot or {}).get("content") == "v2"
+
+
+def test_create_sales_order_from_estimate_preserves_traceability_and_terms() -> None:
+    service = TransactionsWorkspaceService(serialized_terms_blocks=_terms_blocks("v1"))
+    estimate = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.ESTIMATE,
+        project_id="project-a",
+        project_code="P-A",
+        customer_id="customer-a",
+    )
+    service._commercial_service.add_line(
+        estimate,
+        description="Line 1",
+        quantity=Decimal("1"),
+        unit_price=Decimal("100"),
+        unit_cost=Decimal("55"),
+    )
+    service.set_approval_state(
+        document_id=estimate.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+
+    sales_order = service.create_sales_order_from_estimate(
+        estimate_document_id=estimate.document_id,
+        inherit_terms_from_estimate=True,
+    )
+
+    assert sales_order.document_type == CommercialDocumentType.SALES_ORDER
+    assert sales_order.project_id == estimate.project_id
+    assert sales_order.customer_id == estimate.customer_id
+    assert len(sales_order.lines) == len(estimate.lines)
+    assert sales_order.lines[0].source_document_id == estimate.document_id
+    assert sales_order.lines[0].source_line_id == estimate.lines[0].line_id
+    assert (sales_order.terms_and_conditions_reference or {}).get("source") in {
+        "inherited_from_estimate",
+        "resolved",
+    }
+    assert (sales_order.terms_and_conditions_snapshot or {}).get("content")

@@ -22,7 +22,6 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
     assert secondary_keys == [
         "overview",
         "estimates",
-        "proposals",
         "sales_orders",
         "purchase_orders",
         "rfqs",
@@ -44,10 +43,31 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "add",
         "browse",
         "edit",
-        "lines",
+        "customer_view",
+        "internal_view",
         "revisions",
         "issue",
-        "approvals",
+        "accept",
+        "decline",
+        "related_documents",
+        "activity",
+        "export",
+    ]
+
+    sales_order_section = next(
+        item for item in contract if item["secondary_key"] == "sales_orders"
+    )
+    sales_order_actions = [
+        entry["tertiary_key"]
+        for entry in sales_order_section.get("supported_tertiary_actions", [])
+    ]
+    assert sales_order_actions == [
+        "add",
+        "browse",
+        "edit",
+        "lines",
+        "demand",
+        "fulfillment",
         "related_documents",
         "activity",
         "export",

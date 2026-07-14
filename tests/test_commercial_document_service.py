@@ -35,7 +35,7 @@ def test_add_line_uses_stable_document_scoped_line_ids() -> None:
     document = service.create_document(
         tenant_id="tenant-a",
         organization_id="org-1",
-        document_type=CommercialDocumentType.PROPOSAL,
+        document_type=CommercialDocumentType.SALES_ORDER,
     )
 
     line_1 = service.add_line(
@@ -163,6 +163,43 @@ def test_transition_rejects_invalid_state_jump() -> None:
             document,
             CommercialDocumentLifecycleState.ISSUED,
             reason="invalid",
+        )
+
+
+def test_terms_snapshot_assignment_is_immutable_after_issue() -> None:
+    service = CommercialDocumentService()
+    document = service.create_document(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.ESTIMATE,
+    )
+    service.assign_terms_and_conditions(
+        document,
+        reference={"block_id": "terms-estimate-v1", "version": 1},
+        snapshot={"title": "Estimate Terms", "content": "v1", "version": 1},
+    )
+    service.set_approval_state(document, ApprovalState.APPROVED)
+    service.transition_lifecycle(
+        document,
+        CommercialDocumentLifecycleState.IN_REVIEW,
+        reason="review",
+    )
+    service.transition_lifecycle(
+        document,
+        CommercialDocumentLifecycleState.APPROVED,
+        reason="approved",
+    )
+    service.transition_lifecycle(
+        document,
+        CommercialDocumentLifecycleState.ISSUED,
+        reason="issued",
+    )
+
+    with pytest.raises(ValueError):
+        service.assign_terms_and_conditions(
+            document,
+            reference={"block_id": "terms-estimate-v2", "version": 2},
+            snapshot={"title": "Estimate Terms", "content": "v2", "version": 2},
         )
 
 

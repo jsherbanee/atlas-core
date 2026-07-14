@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
 from atlas_core.domain.commercial_document import (
     ApprovalState,
     CommercialDocument,
+    CommercialDocumentDiagnostic,
     CommercialDocumentLifecycleState,
     CommercialDocumentType,
     SyncStatus,
@@ -38,6 +40,7 @@ class TransactionsWorkspaceService:
         *,
         serialized_documents: list[dict[str, Any]] | None = None,
         serialized_numbering_policies: list[dict[str, Any]] | None = None,
+        serialized_terms_blocks: list[dict[str, Any]] | None = None,
         commercial_service: CommercialDocumentService | None = None,
     ) -> None:
         self._commercial_service = commercial_service or CommercialDocumentService(
@@ -50,6 +53,154 @@ class TransactionsWorkspaceService:
             for item in list(serialized_documents or [])
             if isinstance(item, dict)
         ]
+        self._terms_blocks: list[dict[str, Any]] = [
+            dict(item)
+            for item in list(serialized_terms_blocks or [])
+            if isinstance(item, dict)
+        ]
+
+    def _document_family(self, document_type: CommercialDocumentType) -> str:
+        return document_type.value
+
+    def _active_terms_blocks_for_family(
+        self,
+        *,
+        document_family: str,
+        customer_id: str | None,
+        project_id: str | None,
+        transaction_id: str | None,
+    ) -> list[dict[str, Any]]:
+        candidates: list[dict[str, Any]] = []
+        for item in list(self._terms_blocks or []):
+            family = str(item.get("document_family") or "").strip().lower()
+            if family != document_family:
+                continue
+            if bool(item.get("archived", False)):
+                continue
+            if str(item.get("status") or "").strip().lower() != "active":
+                continue
+            scope_transaction_id = str(item.get("transaction_id") or "").strip() or None
+            scope_project_id = str(item.get("project_id") or "").strip() or None
+            scope_customer_id = str(item.get("customer_id") or "").strip() or None
+            if scope_transaction_id and scope_transaction_id != (transaction_id or ""):
+                continue
+            if scope_project_id and scope_project_id != (project_id or ""):
+                continue
+            if scope_customer_id and scope_customer_id != (customer_id or ""):
+                continue
+            candidates.append(dict(item))
+        return candidates
+
+    def _resolve_terms_block(
+        self,
+        *,
+        document_type: CommercialDocumentType,
+        customer_id: str | None,
+        project_id: str | None,
+        transaction_id: str | None,
+        explicit_block_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        family = self._document_family(document_type)
+        candidates = self._active_terms_blocks_for_family(
+            document_family=family,
+            customer_id=customer_id,
+            project_id=project_id,
+            transaction_id=transaction_id,
+        )
+        if explicit_block_id:
+            normalized_id = explicit_block_id.strip()
+            for item in candidates:
+                if str(item.get("block_id") or "").strip() == normalized_id:
+                    return item
+            return None
+        if not candidates:
+            return None
+
+        def _scope_rank(item: dict[str, Any]) -> int:
+            if str(item.get("transaction_id") or "").strip():
+                return 4
+            if str(item.get("project_id") or "").strip():
+                return 3
+            if str(item.get("customer_id") or "").strip():
+                return 2
+            return 1
+
+        candidates.sort(
+            key=lambda item: (
+                _scope_rank(item),
+                int(item.get("version") or 0),
+                str(item.get("updated_at") or ""),
+            ),
+            reverse=True,
+        )
+        return candidates[0]
+
+    def _default_terms_block_id(self, *, document_family: str) -> str | None:
+        defaults = [
+            item
+            for item in self._terms_blocks
+            if str(item.get("document_family") or "").strip().lower() == document_family
+            and bool(item.get("is_default", False))
+            and not bool(item.get("archived", False))
+            and str(item.get("status") or "").strip().lower() == "active"
+            and not str(item.get("customer_id") or "").strip()
+            and not str(item.get("project_id") or "").strip()
+            and not str(item.get("transaction_id") or "").strip()
+        ]
+        if not defaults:
+            return None
+        defaults.sort(
+            key=lambda item: (
+                int(item.get("version") or 0),
+                str(item.get("updated_at") or ""),
+            ),
+            reverse=True,
+        )
+        return str(defaults[0].get("block_id") or "").strip() or None
+
+    def _terms_reference_and_snapshot(
+        self,
+        *,
+        document_type: CommercialDocumentType,
+        customer_id: str | None,
+        project_id: str | None,
+        transaction_id: str | None,
+        explicit_block_id: str | None = None,
+        source: str = "resolved",
+    ) -> tuple[dict[str, Any], dict[str, Any]] | None:
+        block = self._resolve_terms_block(
+            document_type=document_type,
+            customer_id=customer_id,
+            project_id=project_id,
+            transaction_id=transaction_id,
+            explicit_block_id=explicit_block_id,
+        )
+        if block is None:
+            return None
+        family = self._document_family(document_type)
+        reference = {
+            "block_id": str(block.get("block_id") or ""),
+            "document_family": family,
+            "version": int(block.get("version") or 1),
+            "source": source,
+            "is_default": bool(block.get("is_default", False)),
+            "customer_id": str(block.get("customer_id") or "").strip() or None,
+            "project_id": str(block.get("project_id") or "").strip() or None,
+            "transaction_id": str(block.get("transaction_id") or "").strip() or None,
+            "resolved_default_block_id": self._default_terms_block_id(
+                document_family=family
+            ),
+        }
+        snapshot = {
+            "block_id": str(block.get("block_id") or ""),
+            "title": str(block.get("title") or ""),
+            "document_family": family,
+            "version": int(block.get("version") or 1),
+            "content": str(block.get("content") or ""),
+            "effective_date": str(block.get("effective_date") or "").strip() or None,
+            "expiration_date": str(block.get("expiration_date") or "").strip() or None,
+        }
+        return reference, snapshot
 
     def list_documents(
         self,
@@ -117,8 +268,146 @@ class TransactionsWorkspaceService:
             customer_id=customer_id,
             vendor_id=vendor_id,
         )
+        if document.document_type in {
+            CommercialDocumentType.ESTIMATE,
+            CommercialDocumentType.SALES_ORDER,
+        }:
+            terms_payload = self._terms_reference_and_snapshot(
+                document_type=document.document_type,
+                customer_id=document.customer_id,
+                project_id=document.project_id,
+                transaction_id=document.document_id,
+            )
+            if terms_payload is not None:
+                reference, snapshot = terms_payload
+                self._commercial_service.assign_terms_and_conditions(
+                    document,
+                    reference=reference,
+                    snapshot=snapshot,
+                )
         self._documents.append(document)
         return document
+
+    def refresh_draft_terms(
+        self,
+        *,
+        document_id: str,
+        explicit_block_id: str | None = None,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if not document.is_mutable:
+            raise ValueError(
+                "terms can only be refreshed on mutable drafts/review documents"
+            )
+        payload = self._terms_reference_and_snapshot(
+            document_type=document.document_type,
+            customer_id=document.customer_id,
+            project_id=document.project_id,
+            transaction_id=document.document_id,
+            explicit_block_id=explicit_block_id,
+            source="explicit_refresh",
+        )
+        if payload is None:
+            raise ValueError("no active terms and conditions block is available")
+        reference, snapshot = payload
+        self._commercial_service.assign_terms_and_conditions(
+            document,
+            reference=reference,
+            snapshot=snapshot,
+        )
+        return document
+
+    def create_sales_order_from_estimate(
+        self,
+        *,
+        estimate_document_id: str,
+        inherit_terms_from_estimate: bool = True,
+    ) -> CommercialDocument:
+        estimate = self._required_document(estimate_document_id)
+        if estimate.document_type != CommercialDocumentType.ESTIMATE:
+            raise ValueError("source document must be an estimate")
+        is_estimate_approved = (
+            estimate.lifecycle_state
+            in {
+                CommercialDocumentLifecycleState.APPROVED,
+                CommercialDocumentLifecycleState.ISSUED,
+            }
+            or estimate.approval_state == ApprovalState.APPROVED
+        )
+        if not is_estimate_approved:
+            raise ValueError("sales order source estimate must be approved or issued")
+
+        sales_order = self.create_draft(
+            tenant_id=estimate.tenant_id,
+            organization_id=estimate.organization_id,
+            document_type=CommercialDocumentType.SALES_ORDER,
+            project_id=estimate.project_id,
+            project_code=estimate.project_code,
+            customer_id=estimate.customer_id,
+            vendor_id=estimate.vendor_id,
+        )
+
+        for line in list(estimate.lines or []):
+            self._commercial_service.add_line(
+                sales_order,
+                description=line.description,
+                quantity=line.quantity,
+                unit_price=line.unit_price,
+                sequence=line.sequence,
+                unit_of_measure=line.unit_of_measure,
+                discount=line.discount,
+                tax_rate=line.tax_rate,
+                unit_cost=line.unit_cost,
+                project_code=line.project_code,
+                product_or_service_reference=line.product_or_service_reference,
+                source_document_id=estimate.document_id,
+                source_line_id=line.line_id,
+                related_document_id=estimate.document_id,
+                related_line_id=line.line_id,
+            )
+
+        self._commercial_service.add_relationship(
+            sales_order,
+            relationship_type="derived_from_estimate",
+            related_document_id=estimate.document_id,
+        )
+        self._commercial_service.add_diagnostic(
+            sales_order,
+            CommercialDocumentDiagnostic(
+                code="estimate_source_revision",
+                message="Sales order created from estimate source revision",
+                details={
+                    "source_estimate_id": estimate.document_id,
+                    "source_estimate_revision_number": estimate.revision_number,
+                    "source_estimate_document_number": estimate.document_number,
+                },
+            ),
+        )
+
+        if inherit_terms_from_estimate and estimate.terms_and_conditions_snapshot:
+            inherited_reference = dict(estimate.terms_and_conditions_reference or {})
+            inherited_reference["source"] = "inherited_from_estimate"
+            inherited_reference["inherited_from_document_id"] = estimate.document_id
+            self._commercial_service.assign_terms_and_conditions(
+                sales_order,
+                reference=inherited_reference,
+                snapshot=deepcopy(dict(estimate.terms_and_conditions_snapshot)),
+            )
+        else:
+            payload = self._terms_reference_and_snapshot(
+                document_type=CommercialDocumentType.SALES_ORDER,
+                customer_id=sales_order.customer_id,
+                project_id=sales_order.project_id,
+                transaction_id=sales_order.document_id,
+            )
+            if payload is not None:
+                reference, snapshot = payload
+                self._commercial_service.assign_terms_and_conditions(
+                    sales_order,
+                    reference=reference,
+                    snapshot=snapshot,
+                )
+        return sales_order
 
     def preview_number(self, document_id: str) -> str:
         document = self._required_document(document_id)

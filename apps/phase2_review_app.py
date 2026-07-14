@@ -514,7 +514,6 @@ PROJECTS_ACTIVE_PAGES = {
 
 TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE: dict[str, CommercialDocumentType] = {
     "estimates": CommercialDocumentType.ESTIMATE,
-    "proposals": CommercialDocumentType.PROPOSAL,
     "sales_orders": CommercialDocumentType.SALES_ORDER,
     "purchase_orders": CommercialDocumentType.PURCHASE_ORDER,
     "rfqs": CommercialDocumentType.RFQ,
@@ -527,7 +526,6 @@ TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE: dict[str, CommercialDocumentType] = {
 
 TRANSACTION_TYPE_TO_KIND: dict[CommercialDocumentType, str] = {
     CommercialDocumentType.ESTIMATE: "estimate",
-    CommercialDocumentType.PROPOSAL: "proposal",
     CommercialDocumentType.SALES_ORDER: "sales_order",
     CommercialDocumentType.PURCHASE_ORDER: "purchase_order",
     CommercialDocumentType.RFQ: "request_for_quote",
@@ -3508,6 +3506,10 @@ def _transactions_workspace_service(st: Any) -> TransactionsWorkspaceService:
             tenant_id=tenant_id,
             organization_id=organization_id,
         ),
+        serialized_terms_blocks=settings_service.export_terms_and_conditions_blocks(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        ),
     )
 
 
@@ -6286,8 +6288,14 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": "entity",
             },
             {
-                "tertiary_key": "lines",
-                "label": "Lines",
+                "tertiary_key": "customer_view",
+                "label": "Customer View",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "internal_view",
+                "label": "Internal View",
                 "action_type": "detail_view",
                 "required_selection": "entity",
             },
@@ -6304,8 +6312,14 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": "entity",
             },
             {
-                "tertiary_key": "approvals",
-                "label": "Approvals",
+                "tertiary_key": "accept",
+                "label": "Accept",
+                "action_type": "operational_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "decline",
+                "label": "Decline",
                 "action_type": "operational_view",
                 "required_selection": "entity",
             },
@@ -6331,6 +6345,64 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
     }
     for secondary_key in TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE:
         if secondary_key == "estimates":
+            continue
+        if secondary_key == "sales_orders":
+            actions[secondary_key] = [
+                {
+                    "tertiary_key": "add",
+                    "label": "Add",
+                    "action_type": "create_action",
+                    "required_selection": None,
+                },
+                {
+                    "tertiary_key": "browse",
+                    "label": "Browse",
+                    "action_type": "collection_view",
+                    "required_selection": None,
+                },
+                {
+                    "tertiary_key": "edit",
+                    "label": "Edit",
+                    "action_type": "edit_action",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "lines",
+                    "label": "Lines",
+                    "action_type": "detail_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "demand",
+                    "label": "Demand",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "fulfillment",
+                    "label": "Fulfillment",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "related_documents",
+                    "label": "Related Documents",
+                    "action_type": "relationship_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "activity",
+                    "label": "Activity",
+                    "action_type": "history_activity_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "export",
+                    "label": "Export",
+                    "action_type": "export_action",
+                    "required_selection": "entity",
+                },
+            ]
             continue
         actions[secondary_key] = [
             {
@@ -6397,6 +6469,12 @@ def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
             {
                 "tertiary_key": "commercial_numbering",
                 "label": "Commercial Numbering",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "terms_and_conditions",
+                "label": "Terms and Conditions",
                 "action_type": "settings_view",
                 "required_selection": None,
             },
@@ -6530,7 +6608,6 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
         sections = [
             ("overview", "Overview"),
             ("estimates", "Estimates"),
-            ("proposals", "Proposals"),
             ("sales_orders", "Sales Orders"),
             ("purchase_orders", "Purchase Orders"),
             ("rfqs", "RFQs"),
@@ -12336,7 +12413,7 @@ def _render_transactions_workspace_page(
                 st,
                 why_empty="No commercial transactions have been created.",
                 action_to_populate="Open any transaction family and use Add to create your first draft.",
-                next_location="Start with Estimates, Proposals, or Purchase Orders.",
+                next_location="Start with Estimates, Sales Orders, or Purchase Orders.",
             )
             return
         _render_data_table(st, [_transaction_row(item) for item in recent])
@@ -12498,6 +12575,61 @@ def _render_transactions_workspace_page(
             service.archive_document(selected_document.document_id)
         _save_transactions_workspace_state(st, service)
         st.rerun()
+    if action_cols[2].button(
+        "Refresh Terms Snapshot",
+        key=f"{prefix}_refresh_terms",
+        width="stretch",
+        disabled=(
+            not selected_document.is_mutable
+            or selected_document.document_type
+            not in {
+                CommercialDocumentType.ESTIMATE,
+                CommercialDocumentType.SALES_ORDER,
+            }
+        ),
+    ):
+        try:
+            service.refresh_draft_terms(document_id=selected_document.document_id)
+            _save_transactions_workspace_state(st, service)
+            st.success("Terms snapshot refreshed from active defaults/overrides.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Unable to refresh terms snapshot: {exc}")
+    if (
+        selected_document.document_type == CommercialDocumentType.ESTIMATE
+        and action_cols[3].button(
+            "Create Sales Order",
+            key=f"{prefix}_create_sales_order",
+            width="stretch",
+        )
+    ):
+        try:
+            inherit_terms = bool(
+                st.session_state.get(f"{prefix}_inherit_terms_from_estimate", True)
+            )
+            created_sales_order = service.create_sales_order_from_estimate(
+                estimate_document_id=selected_document.document_id,
+                inherit_terms_from_estimate=inherit_terms,
+            )
+            st.session_state["atlas_transactions_selected_document_id"] = (
+                created_sales_order.document_id
+            )
+            st.session_state[_navigation_secondary_state_key()] = "sales_orders"
+            st.session_state[_navigation_tertiary_state_key()] = "edit"
+            _save_transactions_workspace_state(st, service)
+            st.success("Sales order draft created from estimate.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Unable to create sales order from estimate: {exc}")
+
+    if selected_document.document_type == CommercialDocumentType.ESTIMATE:
+        st.checkbox(
+            "Inherit Terms from Estimate when creating Sales Order",
+            value=bool(
+                st.session_state.get(f"{prefix}_inherit_terms_from_estimate", True)
+            ),
+            key=f"{prefix}_inherit_terms_from_estimate",
+        )
 
     if tertiary == "edit":
         edit_cols = st.columns(4)
@@ -12535,6 +12667,82 @@ def _render_transactions_workspace_page(
                 st.rerun()
             except Exception as exc:
                 st.error(f"Unable to update draft: {exc}")
+
+    if (
+        tertiary in {"internal_view", "customer_view"}
+        and selected_document.document_type == CommercialDocumentType.ESTIMATE
+    ):
+        if estimate_engine is None or not selected_revision:
+            st.info("Estimate revision is not available yet.")
+        else:
+            line_items = list(selected_revision.get("line_items") or [])
+            st.dataframe(
+                [
+                    {
+                        "Presentation": (
+                            "Internal Estimate"
+                            if tertiary == "internal_view"
+                            else "Customer Estimate"
+                        ),
+                        "Estimate Revision": _safe_text(selected_revision_id, ""),
+                        "Document Revision": selected_document.revision_number,
+                        "Terms Block": _safe_text(
+                            (
+                                selected_document.terms_and_conditions_reference or {}
+                            ).get("block_id"),
+                            "",
+                        ),
+                        "Terms Version": (
+                            selected_document.terms_and_conditions_reference or {}
+                        ).get("version"),
+                    }
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            if tertiary == "internal_view":
+                st.dataframe(
+                    [
+                        {
+                            "Line Item": _safe_text(item.get("line_item_id"), ""),
+                            "Description": _safe_text(item.get("description"), ""),
+                            "Qty": item.get("requested_quantity"),
+                            "Product": _safe_text(item.get("product_id"), ""),
+                            "Snapshot": _safe_text(
+                                item.get("selected_cost_snapshot_id"), ""
+                            ),
+                        }
+                        for item in line_items
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+            else:
+                st.dataframe(
+                    [
+                        {
+                            "Line Item": _safe_text(item.get("line_item_id"), ""),
+                            "Scope": _safe_text(item.get("description"), ""),
+                            "Qty": item.get("requested_quantity"),
+                            "Selling View": "Included",
+                        }
+                        for item in line_items
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+                terms_content = _safe_text(
+                    (selected_document.terms_and_conditions_snapshot or {}).get(
+                        "content"
+                    ),
+                    "",
+                )
+                st.text_area(
+                    "Terms and Conditions",
+                    value=terms_content,
+                    height=180,
+                    key=f"{prefix}_customer_terms_preview",
+                )
 
     if (
         tertiary == "lines"
@@ -12929,6 +13137,94 @@ def _render_transactions_workspace_page(
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to create draft revision: {exc}")
+
+    if (
+        tertiary == "accept"
+        and selected_document.document_type == CommercialDocumentType.ESTIMATE
+    ):
+        if st.button(
+            "Mark Estimate Accepted", key=f"{prefix}_accept_estimate", width="stretch"
+        ):
+            service.set_approval_state(
+                document_id=selected_document.document_id,
+                approval_state=ApprovalState.APPROVED,
+            )
+            _save_transactions_workspace_state(st, service)
+            st.success("Estimate marked as accepted.")
+            st.rerun()
+
+    if (
+        tertiary == "decline"
+        and selected_document.document_type == CommercialDocumentType.ESTIMATE
+    ):
+        if st.button(
+            "Mark Estimate Declined", key=f"{prefix}_decline_estimate", width="stretch"
+        ):
+            service.set_approval_state(
+                document_id=selected_document.document_id,
+                approval_state=ApprovalState.REJECTED,
+            )
+            _save_transactions_workspace_state(st, service)
+            st.success("Estimate marked as declined.")
+            st.rerun()
+
+    if (
+        tertiary == "lines"
+        and selected_document.document_type == CommercialDocumentType.SALES_ORDER
+    ):
+        st.dataframe(
+            [
+                {
+                    "Line": line.sequence,
+                    "Description": line.description,
+                    "Qty": str(line.quantity),
+                    "Unit Price": str(line.unit_price),
+                    "Unit Cost": str(line.unit_cost),
+                    "Source Document": _safe_text(line.source_document_id, ""),
+                    "Source Line": _safe_text(line.source_line_id, ""),
+                }
+                for line in list(selected_document.lines or [])
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+    if (
+        tertiary == "demand"
+        and selected_document.document_type == CommercialDocumentType.SALES_ORDER
+    ):
+        st.dataframe(
+            [
+                {
+                    "Demand Generated": "Yes",
+                    "Inventory": "Pending future sprint",
+                    "Purchasing": "Pending future sprint",
+                    "Labor": "Pending future sprint",
+                    "Scheduling": "Pending future sprint",
+                    "Project Execution": "Pending future sprint",
+                }
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+    if (
+        tertiary == "fulfillment"
+        and selected_document.document_type == CommercialDocumentType.SALES_ORDER
+    ):
+        st.dataframe(
+            [
+                {
+                    "Lifecycle": _safe_text(
+                        selected_document.lifecycle_state.value, ""
+                    ),
+                    "Fulfillment Status": "Not started",
+                    "Note": "Reservation/allocation workflows are deferred to later T-series sprints.",
+                }
+            ],
+            width="stretch",
+            hide_index=True,
+        )
 
     if tertiary == "approvals":
         selected_approval = st.selectbox(
@@ -13519,6 +13815,398 @@ def _render_application_administration_page(
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to save policy: {exc}")
+
+        elif tertiary == "terms_and_conditions":
+            family = st.selectbox(
+                "Document Family",
+                options=[
+                    CommercialDocumentType.ESTIMATE.value,
+                    CommercialDocumentType.SALES_ORDER.value,
+                ],
+                key="atlas_settings_terms_family",
+            )
+            include_archived_terms = st.checkbox(
+                "Include Archived Blocks",
+                value=False,
+                key="atlas_settings_terms_include_archived",
+            )
+            blocks = settings_service.list_terms_and_conditions_blocks(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                document_family=family,
+                include_archived=include_archived_terms,
+            )
+
+            tabs = st.tabs(
+                [
+                    "Browse",
+                    "Add",
+                    "Edit",
+                    "Versions",
+                    "Assign Defaults",
+                    "Archive",
+                    "Preview",
+                ]
+            )
+
+            with tabs[0]:
+                if not blocks:
+                    st.info(
+                        "No Terms and Conditions blocks are configured for this family."
+                    )
+                else:
+                    st.dataframe(
+                        [
+                            {
+                                "Block ID": item.block_id,
+                                "Title": item.title,
+                                "Family": item.document_family,
+                                "Version": item.version,
+                                "Status": item.status,
+                                "Default": item.is_default,
+                                "Customer": _safe_text(item.customer_id, ""),
+                                "Project": _safe_text(item.project_id, ""),
+                                "Transaction": _safe_text(item.transaction_id, ""),
+                                "Archived": item.archived,
+                                "Updated": item.updated_at,
+                            }
+                            for item in blocks
+                        ],
+                        width="stretch",
+                        hide_index=True,
+                    )
+
+            with tabs[1]:
+                with st.form("atlas_settings_terms_add_form"):
+                    add_cols = st.columns(3)
+                    add_title = add_cols[0].text_input("Title")
+                    add_status = add_cols[1].selectbox(
+                        "Status", options=["draft", "active"]
+                    )
+                    add_is_default = add_cols[2].checkbox(
+                        "Set As Default (tenant-level only)"
+                    )
+                    add_content = st.text_area(
+                        "Content",
+                        height=200,
+                        help="Safe formatted text only.",
+                    )
+                    add_dates = st.columns(2)
+                    add_effective = add_dates[0].text_input(
+                        "Effective Date (ISO)",
+                        value="",
+                        placeholder="2026-07-13T00:00:00+00:00",
+                    )
+                    add_expiration = add_dates[1].text_input(
+                        "Expiration Date (ISO)",
+                        value="",
+                        placeholder="2027-07-13T00:00:00+00:00",
+                    )
+                    override_cols = st.columns(3)
+                    add_customer_override = override_cols[0].text_input(
+                        "Optional Customer Override"
+                    )
+                    add_project_override = override_cols[1].text_input(
+                        "Optional Project Override"
+                    )
+                    add_transaction_override = override_cols[2].text_input(
+                        "Optional Transaction Override"
+                    )
+                    add_submitted = st.form_submit_button(
+                        "Create Terms Block", width="stretch"
+                    )
+                if add_submitted:
+                    try:
+                        settings_service.create_terms_and_conditions_block(
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            actor="atlas-ui",
+                            title=add_title,
+                            document_family=family,
+                            status=add_status,
+                            content=add_content,
+                            effective_date=add_effective or None,
+                            expiration_date=add_expiration or None,
+                            is_default=bool(add_is_default),
+                            customer_id=add_customer_override or None,
+                            project_id=add_project_override or None,
+                            transaction_id=add_transaction_override or None,
+                        )
+                        _save_settings_workspace_state(st, settings_service)
+                        st.success("Terms block created.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to create terms block: {exc}")
+
+            with tabs[2]:
+                editable_blocks = [item for item in blocks if not item.archived]
+                if not editable_blocks:
+                    st.caption("No editable blocks available.")
+                else:
+                    edit_label = st.selectbox(
+                        "Select Block",
+                        options=[
+                            f"{item.block_id} · v{item.version} · {item.title}"
+                            for item in editable_blocks
+                        ],
+                        key="atlas_settings_terms_edit_label",
+                    )
+                    selected_edit_block = editable_blocks[
+                        [
+                            f"{item.block_id} · v{item.version} · {item.title}"
+                            for item in editable_blocks
+                        ].index(edit_label)
+                    ]
+                    with st.form("atlas_settings_terms_edit_form"):
+                        edit_title = st.text_input(
+                            "Title", value=selected_edit_block.title
+                        )
+                        edit_status = st.selectbox(
+                            "Status",
+                            options=["draft", "active"],
+                            index=["draft", "active"].index(selected_edit_block.status),
+                        )
+                        edit_content = st.text_area(
+                            "Content", value=selected_edit_block.content, height=200
+                        )
+                        edit_dates = st.columns(2)
+                        edit_effective = edit_dates[0].text_input(
+                            "Effective Date (ISO)",
+                            value=_safe_text(selected_edit_block.effective_date, ""),
+                        )
+                        edit_expiration = edit_dates[1].text_input(
+                            "Expiration Date (ISO)",
+                            value=_safe_text(selected_edit_block.expiration_date, ""),
+                        )
+                        edit_submitted = st.form_submit_button(
+                            "Save Block", width="stretch"
+                        )
+                    if edit_submitted:
+                        try:
+                            settings_service.update_terms_and_conditions_block(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                block_id=selected_edit_block.block_id,
+                                actor="atlas-ui",
+                                title=edit_title,
+                                status=edit_status,
+                                content=edit_content,
+                                effective_date=edit_effective or None,
+                                expiration_date=edit_expiration or None,
+                            )
+                            _save_settings_workspace_state(st, settings_service)
+                            st.success("Terms block updated.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to update terms block: {exc}")
+
+            with tabs[3]:
+                versionable_blocks = [item for item in blocks if not item.archived]
+                if not versionable_blocks:
+                    st.caption("No blocks are available for versioning.")
+                else:
+                    version_label = st.selectbox(
+                        "Source Block",
+                        options=[
+                            f"{item.block_id} · v{item.version} · {item.title}"
+                            for item in versionable_blocks
+                        ],
+                        key="atlas_settings_terms_version_source",
+                    )
+                    source_block = versionable_blocks[
+                        [
+                            f"{item.block_id} · v{item.version} · {item.title}"
+                            for item in versionable_blocks
+                        ].index(version_label)
+                    ]
+                    with st.form("atlas_settings_terms_version_form"):
+                        version_title = st.text_input("Title", value=source_block.title)
+                        version_status = st.selectbox(
+                            "Status",
+                            options=["draft", "active"],
+                            index=["draft", "active"].index(source_block.status),
+                        )
+                        version_content = st.text_area(
+                            "Content",
+                            value=source_block.content,
+                            height=200,
+                        )
+                        version_create = st.form_submit_button(
+                            "Create New Version", width="stretch"
+                        )
+                    if version_create:
+                        try:
+                            settings_service.create_terms_and_conditions_version(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                block_id=source_block.block_id,
+                                actor="atlas-ui",
+                                title=version_title,
+                                content=version_content,
+                                status=version_status,
+                            )
+                            _save_settings_workspace_state(st, settings_service)
+                            st.success("New terms version created.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to create new version: {exc}")
+
+            with tabs[4]:
+                default_candidates = [
+                    item
+                    for item in blocks
+                    if not item.archived
+                    and item.status == "active"
+                    and not item.customer_id
+                    and not item.project_id
+                    and not item.transaction_id
+                ]
+                if not default_candidates:
+                    st.caption(
+                        "No active tenant-level blocks available to assign as default."
+                    )
+                else:
+                    default_label = st.selectbox(
+                        "Default Block",
+                        options=[
+                            f"{item.block_id} · v{item.version} · {item.title}"
+                            for item in default_candidates
+                        ],
+                        key="atlas_settings_terms_default_label",
+                    )
+                    selected_default = default_candidates[
+                        [
+                            f"{item.block_id} · v{item.version} · {item.title}"
+                            for item in default_candidates
+                        ].index(default_label)
+                    ]
+                    if st.button(
+                        "Assign Default",
+                        key="atlas_settings_terms_assign_default",
+                        width="stretch",
+                    ):
+                        try:
+                            settings_service.assign_default_terms_and_conditions_block(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                block_id=selected_default.block_id,
+                                actor="atlas-ui",
+                            )
+                            _save_settings_workspace_state(st, settings_service)
+                            st.success("Default assigned.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to assign default: {exc}")
+
+            with tabs[5]:
+                if not blocks:
+                    st.caption("No blocks available.")
+                else:
+                    archive_label = st.selectbox(
+                        "Block",
+                        options=[
+                            f"{item.block_id} · v{item.version} · {item.title}"
+                            for item in blocks
+                        ],
+                        key="atlas_settings_terms_archive_label",
+                    )
+                    archive_target = blocks[
+                        [
+                            f"{item.block_id} · v{item.version} · {item.title}"
+                            for item in blocks
+                        ].index(archive_label)
+                    ]
+                    archive_cols = st.columns(2)
+                    if archive_cols[0].button(
+                        "Archive", key="atlas_settings_terms_archive", width="stretch"
+                    ):
+                        try:
+                            settings_service.archive_terms_and_conditions_block(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                block_id=archive_target.block_id,
+                                actor="atlas-ui",
+                            )
+                            _save_settings_workspace_state(st, settings_service)
+                            st.success("Block archived.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to archive block: {exc}")
+                    if archive_cols[1].button(
+                        "Restore", key="atlas_settings_terms_restore", width="stretch"
+                    ):
+                        try:
+                            settings_service.restore_terms_and_conditions_block(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                block_id=archive_target.block_id,
+                                actor="atlas-ui",
+                            )
+                            _save_settings_workspace_state(st, settings_service)
+                            st.success("Block restored.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to restore block: {exc}")
+
+            with tabs[6]:
+                preview_cols = st.columns(4)
+                preview_customer = preview_cols[0].text_input(
+                    "Customer ID", key="atlas_settings_terms_preview_customer"
+                )
+                preview_project = preview_cols[1].text_input(
+                    "Project ID", key="atlas_settings_terms_preview_project"
+                )
+                preview_transaction = preview_cols[2].text_input(
+                    "Transaction ID", key="atlas_settings_terms_preview_transaction"
+                )
+                explicit_block_id = preview_cols[3].text_input(
+                    "Explicit Block ID", key="atlas_settings_terms_preview_block"
+                )
+                resolved = settings_service.terms_and_conditions_snapshot(
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                    document_family=family,
+                    customer_id=preview_customer or None,
+                    project_id=preview_project or None,
+                    transaction_id=preview_transaction or None,
+                    explicit_block_id=explicit_block_id or None,
+                )
+                if resolved is None:
+                    st.info("No active block resolved for this scope.")
+                else:
+                    reference, snapshot = resolved
+                    st.dataframe(
+                        [
+                            {
+                                "Resolved Block": _safe_text(
+                                    reference.get("block_id"), ""
+                                ),
+                                "Version": reference.get("version"),
+                                "Source": _safe_text(
+                                    reference.get("source"), "resolved"
+                                ),
+                                "Scope": ", ".join(
+                                    item
+                                    for item in [
+                                        _safe_text(reference.get("transaction_id"), ""),
+                                        _safe_text(reference.get("project_id"), ""),
+                                        _safe_text(reference.get("customer_id"), ""),
+                                    ]
+                                    if item
+                                )
+                                or "tenant-default",
+                                "Title": _safe_text(snapshot.get("title"), ""),
+                            }
+                        ],
+                        width="stretch",
+                        hide_index=True,
+                    )
+                    st.text_area(
+                        "Resolved Content Preview",
+                        value=_safe_text(snapshot.get("content"), ""),
+                        height=200,
+                        key="atlas_settings_terms_preview_content",
+                    )
 
         else:
             audit_rows = settings_service.audit_events(

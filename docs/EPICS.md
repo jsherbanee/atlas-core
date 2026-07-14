@@ -34,6 +34,7 @@ Status: Active
 - T-02 Transactions Workspace Foundation
 - T-03 Estimate Transaction Integration
 - T-04 Settings Foundation and Document Numbering Preferences
+- T-05 Amendment Terms and Conditions Settings Integration
 
 ### A-07 Scope
 
@@ -182,7 +183,7 @@ Explicitly out of scope:
 
 - Epic E implementation
 - Commercial Intelligence implementation
-- Sell Pricing or Proposal Generation implementation
+- Sell Pricing or separate customer-document generation implementation
 
 
 ## Epic B: Engineering Intelligence
@@ -272,7 +273,7 @@ Status: Active
 ### T-01 Scope
 
 - implement shared backend domain/contracts/services for commercial documents
-- support initial transaction families: Estimate, Proposal, Sales Order, Purchase Order, RFQ, Vendor Quote, Receiving Record, Vendor Bill, Customer Invoice, Change Order
+- support initial transaction families: Estimate, Sales Order, Purchase Order, RFQ, Vendor Quote, Receiving Record, Vendor Bill, Customer Invoice, Change Order
 - implement stable document and line identity, optional project/project-code linkage, explicit lifecycle transitions, revision history, immutable issued revisions, decimal-safe totals, relationship traceability, and tenant/organization numbering preview/allocation behavior
 - register commercial documents in the universal object registry and keep persistence compatibility through existing repository contracts
 

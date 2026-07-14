@@ -75,7 +75,7 @@ Sprint T-02 implements the first Transactions workspace UI and navigation founda
 
 Implemented in T-02:
 - Transactions is now a primary application workspace in the shell navigation
-- secondary sections are implemented for Overview, Estimates, Proposals, Sales Orders, Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills, Customer Invoices, and Change Orders
+- secondary sections are implemented for Overview, Estimates, Sales Orders, Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills, Customer Invoices, and Change Orders
 - tertiary actions are implemented as reusable transaction controls (Add, Browse, Edit, Related Documents, Approvals, Sync Status, Activity, Export)
 - session-backed transaction draft management is implemented on top of the T-01 commercial-document backend foundation
 - transactions are indexed in global search and route to Object Workspace for supported commercial-document kinds
@@ -110,7 +110,6 @@ It must support documents that are:
 
 Initial transaction families:
 - Estimates
-- Proposals
 - Sales Orders
 - Purchase Orders
 - RFQs
@@ -129,7 +128,6 @@ Each family should be modeled as a first-class business object rather than a one
 
 Atlas owns operational creation and workflow for:
 - Estimates
-- Proposals
 - Sales Orders
 - Purchase Orders
 - RFQs
@@ -205,8 +203,7 @@ Transactions may be related to:
 - source documents and supporting attachments
 
 Examples:
-- Proposal derived from Estimate
-- Sales Order derived from Proposal
+- Sales Order derived from Estimate
 - Invoice linked to Sales Order and Change Order
 - Purchase Order derived from Vendor Quote or RFQ outcome
 - Vendor Bill matched against Purchase Order and Receiving Record
@@ -216,7 +213,6 @@ Examples:
 Required customer-side commercial flow:
 
 Estimate
-→ Proposal
 → Sales Order
 → Invoice
 → Sync to QuickBooks
@@ -315,7 +311,6 @@ Sprint A-08 defines the common commercial-document lifecycle contract.
 ### Transactions Secondary Navigation
 - Overview
 - Estimates
-- Proposals
 - Sales Orders
 - Purchase Orders
 - RFQs
@@ -344,7 +339,20 @@ These are action patterns, not a promise that every transaction family exposes e
 
 Future Transactions Overview should summarize at least:
 - Draft Estimates
-- Pending Proposals
+- Pending Estimates
+- Pending Estimates
+
+## T-05 Amendment: Terms and Conditions Settings Integration
+
+Transactions now consume tenant-scoped Terms and Conditions blocks for:
+- Estimates
+- Sales Orders
+
+Behavior:
+- estimate drafts can capture Terms and Conditions snapshots from resolved tenant/project/customer/transaction scope blocks
+- sales orders created from estimates can inherit estimate Terms snapshots or resolve sales-order defaults explicitly
+- draft terms refresh is explicit user action only; no silent replacement
+- issued transaction documents preserve captured terms snapshot content/version immutably
 - Open Sales Orders
 - Open Purchase Orders
 - Partially Received POs
