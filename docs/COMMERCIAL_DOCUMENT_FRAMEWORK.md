@@ -119,12 +119,43 @@ Sync Metadata and External Accounting IDs:
 - bridge fields for QuickBooks and future integrations
 - never a reason to transfer accounting-system ownership into Atlas
 
+## Shared Line-Item Contract
+
+Every commercial document line item should support a shared line-level contract:
+
+- stable line ID
+- sequence
+- product or service reference
+- description
+- quantity
+- unit of measure
+- unit cost
+- unit price
+- discount
+- tax treatment
+- extended amount
+- project code
+- source reference
+- fulfillment or receiving state
+- related transaction line
+- accounting sync reference
+
+### Line-Item Principles
+
+- line identity should be stable inside the document revision it belongs to
+- sequence should remain explicit rather than inferred from display order alone
+- products remain vendor-neutral Atlas objects
+- vendor-specific product details remain in Vendor Offerings rather than mutating the shared product identity
+- project code may be present even when there is no linked Project object
+- source references should preserve source-document and source-line traceability where the document derives from another document
+- related transaction line references should support deterministic line-to-line traceability between predecessor and successor documents
+
 ## Standard Commercial Document Lifecycle
 
 The standard architecture lifecycle for commercial documents is:
 
 Draft
-→ Review
+→ In Review
 → Approved
 → Issued
 → Partially Fulfilled
@@ -138,7 +169,7 @@ Draft:
 - editable working state
 - not yet approved for external issue or downstream fulfillment
 
-Review:
+In Review:
 - under structured human review, correction, or comparison
 - may include commercial, operational, or approval review gates
 
@@ -200,6 +231,7 @@ Examples:
 - one Proposal may generate one or more Sales Orders
 - one Sales Order may generate multiple invoices over time
 - one Purchase Order may map to multiple receiving events and one or more vendor bills
+- source-document and source-line traceability must be preserved when a successor document is created from a predecessor document
 
 ## Revision Philosophy
 
@@ -228,6 +260,9 @@ Numbering principles:
 - document numbering should be configurable by tenant and document family
 - numbering format should remain separate from the immutable Document ID
 - numbering should support revisions without changing the base document identity
+- numbering should support non-consuming preview and consuming allocation behavior
+- document numbers must never be reused once allocated
+- external accounting numbers should be preserved as external references rather than replacing Atlas numbering
 - Project linkage may influence numbering but must not be required to produce a valid document number
 - standalone documents must still receive valid numbers
 
@@ -259,6 +294,7 @@ Approval architecture should allow:
 - single-step approvals
 - multi-step approvals
 - tenant-specific approval policy in the future
+- explicit reapproval after material revision
 
 Sprint A-08 does not define a production approval engine.
 
@@ -271,11 +307,15 @@ Commercial documents that synchronize to QuickBooks should carry explicit sync m
 Expected sync metadata concepts:
 - sync readiness
 - sync status
+- sync direction
+- external object type
 - last sync attempt timestamp
 - last sync success timestamp
-- failure state
-- failure reason
-- retry eligibility
+- failure code
+- failure message
+- retry count
+- source hash
+- reconciliation state
 - external QuickBooks identifiers
 - external revision/version reference where required
 

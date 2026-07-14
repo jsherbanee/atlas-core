@@ -82,6 +82,10 @@ Transactions architecture note:
 - QuickBooks should own the post-sync financial state for payables, receivables, payments, ledger, and statutory reporting.
 - payment status may return from QuickBooks into Atlas as synchronized financial reference state.
 
+Commercial document framework note:
+- future commercial documents should share one common sync-metadata architecture rather than family-specific ad hoc sync fields.
+- shared sync metadata should cover readiness, status, direction, external object type, external object ID, attempt/success timestamps, failure code/message, retry count, source hash, reconciliation state, and external accounting references where applicable.
+
 Exact future synchronization ownership should remain explicitly documented and configurable.
 
 ## Stripe Principles

@@ -243,6 +243,8 @@ The shared commercial-document contract is defined in [COMMERCIAL_DOCUMENT_FRAME
 
 Transactions should consume that common framework rather than invent family-specific object envelopes.
 
+This includes the shared line-item contract, revision philosophy, numbering philosophy, approval model, and sync metadata architecture.
+
 ## Lifecycle Expectations For Transactions
 
 Transaction lifecycle remains separate from Project lifecycle.

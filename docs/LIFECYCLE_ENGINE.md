@@ -236,7 +236,7 @@ Sprint A-07 defines that architecture boundary but does not introduce a transact
 Sprint A-08 defines a common commercial-document lifecycle vocabulary:
 
 Draft
-→ Review
+→ In Review
 → Approved
 → Issued
 → Partially Fulfilled
