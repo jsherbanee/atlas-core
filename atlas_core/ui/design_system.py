@@ -335,6 +335,68 @@ def atlas_stylesheet() -> str:
         .atlas-notice-panel strong {{
             color: #0b3f2a;
         }}
+        .atlas-lifecycle-timeline {{
+            display: flex;
+            gap: 0.6rem;
+            overflow-x: auto;
+            padding: 0.2rem 0 0.5rem 0;
+            margin: 0.35rem 0 0.7rem 0;
+        }}
+        .atlas-lifecycle-stage-wrap {{
+            min-width: 150px;
+            flex: 0 0 auto;
+        }}
+        .atlas-lifecycle-stage {{
+            border: 1px solid var(--atlas-border);
+            border-radius: var(--atlas-radius-md);
+            background: var(--atlas-surface);
+            padding: 0.55rem 0.65rem;
+            box-shadow: var(--atlas-elevation-subtle);
+        }}
+        .atlas-lifecycle-stage--current {{
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--atlas-primary) 45%, white);
+        }}
+        .atlas-lifecycle-stage--selected {{
+            border-color: color-mix(in srgb, var(--atlas-primary) 55%, white);
+            background: #fcfcfb;
+        }}
+        .atlas-lifecycle-stage--complete {{
+            background: color-mix(in srgb, var(--atlas-success) 10%, white);
+            border-color: color-mix(in srgb, var(--atlas-success) 32%, white);
+        }}
+        .atlas-lifecycle-stage--active {{
+            background: color-mix(in srgb, var(--atlas-primary) 10%, white);
+            border-color: color-mix(in srgb, var(--atlas-primary) 30%, white);
+        }}
+        .atlas-lifecycle-stage--available {{
+            background: #f7faf9;
+            border-color: #cfd8e3;
+        }}
+        .atlas-lifecycle-stage--blocked {{
+            background: color-mix(in srgb, var(--atlas-danger) 10%, white);
+            border-color: color-mix(in srgb, var(--atlas-danger) 34%, white);
+        }}
+        .atlas-lifecycle-stage--skipped {{
+            background: color-mix(in srgb, var(--atlas-warning) 10%, white);
+            border-color: color-mix(in srgb, var(--atlas-warning) 30%, white);
+        }}
+        .atlas-lifecycle-stage--archived {{
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }}
+        .atlas-lifecycle-stage-title {{
+            font-size: var(--atlas-body-size);
+            font-weight: 600;
+            line-height: var(--atlas-line-height-tight);
+            color: #0f172a;
+            margin-bottom: 0.18rem;
+        }}
+        .atlas-lifecycle-stage-status {{
+            font-size: var(--atlas-caption-size);
+            color: #475569;
+            letter-spacing: var(--atlas-letter-spacing-label);
+            text-transform: uppercase;
+        }}
         .atlas-table-shell [data-testid="stDataFrame"] {{
             margin-top: 0.15rem;
         }}

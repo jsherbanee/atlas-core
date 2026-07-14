@@ -238,6 +238,23 @@ Remaining UX debt after X-10:
 
 Completion status:
 
+## 8.8 Sprint L-02 Lifecycle Dashboard Visual Rules
+
+The Lifecycle Dashboard should behave like an operational progress instrument, not a decorative roadmap.
+
+Visual posture for L-02:
+- lifecycle progression is horizontal, compact, and scannable
+- state distinction should come from restrained color, border, and weight changes rather than heavy ornament
+- the default view should privilege rapid orientation: current stage, blocked state, next action, and nearby upcoming path
+- deeper stage detail should be progressively disclosed rather than fully expanded by default
+
+The lifecycle timeline should feel like an engineering control surface:
+- complete stages: resolved and calm
+- active stage: visually primary but not loud
+- available stages: clearly eligible without overpowering the current stage
+- blocked stages: explicit and attention-worthy
+- skipped and archived stages: legible but visually secondary
+
 - X-11 typography system and visual polish: completed
 
 X-11 continues product hardening without architecture expansion:

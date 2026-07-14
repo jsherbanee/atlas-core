@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, Literal
 
 from atlas_core.domain import Project, ProjectStatus
 from atlas_core.domain.av_lifecycle import build_default_lifecycle_plan
@@ -113,6 +113,32 @@ class _FakeSt:
     def columns(self, count: int | list[Any]) -> list[_FakeSt]:
         size = len(count) if isinstance(count, list) else int(count)
         return [self for _ in range(size)]
+
+    def selectbox(
+        self,
+        _label: str,
+        options: list[Any],
+        index: int = 0,
+        key: str | None = None,
+        format_func: Any | None = None,
+    ) -> Any:
+        _ = format_func
+        if key and key in self.session_state and self.session_state[key] in options:
+            return self.session_state[key]
+        return options[index]
+
+    def expander(self, _label: str, expanded: bool = False) -> "_FakeSt":
+        _ = expanded
+        return self
+
+    def __enter__(self) -> "_FakeSt":
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> Literal[False]:
+        _ = exc_type
+        _ = exc
+        _ = tb
+        return False
 
     def button(
         self,
@@ -412,3 +438,35 @@ def test_object_workspace_project_compatibility_uses_record_context() -> None:
     assert "MAW" in flattened
     assert "project" in flattened.lower()
     assert "project_management" in flattened.lower()
+
+
+def test_project_object_workspace_renders_lifecycle_dashboard_view() -> None:
+    st = _FakeSt(
+        session_state={
+            "atlas_context_selection": {
+                "kind": "project_record",
+                "data": {
+                    "workspace_id": "maw-demo",
+                    "project_name": "MAW",
+                    "status": "active",
+                    "lifecycle_stage": "project_management",
+                },
+            },
+            "atlas_tenant_scope": "local",
+            "atlas_active_workspace_id": "maw-demo",
+            "atlas_active_project_name": "MAW",
+            "atlas_navigation_history": [],
+            "atlas_return_context": {},
+            "atlas_object_workspace_view": "Lifecycle",
+        }
+    )
+    record = _record()
+    workspace_service = _FakeWorkspaceService([record])
+
+    app._render_universal_object_workspace_page(st, workspace_service, record, None)
+
+    assert any("Lifecycle Dashboard" in text for text in st.markdowns)
+    assert any("atlas-lifecycle-timeline" in text for text in st.markdowns)
+    flattened = "\n".join(str(item) for item in st.dataframes)
+    assert "Available Transitions" in flattened
+    assert "Field Installation" in flattened

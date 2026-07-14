@@ -184,3 +184,16 @@ Implemented in L-01:
 Deferred in L-01:
 - generalized lifecycle-engine rendering for all object families
 - object-specific lifecycle workflow controls outside Project
+
+## L-02 Lifecycle Dashboard View
+
+Sprint L-02 makes lifecycle a first-class Project Object Workspace tertiary view.
+
+Implemented in L-02:
+- `Lifecycle` is now a supported tertiary project view alongside Summary, Details, Relationships, Activity, Documents, and History
+- Project lifecycle dashboard renders a horizontal timeline with distinct complete, active, available, blocked, skipped, and archived states
+- stage selection reveals stage description, readiness diagnostics, transition requirements, stage history, and deterministic related objects where present
+
+Boundary rules:
+- lifecycle dashboard remains read-oriented visualization and inspection
+- lifecycle automation and downstream workflow execution remain out of scope

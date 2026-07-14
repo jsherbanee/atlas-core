@@ -23,6 +23,26 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic L Sprint L-01 AV Lifecycle Engine Foundation)
 
+## Unreleased (Epic L Sprint L-02 Lifecycle Dashboard)
+
+### Improved
+
+- Atlas now includes a first-class `Lifecycle` tertiary Project Object Workspace view for project records
+- project lifecycle is visualized as a horizontal progress timeline with distinct complete, active, available, blocked, skipped, and archived states
+- stage selection now reveals description, readiness diagnostics, transition requirements, stage-specific lifecycle history, and deterministic related objects when available
+- lifecycle dashboard surfaces current stage, stage status, completed stages, blocked stages, upcoming stages, available transitions, recommended next action, and responsible role without duplicating lifecycle state
+
+### Scope Notes
+
+- dashboard visualization only
+- no downstream workflow execution modules
+- no automatic lifecycle advancement or workflow automation
+
+### Validation
+
+- focused lifecycle dashboard coverage validates project supported views, lifecycle dashboard rendering, and project universal-object lifecycle projection
+- full quality gates passed (`black`, `ruff`, `mypy`, `pytest`) with full-suite regression count at 1255 tests
+
 ### Improved
 
 - Atlas now includes a deterministic AV Lifecycle Engine with canonical lifecycle stages from lead through archived

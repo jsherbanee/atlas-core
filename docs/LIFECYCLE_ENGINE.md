@@ -192,3 +192,31 @@ Explicitly deferred from L-01:
 - non-project lifecycle domains such as billing, accounting, or ERP execution
 
 L-01 only establishes the deterministic foundation these future workflows will build on.
+
+## L-02 Lifecycle Dashboard
+
+Sprint L-02 introduces the first reusable Lifecycle Dashboard for Project Object Workspace.
+
+Dashboard rules:
+- the dashboard consumes the persisted lifecycle plan and available engine transitions
+- the dashboard must not duplicate or recompute lifecycle state outside the lifecycle engine and compatibility projections
+- the dashboard is a tertiary Project Object Workspace view, not a standalone workspace or parallel route
+
+Current dashboard coverage:
+- current lifecycle stage
+- stage status
+- completed, blocked, and upcoming stages
+- available transitions
+- readiness diagnostics
+- recent lifecycle events
+- recommended next action
+- responsible role when known
+
+Progressive disclosure behavior:
+- default lifecycle view stays concise with summary cards and a horizontal stage timeline
+- stage-specific diagnostics, requirements, history, and related objects expand on demand
+
+Still deferred in L-02:
+- automatic advancement
+- workflow automation
+- downstream departmental execution modules

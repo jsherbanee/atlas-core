@@ -34,6 +34,7 @@ Status: Active
 Status: Active
 
 - L-01 AV Lifecycle Engine Foundation
+- L-02 Lifecycle Dashboard
 
 ### L-01 Scope
 
@@ -46,6 +47,18 @@ Explicitly out of scope:
 - procurement, installation, commissioning, training, warranty, service, and asset-lifecycle execution workflows
 - accounting/ERP lifecycle workflows
 - broad non-project object lifecycle migration
+
+### L-02 Scope
+
+- create the first reusable lifecycle dashboard for project records
+- integrate lifecycle as a first-class tertiary Project Object Workspace view
+- visualize lifecycle timeline, stage state, diagnostics, transitions, recent events, and responsible role using existing lifecycle-engine state
+
+Explicitly out of scope:
+- procurement, submittals, installation, service, or asset-management workflow implementation
+- automatic advancement or workflow automation
+- AI
+- Epic E start
 
 ## Epic W: Workspace Intelligence
 

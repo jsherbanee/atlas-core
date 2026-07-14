@@ -156,6 +156,9 @@ def test_project_adapter_preserves_existing_id() -> None:
     assert "documents" in [
         view.lower() for view in universal_object.presentation.supported_views
     ]
+    assert "lifecycle" in [
+        view.lower() for view in universal_object.presentation.supported_views
+    ]
 
 
 @pytest.mark.parametrize(

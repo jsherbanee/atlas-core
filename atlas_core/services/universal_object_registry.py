@@ -501,6 +501,7 @@ def _project_to_object(
             secondary_label=_safe_text(project.client, "") or None,
             supported_views=[
                 "summary",
+                "lifecycle",
                 "details",
                 "relationships",
                 "activity",
@@ -762,6 +763,7 @@ def build_default_universal_object_registry() -> UniversalObjectRegistry:
                 secondary_label=_safe_text(dict(source).get("customer"), "") or None,
                 supported_views=[
                     "summary",
+                    "lifecycle",
                     "details",
                     "relationships",
                     "activity",

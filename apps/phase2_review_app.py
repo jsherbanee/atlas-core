@@ -6,6 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 import hashlib
+from html import escape
 import json
 from pathlib import Path
 import platform
@@ -16,6 +17,10 @@ from typing import Any
 from atlas_core import __version__
 from atlas_core.domain import (
     AVLifecycleEngine,
+    LifecyclePlan,
+    LifecycleReadiness,
+    LifecycleStageState,
+    LifecycleStageStatus,
     OrganizationRole,
     Project,
     ProjectStatus,
@@ -3985,6 +3990,126 @@ def _lifecycle_stage_label(stage_key: str) -> str:
         return normalized.replace("_", " ").title()
 
 
+def _lifecycle_status_label(value: LifecycleStageStatus | str) -> str:
+    raw_value = value.value if isinstance(value, LifecycleStageStatus) else str(value)
+    return raw_value.replace("_", " ").title()
+
+
+def _lifecycle_plan_from_universal_object(
+    universal_object: Any,
+) -> LifecyclePlan | None:
+    metadata = getattr(universal_object, "metadata", None)
+    if metadata is None or not hasattr(metadata, "to_dict"):
+        return None
+    payload = metadata.to_dict().get("custom_metadata", {}).get("lifecycle_plan")
+    if not isinstance(payload, dict) or not payload.get("current_stage_key"):
+        return None
+    try:
+        return LifecyclePlan.from_dict(payload)
+    except Exception:
+        return None
+
+
+def _lifecycle_stage_description(
+    stage_definition: Any,
+    stage_state: LifecycleStageState,
+) -> str:
+    owner = _safe_text(getattr(stage_definition, "owner_role", None), "unassigned")
+    summary_action = _safe_text(
+        getattr(stage_definition, "summary_action", None), "No recommended next action"
+    )
+    return (
+        f"{_lifecycle_stage_label(stage_state.stage_key)} is currently "
+        f"{_lifecycle_status_label(stage_state.status).lower()}. "
+        f"Primary responsibility is {owner}. "
+        f"Default next action: {summary_action}."
+    )
+
+
+def _lifecycle_stage_related_objects(
+    stage_state: LifecycleStageState,
+    readiness: LifecycleReadiness | None,
+) -> list[str]:
+    related = {_safe_text(item, "") for item in list(stage_state.related_objects or [])}
+    if readiness is not None:
+        related.update(
+            _safe_text(item, "") for item in list(readiness.affected_objects or [])
+        )
+    for requirement in list(stage_state.requirements or []):
+        related.update(
+            _safe_text(item, "") for item in list(requirement.affected_objects or [])
+        )
+    return sorted(item for item in related if item)
+
+
+def _lifecycle_stage_history_rows(
+    plan: LifecyclePlan,
+    stage_key: str,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in list(plan.history_events or []):
+        if stage_key not in {item.source_stage, item.destination_stage}:
+            continue
+        rows.append(
+            {
+                "Timestamp": item.timestamp,
+                "From": _lifecycle_stage_label(item.source_stage),
+                "To": _lifecycle_stage_label(item.destination_stage),
+                "Reason": item.reason,
+                "Actor": item.actor,
+            }
+        )
+    rows.sort(key=lambda entry: _safe_text(entry.get("Timestamp"), ""), reverse=True)
+    return rows
+
+
+def _render_lifecycle_timeline_html(
+    plan: LifecyclePlan,
+    *,
+    selected_stage_key: str,
+) -> str:
+    items: list[str] = []
+    for stage in list(plan.stage_states or []):
+        status_value = stage.status.value
+        item_class = f"atlas-lifecycle-stage atlas-lifecycle-stage--{status_value}"
+        if stage.stage_key == plan.current_stage_key:
+            item_class += " atlas-lifecycle-stage--current"
+        if stage.stage_key == selected_stage_key:
+            item_class += " atlas-lifecycle-stage--selected"
+        items.append(
+            "<div class='atlas-lifecycle-stage-wrap'>"
+            f"<div class='{item_class}'>"
+            f"<div class='atlas-lifecycle-stage-title'>{escape(_lifecycle_stage_label(stage.stage_key))}</div>"
+            f"<div class='atlas-lifecycle-stage-status'>{escape(_lifecycle_status_label(stage.status))}</div>"
+            "</div>"
+            "</div>"
+        )
+    return "<div class='atlas-lifecycle-timeline'>" + "".join(items) + "</div>"
+
+
+def _project_lifecycle_dashboard_rows(
+    plan: LifecyclePlan,
+) -> tuple[list[str], list[str], list[str]]:
+    completed = [
+        _lifecycle_stage_label(item.stage_key)
+        for item in plan.stage_states
+        if item.status is LifecycleStageStatus.COMPLETE
+    ]
+    blocked = [
+        _lifecycle_stage_label(item.stage_key)
+        for item in plan.stage_states
+        if item.status is LifecycleStageStatus.BLOCKED
+    ]
+    upcoming = [
+        _lifecycle_stage_label(item.stage_key)
+        for item in plan.stage_states
+        if item.stage_key != plan.current_stage_key
+        and item.status
+        in {LifecycleStageStatus.AVAILABLE, LifecycleStageStatus.NOT_STARTED}
+    ]
+    return completed, blocked, upcoming
+
+
 def _atlas_bid_id(record: ProjectWorkspaceRecord) -> str:
     return _safe_text(
         record.metadata.get("atlas_bid_id"),
@@ -7584,6 +7709,7 @@ def _object_workspace_supported_views(
         supported = [item for item in supported if item.lower() != "documents"]
     display_order = [
         "summary",
+        "lifecycle",
         "details",
         "relationships",
         "activity",
@@ -8046,6 +8172,210 @@ def _render_universal_object_workspace_page(
                 action_to_populate="Run existing review/import workflows that provide relationship evidence.",
                 next_location="Use authoritative project and knowledge workflows to build linked evidence.",
             )
+
+    elif selected_view == "Lifecycle":
+        st.markdown("### Lifecycle Dashboard")
+        lifecycle_plan = (
+            workspace_service.lifecycle_plan_for_record(record)
+            if kind in {"project", "project_record"} and record is not None
+            else _lifecycle_plan_from_universal_object(universal_object)
+        )
+        if lifecycle_plan is None:
+            _render_guided_empty_state(
+                st,
+                why_empty="No lifecycle plan is available for this project object.",
+                action_to_populate="Open a project with persisted lifecycle state or load a compatibility-backed project record.",
+                next_location="Use Project Workspace or Project search results.",
+            )
+        else:
+            selected_stage_key = st.selectbox(
+                "Lifecycle Stage",
+                options=[item.stage_key for item in lifecycle_plan.stage_states],
+                index=next(
+                    (
+                        index
+                        for index, item in enumerate(lifecycle_plan.stage_states)
+                        if item.stage_key == lifecycle_plan.current_stage_key
+                    ),
+                    0,
+                ),
+                format_func=_lifecycle_stage_label,
+                key="atlas_object_workspace_lifecycle_stage",
+            )
+            selected_stage = (
+                lifecycle_plan.stage(selected_stage_key) or lifecycle_plan.current_stage
+            )
+            stage_definition = _AV_LIFECYCLE_ENGINE.stage_definition(
+                selected_stage.stage_key
+            )
+            completed_stages, blocked_stages, upcoming_stages = (
+                _project_lifecycle_dashboard_rows(lifecycle_plan)
+            )
+            transitions = (
+                workspace_service.available_project_lifecycle_transitions(
+                    record.workspace_id
+                )
+                if kind in {"project", "project_record"} and record is not None
+                else [
+                    {
+                        "to_stage_key": item.state,
+                        "label": _safe_text(item.reason, item.state),
+                    }
+                    for item in list(
+                        getattr(universal_object.lifecycle, "allowed_transitions", [])
+                        or []
+                    )
+                ]
+            )
+            readiness = selected_stage.readiness or lifecycle_plan.readiness
+            st.markdown(
+                _render_lifecycle_timeline_html(
+                    lifecycle_plan,
+                    selected_stage_key=selected_stage.stage_key,
+                ),
+                unsafe_allow_html=True,
+            )
+
+            summary_cols = st.columns(4)
+            summary_cols[0].markdown(
+                render_metric_card_html(
+                    "Current Stage",
+                    _lifecycle_stage_label(lifecycle_plan.current_stage_key),
+                ),
+                unsafe_allow_html=True,
+            )
+            summary_cols[1].markdown(
+                render_metric_card_html(
+                    "Stage Status",
+                    _lifecycle_status_label(lifecycle_plan.current_stage_status),
+                ),
+                unsafe_allow_html=True,
+            )
+            summary_cols[2].markdown(
+                render_metric_card_html(
+                    "Responsible Role",
+                    _safe_text(
+                        selected_stage.owner_role,
+                        _safe_text(lifecycle_plan.current_owner_role, "unassigned"),
+                    ).title(),
+                ),
+                unsafe_allow_html=True,
+            )
+            summary_cols[3].markdown(
+                render_metric_card_html(
+                    "Next Action",
+                    _safe_text(
+                        getattr(readiness, "recommended_next_action", None),
+                        _safe_text(stage_definition.summary_action, "n/a"),
+                    ),
+                ),
+                unsafe_allow_html=True,
+            )
+
+            st.dataframe(
+                [
+                    {
+                        "Completed Stages": ", ".join(completed_stages) or "None",
+                        "Blocked Stages": ", ".join(blocked_stages) or "None",
+                        "Upcoming Stages": ", ".join(upcoming_stages[:6]) or "None",
+                        "Available Transitions": ", ".join(
+                            _lifecycle_stage_label(
+                                _safe_text(item.get("to_stage_key"), "")
+                            )
+                            for item in transitions
+                        )
+                        or "None",
+                    }
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
+            st.markdown(
+                render_notice_panel_html(
+                    _lifecycle_stage_label(selected_stage.stage_key),
+                    _lifecycle_stage_description(stage_definition, selected_stage),
+                ),
+                unsafe_allow_html=True,
+            )
+
+            if readiness is not None:
+                st.markdown(
+                    "".join(
+                        [
+                            render_status_badge_html(
+                                f"Ready: {'Yes' if readiness.ready else 'No'}",
+                                "success" if readiness.ready else "neutral",
+                            ),
+                            render_status_badge_html(
+                                f"Needs Review: {'Yes' if readiness.needs_review else 'No'}",
+                                "warning" if readiness.needs_review else "neutral",
+                            ),
+                            render_status_badge_html(
+                                f"Blocked: {'Yes' if readiness.blocked else 'No'}",
+                                "danger" if readiness.blocked else "neutral",
+                            ),
+                        ]
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+            with st.expander("Readiness Diagnostics", expanded=False):
+                diagnostics_rows = [
+                    {
+                        "Severity": _safe_text(item.severity, "info").title(),
+                        "Code": _safe_text(item.code, "n/a"),
+                        "Message": _safe_text(item.message, "n/a"),
+                    }
+                    for item in list(getattr(readiness, "diagnostics", []) or [])
+                ]
+                if diagnostics_rows:
+                    _render_data_table(st, diagnostics_rows)
+                else:
+                    st.caption("No readiness diagnostics for the selected stage.")
+
+            with st.expander("Transition Requirements", expanded=False):
+                requirement_rows = [
+                    {
+                        "Category": _safe_text(item.category, "n/a")
+                        .replace("_", " ")
+                        .title(),
+                        "Label": _safe_text(item.label, "n/a"),
+                        "Required": "Yes" if item.required else "No",
+                        "Satisfied": "Yes" if item.satisfied else "No",
+                        "Details": _safe_text(item.details, ""),
+                    }
+                    for item in list(selected_stage.requirements or [])
+                ]
+                if requirement_rows:
+                    _render_data_table(st, requirement_rows)
+                else:
+                    st.caption(
+                        "No deterministic transition requirements captured for this stage."
+                    )
+
+            with st.expander("Transition History", expanded=False):
+                history_rows = _lifecycle_stage_history_rows(
+                    lifecycle_plan,
+                    selected_stage.stage_key,
+                )
+                if history_rows:
+                    _render_data_table(st, history_rows)
+                else:
+                    st.caption("No lifecycle events reference the selected stage yet.")
+
+            with st.expander("Related Project Objects", expanded=False):
+                related_objects = _lifecycle_stage_related_objects(
+                    selected_stage, readiness
+                )
+                if related_objects:
+                    _render_data_table(
+                        st, [{"Object": item} for item in related_objects]
+                    )
+                else:
+                    st.caption(
+                        "No deterministic related project objects are available for this stage."
+                    )
 
     elif selected_view == "Activity":
         st.markdown("### Activity")

@@ -232,6 +232,20 @@ Current GUI behavior:
 Still deferred:
 - dedicated lifecycle workspace pages for procurement, installation, commissioning, service, or asset-lifecycle operations
 
+## Sprint L-02 Lifecycle Dashboard
+
+L-02 extends the shared Project Object Workspace rather than adding a new page.
+
+Current GUI behavior:
+- Project Object Workspace now includes a `Lifecycle` tertiary view for project records
+- lifecycle is visualized as a horizontal progress timeline with distinct complete, active, available, blocked, skipped, and archived states
+- default view remains concise and uses progressive disclosure for diagnostics, requirements, history, and related-object detail
+- lifecycle dashboard summary surfaces current stage, stage status, responsible role, next action, completed stages, blocked stages, upcoming stages, and available transitions
+
+Explicit non-goals:
+- no dedicated procurement, installation, commissioning, service, or asset-management pages
+- no automatic lifecycle advancement or workflow automation
+
 ## Projects Library
 Projects is the primary project library.
 
