@@ -12,7 +12,10 @@ from atlas_core.domain.commercial_document import (
     CommercialDocumentType,
     SyncStatus,
 )
-from atlas_core.services.commercial_document_service import CommercialDocumentService
+from atlas_core.services.commercial_document_service import (
+    CommercialDocumentService,
+    CommercialNumberingService,
+)
 
 
 @dataclass(frozen=True)
@@ -34,9 +37,14 @@ class TransactionsWorkspaceService:
         self,
         *,
         serialized_documents: list[dict[str, Any]] | None = None,
+        serialized_numbering_policies: list[dict[str, Any]] | None = None,
         commercial_service: CommercialDocumentService | None = None,
     ) -> None:
-        self._commercial_service = commercial_service or CommercialDocumentService()
+        self._commercial_service = commercial_service or CommercialDocumentService(
+            numbering_service=CommercialNumberingService(
+                serialized_policies=serialized_numbering_policies
+            )
+        )
         self._documents: list[CommercialDocument] = [
             CommercialDocument.from_dict(item)
             for item in list(serialized_documents or [])
@@ -293,6 +301,9 @@ class TransactionsWorkspaceService:
 
     def to_payload(self) -> list[dict[str, Any]]:
         return [document.to_dict() for document in self._documents]
+
+    def numbering_policy_payload(self) -> list[dict[str, Any]]:
+        return self._commercial_service.numbering_service.to_payload()
 
     def _required_document(self, document_id: str) -> CommercialDocument:
         document = self.get_document(document_id)

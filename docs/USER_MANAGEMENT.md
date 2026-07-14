@@ -137,6 +137,10 @@ User and organization administration are future platform capabilities and not th
 
 Current repository and workspace behavior should be treated as development scaffolding, not as the final administration system.
 
+T-04 implementation note:
+- initial personal-preference support is available for landing workspace, density, table size, date format, timezone, and reduced-motion preferences
+- personal preferences are user-scoped and do not override tenant-controlled numbering, security, billing, retention, or integration policy controls
+
 ## Future Direction
 Atlas should eventually support enterprise-ready administration with invitations, memberships, teams, billing roles, and SSO.
 

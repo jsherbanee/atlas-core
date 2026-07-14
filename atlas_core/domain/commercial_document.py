@@ -423,8 +423,25 @@ class CommercialNumberingPolicy:
     organization_id: str
     document_type: CommercialDocumentType
     prefix: str
+    syntax_template: str = "{PREFIX}-{SEQUENCE}"
+    suffix: str = ""
+    separator: str = "-"
+    sequence_padding: int = 5
+    starting_sequence: int = 1
+    reset_policy: str = "never"
     next_sequence: int = 1
+    last_reset_period: str = ""
     allocated_numbers: list[str] = field(default_factory=list)
+
+    _ALLOWED_TOKENS = {
+        "{PREFIX}",
+        "{TYPE}",
+        "{YEAR}",
+        "{MONTH}",
+        "{PROJECT_CODE}",
+        "{SEQUENCE}",
+        "{SUFFIX}",
+    }
 
     def __post_init__(self) -> None:
         self.tenant_id = _required_text("tenant_id", self.tenant_id)
@@ -432,9 +449,48 @@ class CommercialNumberingPolicy:
         if not isinstance(self.document_type, CommercialDocumentType):
             self.document_type = CommercialDocumentType(self.document_type)
         self.prefix = _required_text("prefix", self.prefix)
+        if (
+            not isinstance(self.syntax_template, str)
+            or not self.syntax_template.strip()
+        ):
+            raise ValueError("syntax_template cannot be blank")
+        self.syntax_template = self.syntax_template.strip()
+        self.suffix = str(self.suffix or "").strip()
+        self.separator = str(self.separator or "-")
+        if not self.separator.strip():
+            raise ValueError("separator cannot be blank")
+        self.separator = self.separator.strip()
+        self.sequence_padding = int(self.sequence_padding)
+        if self.sequence_padding <= 0:
+            raise ValueError("sequence_padding must be greater than 0")
+        self.starting_sequence = int(self.starting_sequence)
+        if self.starting_sequence <= 0:
+            raise ValueError("starting_sequence must be greater than 0")
+        self.reset_policy = str(self.reset_policy or "never").strip().lower()
+        if self.reset_policy not in {"never", "year", "month"}:
+            raise ValueError("reset_policy must be one of never, year, month")
         self.next_sequence = int(self.next_sequence)
         if self.next_sequence <= 0:
             raise ValueError("next_sequence must be greater than 0")
+        if self.next_sequence < self.starting_sequence:
+            self.next_sequence = self.starting_sequence
+        self.last_reset_period = str(self.last_reset_period or "").strip()
+
+        tokens = {
+            part
+            for part in self.syntax_template.split("{")
+            if "}" in part
+            for part in ["{" + part.split("}", 1)[0] + "}"]
+        }
+        invalid_tokens = sorted(
+            token for token in tokens if token not in self._ALLOWED_TOKENS
+        )
+        if invalid_tokens:
+            raise ValueError(
+                f"unsupported numbering tokens: {', '.join(invalid_tokens)}"
+            )
+        if "{SEQUENCE}" not in self.syntax_template:
+            raise ValueError("syntax_template must include {SEQUENCE}")
         seen: set[str] = set()
         normalized: list[str] = []
         for value in list(self.allocated_numbers or []):
@@ -445,15 +501,70 @@ class CommercialNumberingPolicy:
             seen.add(candidate)
         self.allocated_numbers = normalized
 
-    def preview(self) -> str:
-        return f"{self.prefix}-{self.next_sequence:05d}"
+    @staticmethod
+    def _coerce_datetime(value: Any) -> datetime:
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str) and value.strip():
+            parsed = value.strip().replace("Z", "+00:00")
+            try:
+                return datetime.fromisoformat(parsed)
+            except ValueError:
+                pass
+        return datetime.now(UTC)
 
-    def allocate(self) -> str:
-        number = self.preview()
+    def _period_key(self, *, context: dict[str, Any] | None) -> str:
+        if self.reset_policy == "never":
+            return ""
+        timestamp = self._coerce_datetime((context or {}).get("as_of"))
+        if self.reset_policy == "year":
+            return f"{timestamp.year:04d}"
+        return f"{timestamp.year:04d}-{timestamp.month:02d}"
+
+    def _effective_sequence(self, *, context: dict[str, Any] | None) -> int:
+        period_key = self._period_key(context=context)
+        if (
+            self.reset_policy != "never"
+            and period_key
+            and period_key != self.last_reset_period
+        ):
+            return self.starting_sequence
+        return max(self.starting_sequence, self.next_sequence)
+
+    def _render_number(self, *, sequence: int, context: dict[str, Any] | None) -> str:
+        normalized_context = dict(context or {})
+        timestamp = self._coerce_datetime(normalized_context.get("as_of"))
+        project_code = str(normalized_context.get("project_code") or "").strip()
+        replacements = {
+            "{PREFIX}": self.prefix,
+            "{TYPE}": self.document_type.value.upper().replace("_", "-"),
+            "{YEAR}": f"{timestamp.year:04d}",
+            "{MONTH}": f"{timestamp.month:02d}",
+            "{PROJECT_CODE}": project_code,
+            "{SEQUENCE}": f"{sequence:0{self.sequence_padding}d}",
+            "{SUFFIX}": self.suffix,
+        }
+        rendered = self.syntax_template
+        for token, value in replacements.items():
+            rendered = rendered.replace(token, value)
+        separator = self.separator
+        while f"{separator}{separator}" in rendered:
+            rendered = rendered.replace(f"{separator}{separator}", separator)
+        return rendered.strip(separator).strip()
+
+    def preview(self, *, context: dict[str, Any] | None = None) -> str:
+        sequence = self._effective_sequence(context=context)
+        return self._render_number(sequence=sequence, context=context)
+
+    def allocate(self, *, context: dict[str, Any] | None = None) -> str:
+        sequence = self._effective_sequence(context=context)
+        number = self._render_number(sequence=sequence, context=context)
         if number in self.allocated_numbers:
             raise ValueError("document number already allocated")
         self.allocated_numbers.append(number)
-        self.next_sequence += 1
+        self.next_sequence = sequence + 1
+        if self.reset_policy != "never":
+            self.last_reset_period = self._period_key(context=context)
         return number
 
     def to_dict(self) -> dict[str, Any]:
@@ -462,7 +573,14 @@ class CommercialNumberingPolicy:
             "organization_id": self.organization_id,
             "document_type": self.document_type.value,
             "prefix": self.prefix,
+            "syntax_template": self.syntax_template,
+            "suffix": self.suffix,
+            "separator": self.separator,
+            "sequence_padding": self.sequence_padding,
+            "starting_sequence": self.starting_sequence,
+            "reset_policy": self.reset_policy,
             "next_sequence": self.next_sequence,
+            "last_reset_period": self.last_reset_period,
             "allocated_numbers": list(self.allocated_numbers),
         }
 

@@ -193,6 +193,11 @@ The multi-tenant operating model is an architectural requirement and a future im
 
 Current repository and workspace behavior should be interpreted in the context of a local development baseline, not as proof of the final SaaS tenancy architecture.
 
+T-04 implementation note:
+- organization-scoped commercial numbering settings and user-scoped personal preferences are now modeled as separate settings scopes
+- numbering policies are isolated by tenant and organization and do not leak across tenants
+- personal preferences are isolated by tenant, organization, and user and cannot override tenant-governed policies
+
 ## Future Direction
 Atlas should eventually support organization lifecycle administration, enterprise access patterns, and tenant-safe shared services across the full lifecycle platform.
 

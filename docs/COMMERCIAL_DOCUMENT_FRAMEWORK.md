@@ -68,6 +68,23 @@ Deferred in T-03:
 - external financial sync execution
 - accounting/payment/ledger workflows
 
+## T-04 Implementation Status
+
+Sprint T-04 introduces tenant-level commercial document numbering preferences through the Settings workspace foundation.
+
+Implemented in T-04:
+- organization-scoped numbering policy configuration by commercial document family
+- configurable numbering syntax using deterministic tokens (`{PREFIX}`, `{TYPE}`, `{YEAR}`, `{MONTH}`, `{PROJECT_CODE}`, `{SEQUENCE}`, `{SUFFIX}`)
+- configurable prefix, suffix, separator, sequence padding, starting sequence, and reset policy
+- non-consuming live and next-number previews
+- validation for invalid templates and duplicate cross-family signatures that could collide
+- audit metadata for settings edits and runtime numbering synchronization
+
+Preserved guarantees in T-04:
+- consuming allocation remains in the existing commercial numbering service
+- no document number reuse
+- previously allocated numbers are preserved when policy settings are edited
+
 Related documents:
 - [TRANSACTIONS_ARCHITECTURE.md](TRANSACTIONS_ARCHITECTURE.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)

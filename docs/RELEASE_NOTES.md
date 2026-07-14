@@ -21,6 +21,22 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic W Sprint W-03 Universal Object Workspace)
 
+## Unreleased (Epic T Sprint T-04 Settings Foundation and Numbering Preferences)
+
+### Improved
+
+- Atlas now includes a reusable Settings workspace navigation foundation with secondary and tertiary settings contracts.
+- Organization Settings now supports tenant-level commercial document numbering preferences by document family.
+- Numbering preferences now support configurable syntax tokens, optional prefix/suffix, sequence padding, starting sequence, separator, and sequence reset policy.
+- Settings now provides deterministic non-consuming live preview and next-number preview for numbering policies.
+- Personal Preferences now supports user-scoped defaults for landing workspace, density, table page size, date format, timezone, and reduced motion.
+
+### Scope Notes
+
+- active settings scope in this sprint: Organization Settings and Personal Preferences
+- Integrations, Security, Billing, and Advanced are intentionally visible as future sections
+- no authentication, billing implementation, QuickBooks implementation, or role-management implementation beyond future permission hooks
+
 ## Unreleased (Epic T Sprint T-03 Estimate Transaction Integration)
 
 ### Improved

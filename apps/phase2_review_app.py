@@ -29,6 +29,7 @@ from atlas_core.domain.commercial_document import (
     ApprovalState,
     CommercialDocument,
     CommercialDocumentLifecycleState,
+    CommercialNumberingPolicy,
     CommercialDocumentType,
     SyncStatus,
 )
@@ -71,6 +72,7 @@ from atlas_core.services.commercial_knowledge_service import CommercialKnowledge
 from atlas_core.services.transactions_workspace_service import (
     TransactionsWorkspaceService,
 )
+from atlas_core.services.settings_service import SettingsService
 from atlas_core.services.cost_engine_service import DeterministicCostEngine
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
@@ -1318,6 +1320,10 @@ def _navigation_section_group(primary: str, mode: str, secondary_key: str) -> st
         if secondary_key in {"vendor_bills", "customer_invoices"}:
             return "Settlement"
         return "Overview"
+    if primary == "Settings":
+        if secondary_key in {"organization_settings", "personal_preferences"}:
+            return "Active"
+        return "Future"
     if primary != "Projects":
         return "Workspace"
     if mode == "library":
@@ -3461,6 +3467,27 @@ def _default_transactions_workspace_state() -> dict[str, Any]:
     }
 
 
+def _default_settings_workspace_state() -> dict[str, Any]:
+    return SettingsService.empty_state()
+
+
+def _settings_workspace_state(st: Any) -> dict[str, Any]:
+    state = st.session_state.get("atlas_settings_workspace")
+    if isinstance(state, dict):
+        return dict(state)
+    default_state = _default_settings_workspace_state()
+    st.session_state["atlas_settings_workspace"] = default_state
+    return default_state
+
+
+def _settings_workspace_service(st: Any) -> SettingsService:
+    return SettingsService(state=_settings_workspace_state(st))
+
+
+def _save_settings_workspace_state(st: Any, service: SettingsService) -> None:
+    st.session_state["atlas_settings_workspace"] = service.to_dict()
+
+
 def _transactions_workspace_state(st: Any) -> dict[str, Any]:
     state = st.session_state.get("atlas_transactions_workspace")
     if isinstance(state, dict):
@@ -3472,8 +3499,15 @@ def _transactions_workspace_state(st: Any) -> dict[str, Any]:
 
 def _transactions_workspace_service(st: Any) -> TransactionsWorkspaceService:
     state = _transactions_workspace_state(st)
+    settings_service = _settings_workspace_service(st)
+    tenant_id = _safe_text(state.get("tenant_id"), "local")
+    organization_id = _safe_text(state.get("organization_id"), "atlas")
     return TransactionsWorkspaceService(
         serialized_documents=list(state.get("documents") or []),
+        serialized_numbering_policies=settings_service.export_numbering_policies(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        ),
     )
 
 
@@ -3484,6 +3518,15 @@ def _save_transactions_workspace_state(
     state = _transactions_workspace_state(st)
     state["documents"] = service.to_payload()
     st.session_state["atlas_transactions_workspace"] = state
+    settings_service = _settings_workspace_service(st)
+    settings_service.replace_numbering_policies(
+        tenant_id=_safe_text(state.get("tenant_id"), "local"),
+        organization_id=_safe_text(state.get("organization_id"), "atlas"),
+        policies_payload=service.numbering_policy_payload(),
+        actor="atlas-ui",
+        reason="transactions-workspace-sync",
+    )
+    _save_settings_workspace_state(st, settings_service)
 
 
 def _ensure_commercial_seed_data(st: Any) -> CommercialProductService:
@@ -4029,6 +4072,9 @@ def _init_session_state(st: Any) -> None:
     )
     st.session_state.setdefault(
         "atlas_transactions_workspace", _default_transactions_workspace_state()
+    )
+    st.session_state.setdefault(
+        "atlas_settings_workspace", _default_settings_workspace_state()
     )
     st.session_state.setdefault("atlas_transaction_estimate_engine_states", {})
     st.session_state.setdefault("atlas_transactions_selected_document_id", "")
@@ -6339,6 +6385,77 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
     return actions
 
 
+def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
+    return {
+        "organization_settings": [
+            {
+                "tertiary_key": "overview",
+                "label": "Overview",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "commercial_numbering",
+                "label": "Commercial Numbering",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "audit",
+                "label": "Audit",
+                "action_type": "history_activity_view",
+                "required_selection": None,
+            },
+        ],
+        "personal_preferences": [
+            {
+                "tertiary_key": "profile",
+                "label": "Profile",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "display",
+                "label": "Display",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+        ],
+        "integrations": [
+            {
+                "tertiary_key": "future",
+                "label": "Future",
+                "action_type": "collection_view",
+                "required_selection": None,
+            }
+        ],
+        "security": [
+            {
+                "tertiary_key": "future",
+                "label": "Future",
+                "action_type": "collection_view",
+                "required_selection": None,
+            }
+        ],
+        "billing": [
+            {
+                "tertiary_key": "future",
+                "label": "Future",
+                "action_type": "collection_view",
+                "required_selection": None,
+            }
+        ],
+        "advanced": [
+            {
+                "tertiary_key": "future",
+                "label": "Future",
+                "action_type": "collection_view",
+                "required_selection": None,
+            }
+        ],
+    }
+
+
 def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, Any]]:
     if primary == "Knowledge":
         templates = _knowledge_secondary_templates()
@@ -6475,6 +6592,62 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                 }
             )
         return built
+
+    if primary == "Settings":
+        templates = _settings_secondary_templates()
+        sections = [
+            ("organization_settings", "Organization Settings"),
+            ("personal_preferences", "Personal Preferences"),
+            ("integrations", "Integrations"),
+            ("security", "Security"),
+            ("billing", "Billing"),
+            ("advanced", "Advanced"),
+        ]
+        settings_sections: list[dict[str, Any]] = []
+        for secondary_key, label in sections:
+            section_actions = templates.get(secondary_key, [])
+            default_action = (
+                _safe_text(section_actions[0].get("tertiary_key"), "overview")
+                if section_actions
+                else "overview"
+            )
+            settings_sections.append(
+                {
+                    "workspace": "Settings",
+                    "workspace_mode": "application",
+                    "secondary_key": secondary_key,
+                    "label": label,
+                    "icon": None,
+                    "route": "Administration",
+                    "visibility": True,
+                    "enabled": True,
+                    "required_context": None,
+                    "default_tertiary_action": default_action,
+                    "supported_tertiary_actions": [
+                        {
+                            "tertiary_key": _safe_text(
+                                action.get("tertiary_key"), "overview"
+                            ),
+                            "label": _safe_text(action.get("label"), "Overview"),
+                            "route": "Administration",
+                            "action_type": _safe_text(
+                                action.get("action_type"), "collection_view"
+                            ),
+                            "visibility": True,
+                            "enabled": True,
+                            "required_selection": action.get("required_selection"),
+                            "empty_state_behavior": "Future settings modules are visible but intentionally not implemented in this sprint.",
+                            "permission_hook": "future_permission_check",
+                            "deterministic_fallback": default_action,
+                        }
+                        for action in section_actions
+                    ],
+                    "selected_record_requirement": False,
+                    "selected_project_requirement": False,
+                    "responsive_behavior": "persistent",
+                }
+            )
+        return settings_sections
 
     if primary != "Projects":
         return []
@@ -6735,6 +6908,10 @@ def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
     if primary != "Projects":
         if primary == "Transactions":
             return "overview" if page == "Transactions" else None
+        if primary == "Settings":
+            if page == "Administration":
+                return "organization_settings"
+            return None
         return None
     if mode == "library":
         page_map = {
@@ -6819,7 +6996,7 @@ def _sync_workspace_navigation_state(
         "",
     )
 
-    if primary not in {"Knowledge", "Projects", "Transactions"}:
+    if primary not in {"Knowledge", "Projects", "Transactions", "Settings"}:
         return
 
     sections = _workspace_navigation_contract(primary, mode)
@@ -9042,6 +9219,7 @@ def _workspace_state_snapshot(st: Any) -> dict[str, Any]:
         "review_flags": dict(st.session_state.get("atlas_review_flags") or {}),
         "price_list_library": dict(_price_list_library_state(st)),
         "transactions_workspace": dict(_transactions_workspace_state(st)),
+        "settings_workspace": dict(_settings_workspace_state(st)),
         "product_resolution_overrides": dict(
             st.session_state.get("atlas_product_resolution_overrides") or {}
         ),
@@ -9195,6 +9373,10 @@ def _restore_workspace_state(
     transactions_workspace = state.get("transactions_workspace")
     if isinstance(transactions_workspace, dict):
         st.session_state["atlas_transactions_workspace"] = dict(transactions_workspace)
+
+    settings_workspace = state.get("settings_workspace")
+    if isinstance(settings_workspace, dict):
+        st.session_state["atlas_settings_workspace"] = dict(settings_workspace)
 
     product_resolution_overrides = state.get("product_resolution_overrides")
     if isinstance(product_resolution_overrides, dict):
@@ -13118,31 +13300,352 @@ def _render_home_workspace_panels(
 def _render_application_administration_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
+    _ = workspace_service
     _render_page_header(
         st,
         "Settings",
-        "Application-level settings and local repository controls.",
+        "Tenant and personal configuration with deterministic policy boundaries.",
     )
-    st.dataframe(
-        [
-            {
-                "Setting": "Workspace Root",
-                "Value": str(workspace_service.workspace_root),
-            },
-            {
-                "Setting": "Layout Mode",
-                "Value": _safe_text(
-                    st.session_state.get("atlas_layout_mode"), "Desktop"
-                ),
-            },
-            {
-                "Setting": "Navigation Behavior",
-                "Value": "Top header navigation",
-            },
-        ],
-        width="stretch",
-        hide_index=True,
+    _render_workspace_section_header(
+        st,
+        workspace="Settings",
+        objective="Manage organization and personal settings without breaking tenant policy boundaries.",
+        current_focus="Organization Settings and Personal Preferences are active in this sprint.",
     )
+
+    secondary = _safe_text(
+        st.session_state.get(_navigation_secondary_state_key()),
+        "organization_settings",
+    )
+    tertiary = _safe_text(
+        st.session_state.get(_navigation_tertiary_state_key()),
+        "overview",
+    )
+
+    transactions_state = _transactions_workspace_state(st)
+    tenant_id = _safe_text(transactions_state.get("tenant_id"), "local")
+    organization_id = _safe_text(transactions_state.get("organization_id"), "atlas")
+    user_id = _safe_text(st.session_state.get("atlas_settings_user_id"), "local-user")
+    settings_service = _settings_workspace_service(st)
+
+    if secondary == "organization_settings":
+        if tertiary == "overview":
+            policies = settings_service.list_numbering_policies(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+            )
+            st.dataframe(
+                [
+                    {
+                        "Document Family": policy.document_type.value,
+                        "Syntax": policy.syntax_template,
+                        "Prefix": policy.prefix,
+                        "Suffix": policy.suffix,
+                        "Separator": policy.separator,
+                        "Padding": policy.sequence_padding,
+                        "Reset": policy.reset_policy,
+                        "Next Sequence": policy.next_sequence,
+                        "Preview": settings_service.preview_number(
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            document_type=policy.document_type,
+                            project_code="PRJ-001",
+                        ),
+                    }
+                    for policy in policies.values()
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
+        elif tertiary == "commercial_numbering":
+            document_type_labels = [item.value for item in CommercialDocumentType]
+            selected_doc_type = st.selectbox(
+                "Document Family",
+                options=document_type_labels,
+                key="atlas_settings_numbering_document_type",
+            )
+            selected_policy = settings_service.numbering_policy_for_document_type(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                document_type=CommercialDocumentType(selected_doc_type),
+            )
+            with st.form("atlas_settings_numbering_form"):
+                numbering_cols = st.columns(3)
+                syntax_template = numbering_cols[0].text_input(
+                    "Numbering Syntax",
+                    value=selected_policy.syntax_template,
+                    help="Allowed tokens: {PREFIX}, {TYPE}, {YEAR}, {MONTH}, {PROJECT_CODE}, {SEQUENCE}, {SUFFIX}",
+                )
+                prefix = numbering_cols[1].text_input(
+                    "Optional Prefix",
+                    value=selected_policy.prefix,
+                )
+                suffix = numbering_cols[2].text_input(
+                    "Optional Suffix",
+                    value=selected_policy.suffix,
+                )
+
+                option_cols = st.columns(4)
+                starting_sequence = int(
+                    option_cols[0].number_input(
+                        "Starting Sequence",
+                        min_value=1,
+                        value=int(selected_policy.starting_sequence),
+                        step=1,
+                    )
+                )
+                sequence_padding = int(
+                    option_cols[1].number_input(
+                        "Sequence Padding",
+                        min_value=1,
+                        max_value=12,
+                        value=int(selected_policy.sequence_padding),
+                        step=1,
+                    )
+                )
+                separator = option_cols[2].text_input(
+                    "Separator",
+                    value=selected_policy.separator,
+                )
+                reset_policy = option_cols[3].selectbox(
+                    "Sequence Reset Policy",
+                    options=["never", "year", "month"],
+                    index=["never", "year", "month"].index(
+                        selected_policy.reset_policy
+                    ),
+                )
+
+                token_cols = st.columns(3)
+                include_year = token_cols[0].checkbox(
+                    "Include YEAR token",
+                    value="{YEAR}" in syntax_template,
+                )
+                include_month = token_cols[1].checkbox(
+                    "Include MONTH token",
+                    value="{MONTH}" in syntax_template,
+                )
+                include_project_code = token_cols[2].checkbox(
+                    "Include PROJECT_CODE token",
+                    value="{PROJECT_CODE}" in syntax_template,
+                )
+
+                project_code_preview = st.text_input(
+                    "Live Preview Project Code",
+                    value="PRJ-001",
+                )
+                submitted = st.form_submit_button(
+                    "Save Numbering Policy",
+                    width="stretch",
+                )
+
+            live_preview_value = ""
+            try:
+                live_preview_policy = CommercialNumberingPolicy(
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                    document_type=CommercialDocumentType(selected_doc_type),
+                    syntax_template=syntax_template,
+                    prefix=prefix,
+                    suffix=suffix,
+                    starting_sequence=starting_sequence,
+                    sequence_padding=sequence_padding,
+                    separator=separator,
+                    reset_policy=reset_policy,
+                    next_sequence=max(starting_sequence, selected_policy.next_sequence),
+                    allocated_numbers=list(selected_policy.allocated_numbers),
+                    last_reset_period=selected_policy.last_reset_period,
+                )
+                if include_year and "{YEAR}" not in live_preview_policy.syntax_template:
+                    raise ValueError(
+                        "{YEAR} token is enabled but missing from syntax_template"
+                    )
+                if (
+                    include_month
+                    and "{MONTH}" not in live_preview_policy.syntax_template
+                ):
+                    raise ValueError(
+                        "{MONTH} token is enabled but missing from syntax_template"
+                    )
+                if (
+                    include_project_code
+                    and "{PROJECT_CODE}" not in live_preview_policy.syntax_template
+                ):
+                    raise ValueError(
+                        "{PROJECT_CODE} token is enabled but missing from syntax_template"
+                    )
+                live_preview_value = live_preview_policy.preview(
+                    context={"project_code": project_code_preview, "as_of": _now_iso()}
+                )
+            except Exception as exc:
+                live_preview_value = f"Invalid: {exc}"
+
+            st.dataframe(
+                [
+                    {
+                        "Live Preview": live_preview_value,
+                        "Next-Number Preview": settings_service.preview_number(
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            document_type=CommercialDocumentType(selected_doc_type),
+                            project_code=project_code_preview,
+                        ),
+                    }
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
+            if submitted:
+                try:
+                    settings_service.update_numbering_policy(
+                        tenant_id=tenant_id,
+                        organization_id=organization_id,
+                        document_type=CommercialDocumentType(selected_doc_type),
+                        actor="atlas-ui",
+                        syntax_template=syntax_template,
+                        prefix=prefix,
+                        suffix=suffix,
+                        starting_sequence=starting_sequence,
+                        sequence_padding=sequence_padding,
+                        separator=separator,
+                        reset_policy=reset_policy,
+                        include_year_token=include_year,
+                        include_month_token=include_month,
+                        include_project_code_token=include_project_code,
+                    )
+                    _save_settings_workspace_state(st, settings_service)
+                    st.success("Commercial document numbering policy saved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to save policy: {exc}")
+
+        else:
+            audit_rows = settings_service.audit_events(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+            )
+            if not audit_rows:
+                st.info("No settings audit events recorded yet.")
+            else:
+                st.dataframe(audit_rows, width="stretch", hide_index=True)
+
+    elif secondary == "personal_preferences":
+        prefs = settings_service.personal_preferences(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            user_id=user_id,
+        )
+        if tertiary in {"profile", "display"}:
+            with st.form("atlas_settings_personal_preferences_form"):
+                pref_cols = st.columns(3)
+                landing_workspace = pref_cols[0].selectbox(
+                    "Default Landing Workspace",
+                    options=[
+                        "Atlas",
+                        "Projects",
+                        "Knowledge",
+                        "Transactions",
+                        "Reports",
+                        "Settings",
+                    ],
+                    index=(
+                        [
+                            "Atlas",
+                            "Projects",
+                            "Knowledge",
+                            "Transactions",
+                            "Reports",
+                            "Settings",
+                        ].index(prefs.default_landing_workspace)
+                        if prefs.default_landing_workspace
+                        in [
+                            "Atlas",
+                            "Projects",
+                            "Knowledge",
+                            "Transactions",
+                            "Reports",
+                            "Settings",
+                        ]
+                        else 0
+                    ),
+                )
+                density = pref_cols[1].selectbox(
+                    "Density",
+                    options=["comfortable", "compact"],
+                    index=(
+                        ["comfortable", "compact"].index(prefs.density)
+                        if prefs.density in {"comfortable", "compact"}
+                        else 0
+                    ),
+                )
+                table_page_size = int(
+                    pref_cols[2].number_input(
+                        "Preferred Table Page Size",
+                        min_value=10,
+                        max_value=200,
+                        value=int(prefs.table_page_size),
+                        step=5,
+                    )
+                )
+
+                time_cols = st.columns(3)
+                date_format = time_cols[0].selectbox(
+                    "Date Display Format",
+                    options=["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"],
+                    index=(
+                        ["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"].index(
+                            prefs.date_display_format
+                        )
+                        if prefs.date_display_format
+                        in {"YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"}
+                        else 0
+                    ),
+                )
+                timezone = time_cols[1].text_input(
+                    "Timezone",
+                    value=prefs.timezone,
+                )
+                reduced_motion = time_cols[2].checkbox(
+                    "Reduced Motion",
+                    value=bool(prefs.reduced_motion),
+                )
+
+                saved = st.form_submit_button(
+                    "Save Personal Preferences",
+                    width="stretch",
+                )
+
+            if saved:
+                try:
+                    settings_service.update_personal_preferences(
+                        tenant_id=tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        actor="atlas-ui",
+                        updates={
+                            "default_landing_workspace": landing_workspace,
+                            "density": density,
+                            "table_page_size": table_page_size,
+                            "date_display_format": date_format,
+                            "timezone": timezone,
+                            "reduced_motion": bool(reduced_motion),
+                        },
+                    )
+                    _save_settings_workspace_state(st, settings_service)
+                    st.success("Personal preferences saved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to save preferences: {exc}")
+
+            st.caption(
+                "Personal preferences cannot override tenant-controlled numbering, security, billing, retention, or integration policy."
+            )
+
+    else:
+        st.info(
+            "This settings section is intentionally marked as future scope for T-04."
+        )
 
 
 def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:

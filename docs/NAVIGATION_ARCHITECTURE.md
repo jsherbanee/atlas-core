@@ -80,6 +80,17 @@ Implemented behavior:
 - tertiary actions: Add, Browse, Edit, Related Documents, Approvals, Sync Status, Activity, Export
 - navigation continuity/state persistence uses existing shell state keys and workspace-state snapshot behavior
 
+## Settings Navigation Implementation (T-04)
+
+Sprint T-04 introduces the first reusable Settings workspace navigation contract.
+
+Implemented behavior:
+- Settings remains the public label while internal routing continues to use `Administration`
+- secondary settings groups: Organization Settings, Personal Preferences, Integrations, Security, Billing, Advanced
+- tertiary settings pages are contract-driven per selected settings group
+- active T-04 content is limited to Organization Settings and Personal Preferences
+- Integrations, Security, Billing, and Advanced remain visible and explicitly marked as future scope
+
 W-03 implementation note:
 - Object Workspace is now a shared route that owns object-level tertiary navigation for migrated object families
 - object tertiary navigation is contract-driven and limited to supported views (Summary, Details, Relationships, Activity, Documents, History)

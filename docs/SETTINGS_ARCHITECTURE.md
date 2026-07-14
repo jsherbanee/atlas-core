@@ -1,0 +1,146 @@
+# Settings Architecture
+
+This document defines the reusable Settings workspace foundation and scope boundaries introduced in Sprint T-04.
+
+## Purpose
+
+Provide a deterministic, tenant-aware settings surface for organization controls and user preferences while preserving existing runtime and numbering guarantees.
+
+## Scope (T-04)
+
+Active sections:
+- Organization Settings
+- Personal Preferences
+
+Visible but future-scoped sections:
+- Integrations
+- Security
+- Billing
+- Advanced
+
+Out of scope:
+- identity and auth provider implementation
+- role and policy management UI
+- billing-provider integrations
+- external accounting sync configuration
+
+## Navigation Contract
+
+Settings uses the shared secondary/tertiary contract architecture.
+
+Primary routing behavior:
+- public workspace label is `Settings`
+- compatibility route key remains `Administration`
+
+Secondary sections:
+- `organization_settings`
+- `personal_preferences`
+- `integrations`
+- `security`
+- `billing`
+- `advanced`
+
+Organization tertiary actions:
+- `overview`
+- `commercial_numbering`
+- `audit`
+
+Personal tertiary actions:
+- `overview`
+- `display`
+- `regional`
+
+## Tenant and User Scope Model
+
+Settings state is modeled in two explicit scope layers:
+
+- Organization settings
+  - scoped by tenant and organization
+  - authoritative for tenant-governed controls
+  - includes commercial document numbering policies
+
+- Personal preferences
+  - scoped by tenant, organization, and user
+  - user-adjustable defaults for workspace ergonomics
+  - must not override tenant-governed controls
+
+## Commercial Numbering Preferences
+
+Numbering policy configuration is managed per commercial document family.
+
+Supported template tokens:
+- `{PREFIX}`
+- `{TYPE}`
+- `{YEAR}`
+- `{MONTH}`
+- `{PROJECT_CODE}`
+- `{SEQUENCE}`
+- `{SUFFIX}`
+
+Policy controls:
+- syntax template
+- prefix
+- suffix
+- separator
+- sequence padding
+- starting sequence
+- reset policy (`never`, `year`, `month`)
+
+Deterministic behavior requirements preserved:
+- preview operations are non-consuming
+- allocation consumes sequence only through the existing numbering service
+- no number reuse
+- no mutation of already allocated numbers after policy edits
+- tenant isolation remains enforced
+
+Validation rules:
+- templates must include `{SEQUENCE}`
+- token usage must align to enabled policy flags
+- duplicate family signatures that could collide are rejected
+
+## Personal Preferences Model
+
+Initial preference fields:
+- landing workspace
+- interface density
+- table page size
+- date format
+- timezone
+- reduced motion
+
+Boundary rules:
+- preferences are user-scoped defaults
+- preferences cannot override organization numbering controls
+- preferences cannot override tenant security/billing/integration governance
+
+## State Persistence
+
+Settings state participates in workspace snapshot and restore so navigation and settings continuity are preserved across app state transitions.
+
+Persisted areas:
+- settings workspace navigation state
+- organization numbering policies
+- personal preference values
+- settings audit events
+
+## Service Layer
+
+`SettingsService` is the authority for:
+- organization numbering policy list/update/replace/export
+- numbering previews
+- personal preference defaults and updates
+- settings audit event recording
+
+Transactions integration:
+- transactions workspace service is initialized from serialized numbering policies supplied by settings
+- numbering policy updates that occur during transaction operations are synchronized back into settings state
+
+## Testing Expectations
+
+T-04 validation includes:
+- numbering preview non-consumption behavior
+- allocation/no-reuse behavior continuity
+- policy serialization and restoration
+- tenant/user isolation boundaries
+- personal preference restriction enforcement
+- settings navigation contract and state-default behavior

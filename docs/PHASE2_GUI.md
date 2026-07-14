@@ -26,6 +26,7 @@ Atlas Workspace UI Sprint X-12 introduces a reusable secondary and tertiary navi
 Atlas Workspace UI Sprint X-13 completes navigation clarity and UX refinement, removing production-facing implementation artifacts and consolidating contextual navigation into the shared shell.
 Atlas Workspace Sprint T-02 adds the first Transactions workspace UI/navigation foundation with sectioned transaction families, action-oriented tertiary controls, and search/object-workspace handoff for commercial-document records.
 Atlas Workspace Sprint T-03 makes Transactions > Estimates the first fully operational transaction family with estimate-specific tertiary controls (Lines, Revisions, Issue) while reusing the existing deterministic estimate engine.
+Atlas Workspace Sprint T-04 introduces the Settings workspace foundation with reusable secondary/tertiary navigation, active Organization Settings and Personal Preferences content, and tenant-level commercial document numbering preferences.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.

@@ -181,6 +181,11 @@ Future releases should follow this structure.
 - Audience: Workspace, search, UI, and platform contributors.
 - When to reference: When changing navigation state, breadcrumbs, or search-to-workspace handoff behavior.
 
+### [SETTINGS_ARCHITECTURE.md](SETTINGS_ARCHITECTURE.md)
+- Purpose: Defines the reusable Settings workspace contract, settings scope boundaries, and tenant/user settings behavior.
+- Audience: Workspace, product, platform, and commercial-operations contributors.
+- When to reference: When changing settings navigation, numbering preferences, or personal preference boundaries.
+
 ### [WORKSPACE_INTELLIGENCE.md](WORKSPACE_INTELLIGENCE.md)
 - Purpose: Defines the deterministic continuity layer for context persistence, return context, mixed-scope Working Set behavior, and cross-workspace handoff.
 - Audience: Workspace, search, UI, and platform contributors.

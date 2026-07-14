@@ -33,6 +33,7 @@ Status: Active
 - T-01 Commercial Document Domain Foundation
 - T-02 Transactions Workspace Foundation
 - T-03 Estimate Transaction Integration
+- T-04 Settings Foundation and Document Numbering Preferences
 
 ### A-07 Scope
 

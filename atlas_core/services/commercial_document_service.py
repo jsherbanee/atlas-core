@@ -46,10 +46,15 @@ class NumberPreview:
 class CommercialNumberingService:
     """Organization-scoped tenant-safe numbering service with no number reuse."""
 
-    def __init__(self) -> None:
+    def __init__(self, serialized_policies: list[dict[str, Any]] | None = None) -> None:
         self._policies: dict[
             tuple[str, str, CommercialDocumentType], CommercialNumberingPolicy
         ] = {}
+        for payload in list(serialized_policies or []):
+            if not isinstance(payload, dict):
+                continue
+            policy = CommercialNumberingPolicy(**payload)
+            self.set_policy(policy)
 
     def set_policy(self, policy: CommercialNumberingPolicy) -> None:
         key = (policy.tenant_id, policy.organization_id, policy.document_type)
@@ -83,6 +88,7 @@ class CommercialNumberingService:
         tenant_id: str,
         organization_id: str,
         document_type: CommercialDocumentType,
+        context: dict[str, Any] | None = None,
     ) -> NumberPreview:
         policy = self._policy(
             tenant_id=tenant_id,
@@ -93,7 +99,7 @@ class CommercialNumberingService:
             tenant_id=tenant_id,
             organization_id=organization_id,
             document_type=document_type,
-            preview_number=policy.preview(),
+            preview_number=policy.preview(context=context),
         )
 
     def allocate_number(
@@ -102,13 +108,27 @@ class CommercialNumberingService:
         tenant_id: str,
         organization_id: str,
         document_type: CommercialDocumentType,
+        context: dict[str, Any] | None = None,
     ) -> str:
         policy = self._policy(
             tenant_id=tenant_id,
             organization_id=organization_id,
             document_type=document_type,
         )
-        return policy.allocate()
+        return policy.allocate(context=context)
+
+    def to_payload(self) -> list[dict[str, Any]]:
+        return [
+            policy.to_dict()
+            for policy in sorted(
+                self._policies.values(),
+                key=lambda item: (
+                    item.tenant_id,
+                    item.organization_id,
+                    item.document_type.value,
+                ),
+            )
+        ]
 
     def policy_snapshot(
         self,
@@ -281,6 +301,10 @@ class CommercialDocumentService:
             tenant_id=document.tenant_id,
             organization_id=document.organization_id,
             document_type=document.document_type,
+            context={
+                "project_code": document.project_code,
+                "as_of": _utc_now(),
+            },
         )
 
     def allocate_number(self, document: CommercialDocument) -> str:
@@ -290,6 +314,10 @@ class CommercialDocumentService:
             tenant_id=document.tenant_id,
             organization_id=document.organization_id,
             document_type=document.document_type,
+            context={
+                "project_code": document.project_code,
+                "as_of": _utc_now(),
+            },
         )
         document.document_number = number
         document.updated_at = _utc_now()
