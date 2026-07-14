@@ -418,6 +418,20 @@ Proposed repository-consistent API surface:
 - refresh_revision_costs
 - compare_cost_snapshots
 - validate_revision
+
+## T-05 Amendment: Transactions Estimate Versioning and Export
+
+Transactions estimate behavior extends deterministic estimate foundations with explicit controls:
+- duplicate estimate as a new draft document identity
+- create revision explicitly with reason and label
+- preserve superseded revision history and parent lineage
+- preserve immutable issued revisions
+- archive/restore while retaining revision readability
+
+Presentation and export behavior:
+- Internal Estimate and Customer Estimate remain two views over one estimate revision
+- deterministic PDF export is supported for both estimate presentations
+- historical and archived revisions remain exportable
 - calculate_revision_totals
 - lock_revision
 - clone_revision

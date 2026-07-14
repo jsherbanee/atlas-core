@@ -60,6 +60,7 @@ Sprint T-02 implements the Transactions Workspace Foundation UI/navigation layer
 Sprint T-03 implements Estimate Transaction Integration, making Transactions > Estimates the first fully operational transaction family using the existing deterministic estimate engine for lines/revisions/issue workflows.
 Sprint T-04 implements Settings Foundation and Document Numbering Preferences, including tenant-level commercial numbering policy configuration and user-level personal preferences boundaries.
 Sprint T-05 amendment implements tenant Terms and Conditions settings blocks and integrates explicit terms snapshot behavior into Estimates and Sales Orders, including sales-order-from-estimate terms inheritance/default resolution and draft-only refresh controls.
+Sprint T-05 amendment now also implements estimate and sales-order duplication, explicit revision lineage metadata, archive/restore revision-safe behavior, deterministic PDF export, and future email-delivery metadata hooks (non-executing).
 
 X-01 through X-13 are closed.
 
@@ -81,7 +82,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1295 tests)
+- pytest: full suite passing (1303 tests)
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces

@@ -173,6 +173,23 @@ class CommercialDocumentService:
             project_code=project_code,
         )
         now = _utc_now()
+        first_revision = CommercialDocumentRevision(
+            revision_id=f"{doc_id}-r1",
+            revision_number=1,
+            lifecycle_state=CommercialDocumentLifecycleState.DRAFT,
+            approval_state=ApprovalState.NOT_REQUESTED,
+            revision_label="R1",
+            revision_reason="Initial draft",
+            revision_date=now,
+            parent_revision_id=None,
+            is_current=True,
+            immutable=False,
+            notes="Initial draft",
+            lines=[],
+            totals=CommercialDocumentTotals(),
+            created_at=now,
+            created_by="system",
+        )
         return CommercialDocument(
             document_id=doc_id,
             tenant_id=tenant_id,
@@ -187,7 +204,7 @@ class CommercialDocumentService:
             diagnostics=[],
             sync_metadata=CommercialDocumentSyncMetadata(),
             totals=CommercialDocumentTotals(),
-            revisions=[],
+            revisions=[first_revision],
             created_at=now,
             updated_at=now,
         )
@@ -257,6 +274,7 @@ class CommercialDocumentService:
         )
         document.lines.append(line)
         self.recompute_totals(document)
+        self._sync_current_revision_snapshot(document)
         document.updated_at = _utc_now()
         return line
 
@@ -278,6 +296,7 @@ class CommercialDocumentService:
         )
         document.relationships.append(relationship)
         document.updated_at = _utc_now()
+        self._sync_current_revision_snapshot(document)
         return relationship
 
     def set_approval_state(
@@ -294,6 +313,7 @@ class CommercialDocumentService:
         self, document: CommercialDocument
     ) -> CommercialDocumentTotals:
         document.totals = CommercialDocumentTotals.from_lines(document.lines)
+        self._sync_current_revision_snapshot(document)
         return document.totals
 
     def preview_number(self, document: CommercialDocument) -> NumberPreview:
@@ -320,6 +340,12 @@ class CommercialDocumentService:
             },
         )
         document.document_number = number
+        document.numbering_policy_snapshot = self.numbering_service.policy_snapshot(
+            tenant_id=document.tenant_id,
+            organization_id=document.organization_id,
+            document_type=document.document_type,
+        )
+        self._sync_current_revision_snapshot(document)
         document.updated_at = _utc_now()
         return number
 
@@ -352,7 +378,14 @@ class CommercialDocumentService:
         ):
             self.start_new_revision(document, reason=reason)
 
-    def start_new_revision(self, document: CommercialDocument, *, reason: str) -> int:
+    def start_new_revision(
+        self,
+        document: CommercialDocument,
+        *,
+        reason: str,
+        actor: str = "system",
+        revision_label: str | None = None,
+    ) -> int:
         if document.lifecycle_state not in {
             CommercialDocumentLifecycleState.DRAFT,
             CommercialDocumentLifecycleState.IN_REVIEW,
@@ -360,8 +393,37 @@ class CommercialDocumentService:
         }:
             raise ValueError("new revision can only start in editable lifecycle states")
 
+        now = _utc_now()
+        previous_revision = self._current_revision(document)
+
         document.revision_number += 1
+        revision_id = f"{document.document_id}-r{document.revision_number}"
+        if previous_revision is not None:
+            previous_revision.is_current = False
+            previous_revision.superseded_by_revision_id = revision_id
+            previous_revision.superseded_at = now
+
         document.approval_state = ApprovalState.NOT_REQUESTED
+        revision = CommercialDocumentRevision(
+            revision_id=revision_id,
+            revision_number=document.revision_number,
+            lifecycle_state=document.lifecycle_state,
+            approval_state=document.approval_state,
+            revision_label=revision_label or f"R{document.revision_number}",
+            revision_reason=reason,
+            revision_date=now,
+            parent_revision_id=(
+                previous_revision.revision_id if previous_revision is not None else None
+            ),
+            is_current=True,
+            immutable=False,
+            notes=reason,
+            lines=deepcopy(document.lines),
+            totals=deepcopy(document.totals),
+            created_at=now,
+            created_by=actor,
+        )
+        document.revisions.append(revision)
         document.diagnostics.append(
             CommercialDocumentDiagnostic(
                 code="revision_started",
@@ -369,25 +431,44 @@ class CommercialDocumentService:
                 details={"reason": reason},
             )
         )
-        document.updated_at = _utc_now()
+        document.updated_at = now
         return document.revision_number
 
     def _freeze_current_revision(
         self, document: CommercialDocument, *, reason: str
     ) -> None:
-        revision = CommercialDocumentRevision(
-            revision_id=f"{document.document_id}-r{document.revision_number}",
-            revision_number=document.revision_number,
-            lifecycle_state=document.lifecycle_state,
-            approval_state=document.approval_state,
-            issued_at=_utc_now(),
-            immutable=True,
-            notes=reason,
-            lines=deepcopy(document.lines),
-            totals=deepcopy(document.totals),
-            created_at=_utc_now(),
-        )
-        document.revisions.append(revision)
+        now = _utc_now()
+        current_revision = self._current_revision(document)
+        if current_revision is None:
+            current_revision = CommercialDocumentRevision(
+                revision_id=f"{document.document_id}-r{document.revision_number}",
+                revision_number=document.revision_number,
+                lifecycle_state=document.lifecycle_state,
+                approval_state=document.approval_state,
+                revision_label=f"R{document.revision_number}",
+                revision_reason=reason,
+                revision_date=now,
+                is_current=True,
+                immutable=True,
+                issued_at=now,
+                notes=reason,
+                lines=deepcopy(document.lines),
+                totals=deepcopy(document.totals),
+                created_at=now,
+                created_by="system",
+            )
+            document.revisions.append(current_revision)
+            return
+
+        current_revision.lifecycle_state = document.lifecycle_state
+        current_revision.approval_state = document.approval_state
+        current_revision.issued_at = now
+        current_revision.immutable = True
+        current_revision.revision_reason = reason
+        current_revision.notes = reason
+        current_revision.lines = deepcopy(document.lines)
+        current_revision.totals = deepcopy(document.totals)
+        current_revision.revision_date = now
 
     def add_diagnostic(
         self,
@@ -409,6 +490,7 @@ class CommercialDocumentService:
             self._assert_mutable(document)
         document.terms_and_conditions_reference = dict(reference)
         document.terms_and_conditions_snapshot = dict(snapshot)
+        self._sync_current_revision_snapshot(document)
         document.updated_at = _utc_now()
 
     @staticmethod
@@ -431,3 +513,27 @@ class CommercialDocumentService:
             raise ValueError(
                 "document revision is immutable in current lifecycle state"
             )
+
+    @staticmethod
+    def _current_revision(
+        document: CommercialDocument,
+    ) -> CommercialDocumentRevision | None:
+        for revision in list(document.revisions or []):
+            if (
+                revision.revision_number == document.revision_number
+                and revision.is_current
+            ):
+                return revision
+        for revision in list(document.revisions or []):
+            if revision.revision_number == document.revision_number:
+                return revision
+        return None
+
+    def _sync_current_revision_snapshot(self, document: CommercialDocument) -> None:
+        current_revision = self._current_revision(document)
+        if current_revision is None or current_revision.immutable:
+            return
+        current_revision.lifecycle_state = document.lifecycle_state
+        current_revision.approval_state = document.approval_state
+        current_revision.lines = deepcopy(document.lines)
+        current_revision.totals = deepcopy(document.totals)

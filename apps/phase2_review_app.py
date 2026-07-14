@@ -6288,6 +6288,36 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": "entity",
             },
             {
+                "tertiary_key": "duplicate",
+                "label": "Duplicate",
+                "action_type": "operational_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "create_revision",
+                "label": "Create Revision",
+                "action_type": "operational_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "revision_history",
+                "label": "Revision History",
+                "action_type": "history_activity_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "archive",
+                "label": "Archive",
+                "action_type": "operational_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "restore",
+                "label": "Restore",
+                "action_type": "operational_view",
+                "required_selection": "entity",
+            },
+            {
                 "tertiary_key": "customer_view",
                 "label": "Customer View",
                 "action_type": "detail_view",
@@ -6336,8 +6366,8 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": "entity",
             },
             {
-                "tertiary_key": "export",
-                "label": "Export",
+                "tertiary_key": "export_pdf",
+                "label": "Export PDF",
                 "action_type": "export_action",
                 "required_selection": "entity",
             },
@@ -6364,6 +6394,36 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                     "tertiary_key": "edit",
                     "label": "Edit",
                     "action_type": "edit_action",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "duplicate",
+                    "label": "Duplicate",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "create_revision",
+                    "label": "Create Revision",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "revision_history",
+                    "label": "Revision History",
+                    "action_type": "history_activity_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "archive",
+                    "label": "Archive",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "restore",
+                    "label": "Restore",
+                    "action_type": "operational_view",
                     "required_selection": "entity",
                 },
                 {
@@ -6397,8 +6457,8 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                     "required_selection": "entity",
                 },
                 {
-                    "tertiary_key": "export",
-                    "label": "Export",
+                    "tertiary_key": "export_pdf",
+                    "label": "Export PDF",
                     "action_type": "export_action",
                     "required_selection": "entity",
                 },
@@ -12630,6 +12690,193 @@ def _render_transactions_workspace_page(
             ),
             key=f"{prefix}_inherit_terms_from_estimate",
         )
+
+    if tertiary == "duplicate" and selected_document.document_type in {
+        CommercialDocumentType.ESTIMATE,
+        CommercialDocumentType.SALES_ORDER,
+    }:
+        if st.button("Duplicate Document", key=f"{prefix}_duplicate", width="stretch"):
+            try:
+                duplicated = service.duplicate_document(
+                    document_id=selected_document.document_id,
+                    actor="atlas-ui",
+                )
+                st.session_state["atlas_transactions_selected_document_id"] = (
+                    duplicated.document_id
+                )
+                _save_transactions_workspace_state(st, service)
+                st.success("Document duplicated as a new draft.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to duplicate document: {exc}")
+
+    if tertiary == "create_revision" and selected_document.document_type in {
+        CommercialDocumentType.ESTIMATE,
+        CommercialDocumentType.SALES_ORDER,
+    }:
+        create_revision_reason = st.text_input(
+            "Revision Reason",
+            value="Commercial update",
+            key=f"{prefix}_create_revision_reason",
+        )
+        create_revision_label = st.text_input(
+            "Revision Label",
+            value=f"R{selected_document.revision_number + 1}",
+            key=f"{prefix}_create_revision_label",
+        )
+        if st.button(
+            "Create Revision",
+            key=f"{prefix}_create_revision_action",
+            width="stretch",
+        ):
+            try:
+                service.create_draft_revision(
+                    document_id=selected_document.document_id,
+                    reason=create_revision_reason,
+                    actor="atlas-ui",
+                    revision_label=create_revision_label,
+                )
+                _save_transactions_workspace_state(st, service)
+                st.success("Revision created.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to create revision: {exc}")
+
+    if tertiary == "revision_history" and selected_document.document_type in {
+        CommercialDocumentType.ESTIMATE,
+        CommercialDocumentType.SALES_ORDER,
+    }:
+        st.dataframe(
+            service.revision_history(document_id=selected_document.document_id),
+            width="stretch",
+            hide_index=True,
+        )
+
+    if tertiary == "archive" and selected_document.document_type in {
+        CommercialDocumentType.ESTIMATE,
+        CommercialDocumentType.SALES_ORDER,
+    }:
+        if st.button(
+            "Archive Document", key=f"{prefix}_archive_action", width="stretch"
+        ):
+            service.archive_document(selected_document.document_id)
+            _save_transactions_workspace_state(st, service)
+            st.success("Document archived.")
+            st.rerun()
+
+    if tertiary == "restore" and selected_document.document_type in {
+        CommercialDocumentType.ESTIMATE,
+        CommercialDocumentType.SALES_ORDER,
+    }:
+        if st.button(
+            "Restore Document", key=f"{prefix}_restore_action", width="stretch"
+        ):
+            service.restore_document(selected_document.document_id)
+            _save_transactions_workspace_state(st, service)
+            st.success("Document restored as draft.")
+            st.rerun()
+
+    if tertiary == "export_pdf" and selected_document.document_type in {
+        CommercialDocumentType.ESTIMATE,
+        CommercialDocumentType.SALES_ORDER,
+    }:
+        if selected_document.document_type == CommercialDocumentType.ESTIMATE:
+            presentation = st.selectbox(
+                "PDF Presentation",
+                options=["internal_estimate", "customer_estimate"],
+                key=f"{prefix}_pdf_presentation",
+            )
+        else:
+            presentation = "sales_order"
+            st.caption("Sales Order presentation is fixed to sales_order.")
+
+        revision_number = int(
+            st.number_input(
+                "Revision Number",
+                min_value=1,
+                value=int(selected_document.revision_number),
+                step=1,
+                key=f"{prefix}_pdf_revision_number",
+            )
+        )
+        if st.button("Generate PDF", key=f"{prefix}_generate_pdf", width="stretch"):
+            try:
+                export_result = service.export_document_pdf(
+                    document_id=selected_document.document_id,
+                    presentation=presentation,
+                    actor="atlas-ui",
+                    revision_number=revision_number,
+                )
+                st.session_state[f"{prefix}_pdf_export_payload"] = export_result
+                _save_transactions_workspace_state(st, service)
+                st.success("PDF generated deterministically for selected revision.")
+            except Exception as exc:
+                st.error(f"Unable to generate PDF: {exc}")
+
+        pdf_export_payload = dict(
+            st.session_state.get(f"{prefix}_pdf_export_payload") or {}
+        )
+        if pdf_export_payload:
+            st.download_button(
+                "Download PDF",
+                data=pdf_export_payload.get("payload", b""),
+                file_name=_safe_text(
+                    pdf_export_payload.get("file_name"), "document.pdf"
+                ),
+                mime=_safe_text(pdf_export_payload.get("mime_type"), "application/pdf"),
+                key=f"{prefix}_download_pdf",
+                width="stretch",
+            )
+
+        email_cols = st.columns(3)
+        provider = email_cols[0].selectbox(
+            "Future Email Provider",
+            options=["microsoft_365", "google_workspace", "smtp", "approved_other"],
+            key=f"{prefix}_email_provider",
+        )
+        recipient = email_cols[1].text_input(
+            "Recipient",
+            key=f"{prefix}_email_recipient",
+        )
+        subject = email_cols[2].text_input(
+            "Subject",
+            value=f"{_safe_text(selected_document.document_number, selected_document.document_id)} revision {selected_document.revision_number}",
+            key=f"{prefix}_email_subject",
+        )
+        cc_value = st.text_input(
+            "CC (comma separated)",
+            key=f"{prefix}_email_cc",
+        )
+        bcc_value = st.text_input(
+            "BCC (comma separated)",
+            key=f"{prefix}_email_bcc",
+        )
+        message_template = st.text_area(
+            "Message Template",
+            key=f"{prefix}_email_template",
+            height=120,
+        )
+        if st.button(
+            "Queue Future Email Metadata",
+            key=f"{prefix}_queue_email_metadata",
+            width="stretch",
+        ):
+            try:
+                service.enqueue_future_email_delivery(
+                    document_id=selected_document.document_id,
+                    provider=provider,
+                    recipient=recipient,
+                    subject=subject,
+                    actor="atlas-ui",
+                    cc=[item.strip() for item in cc_value.split(",") if item.strip()],
+                    bcc=[item.strip() for item in bcc_value.split(",") if item.strip()],
+                    message_template=message_template,
+                    attached_revision_number=revision_number,
+                )
+                _save_transactions_workspace_state(st, service)
+                st.success("Future email metadata queued. No email was sent.")
+            except Exception as exc:
+                st.error(f"Unable to queue email metadata: {exc}")
 
     if tertiary == "edit":
         edit_cols = st.columns(4)

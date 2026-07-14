@@ -43,6 +43,11 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "add",
         "browse",
         "edit",
+        "duplicate",
+        "create_revision",
+        "revision_history",
+        "archive",
+        "restore",
         "customer_view",
         "internal_view",
         "revisions",
@@ -51,7 +56,7 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "decline",
         "related_documents",
         "activity",
-        "export",
+        "export_pdf",
     ]
 
     sales_order_section = next(
@@ -65,12 +70,17 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "add",
         "browse",
         "edit",
+        "duplicate",
+        "create_revision",
+        "revision_history",
+        "archive",
+        "restore",
         "lines",
         "demand",
         "fulfillment",
         "related_documents",
         "activity",
-        "export",
+        "export_pdf",
     ]
 
 

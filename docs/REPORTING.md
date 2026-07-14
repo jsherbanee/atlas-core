@@ -72,3 +72,17 @@ AI can help summarize or explain report contents, but it should not replace dete
 - final template engine remains open
 - final scheduling mechanisms remain open
 - final delivery channels remain open
+
+## T-05 Amendment: Commercial Document PDF Exports
+
+Deterministic PDF export is now available for transaction-document revisions:
+- Internal Estimate
+- Customer Estimate
+- Sales Order
+
+Export guarantees:
+- reproducible output from the same document revision and section configuration
+- filename includes document number and revision
+- issued and archived revisions remain exportable
+- export activity metadata is recorded
+- export generation does not mutate revision commercial content

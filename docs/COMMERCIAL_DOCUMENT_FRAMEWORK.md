@@ -458,6 +458,32 @@ It only defines the common contract they should follow.
 
 ## Open Architecture Decisions
 
+## T-05 Amendment: Estimate and Sales Order Versioning, Duplication, and Export
+
+Implemented scope for `estimate` and `sales_order` families:
+- explicit duplication as a new document identity (not a revision)
+- explicit revision creation with parent/superseded/current metadata
+- immutable issued revisions
+- archived revisions remain readable and exportable
+- deterministic PDF export for internal estimate, customer estimate, and sales order presentations
+
+Duplication guarantees:
+- duplicate gets a new document ID and new document number
+- duplicate keeps source-document traceability (`duplicate_of` relationship and source metadata)
+- duplicate copies current line items and terms snapshot content
+- duplicate starts in Draft and records duplicated-by and duplicated-at metadata
+
+Revision guarantees:
+- revision creation is explicit user intent (no automatic revision creation)
+- revision chain tracks parent revision, superseded revision, revision reason, and revision date
+- issued revisions are immutable and cannot be edited in place
+
+Export guarantees:
+- PDF export is deterministic for the same revision and section configuration
+- export filename includes document number and revision
+- issued and archived revisions remain exportable
+- export activity is recorded as document activity metadata
+
 Still intentionally unresolved:
 - final canonical status taxonomies by document family
 - whether all document families share one revision model or allow family-specific overlays

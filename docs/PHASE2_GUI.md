@@ -765,6 +765,25 @@ Inside project Reports, navigation now explicitly includes:
 ## Project Summary Report
 Project Summary is an operational summary report for the active organization, not a separate customer-document artifact.
 
+## Transactions GUI: T-05 Amendment Versioning and Export Controls
+
+Transactions Estimates and Sales Orders now expose tertiary actions for:
+- Duplicate
+- Create Revision
+- Revision History
+- Archive
+- Restore
+- Export PDF
+
+Estimate-specific export presentations:
+- Internal Estimate PDF
+- Customer Estimate PDF
+
+Sales-order export presentation:
+- Sales Order PDF
+
+Export workflows include non-executing future email metadata capture (provider/recipient/template/revision) and do not send email in this sprint.
+
 Default sections:
 - Project Overview
 - Documents Reviewed

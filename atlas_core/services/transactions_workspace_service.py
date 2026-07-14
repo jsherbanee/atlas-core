@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from hashlib import sha1
 from typing import Any
 
 from atlas_core.domain.commercial_document import (
@@ -18,6 +20,14 @@ from atlas_core.services.commercial_document_service import (
     CommercialDocumentService,
     CommercialNumberingService,
 )
+from atlas_core.services.commercial_document_pdf_export_service import (
+    CommercialDocumentPdfExportService,
+    PdfSectionConfig,
+)
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass(frozen=True)
@@ -58,6 +68,7 @@ class TransactionsWorkspaceService:
             for item in list(serialized_terms_blocks or [])
             if isinstance(item, dict)
         ]
+        self._pdf_export_service = CommercialDocumentPdfExportService()
 
     def _document_family(self, document_type: CommercialDocumentType) -> str:
         return document_type.value
@@ -439,15 +450,233 @@ class TransactionsWorkspaceService:
         *,
         document_id: str,
         reason: str,
+        actor: str = "atlas-ui",
+        revision_label: str | None = None,
     ) -> CommercialDocument:
         document = self._required_document(document_id)
         if document.lifecycle_state == CommercialDocumentLifecycleState.ISSUED:
             document.lifecycle_state = CommercialDocumentLifecycleState.DRAFT
             document.approval_state = ApprovalState.NOT_REQUESTED
-            self._commercial_service.start_new_revision(document, reason=reason)
+            self._commercial_service.start_new_revision(
+                document,
+                reason=reason,
+                actor=actor,
+                revision_label=revision_label,
+            )
             return document
-        self._commercial_service.start_new_revision(document, reason=reason)
+        self._commercial_service.start_new_revision(
+            document,
+            reason=reason,
+            actor=actor,
+            revision_label=revision_label,
+        )
         return document
+
+    def duplicate_document(
+        self,
+        *,
+        document_id: str,
+        actor: str,
+    ) -> CommercialDocument:
+        source = self._required_document(document_id)
+        if source.document_type not in {
+            CommercialDocumentType.ESTIMATE,
+            CommercialDocumentType.SALES_ORDER,
+        }:
+            raise ValueError("only estimates and sales orders are supported")
+
+        duplicate = self.create_draft(
+            tenant_id=source.tenant_id,
+            organization_id=source.organization_id,
+            document_type=source.document_type,
+            project_id=source.project_id,
+            project_code=source.project_code,
+            customer_id=source.customer_id,
+            vendor_id=source.vendor_id,
+        )
+
+        for line in list(source.lines or []):
+            self._commercial_service.add_line(
+                duplicate,
+                description=line.description,
+                quantity=line.quantity,
+                unit_price=line.unit_price,
+                sequence=line.sequence,
+                unit_of_measure=line.unit_of_measure,
+                discount=line.discount,
+                tax_rate=line.tax_rate,
+                unit_cost=line.unit_cost,
+                project_code=line.project_code,
+                product_or_service_reference=line.product_or_service_reference,
+            )
+
+        if source.terms_and_conditions_snapshot:
+            reference = dict(source.terms_and_conditions_reference or {})
+            reference["source"] = "duplicated_snapshot"
+            reference["duplicated_from_document_id"] = source.document_id
+            self._commercial_service.assign_terms_and_conditions(
+                duplicate,
+                reference=reference,
+                snapshot=deepcopy(dict(source.terms_and_conditions_snapshot)),
+            )
+
+        duplicate.source_document_id = source.document_id
+        duplicate.source_relationship_type = "duplicate_of"
+        duplicate.duplicated_from_document_id = source.document_id
+        duplicate.duplicated_by = actor
+        duplicate.duplicated_at = _utc_now()
+        duplicate.numbering_policy_snapshot = deepcopy(source.numbering_policy_snapshot)
+
+        self._commercial_service.add_relationship(
+            duplicate,
+            relationship_type="duplicate_of",
+            related_document_id=source.document_id,
+        )
+        self._commercial_service.add_diagnostic(
+            duplicate,
+            CommercialDocumentDiagnostic(
+                code="document_duplicated",
+                message="Draft duplicated from source document",
+                details={
+                    "source_document_id": source.document_id,
+                    "source_document_number": source.document_number,
+                    "duplicated_by": actor,
+                    "duplicated_at": duplicate.duplicated_at,
+                },
+            ),
+        )
+        self._commercial_service.allocate_number(duplicate)
+        return duplicate
+
+    def revision_history(self, *, document_id: str) -> list[dict[str, Any]]:
+        document = self._required_document(document_id)
+        rows = [
+            {
+                "revision_id": revision.revision_id,
+                "revision_number": revision.revision_number,
+                "revision_label": revision.revision_label,
+                "revision_reason": revision.revision_reason,
+                "revision_date": revision.revision_date,
+                "parent_revision_id": revision.parent_revision_id,
+                "superseded_by_revision_id": revision.superseded_by_revision_id,
+                "superseded_at": revision.superseded_at,
+                "is_current": revision.is_current,
+                "is_archived": revision.is_archived,
+                "archived_at": revision.archived_at,
+                "immutable": revision.immutable,
+                "lifecycle_state": revision.lifecycle_state.value,
+                "approval_state": revision.approval_state.value,
+            }
+            for revision in list(document.revisions or [])
+        ]
+        rows.sort(key=lambda item: int(item.get("revision_number") or 0))
+        return rows
+
+    def export_document_pdf(
+        self,
+        *,
+        document_id: str,
+        presentation: str,
+        actor: str,
+        revision_number: int | None = None,
+        section_config: PdfSectionConfig | None = None,
+        branding: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        document = self._required_document(document_id)
+        normalized_presentation = presentation.strip().lower()
+        if normalized_presentation not in {
+            "internal_estimate",
+            "customer_estimate",
+            "sales_order",
+        }:
+            raise ValueError("unsupported presentation")
+
+        target_revision_number = revision_number or document.revision_number
+        revision = next(
+            (
+                item
+                for item in list(document.revisions or [])
+                if item.revision_number == target_revision_number
+            ),
+            None,
+        )
+        if revision is None:
+            raise ValueError("revision was not found")
+
+        config = section_config or PdfSectionConfig()
+        payload = self._pdf_export_service.build_pdf_bytes(
+            document=document,
+            revision=revision,
+            presentation=normalized_presentation,
+            section_config=config,
+            branding=branding,
+        )
+        file_name = self._pdf_export_service.suggested_filename(
+            document=document,
+            presentation=normalized_presentation,
+            revision_number=revision.revision_number,
+        )
+        content_hash = sha1(payload).hexdigest()
+        export_event = {
+            "event": "pdf_exported",
+            "actor": actor,
+            "timestamp": _utc_now(),
+            "presentation": normalized_presentation,
+            "revision_number": revision.revision_number,
+            "revision_id": revision.revision_id,
+            "file_name": file_name,
+            "content_hash": content_hash,
+            "status": document.lifecycle_state.value,
+            "is_archived_revision": revision.is_archived,
+        }
+        document.export_activity.append(export_event)
+        return {
+            "file_name": file_name,
+            "mime_type": "application/pdf",
+            "payload": payload,
+            "revision_number": revision.revision_number,
+            "content_hash": content_hash,
+        }
+
+    def enqueue_future_email_delivery(
+        self,
+        *,
+        document_id: str,
+        provider: str,
+        recipient: str,
+        subject: str,
+        actor: str,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+        message_template: str | None = None,
+        attached_revision_number: int | None = None,
+    ) -> dict[str, Any]:
+        document = self._required_document(document_id)
+        normalized_provider = provider.strip().lower()
+        if normalized_provider not in {
+            "microsoft_365",
+            "google_workspace",
+            "smtp",
+            "approved_other",
+        }:
+            raise ValueError("unsupported email provider")
+        entry = {
+            "provider": normalized_provider,
+            "recipient": recipient.strip(),
+            "cc": list(cc or []),
+            "bcc": list(bcc or []),
+            "subject": subject.strip(),
+            "message_template": (message_template or "").strip() or None,
+            "attached_revision_number": attached_revision_number
+            or document.revision_number,
+            "sent_timestamp": None,
+            "delivery_status": "queued_for_future",
+            "provider_message_id": None,
+            "created_at": _utc_now(),
+            "created_by": actor,
+        }
+        document.future_email_metadata.append(entry)
+        return dict(entry)
 
     def get_document(self, document_id: str) -> CommercialDocument | None:
         normalized_id = document_id.strip()
@@ -512,6 +741,17 @@ class TransactionsWorkspaceService:
         document = self._required_document(document_id)
         if document.lifecycle_state != CommercialDocumentLifecycleState.ARCHIVED:
             document.lifecycle_state = CommercialDocumentLifecycleState.ARCHIVED
+        active_revision = next(
+            (
+                revision
+                for revision in list(document.revisions or [])
+                if revision.revision_number == document.revision_number
+            ),
+            None,
+        )
+        if active_revision is not None:
+            active_revision.is_archived = True
+            active_revision.archived_at = _utc_now()
         return document
 
     def restore_document(self, document_id: str) -> CommercialDocument:
@@ -519,6 +759,17 @@ class TransactionsWorkspaceService:
         if document.lifecycle_state == CommercialDocumentLifecycleState.ARCHIVED:
             document.lifecycle_state = CommercialDocumentLifecycleState.DRAFT
             document.approval_state = ApprovalState.NOT_REQUESTED
+        active_revision = next(
+            (
+                revision
+                for revision in list(document.revisions or [])
+                if revision.revision_number == document.revision_number
+            ),
+            None,
+        )
+        if active_revision is not None:
+            active_revision.is_archived = False
+            active_revision.archived_at = None
         return document
 
     def overview_metrics(self) -> TransactionsOverviewMetrics:

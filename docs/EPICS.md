@@ -35,6 +35,7 @@ Status: Active
 - T-03 Estimate Transaction Integration
 - T-04 Settings Foundation and Document Numbering Preferences
 - T-05 Amendment Terms and Conditions Settings Integration
+- T-05 Amendment Estimate and Sales Order Versioning, Duplication, and PDF Export
 
 ### A-07 Scope
 

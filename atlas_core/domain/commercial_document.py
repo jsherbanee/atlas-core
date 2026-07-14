@@ -32,6 +32,19 @@ def _optional_dict(value: Any) -> dict[str, Any] | None:
     return dict(value)
 
 
+def _list_of_dicts(value: Any) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("value must be a list when provided")
+    normalized: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise ValueError("list items must be dictionaries")
+        normalized.append(dict(item))
+    return normalized
+
+
 def _decimal(field_name: str, value: Any) -> Decimal:
     if isinstance(value, Decimal):
         return value
@@ -379,6 +392,16 @@ class CommercialDocumentRevision:
     revision_number: int
     lifecycle_state: CommercialDocumentLifecycleState
     approval_state: ApprovalState
+    revision_label: str | None = None
+    revision_reason: str | None = None
+    revision_date: str = field(default_factory=_utc_now)
+    parent_revision_id: str | None = None
+    superseded_by_revision_id: str | None = None
+    superseded_at: str | None = None
+    is_current: bool = True
+    is_archived: bool = False
+    archived_at: str | None = None
+    created_by: str | None = None
     issued_at: str | None = None
     immutable: bool = False
     notes: str | None = None
@@ -397,8 +420,20 @@ class CommercialDocumentRevision:
             )
         if not isinstance(self.approval_state, ApprovalState):
             self.approval_state = ApprovalState(self.approval_state)
+        self.revision_label = _optional_text(self.revision_label)
+        self.revision_reason = _optional_text(self.revision_reason)
+        self.parent_revision_id = _optional_text(self.parent_revision_id)
+        self.superseded_by_revision_id = _optional_text(self.superseded_by_revision_id)
+        self.superseded_at = _optional_text(self.superseded_at)
+        self.archived_at = _optional_text(self.archived_at)
+        self.created_by = _optional_text(self.created_by)
         self.issued_at = _optional_text(self.issued_at)
         self.notes = _optional_text(self.notes)
+        if self.revision_reason is None and self.notes is not None:
+            self.revision_reason = self.notes
+        if self.notes is None and self.revision_reason is not None:
+            self.notes = self.revision_reason
+        self.revision_date = _required_text("revision_date", self.revision_date)
         self.lines = [
             (
                 line
@@ -416,6 +451,16 @@ class CommercialDocumentRevision:
             "revision_number": self.revision_number,
             "lifecycle_state": self.lifecycle_state.value,
             "approval_state": self.approval_state.value,
+            "revision_label": self.revision_label,
+            "revision_reason": self.revision_reason,
+            "revision_date": self.revision_date,
+            "parent_revision_id": self.parent_revision_id,
+            "superseded_by_revision_id": self.superseded_by_revision_id,
+            "superseded_at": self.superseded_at,
+            "is_current": self.is_current,
+            "is_archived": self.is_archived,
+            "archived_at": self.archived_at,
+            "created_by": self.created_by,
             "issued_at": self.issued_at,
             "immutable": self.immutable,
             "notes": self.notes,
@@ -608,8 +653,14 @@ class CommercialDocument:
     project_code: str | None = None
     customer_id: str | None = None
     vendor_id: str | None = None
+    source_document_id: str | None = None
+    source_relationship_type: str | None = None
+    duplicated_from_document_id: str | None = None
+    duplicated_by: str | None = None
+    duplicated_at: str | None = None
     terms_and_conditions_reference: dict[str, Any] | None = None
     terms_and_conditions_snapshot: dict[str, Any] | None = None
+    numbering_policy_snapshot: dict[str, Any] | None = None
     revision_number: int = 1
     lines: list[CommercialDocumentLineItem] = field(default_factory=list)
     relationships: list[CommercialDocumentRelationship] = field(default_factory=list)
@@ -619,6 +670,8 @@ class CommercialDocument:
     )
     totals: CommercialDocumentTotals = field(default_factory=CommercialDocumentTotals)
     revisions: list[CommercialDocumentRevision] = field(default_factory=list)
+    export_activity: list[dict[str, Any]] = field(default_factory=list)
+    future_email_metadata: list[dict[str, Any]] = field(default_factory=list)
     created_at: str = field(default_factory=_utc_now)
     updated_at: str = field(default_factory=_utc_now)
 
@@ -639,12 +692,20 @@ class CommercialDocument:
         self.project_code = _optional_text(self.project_code)
         self.customer_id = _optional_text(self.customer_id)
         self.vendor_id = _optional_text(self.vendor_id)
+        self.source_document_id = _optional_text(self.source_document_id)
+        self.source_relationship_type = _optional_text(self.source_relationship_type)
+        self.duplicated_from_document_id = _optional_text(
+            self.duplicated_from_document_id
+        )
+        self.duplicated_by = _optional_text(self.duplicated_by)
+        self.duplicated_at = _optional_text(self.duplicated_at)
         self.terms_and_conditions_reference = _optional_dict(
             self.terms_and_conditions_reference
         )
         self.terms_and_conditions_snapshot = _optional_dict(
             self.terms_and_conditions_snapshot
         )
+        self.numbering_policy_snapshot = _optional_dict(self.numbering_policy_snapshot)
 
         self.revision_number = int(self.revision_number)
         if self.revision_number <= 0:
@@ -688,6 +749,8 @@ class CommercialDocument:
             )
             for revision in self.revisions
         ]
+        self.export_activity = _list_of_dicts(self.export_activity)
+        self.future_email_metadata = _list_of_dicts(self.future_email_metadata)
         self.created_at = _required_text("created_at", self.created_at)
         self.updated_at = _required_text("updated_at", self.updated_at)
 
@@ -726,8 +789,14 @@ class CommercialDocument:
             "project_code": self.project_code,
             "customer_id": self.customer_id,
             "vendor_id": self.vendor_id,
+            "source_document_id": self.source_document_id,
+            "source_relationship_type": self.source_relationship_type,
+            "duplicated_from_document_id": self.duplicated_from_document_id,
+            "duplicated_by": self.duplicated_by,
+            "duplicated_at": self.duplicated_at,
             "terms_and_conditions_reference": self.terms_and_conditions_reference,
             "terms_and_conditions_snapshot": self.terms_and_conditions_snapshot,
+            "numbering_policy_snapshot": self.numbering_policy_snapshot,
             "lines": [line.to_dict() for line in self.lines],
             "relationships": [
                 relationship.to_dict() for relationship in self.relationships
@@ -736,6 +805,10 @@ class CommercialDocument:
             "sync_metadata": self.sync_metadata.to_dict(),
             "totals": self.totals.to_dict(),
             "revisions": [revision.to_dict() for revision in self.revisions],
+            "export_activity": [dict(item) for item in self.export_activity],
+            "future_email_metadata": [
+                dict(item) for item in self.future_email_metadata
+            ],
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -759,4 +832,20 @@ class CommercialDocument:
             normalized["terms_and_conditions_reference"] = None
         if "terms_and_conditions_snapshot" not in normalized:
             normalized["terms_and_conditions_snapshot"] = None
+        if "source_document_id" not in normalized:
+            normalized["source_document_id"] = None
+        if "source_relationship_type" not in normalized:
+            normalized["source_relationship_type"] = None
+        if "duplicated_from_document_id" not in normalized:
+            normalized["duplicated_from_document_id"] = None
+        if "duplicated_by" not in normalized:
+            normalized["duplicated_by"] = None
+        if "duplicated_at" not in normalized:
+            normalized["duplicated_at"] = None
+        if "numbering_policy_snapshot" not in normalized:
+            normalized["numbering_policy_snapshot"] = None
+        if "export_activity" not in normalized:
+            normalized["export_activity"] = []
+        if "future_email_metadata" not in normalized:
+            normalized["future_email_metadata"] = []
         return cls(**normalized)

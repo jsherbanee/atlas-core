@@ -353,6 +353,33 @@ Behavior:
 - sales orders created from estimates can inherit estimate Terms snapshots or resolve sales-order defaults explicitly
 - draft terms refresh is explicit user action only; no silent replacement
 - issued transaction documents preserve captured terms snapshot content/version immutably
+
+## T-05 Amendment: Versioning, Duplication, Archive/Restore, and PDF Export
+
+Transactions now supports explicit document controls for Estimates and Sales Orders:
+- Duplicate
+- Create Revision
+- Revision History
+- Archive
+- Restore
+- Export PDF
+
+Behavior:
+- duplication creates a new draft document with a new ID and number while preserving source traceability
+- duplication is not treated as revision continuation of the source document
+- revision creation is explicit and records revision reason/date/lineage
+- issued revisions remain immutable
+- archived documents and revisions remain readable and exportable
+
+PDF export support:
+- internal estimate presentation
+- customer estimate presentation
+- sales order presentation
+- deterministic output from the same revision and section configuration
+
+Future delivery hooks:
+- non-executing metadata capture for Microsoft 365, Google Workspace, SMTP, and approved future providers
+- no mail-provider transport implementation in this sprint
 - Open Sales Orders
 - Open Purchase Orders
 - Partially Received POs

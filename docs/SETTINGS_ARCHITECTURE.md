@@ -175,3 +175,8 @@ Behavior:
 - settings updates do not silently replace document snapshots
 - issued documents retain captured terms snapshots immutably
 - draft documents refresh terms only via explicit user action
+
+T-05 revision/export interaction:
+- revisions preserve terms reference fields (block ID/version/source) and content snapshot history
+- later settings edits do not mutate historical revision terms content
+- document export and future email metadata are transaction-level controls, not settings-side transport behavior

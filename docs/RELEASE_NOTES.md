@@ -23,6 +23,24 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Epic T Sprint T-05 Amendment Terms and Conditions Settings)
 
+## Unreleased (Epic T Sprint T-05 Amendment Estimate and Sales Order Versioning, Duplication, and PDF Export)
+
+### Improved
+
+- Transactions Estimates and Sales Orders now support explicit duplicate, create revision, revision history, archive, and restore controls.
+- Duplicate document behavior now assigns a new document identity/number, preserves source traceability, copies line items and terms snapshots, and starts as Draft.
+- Revision model now records explicit revision reason/date/parent/superseded/current metadata and preserves immutable issued revisions.
+- Deterministic PDF export is now supported for Internal Estimate, Customer Estimate, and Sales Order presentations.
+- Export activity metadata is now recorded, and archived revisions remain exportable.
+- Future email-delivery metadata hooks are now available for Microsoft 365, Google Workspace, SMTP, and approved providers (metadata only, no live send).
+
+### Scope Notes
+
+- no live email sending
+- no electronic signatures
+- no QuickBooks API transport implementation
+- no automatic revision creation without explicit user intent
+
 ### Improved
 
 - Organization Settings now supports tenant-scoped Terms and Conditions content blocks for Estimates and Sales Orders.

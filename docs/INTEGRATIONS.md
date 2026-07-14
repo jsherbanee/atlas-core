@@ -115,6 +115,21 @@ Current functionality should not be overstated.
 ## Future Direction
 Atlas should eventually act as an operational hub that synchronizes with accounting, billing, productivity, storage, manufacturer, and field systems without becoming a duplicate of those systems.
 
+## T-05 Amendment: Future Email Delivery Metadata Hooks
+
+Commercial document export workflows now capture non-executing future email-delivery metadata for:
+- Microsoft 365
+- Google Workspace
+- SMTP
+- approved future providers
+
+Captured metadata may include recipient, CC/BCC, subject, message template, attached revision, sent timestamp, delivery status, and provider message ID.
+
+Current boundary:
+- metadata capture only
+- no live mail send
+- no provider integration implementation in this sprint
+
 ## Unresolved Decisions
 - The final sync direction for each shared entity remains configurable.
 - The balance between polling and webhooks may vary by integration.
