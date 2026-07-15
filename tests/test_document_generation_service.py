@@ -241,7 +241,11 @@ def test_transactions_export_records_generated_artifact_template_and_determinist
             document_family="sales_order",
         )
     ]
-    service = TransactionsWorkspaceService(serialized_document_templates=templates)
+    service = TransactionsWorkspaceService(
+        serialized_document_templates=templates,
+        active_tenant_id="tenant-a",
+        active_organization_id="org-a",
+    )
     document = service.create_draft(
         tenant_id="tenant-a",
         organization_id="org-a",

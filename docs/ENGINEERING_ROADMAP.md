@@ -54,6 +54,8 @@ W-03 Universal Object Workspace shared UI migration is implemented for controlle
 
 Current engineering focus is post-W-03 validation, broader adapter coverage, deeper activity/history compatibility, and future object-family migration planning.
 
+P-07 Alpha blocker remediation is complete with default-safe transactions scope enforcement and regression validation.
+
 Epic E remains the next candidate epic only after architecture review and explicit sprint approval.
 
 Epic E must not be started from this roadmap.
@@ -168,6 +170,7 @@ Production readiness should require:
 - implement deterministic local background job framework (P-03) with storage-agnostic contracts and immutable audit linkage
 - implement unified attachment framework (P-04) with tenant-scoped contracts, repository/local adapters, and Object Workspace documents integration
 - implement deterministic document-generation and template engine foundation (P-05) with precedence-aware template resolution and revision snapshot reuse guarantees
+- remediate alpha blocker-class tenancy and authorization boundary gaps (P-07) without introducing new feature scope
 - consolidate search and object-graph foundations
 - formalize rule-engine and diagnostics contracts
 - deliver deterministic roles and permissions foundation with centralized action gating and audit-ready permission events

@@ -21,6 +21,20 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Sprint P-07 Alpha Blocker Remediation)
+
+### Improved
+
+- Transactions workspace service now enforces active tenant and organization scope by default, preventing unscoped multi-tenant mutation behavior in normal runtime usage.
+- Transactions scoped creation now rejects cross-tenant draft creation when scope enforcement is active.
+- Regression coverage now includes constructor scope enforcement and cross-tenant create rejection under enforced scope.
+
+### Scope Notes
+
+- no new roadmap feature scope was added
+- no inventory reactivation
+- no AI/procurement/receiving/service workflow activation
+
 ## Unreleased (Sprint P-06 Alpha Foundation Integrity Audit)
 
 ### Improved

@@ -14,7 +14,10 @@ from atlas_core.services.transactions_workspace_service import (
 
 
 def _service() -> TransactionsWorkspaceService:
-    return TransactionsWorkspaceService()
+    return TransactionsWorkspaceService(
+        active_tenant_id="tenant-1",
+        active_organization_id="org-1",
+    )
 
 
 def _terms_blocks(default_content: str, *, version: int = 1) -> list[dict[str, object]]:
@@ -94,6 +97,29 @@ def test_create_and_filter_documents() -> None:
     assert searched[0].document_id == sales_order.document_id
 
 
+def test_transactions_workspace_requires_active_scope_by_default() -> None:
+    with pytest.raises(ValueError, match="active_tenant_id"):
+        TransactionsWorkspaceService()
+
+
+def test_transactions_workspace_blocks_cross_tenant_create_when_scope_enforced() -> (
+    None
+):
+    service = TransactionsWorkspaceService(
+        active_tenant_id="tenant-a",
+        active_organization_id="org-1",
+    )
+
+    with pytest.raises(ValueError, match="tenant scope mismatch"):
+        service.create_draft(
+            tenant_id="tenant-b",
+            organization_id="org-1",
+            document_type=CommercialDocumentType.ESTIMATE,
+            project_id="project-b",
+            customer_id="customer-b",
+        )
+
+
 def test_active_scope_filters_cross_tenant_documents() -> None:
     service = TransactionsWorkspaceService(
         active_tenant_id="tenant-a",
@@ -107,7 +133,8 @@ def test_active_scope_filters_cross_tenant_documents() -> None:
         customer_id="customer-a",
     )
     service_unscoped = TransactionsWorkspaceService(
-        serialized_documents=service.to_payload()
+        serialized_documents=service.to_payload(),
+        enforce_active_scope=False,
     )
     tenant_b = service_unscoped.create_draft(
         tenant_id="tenant-b",
@@ -629,7 +656,7 @@ def test_change_order_revision_behavior_and_audit_diagnostics() -> None:
 
 
 def test_change_order_tenant_isolation_numbering() -> None:
-    service = _service()
+    service = TransactionsWorkspaceService(enforce_active_scope=False)
     tenant_a = service.create_draft(
         tenant_id="tenant-a",
         organization_id="org-1",
@@ -756,7 +783,11 @@ def test_create_draft_revision_from_issued_estimate_returns_to_review() -> None:
 
 
 def test_explicit_draft_terms_refresh_and_issued_snapshot_immutability() -> None:
-    service = TransactionsWorkspaceService(serialized_terms_blocks=_terms_blocks("v1"))
+    service = TransactionsWorkspaceService(
+        serialized_terms_blocks=_terms_blocks("v1"),
+        active_tenant_id="tenant-1",
+        active_organization_id="org-1",
+    )
     estimate = service.create_draft(
         tenant_id="tenant-1",
         organization_id="org-1",
@@ -769,6 +800,8 @@ def test_explicit_draft_terms_refresh_and_issued_snapshot_immutability() -> None
     service_v2 = TransactionsWorkspaceService(
         serialized_documents=service.to_payload(),
         serialized_terms_blocks=_terms_blocks("v2", version=2),
+        active_tenant_id="tenant-1",
+        active_organization_id="org-1",
     )
     refreshed = service_v2.refresh_draft_terms(document_id=estimate.document_id)
     assert (refreshed.terms_and_conditions_snapshot or {}).get("content") == "v2"
@@ -788,6 +821,8 @@ def test_explicit_draft_terms_refresh_and_issued_snapshot_immutability() -> None
     service_v3 = TransactionsWorkspaceService(
         serialized_documents=service_v2.to_payload(),
         serialized_terms_blocks=_terms_blocks("v3", version=3),
+        active_tenant_id="tenant-1",
+        active_organization_id="org-1",
     )
     preserved = service_v3.get_document(estimate.document_id)
     assert preserved is not None
@@ -795,7 +830,11 @@ def test_explicit_draft_terms_refresh_and_issued_snapshot_immutability() -> None
 
 
 def test_create_sales_order_from_estimate_preserves_traceability_and_terms() -> None:
-    service = TransactionsWorkspaceService(serialized_terms_blocks=_terms_blocks("v1"))
+    service = TransactionsWorkspaceService(
+        serialized_terms_blocks=_terms_blocks("v1"),
+        active_tenant_id="tenant-1",
+        active_organization_id="org-1",
+    )
     estimate = service.create_draft(
         tenant_id="tenant-1",
         organization_id="org-1",
@@ -835,7 +874,11 @@ def test_create_sales_order_from_estimate_preserves_traceability_and_terms() -> 
 
 
 def test_duplicate_document_assigns_new_identity_number_and_traceability() -> None:
-    service = TransactionsWorkspaceService(serialized_terms_blocks=_terms_blocks("v1"))
+    service = TransactionsWorkspaceService(
+        serialized_terms_blocks=_terms_blocks("v1"),
+        active_tenant_id="tenant-1",
+        active_organization_id="org-1",
+    )
     estimate = service.create_draft(
         tenant_id="tenant-1",
         organization_id="org-1",
@@ -1010,7 +1053,11 @@ def test_future_email_metadata_serialization_round_trip() -> None:
     assert queued["delivery_status"] == "queued_for_future"
     assert queued["provider_message_id"] is None
 
-    restored = TransactionsWorkspaceService(serialized_documents=service.to_payload())
+    restored = TransactionsWorkspaceService(
+        serialized_documents=service.to_payload(),
+        active_tenant_id="tenant-1",
+        active_organization_id="org-1",
+    )
     restored_doc = restored.get_document(estimate.document_id)
     assert restored_doc is not None
     assert len(restored_doc.future_email_metadata) == 1
@@ -1018,7 +1065,7 @@ def test_future_email_metadata_serialization_round_trip() -> None:
 
 
 def test_duplicate_and_export_preserve_tenant_isolation() -> None:
-    service = _service()
+    service = TransactionsWorkspaceService(enforce_active_scope=False)
     estimate_tenant_a = service.create_draft(
         tenant_id="tenant-a",
         organization_id="org-1",
@@ -1267,7 +1314,7 @@ def test_credit_memo_pdf_export_and_quickbooks_sync_metadata() -> None:
 
 
 def test_return_order_tenant_isolation_preserved_through_credit_generation() -> None:
-    service = _service()
+    service = TransactionsWorkspaceService(enforce_active_scope=False)
     tenant_a = service.create_return_order(
         tenant_id="tenant-a",
         organization_id="org-1",

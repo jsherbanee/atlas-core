@@ -69,6 +69,7 @@ Sprint P-03 implements the Deterministic Background Job Framework with storage-a
 Sprint P-04 implements the Unified Attachment Framework with tenant-scoped attachment contracts/services, repository and local adapter support, Object Workspace Documents integration, compatibility registration of legacy project documents, and deterministic attachment audit/hook emission.
 Sprint P-05 implements the Document Generation and Template Engine with deterministic template contracts, template precedence resolution, revision template snapshots, settings template versioning/default behavior, and generation-backed transactions export artifact metadata.
 Sprint P-06 completes the Alpha Foundation Integrity Audit, including repository-wide hardening validation and targeted corrections for tenant-scoped transactions access, explicit template scope enforcement, and attachment-version file-extension validation with regression coverage.
+Sprint P-07 resolves Alpha blocker remediation by enforcing default active tenant/organization scope requirements in transactions service construction, blocking cross-tenant draft creation under enforced scope, and adding regression coverage while preserving explicit test-only unscoped compatibility.
 Sprint T-09 implements project-scoped change-order tracking convention on Sales Orders (additive) and Return Orders (deductive), including shared change-order metadata, project-level `CO #n` sequence allocation/preview guarantees, base-bid assignment, and project commercial summary rollups without creating a standalone Change Order document object.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 
@@ -147,6 +148,7 @@ Current governance posture:
 Broader product direction remains aligned to the lifecycle-platform roadmap, while implementation sequencing should follow the approved roadmap and progressive refinement model.
 
 Secondary active focus:
+- P-07 alpha blocker remediation complete; continue P-08 readiness planning for attachment security depth within approved roadmap scope.
 - closeout regression monitoring and remaining page-migration debt triage for lower-priority advanced and object-detail surfaces.
 - explicit identifier discoverability across project creation, listing, open flows, global search, and project settings.
 - Epic E readiness assessment only (architecture review and sprint approval required; Epic E not started).

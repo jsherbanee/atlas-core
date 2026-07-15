@@ -1,7 +1,7 @@
 # Alpha Readiness Report
 
 ## Scope
-Sprint P-06 Alpha Foundation Integrity Audit.
+Sprint P-07 Alpha Blocker Remediation on top of P-06 baseline (`7df177c`, `1366` passing tests).
 
 Audit domains:
 - roles and permissions
@@ -28,7 +28,7 @@ Audit domains:
   - `mypy .`
   - `pytest -q`
 
-Latest full run:
+Baseline full run at sprint start:
 - black: passing
 - ruff: passing
 - mypy: passing
@@ -60,22 +60,38 @@ Missing (intentional by roadmap/scope):
 - external malware scanning and advanced DLP for attachments
 - full enterprise deployment hardening controls
 
-## Findings
-Blocking defects found and fixed in P-06:
-1. Tenant-scope leakage risk in transactions service list/read flows and source-document linkage paths.
-2. Explicit template resolution accepted cross-scope template IDs.
-3. Attachment version creation did not enforce extension allow-list.
+## Critical, High, and Alpha-Blocking Findings Extract
+Critical:
+- none currently confirmed in repository evidence.
 
-Non-blocking debt:
-- scope discipline still depends on runtime context wiring in app/service boundaries.
-- tenancy validation should continue expanding to all API surfaces as cloud adapters are introduced.
-- attachment security hooks are intent-only until scanner integration exists.
+High:
+- explicit template resolution previously accepted cross-scope template IDs (corrected in P-06).
+- attachment version creation previously bypassed extension allow-list policy (corrected in P-06).
+
+Alpha blocking:
+- transactions scope discipline still depended on runtime context wiring; unscoped `TransactionsWorkspaceService` construction allowed multi-tenant mutation behavior in a single service instance.
+
+## Remediation Matrix
+| finding | affected subsystem | severity | proposed correction | tests required | documentation impact |
+|---|---|---|---|---|---|
+| Unscoped transactions service instances allow cross-tenant mutation paths | transactions workspace service | alpha blocking | require active tenant/org scope by default; allow explicit test-only opt-out (`enforce_active_scope=False`) | constructor enforcement, cross-tenant create rejection, scoped workflow regression | update readiness and sprint status notes |
+| Explicit template can cross tenant/org/family/scope when selected by ID | document generation | high | enforce tenant/org/document family and customer/project/transaction scope validation for explicit templates | explicit cross-tenant template rejection regression | reflected as corrected in readiness/release notes |
+| Attachment version upload does not enforce extension allow-list | attachment service | high | apply extension allow-list validation to version uploads same as initial upload | version-upload disallowed extension regression | reflected as corrected in readiness/release notes |
+
+## Remediation Outcome (P-07)
+Corrected in P-07:
+- transactions service now enforces active tenant/organization scope by default (`enforce_active_scope=True`) and rejects unconfigured scope construction.
+- cross-tenant draft creation is blocked when scope enforcement is active.
+
+Previously corrected in P-06 and retained:
+- explicit template scope enforcement.
+- attachment version extension allow-list enforcement.
 
 ## Security and Tenancy Findings
-- No active cross-tenant read/write regression remains in audited P-06 paths after fixes.
-- Transactions runtime now supports active tenant/organization scope enforcement for document list/read access.
-- Cross-scope explicit template assignment is now rejected.
-- Attachment version uploads now enforce allow-list consistency with initial uploads.
+- No active cross-tenant mutation regression remains in audited transactions paths with default service configuration.
+- Transactions service construction now fails fast when active tenant/org scope is omitted.
+- Cross-scope explicit template assignment remains rejected.
+- Attachment version uploads continue to enforce allow-list consistency with initial uploads.
 
 ## Data Integrity Findings
 - Issued revision immutability remains enforced with template snapshot replay.
@@ -84,35 +100,35 @@ Non-blocking debt:
 - No data-loss risk identified in patched paths.
 
 ## Technical Debt
-- Strengthen scope requirements at all public service entry points (tenant/org mandatory in more APIs).
-- Expand mutation-path tests for cross-tenant and cross-organization rejection cases.
-- Add continuous security tests for attachment scanning integration once implemented.
-- Introduce cloud-ready persistence adapters while preserving deterministic contracts.
+- broaden tenant/org scope contracts across additional public service entry points beyond transactions.
+- continue cross-tenant/cross-organization mutation-path regression expansion.
+- add attachment malware-scanning adapter coverage when that roadmap scope activates.
+- introduce cloud-ready persistence adapters while preserving deterministic contracts.
+
+## Blockers Remaining
+- no confirmed critical, high, or alpha-blocking defects remain in current repository evidence.
+- deferred roadmap constraints (auth/SSO, cloud workers, malware scanning integration) remain intentionally out of current sprint scope and are tracked as non-blocking architectural gaps.
 
 ## Recommended Sprint Sequence
-1. P-07 Authorization Boundary Completion
-- Require tenant/org on remaining transactions mutation APIs.
-- Add centralized scope guard helper coverage across all service entry points.
-
-2. P-08 Attachment Security Depth
+1. P-08 Attachment Security Depth
 - Integrate malware scanning adapter and quarantine decisions.
 - Add redaction and retention controls for attachment diagnostics.
 
-3. P-09 Cloud/Operational Hardening Gate
+2. P-09 Cloud/Operational Hardening Gate
 - Job adapter abstraction validation for external workers.
 - Secrets/config hardening and operational observability checkpoints.
 
-4. P-10 Tenant Integrity and Export Assurance
+3. P-10 Tenant Integrity and Export Assurance
 - Tenant-isolated export/import verification suite.
 - Large-scale repository compatibility migration checks.
 
 ## Alpha Readiness Percentage
-Readiness score: 86%
+Readiness score: 91%
 
 Method:
 - weighted assessment across 14 audited domains
-- implemented foundations with full static/dynamic gates: strong positive weight
-- partial/missing roadmap-acknowledged enterprise controls: negative weight
+- blocker-class tenancy/scope remediations completed with regression coverage: positive uplift
+- partial/missing roadmap-acknowledged enterprise controls remain negative factors
 
 Interpretation:
 - the current codebase is suitable for controlled alpha usage under current local deterministic architecture constraints

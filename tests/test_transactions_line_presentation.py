@@ -9,7 +9,10 @@ from atlas_core.services.transactions_workspace_service import (
 
 
 def _service() -> TransactionsWorkspaceService:
-    return TransactionsWorkspaceService()
+    return TransactionsWorkspaceService(
+        active_tenant_id="tenant-1",
+        active_organization_id="org-1",
+    )
 
 
 def _sales_order_with_lines() -> tuple[TransactionsWorkspaceService, str]:
@@ -202,7 +205,22 @@ def test_pdf_export_respects_presentation_order_and_visible_columns() -> None:
 
 
 def test_tenant_isolation_for_presentation_metadata() -> None:
-    service, document_id = _sales_order_with_lines()
+    service = TransactionsWorkspaceService(enforce_active_scope=False)
+    primary = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        project_code="P-A",
+        customer_id="customer-a",
+    )
+    service._commercial_service.add_line(
+        primary,
+        description="Camera",
+        quantity=Decimal("2"),
+        unit_price=Decimal("100.00"),
+    )
+    document_id = primary.document_id
     other = service.create_draft(
         tenant_id="tenant-2",
         organization_id="org-1",

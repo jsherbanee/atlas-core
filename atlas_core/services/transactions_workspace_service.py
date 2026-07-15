@@ -99,6 +99,7 @@ class TransactionsWorkspaceService:
         serialized_project_commercial_state: dict[str, Any] | None = None,
         active_tenant_id: str | None = None,
         active_organization_id: str | None = None,
+        enforce_active_scope: bool = True,
         commercial_service: CommercialDocumentService | None = None,
     ) -> None:
         self._commercial_service = commercial_service or CommercialDocumentService(
@@ -127,8 +128,15 @@ class TransactionsWorkspaceService:
             ).items()
             if str(project_id).strip() and isinstance(payload, dict)
         }
+        self._enforce_active_scope = bool(enforce_active_scope)
         self._active_tenant_id = _safe_text(active_tenant_id, "") or None
         self._active_organization_id = _safe_text(active_organization_id, "") or None
+        if self._enforce_active_scope and (
+            not self._active_tenant_id or not self._active_organization_id
+        ):
+            raise ValueError(
+                "active_tenant_id and active_organization_id are required when scope enforcement is enabled"
+            )
 
     def _is_in_active_scope(self, document: CommercialDocument) -> bool:
         if self._active_tenant_id and document.tenant_id != self._active_tenant_id:
@@ -141,6 +149,10 @@ class TransactionsWorkspaceService:
         return True
 
     def _assert_scope_allowed(self, *, tenant_id: str, organization_id: str) -> None:
+        if self._enforce_active_scope and (
+            not self._active_tenant_id or not self._active_organization_id
+        ):
+            raise ValueError("transactions workspace scope is not configured")
         if self._active_tenant_id and tenant_id != self._active_tenant_id:
             raise ValueError("tenant scope mismatch for transactions workspace")
         if (

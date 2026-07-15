@@ -44,6 +44,7 @@ Status: Active
 - P-04 Unified Attachment Framework
 - P-05 Document Generation and Template Engine
 - P-06 Alpha Foundation Integrity Audit
+- P-07 Alpha Blocker Remediation
 - T-09 Change Order Tracking Convention
 
 ### A-07 Scope
@@ -131,6 +132,19 @@ Explicitly out of scope:
 - new product feature scope expansion
 - Epic E implementation start
 - cloud infrastructure expansion beyond current local deterministic adapters
+
+### P-07 Scope
+
+- remediate confirmed Alpha blocker-class findings from `ALPHA_READINESS.md`
+- prioritize tenant isolation and authorization boundary hardening without introducing new feature scope
+- require safe default scope behavior in transactions service boundaries and preserve deterministic compatibility behavior for explicit test-only opt-outs
+- add regression coverage and documentation updates for all corrected blocker-class defects
+
+Explicitly out of scope:
+
+- new product capability expansion
+- AI, procurement, receiving, or service workflow activation
+- inventory reactivation
 
 ### P-05 Scope
 
