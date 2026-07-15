@@ -97,6 +97,8 @@ class TransactionsWorkspaceService:
         serialized_terms_blocks: list[dict[str, Any]] | None = None,
         serialized_document_templates: list[dict[str, Any]] | None = None,
         serialized_project_commercial_state: dict[str, Any] | None = None,
+        active_tenant_id: str | None = None,
+        active_organization_id: str | None = None,
         commercial_service: CommercialDocumentService | None = None,
     ) -> None:
         self._commercial_service = commercial_service or CommercialDocumentService(
@@ -125,6 +127,27 @@ class TransactionsWorkspaceService:
             ).items()
             if str(project_id).strip() and isinstance(payload, dict)
         }
+        self._active_tenant_id = _safe_text(active_tenant_id, "") or None
+        self._active_organization_id = _safe_text(active_organization_id, "") or None
+
+    def _is_in_active_scope(self, document: CommercialDocument) -> bool:
+        if self._active_tenant_id and document.tenant_id != self._active_tenant_id:
+            return False
+        if (
+            self._active_organization_id
+            and document.organization_id != self._active_organization_id
+        ):
+            return False
+        return True
+
+    def _assert_scope_allowed(self, *, tenant_id: str, organization_id: str) -> None:
+        if self._active_tenant_id and tenant_id != self._active_tenant_id:
+            raise ValueError("tenant scope mismatch for transactions workspace")
+        if (
+            self._active_organization_id
+            and organization_id != self._active_organization_id
+        ):
+            raise ValueError("organization scope mismatch for transactions workspace")
 
     def _document_family(self, document_type: CommercialDocumentType) -> str:
         return document_type.value
@@ -276,10 +299,23 @@ class TransactionsWorkspaceService:
         document_type: CommercialDocumentType | None = None,
         include_archived: bool = False,
         lifecycle_state: CommercialDocumentLifecycleState | None = None,
+        tenant_id: str | None = None,
+        organization_id: str | None = None,
     ) -> list[CommercialDocument]:
         normalized_query = query.strip().lower()
         rows: list[CommercialDocument] = []
+        scoped_tenant_id = _safe_text(tenant_id, "") or None
+        scoped_organization_id = _safe_text(organization_id, "") or None
         for document in self._documents:
+            if not self._is_in_active_scope(document):
+                continue
+            if scoped_tenant_id and document.tenant_id != scoped_tenant_id:
+                continue
+            if (
+                scoped_organization_id
+                and document.organization_id != scoped_organization_id
+            ):
+                continue
             if not include_archived and (
                 document.lifecycle_state == CommercialDocumentLifecycleState.ARCHIVED
             ):
@@ -342,6 +378,10 @@ class TransactionsWorkspaceService:
             and not (customer_id or "").strip()
         ):
             raise ValueError("standalone estimates require customer_id")
+        self._assert_scope_allowed(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
         document = self._commercial_service.create_document(
             tenant_id=tenant_id,
             organization_id=organization_id,
@@ -438,12 +478,20 @@ class TransactionsWorkspaceService:
             },
         )
         if source_sales_order is not None:
+            if source_sales_order.tenant_id != tenant_id:
+                raise ValueError("cross-tenant source sales order is not allowed")
+            if source_sales_order.organization_id != organization_id:
+                raise ValueError("cross-organization source sales order is not allowed")
             self._commercial_service.add_relationship(
                 document,
                 relationship_type="source_sales_order",
                 related_document_id=source_sales_order.document_id,
             )
         if source_invoice is not None:
+            if source_invoice.tenant_id != tenant_id:
+                raise ValueError("cross-tenant source invoice is not allowed")
+            if source_invoice.organization_id != organization_id:
+                raise ValueError("cross-organization source invoice is not allowed")
             self._commercial_service.add_relationship(
                 document,
                 relationship_type="source_invoice",
@@ -611,6 +659,8 @@ class TransactionsWorkspaceService:
         normalized_reference_type = _safe_text(reference_type, "").lower()
         if not normalized_project_id:
             raise ValueError("project_id is required")
+        if self._active_tenant_id and tenant_id != self._active_tenant_id:
+            raise ValueError("tenant scope mismatch for transactions workspace")
         if normalized_reference_type not in {
             "accepted_estimate",
             "originating_sales_order",
@@ -631,6 +681,11 @@ class TransactionsWorkspaceService:
             source_document = self._required_document(source_id)
             if source_document.tenant_id != tenant_id:
                 raise ValueError("cross-tenant base bid assignment is not allowed")
+            if self._active_organization_id:
+                if source_document.organization_id != self._active_organization_id:
+                    raise ValueError(
+                        "cross-organization base bid assignment is not allowed"
+                    )
             expected_type = (
                 CommercialDocumentType.ESTIMATE
                 if normalized_reference_type == "accepted_estimate"
@@ -2109,10 +2164,27 @@ class TransactionsWorkspaceService:
         document.future_email_metadata.append(entry)
         return dict(entry)
 
-    def get_document(self, document_id: str) -> CommercialDocument | None:
+    def get_document(
+        self,
+        document_id: str,
+        *,
+        tenant_id: str | None = None,
+        organization_id: str | None = None,
+    ) -> CommercialDocument | None:
         normalized_id = document_id.strip()
+        scoped_tenant_id = _safe_text(tenant_id, "") or None
+        scoped_organization_id = _safe_text(organization_id, "") or None
         for document in self._documents:
+            if not self._is_in_active_scope(document):
+                continue
             if document.document_id == normalized_id:
+                if scoped_tenant_id and document.tenant_id != scoped_tenant_id:
+                    continue
+                if (
+                    scoped_organization_id
+                    and document.organization_id != scoped_organization_id
+                ):
+                    continue
                 return document
         return None
 

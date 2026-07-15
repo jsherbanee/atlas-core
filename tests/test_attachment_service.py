@@ -277,6 +277,31 @@ def test_attachment_validation_rejects_unsafe_inputs(tmp_path: Path) -> None:
         )
 
 
+def test_attachment_versioning_rejects_disallowed_extension(tmp_path: Path) -> None:
+    service = _build_attachment_service(tmp_path)
+    uploaded = service.upload_attachment(
+        tenant_id="tenant-a",
+        organization_id="org-a",
+        object_type="project",
+        object_id="project-1",
+        filename="scope.txt",
+        data=b"v1",
+        mime_type="text/plain",
+        actor_id="user-a",
+    )
+
+    with pytest.raises(ValueError, match="file extension is not allowed"):
+        service.create_attachment_version(
+            tenant_id="tenant-a",
+            organization_id="org-a",
+            attachment_id=uploaded["attachment"]["attachment_id"],
+            filename="scope.exe",
+            data=b"v2",
+            mime_type="text/plain",
+            actor_id="user-a",
+        )
+
+
 def test_attachment_tenant_scope_isolation(tmp_path: Path) -> None:
     service = _build_attachment_service(tmp_path)
 

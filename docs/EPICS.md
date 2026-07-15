@@ -43,6 +43,7 @@ Status: Active
 - P-03 Deterministic Background Job Framework
 - P-04 Unified Attachment Framework
 - P-05 Document Generation and Template Engine
+- P-06 Alpha Foundation Integrity Audit
 - T-09 Change Order Tracking Convention
 
 ### A-07 Scope
@@ -117,6 +118,19 @@ Explicitly out of scope:
 - cloud object-store adapters
 - malware scanning engines
 - external worker execution for attachment hooks
+
+### P-06 Scope
+
+- perform repository-wide integrity audit for permissions, immutable audit, background jobs, attachments, document generation, settings, commercial documents, universal object framework, workspace continuity, lifecycle engine, tenant isolation, repository persistence, search/navigation, and documentation accuracy
+- classify findings as implemented, partial, missing, blocking, and non-blocking with evidence
+- apply only hardening-safe corrective fixes (security, tenant isolation, data integrity, compatibility, test correctness, documentation accuracy)
+- publish Alpha readiness report with recommended sprint sequencing and evidence-backed readiness percentage
+
+Explicitly out of scope:
+
+- new product feature scope expansion
+- Epic E implementation start
+- cloud infrastructure expansion beyond current local deterministic adapters
 
 ### P-05 Scope
 

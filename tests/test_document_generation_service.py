@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
+
 from atlas_core.contracts.document_generation_contracts import (
     OutputFormat,
     RenderRequest,
@@ -271,3 +273,30 @@ def test_transactions_export_records_generated_artifact_template_and_determinist
     assert latest_attachment["output_format"] == "pdf"
     assert "template_assignment" in latest_attachment
     assert document.export_activity[-1]["event"] == "document_generated"
+
+
+def test_explicit_template_rejects_cross_tenant_scope() -> None:
+    _, document = _build_document()
+    generation = DocumentGenerationService(
+        serialized_templates=[
+            _template_payload(
+                template_id="tenant-b-template",
+                version_number=1,
+                content="<html><body>tenant-b</body></html>",
+                tenant_id="tenant-b",
+                organization_id="org-a",
+                is_default=False,
+            )
+        ]
+    )
+
+    with pytest.raises(ValueError, match="tenant mismatch"):
+        generation.resolve_template(
+            tenant_id=document.tenant_id,
+            organization_id=document.organization_id,
+            document_family=document.document_type.value,
+            customer_id=document.customer_id,
+            project_id=document.project_id,
+            transaction_id=document.document_id,
+            explicit_template_id="tenant-b-template",
+        )

@@ -94,6 +94,40 @@ def test_create_and_filter_documents() -> None:
     assert searched[0].document_id == sales_order.document_id
 
 
+def test_active_scope_filters_cross_tenant_documents() -> None:
+    service = TransactionsWorkspaceService(
+        active_tenant_id="tenant-a",
+        active_organization_id="org-1",
+    )
+    tenant_a = service.create_draft(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.ESTIMATE,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service_unscoped = TransactionsWorkspaceService(
+        serialized_documents=service.to_payload()
+    )
+    tenant_b = service_unscoped.create_draft(
+        tenant_id="tenant-b",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.ESTIMATE,
+        project_id="project-b",
+        customer_id="customer-b",
+    )
+
+    scoped = TransactionsWorkspaceService(
+        serialized_documents=service_unscoped.to_payload(),
+        active_tenant_id="tenant-a",
+        active_organization_id="org-1",
+    )
+    visible = scoped.list_documents(include_archived=True)
+
+    assert [item.document_id for item in visible] == [tenant_a.document_id]
+    assert scoped.get_document(tenant_b.document_id) is None
+
+
 def test_edit_archive_restore() -> None:
     service = _service()
     created = service.create_draft(

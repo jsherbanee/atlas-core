@@ -168,6 +168,22 @@ class DocumentGenerationService:
             candidate = self._template_required(_safe_text(explicit_template_id))
             if candidate.archived or candidate.status != TemplateStatus.ACTIVE:
                 raise ValueError("explicit template is not active")
+            if candidate.tenant_id != _safe_text(tenant_id):
+                raise ValueError("explicit template tenant mismatch")
+            if candidate.organization_id != _safe_text(organization_id):
+                raise ValueError("explicit template organization mismatch")
+            if candidate.document_family != _safe_text(document_family).lower():
+                raise ValueError("explicit template document family mismatch")
+            if candidate.customer_id and candidate.customer_id != _safe_text(
+                customer_id
+            ):
+                raise ValueError("explicit template customer scope mismatch")
+            if candidate.project_id and candidate.project_id != _safe_text(project_id):
+                raise ValueError("explicit template project scope mismatch")
+            if candidate.transaction_id and candidate.transaction_id != _safe_text(
+                transaction_id
+            ):
+                raise ValueError("explicit template transaction scope mismatch")
             return _ResolvedTemplate(candidate, TemplateSource.EXPLICIT)
 
         candidates = [

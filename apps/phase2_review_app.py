@@ -3552,6 +3552,8 @@ def _transactions_workspace_service(st: Any) -> TransactionsWorkspaceService:
         serialized_project_commercial_state=dict(
             state.get("project_commercial_state") or {}
         ),
+        active_tenant_id=tenant_id,
+        active_organization_id=organization_id,
     )
 
 

@@ -21,6 +21,23 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Sprint P-06 Alpha Foundation Integrity Audit)
+
+### Improved
+
+- Completed evidence-based alpha integrity audit across permissions, immutable audit, jobs, attachments, document generation, settings, commercial documents, universal object framework, workspace continuity, lifecycle, tenancy, persistence, and search/navigation.
+- Transactions workspace service now supports active tenant/organization scope enforcement for list/read flows and rejects cross-scope source-document linkage in return-order creation paths.
+- Document generation explicit-template resolution now enforces tenant/organization/document-family and scope compatibility checks.
+- Attachment version uploads now enforce the same extension allow-list as initial uploads.
+- Added regression tests for tenant scope filtering, explicit template scope enforcement, and attachment version extension validation.
+
+### Quality
+
+- black --check .: passing
+- ruff check .: passing
+- mypy .: passing
+- pytest: full suite passing (1366 tests)
+
 ## Unreleased (Epic T Sprint T-09 Change Order Tracking Convention)
 
 ### Improved

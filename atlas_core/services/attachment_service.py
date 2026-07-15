@@ -377,6 +377,9 @@ class AttachmentService:
         payload = bytes(data or b"")
         mime = self._validated_mime_type(mime_type)
         self._validate_size(len(payload))
+        ext = self._extension_for_filename(safe_name)
+        if ext not in self.allowed_extensions:
+            raise ValueError("file extension is not allowed")
 
         record = self._required_attachment(
             tenant_id=tenant_id,
