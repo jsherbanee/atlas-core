@@ -38,6 +38,9 @@ from atlas_core.domain.commercial_document import (
 )
 from atlas_core.services.assembly_expansion_service import AssemblyExpansionService
 from atlas_core.services.bom_review_service import BomReviewService
+from atlas_core.services.commercial_catalog_seed_service import (
+    CommercialCatalogSeedService,
+)
 from atlas_core.services.commercial_knowledge_service import (
     CommercialKnowledgeService,
 )
@@ -3424,6 +3427,14 @@ def _commercial_service(st: Any) -> CommercialKnowledgeService:
     return CommercialKnowledgeService(state=_commercial_knowledge_state(st))
 
 
+def _save_commercial_knowledge_state(
+    st: Any, service: CommercialKnowledgeService
+) -> None:
+    library = _price_list_library_state(st)
+    library["commercial_knowledge"] = service.to_dict()
+    st.session_state["atlas_price_list_library"] = library
+
+
 def _commercial_product_state(st: Any) -> dict[str, Any]:
     library = _price_list_library_state(st)
     state = library.get("commercial_products")
@@ -3548,6 +3559,7 @@ def _transactions_workspace_service(st: Any) -> TransactionsWorkspaceService:
             tenant_id=tenant_id,
             organization_id=organization_id,
         ),
+        serialized_catalog_state=_commercial_knowledge_state(st),
         serialized_project_commercial_state=dict(
             state.get("project_commercial_state") or {}
         ),
@@ -3564,6 +3576,7 @@ def _save_transactions_workspace_state(
     state["documents"] = service.to_payload()
     state["project_commercial_state"] = service.project_commercial_state_payload()
     st.session_state["atlas_transactions_workspace"] = state
+    _save_commercial_knowledge_state(st, service.catalog_service)
     settings_service = _settings_workspace_service(st)
     settings_service.replace_numbering_policies(
         tenant_id=_safe_text(state.get("tenant_id"), "local"),
@@ -3613,6 +3626,21 @@ def _ensure_commercial_seed_data(st: Any) -> CommercialProductService:
             continue
 
     _save_commercial_product_state(st, service)
+    return service
+
+
+def _ensure_commercial_catalog_seed_data(st: Any) -> CommercialKnowledgeService:
+    service = _commercial_service(st)
+    seed_service = CommercialCatalogSeedService(service)
+    if not seed_service.is_seed_loaded(tenant_id="local"):
+        seed_service.load_seed_data(
+            tenant_id="local",
+            organization_id="atlas",
+            imported_by="atlas-ui",
+            force_reload=False,
+            enable_pdf_finalize=False,
+        )
+        _save_commercial_knowledge_state(st, service)
     return service
 
 
@@ -4058,6 +4086,519 @@ def _resolution_summary_rows(resolutions: list[Any]) -> dict[str, int]:
         if status in {"unknown_product", "generic_allowance"} or confidence < 0.75:
             summary["requires_review"] += 1
     return summary
+
+
+def _estimate_project_code_candidates(record: ProjectWorkspaceRecord) -> list[str]:
+    candidates = [
+        _safe_text(record.metadata.get("project_code"), ""),
+        _safe_text(record.project.atlas_bid_id, ""),
+        _safe_text(record.project.client_project_number, ""),
+        _safe_text(record.project.internal_project_number, ""),
+        _safe_text(record.workspace_id, ""),
+    ]
+    deduped: list[str] = []
+    for item in candidates:
+        if item and item not in deduped:
+            deduped.append(item)
+    return deduped
+
+
+def _estimate_catalog_search_rows(
+    service: TransactionsWorkspaceService,
+    *,
+    search: str,
+    item_type: str,
+    include_archived: bool,
+) -> list[dict[str, Any]]:
+    catalog_service = service._commercial_catalog_service
+    normalized_type = _safe_text(item_type, "all").lower()
+    rows = catalog_service.list_catalog_items(
+        item_type=(None if normalized_type == "all" else normalized_type),
+        include_archived=include_archived,
+    )
+    query = _safe_text(search, "").lower()
+    if not query:
+        return rows
+    filtered: list[dict[str, Any]] = []
+    for item in rows:
+        corpus = " ".join(
+            [
+                _safe_text(item.get("item_type"), ""),
+                _safe_text(item.get("code"), ""),
+                _safe_text(item.get("name"), ""),
+                _safe_text(item.get("description"), ""),
+                _safe_text(item.get("manufacturer"), ""),
+                _safe_text(item.get("tax_category"), ""),
+                _safe_text(item.get("status"), ""),
+            ]
+        ).lower()
+        if query in corpus:
+            filtered.append(item)
+    return filtered
+
+
+def _render_estimate_add_workspace(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    service: TransactionsWorkspaceService,
+) -> None:
+    _render_page_header(
+        st,
+        "Add Estimate",
+        "Create a new estimate and add catalog items, services, fees, or assemblies.",
+    )
+
+    project_rows = _project_library_rows(
+        workspace_service,
+        include_archived=False,
+        limit=300,
+    )
+    _ensure_commercial_catalog_seed_data(st)
+    project_options = [
+        {
+            "project_id": _safe_text(row.get("workspace_id"), ""),
+            "project_name": _safe_text(row.get("project_name"), ""),
+            "project_codes": _estimate_project_code_candidates(row["record"]),
+            "customer": _safe_text(row.get("customer"), ""),
+        }
+        for row in project_rows
+        if _safe_text(row.get("workspace_id"), "")
+    ]
+    project_by_id = {item["project_id"]: item for item in project_options}
+
+    product_service = _ensure_commercial_seed_data(st)
+    customer_entities = product_service.list_knowledge_entities(
+        entity_type="customer",
+        include_inactive=True,
+    )
+    customer_values: dict[str, str] = {}
+    for item in customer_entities:
+        attributes = dict(item.get("attributes") or {})
+        customer_id = _safe_text(attributes.get("customer_id"), "")
+        if not customer_id:
+            continue
+        customer_values[customer_id] = _safe_text(
+            item.get("display_name"),
+            _safe_text(item.get("canonical_name"), customer_id),
+        )
+    for item in project_options:
+        candidate = _safe_text(item.get("customer"), "")
+        if candidate and candidate not in customer_values:
+            customer_values[candidate] = candidate
+
+    customer_ids = sorted(customer_values.keys())
+    customer_labels = {cid: f"{customer_values[cid]} ({cid})" for cid in customer_ids}
+    project_ids = ["", *[item["project_id"] for item in project_options]]
+    project_labels = {
+        "": "No project link",
+        **{
+            item["project_id"]: f"{item['project_name']} ({item['project_id']})"
+            for item in project_options
+        },
+    }
+
+    st.markdown("### 1. Estimate Details")
+    detail_cols = st.columns([2, 2, 2, 2])
+    selected_customer_id = detail_cols[0].selectbox(
+        "Customer *",
+        options=customer_ids,
+        format_func=lambda value: customer_labels.get(value, value),
+        key="atlas_estimate_add_customer",
+    )
+    selected_project_id = detail_cols[1].selectbox(
+        "Project",
+        options=project_ids,
+        format_func=lambda value: project_labels.get(value, value),
+        key="atlas_estimate_add_project",
+    )
+    project_code_options = [""]
+    selected_project = project_by_id.get(selected_project_id)
+    if selected_project is not None:
+        project_code_options.extend(list(selected_project.get("project_codes") or []))
+    selected_project_code = detail_cols[2].selectbox(
+        "Project Code",
+        options=project_code_options,
+        format_func=lambda value: value or "No project code",
+        key="atlas_estimate_add_project_code",
+    )
+    detail_cols[3].text_input(
+        "Estimate Number",
+        value="Auto-generated",
+        disabled=True,
+        key="atlas_estimate_add_number_preview",
+    )
+
+    if selected_project is not None and len(project_code_options) == 1:
+        st.warning("No Project Codes available for selected Project.")
+
+    date_cols = st.columns([1, 1, 1, 1])
+    estimate_date = date_cols[0].date_input(
+        "Estimate Date",
+        value=date.today(),
+        key="atlas_estimate_add_estimate_date",
+    )
+    valid_through = date_cols[1].date_input(
+        "Valid Through",
+        value=date.today(),
+        key="atlas_estimate_add_valid_through",
+    )
+    currency = date_cols[2].selectbox(
+        "Currency",
+        options=["USD - US Dollar"],
+        key="atlas_estimate_add_currency",
+    )
+    salesperson = date_cols[3].text_input(
+        "Salesperson",
+        key="atlas_estimate_add_salesperson",
+        placeholder="Optional owner",
+    )
+
+    description = st.text_area(
+        "Description",
+        key="atlas_estimate_add_description",
+        height=80,
+        placeholder="Optional description for this estimate.",
+    )
+
+    draft_document_id = _safe_text(
+        st.session_state.get("atlas_transactions_estimate_add_document_id"),
+        "",
+    )
+    draft_document = (
+        service.get_document(draft_document_id) if draft_document_id else None
+    )
+    if (
+        draft_document is None
+        or draft_document.document_type != CommercialDocumentType.ESTIMATE
+    ):
+        draft_document_id = ""
+        st.session_state["atlas_transactions_estimate_add_document_id"] = ""
+
+    create_label = (
+        "Create Draft Estimate"
+        if not draft_document_id
+        else "Continue with Draft Estimate"
+    )
+    if st.button(
+        create_label,
+        key="atlas_estimate_add_create_draft",
+        type="primary",
+        width="content",
+    ):
+        if not _safe_text(selected_customer_id, ""):
+            st.error("Customer required")
+        elif not draft_document_id:
+            try:
+                created = service.create_draft(
+                    tenant_id="local",
+                    organization_id="atlas",
+                    document_type=CommercialDocumentType.ESTIMATE,
+                    project_id=selected_project_id or None,
+                    project_code=selected_project_code or None,
+                    customer_id=selected_customer_id,
+                    vendor_id=None,
+                )
+                service._commercial_service.set_document_metadata(
+                    created,
+                    metadata={
+                        "estimate_date": estimate_date.isoformat(),
+                        "valid_through_date": valid_through.isoformat(),
+                        "currency": currency,
+                        "salesperson": _safe_text(salesperson, "") or None,
+                        "description": _safe_text(description, "") or None,
+                    },
+                )
+                st.session_state["atlas_transactions_estimate_add_document_id"] = (
+                    created.document_id
+                )
+                st.session_state["atlas_transactions_selected_document_id"] = (
+                    created.document_id
+                )
+                _save_transactions_workspace_state(st, service)
+                st.success("Draft estimate created. Continue by adding line items.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to create estimate draft: {exc}")
+
+    draft_document = (
+        service.get_document(
+            _safe_text(
+                st.session_state.get("atlas_transactions_estimate_add_document_id"), ""
+            )
+        )
+        if _safe_text(
+            st.session_state.get("atlas_transactions_estimate_add_document_id"), ""
+        )
+        else None
+    )
+    if draft_document is None:
+        _render_guided_empty_state(
+            st,
+            why_empty="No draft estimate is active yet.",
+            action_to_populate="Complete the required customer field and create a draft.",
+            next_location="Create Draft Estimate.",
+        )
+        return
+
+    st.markdown("### 2. Estimate Line Items")
+    search_cols = st.columns([3, 2, 1, 1])
+    catalog_query = search_cols[0].text_input(
+        "Search catalog",
+        key="atlas_estimate_add_catalog_query",
+        placeholder="Search by product, part number, or description",
+    )
+    catalog_type_filter = search_cols[1].selectbox(
+        "Item Type",
+        options=["all", "product", "service", "fee", "assembly"],
+        key="atlas_estimate_add_catalog_type_filter",
+    )
+    include_archived = search_cols[2].checkbox(
+        "Include Archived",
+        key="atlas_estimate_add_catalog_include_archived",
+        value=False,
+    )
+    assembly_mode = search_cols[3].selectbox(
+        "Assembly Mode",
+        options=["expand", "grouped"],
+        key="atlas_estimate_add_assembly_mode",
+    )
+
+    catalog_rows = _estimate_catalog_search_rows(
+        service,
+        search=catalog_query,
+        item_type=catalog_type_filter,
+        include_archived=include_archived,
+    )
+
+    if not catalog_rows:
+        _render_guided_empty_state(
+            st,
+            why_empty="No catalog items found for the current filters.",
+            action_to_populate="Clear search/filter or import catalog entities.",
+            next_location="Use Search catalog and Item Type filters.",
+        )
+    else:
+        st.dataframe(
+            [
+                {
+                    "Item Type": _safe_text(item.get("item_type"), ""),
+                    "SKU / Code": _safe_text(item.get("code"), ""),
+                    "Name": _safe_text(item.get("name"), ""),
+                    "Manufacturer": _safe_text(item.get("manufacturer"), ""),
+                    "Description": _safe_text(item.get("description"), ""),
+                    "Cost": _safe_text(item.get("cost"), ""),
+                    "Default Sales Price": _safe_text(
+                        item.get("default_sales_price"), ""
+                    ),
+                    "Tax Category": _safe_text(item.get("tax_category"), ""),
+                    "Status": _safe_text(item.get("status"), "active"),
+                    "Archived": bool(item.get("archived", False)),
+                }
+                for item in catalog_rows
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+    catalog_option_labels = [
+        f"{_safe_text(item.get('item_type'), '').title()} · {_safe_text(item.get('code'), '')} · {_safe_text(item.get('name'), '')}"
+        for item in catalog_rows
+    ]
+    catalog_map = {
+        label: item for label, item in zip(catalog_option_labels, catalog_rows)
+    }
+    selected_labels = st.multiselect(
+        "Select Catalog Items",
+        options=catalog_option_labels,
+        key="atlas_estimate_add_catalog_selected",
+    )
+    add_cols = st.columns([1, 1, 1, 1])
+    quantity = Decimal(
+        str(
+            add_cols[0].number_input(
+                "Quantity",
+                min_value=0.01,
+                value=1.0,
+                step=1.0,
+                key="atlas_estimate_add_quantity",
+            )
+        )
+    )
+    override_price_enabled = add_cols[1].checkbox(
+        "Manual sales price",
+        key="atlas_estimate_add_override_enabled",
+        value=False,
+    )
+    override_price = Decimal(
+        str(
+            add_cols[2].number_input(
+                "Manual Unit Price",
+                min_value=0.0,
+                value=0.0,
+                step=1.0,
+                key="atlas_estimate_add_override_price",
+                disabled=not override_price_enabled,
+            )
+        )
+    )
+    description_override = add_cols[3].text_input(
+        "Description Override",
+        key="atlas_estimate_add_description_override",
+        placeholder="Optional",
+    )
+
+    action_cols = st.columns([1, 1])
+    if action_cols[0].button(
+        "Add Items",
+        key="atlas_estimate_add_add_catalog_items",
+        width="content",
+    ):
+        if not selected_labels:
+            st.error("No catalog items found")
+        else:
+            try:
+                for label in selected_labels:
+                    item = catalog_map.get(label) or {}
+                    if bool(item.get("archived", False)):
+                        st.warning(
+                            f"Selected item is archived: {_safe_text(item.get('name'), _safe_text(item.get('code'), 'catalog item'))}"
+                        )
+                        continue
+                    service.add_catalog_line(
+                        document_id=draft_document.document_id,
+                        catalog_item_id=_safe_text(item.get("catalog_item_id"), ""),
+                        quantity=quantity,
+                        manual_unit_price=(
+                            override_price if override_price_enabled else None
+                        ),
+                        description_override=_safe_text(description_override, "")
+                        or None,
+                        assembly_mode=assembly_mode,
+                    )
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to add catalog items: {exc}")
+
+    if action_cols[1].button(
+        "Add Service",
+        key="atlas_estimate_add_add_service_line",
+        width="content",
+    ):
+        try:
+            service._commercial_service.add_line(
+                draft_document,
+                description="Manual service line",
+                quantity=Decimal("1"),
+                unit_price=Decimal("0"),
+                line_metadata={
+                    "line_type": "service",
+                    "catalog": {"manual_entry": True},
+                },
+            )
+            _save_transactions_workspace_state(st, service)
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Unable to add service line: {exc}")
+
+    st.markdown("### 3. Review Pricing and Tax")
+    current_document = service.get_document(draft_document.document_id)
+    if current_document is None:
+        st.error("Unable to load active estimate draft.")
+        return
+
+    line_rows = [
+        {
+            "Sequence": line.sequence,
+            "Item Type": _safe_text(
+                line.line_metadata.get("line_type") if line.line_metadata else "item",
+                "item",
+            ),
+            "SKU": _safe_text(line.product_or_service_reference, ""),
+            "Description": _safe_text(line.description, ""),
+            "Quantity": str(line.quantity),
+            "Unit Price": str(line.unit_price),
+            "Extended Price": str(line.extended_amount),
+            "Tax Status": "Taxed" if line.tax_rate > Decimal("0") else "Review",
+            "Actions": "Override price",
+        }
+        for line in list(current_document.lines or [])
+    ]
+    if line_rows:
+        st.dataframe(line_rows, width="stretch", hide_index=True)
+        override_line_cols = st.columns([2, 1, 1])
+        line_ids = [line.line_id for line in list(current_document.lines or [])]
+        selected_line_id = override_line_cols[0].selectbox(
+            "Line",
+            options=line_ids,
+            key="atlas_estimate_add_override_line_id",
+        )
+        selected_override_price = Decimal(
+            str(
+                override_line_cols[1].number_input(
+                    "Override Unit Price",
+                    min_value=0.0,
+                    value=0.0,
+                    step=1.0,
+                    key="atlas_estimate_add_override_line_price",
+                )
+            )
+        )
+        if override_line_cols[2].button(
+            "Apply Override",
+            key="atlas_estimate_add_apply_override",
+            width="content",
+        ):
+            target_line = next(
+                (
+                    line
+                    for line in current_document.lines
+                    if line.line_id == selected_line_id
+                ),
+                None,
+            )
+            if target_line is None:
+                st.error("Unable to apply line override.")
+            else:
+                target_line.unit_price = selected_override_price
+                service._commercial_service.recompute_totals(current_document)
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
+
+        unresolved_tax_lines = [
+            line
+            for line in list(current_document.lines or [])
+            if line.contributes_to_totals and line.tax_rate == Decimal("0")
+        ]
+        if unresolved_tax_lines:
+            st.warning("Tax rule unresolved")
+    else:
+        _render_guided_empty_state(
+            st,
+            why_empty="No line items added yet.",
+            action_to_populate="Search and add catalog items or add a manual service line.",
+            next_location="Use Add Items or Add Service.",
+        )
+
+    totals = current_document.totals
+    total_cols = st.columns([2, 1, 1])
+    total_cols[1].markdown(f"**Estimate Subtotal**\n\n{totals.subtotal}")
+    total_cols[2].markdown(f"**Estimated Total**\n\n{totals.grand_total}")
+
+    st.markdown("### 4. Create Draft Estimate")
+    st.success(
+        f"Draft estimate ready: {_safe_text(current_document.document_number, current_document.document_id)}"
+    )
+    if st.button(
+        "Open Lines Editor",
+        key="atlas_estimate_add_open_lines_editor",
+        width="content",
+    ):
+        st.session_state[_navigation_tertiary_state_key()] = "lines"
+        st.session_state["atlas_transactions_selected_document_id"] = (
+            current_document.document_id
+        )
+        st.rerun()
 
 
 def _normalized_resolution_status(item: Any) -> str:
@@ -7515,9 +8056,9 @@ def _render_top_navigation(
 ) -> None:
     active_page = st.session_state.get("atlas_active_page", "Mission Control")
     nav_items = [
+        ("Transactions", "Transactions"),
         ("Projects", "Projects"),
         ("Knowledge", "Knowledge"),
-        ("Transactions", "Transactions"),
         ("Reports", "Reports"),
     ]
 
@@ -7559,22 +8100,24 @@ def _render_header(
     record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> None:
+    _ = (workspace_service, context)
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
     alpha_marker = _alpha_environment_marker()
 
-    header_cols = st.columns([1.05, 3.2, 3.6, 0.55])
-    if header_cols[0].button(
+    top_cols = st.columns([1.6, 5.2, 0.5])
+    if top_cols[0].button(
         "Atlas",
         key="atlas_header_nav_Atlas",
         width="content",
         type="primary" if current_page == "Mission Control" else "secondary",
     ):
         _open_page(st, "Mission Control")
-    nav_cols = header_cols[1].columns([0.85, 1.0, 1.3, 0.85])
+    _render_global_search_control(st, top_cols[1])
+    _render_header_menu(st, top_cols[2])
+
+    nav_cols = st.columns([1.05, 1.05, 1.05, 1.05])
     _render_top_navigation(st, nav_cols, record)
-    _render_global_search_control(st, header_cols[2])
-    _render_header_menu(st, header_cols[3])
-    header_cols[0].caption(
+    top_cols[0].caption(
         f"{_safe_text(alpha_marker.get('label'), 'Controlled Alpha')} · {ALPHA_APP_VERSION_IDENTIFIER}"
     )
 
@@ -13151,6 +13694,10 @@ def _render_transactions_workspace_page(
     )
     document_type = _transaction_document_type_for_secondary(secondary)
 
+    if tertiary == "add" and document_type == CommercialDocumentType.ESTIMATE:
+        _ensure_commercial_catalog_seed_data(st)
+        service = _transactions_workspace_service(st)
+
     deferred_secondary = {
         "purchase_orders",
         "rfqs",
@@ -13374,6 +13921,14 @@ def _render_transactions_workspace_page(
 
     if document_type is None:
         _render_empty_state(st, "Transactions section is not available.")
+        return
+
+    if tertiary == "add" and document_type == CommercialDocumentType.ESTIMATE:
+        _render_estimate_add_workspace(
+            st,
+            workspace_service,
+            service,
+        )
         return
 
     prefix = f"atlas_transactions_{secondary}_{tertiary}"
@@ -34955,19 +35510,16 @@ def _render_status_bar(
     context: dict[str, Any] | None,
 ) -> None:
     _ = (record, context)
-    alpha_marker = _alpha_environment_marker()
     show_diagnostics = _build_diagnostics_visible(st)
     st.markdown("<div class='atlas-statusbar'></div>", unsafe_allow_html=True)
     cols = st.columns([7, 3])
-    cols[0].caption(
-        f"Atlas workspace · {_safe_text(alpha_marker.get('label'), 'Controlled Alpha')}"
-    )
+    cols[0].caption("©2026 Corsa Systems. All rights reserved.")
     if show_diagnostics:
         cols[1].caption(
             f"Atlas v{ALPHA_APP_VERSION_IDENTIFIER} · commit {_current_commit()} · tests {ALPHA_TEST_SUITE_BASELINE_REFERENCE}"
         )
     else:
-        cols[1].caption(f"Atlas v{ALPHA_APP_VERSION_IDENTIFIER}")
+        cols[1].caption("")
 
 
 def _render_main_content(

@@ -169,6 +169,15 @@ U-02 end-to-end workflow validation now includes:
 
 No blocker-class tenant-isolation, issued-immutability, or cross-scope regressions were identified in U-02 validation.
 
+## Alpha UI Cleanup Follow-Up Note (Responsive Navigation and Estimate Creation UX)
+
+Additional alpha hardening now includes:
+- standardized primary shell order for tenant-facing navigation (Transactions, Projects, Knowledge, Reports) with Atlas fixed as Home
+- tenant footer restoration to `©2026 Corsa Systems. All rights reserved.` and continued suppression of internal diagnostics on normal tenant routes
+- dedicated Transactions > Estimates > Add workflow with dropdown-driven customer/project/project-code capture and catalog-backed Product/Service/Fee/Assembly line insertion
+
+No blocker-class tenant-isolation, issued-immutability, or cross-scope regressions were identified in targeted navigation/estimate-add validation coverage.
+
 ## M-01 Follow-Up Note
 
 M-01 alpha infrastructure validation now includes:

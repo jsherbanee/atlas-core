@@ -556,6 +556,7 @@ def atlas_stylesheet() -> str:
             line-height: var(--atlas-line-height-body);
         }}
         .st-key-atlas_header_nav_Atlas button,
+        .st-key-atlas_header_nav_Transactions button,
         .st-key-atlas_header_nav_Projects button,
         .st-key-atlas_header_nav_Knowledge button,
         .st-key-atlas_header_nav_Reports button {{
@@ -571,11 +572,20 @@ def atlas_stylesheet() -> str:
             font-size: var(--atlas-body-small-size) !important;
         }}
         .st-key-atlas_header_nav_Atlas button[kind="primary"],
+        .st-key-atlas_header_nav_Transactions button[kind="primary"],
         .st-key-atlas_header_nav_Projects button[kind="primary"],
         .st-key-atlas_header_nav_Knowledge button[kind="primary"],
         .st-key-atlas_header_nav_Reports button[kind="primary"] {{
             background: var(--atlas-primary-soft) !important;
             color: var(--atlas-primary) !important;
+        }}
+        .st-key-atlas_header_nav_Transactions button {{
+            min-width: 8.5rem !important;
+        }}
+        .st-key-atlas_header_nav_Transactions button p {{
+            white-space: nowrap !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
         }}
         .st-key-atlas_header_nav_Projects button p,
         .st-key-atlas_header_nav_Knowledge button p,
@@ -587,18 +597,20 @@ def atlas_stylesheet() -> str:
         }}
         .st-key-atlas_header_nav_Atlas button p {{
             font-family: var(--atlas-font-display) !important;
-            font-size: var(--atlas-display-l-size) !important;
+            font-size: calc(var(--atlas-display-l-size) * 1.5) !important;
             font-weight: 600 !important;
             letter-spacing: var(--atlas-letter-spacing-display) !important;
             line-height: var(--atlas-line-height-tight) !important;
         }}
         .st-key-atlas_header_nav_Atlas button:hover,
+        .st-key-atlas_header_nav_Transactions button:hover,
         .st-key-atlas_header_nav_Projects button:hover,
         .st-key-atlas_header_nav_Knowledge button:hover,
         .st-key-atlas_header_nav_Reports button:hover {{
             background: var(--atlas-hover) !important;
         }}
         .st-key-atlas_header_nav_Atlas button[kind="primary"]:hover,
+        .st-key-atlas_header_nav_Transactions button[kind="primary"]:hover,
         .st-key-atlas_header_nav_Projects button[kind="primary"]:hover,
         .st-key-atlas_header_nav_Knowledge button[kind="primary"]:hover,
         .st-key-atlas_header_nav_Reports button[kind="primary"]:hover {{
@@ -606,6 +618,8 @@ def atlas_stylesheet() -> str:
         }}
         .st-key-atlas_header_nav_Atlas button:focus,
         .st-key-atlas_header_nav_Atlas button:focus-visible,
+        .st-key-atlas_header_nav_Transactions button:focus,
+        .st-key-atlas_header_nav_Transactions button:focus-visible,
         .st-key-atlas_header_nav_Projects button:focus,
         .st-key-atlas_header_nav_Knowledge button:focus,
         .st-key-atlas_header_nav_Reports button:focus,

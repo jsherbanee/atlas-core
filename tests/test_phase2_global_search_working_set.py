@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
+import inspect
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
@@ -642,9 +644,9 @@ def test_top_navigation_renders_primary_header_buttons() -> None:
 
     assert st.session_state["atlas_active_page"] == "Projects"
     assert [call["label"] for call in st.button_calls] == [
+        "Transactions",
         "Projects",
         "Knowledge",
-        "Transactions",
         "Reports",
     ]
     assert all(call["use_container_width"] is False for call in st.button_calls)
@@ -812,7 +814,17 @@ def test_header_uses_compact_responsive_column_contract() -> None:
 
     app._render_header(st, _FakeWorkspaceService([]), None, None)
 
-    assert st.column_specs[:2] == [[1.05, 3.2, 3.6, 0.55], [0.85, 1.0, 1.3, 0.85]]
+    assert st.column_specs[:2] == [[1.6, 5.2, 0.5], [1.05, 1.05, 1.05, 1.05]]
+
+
+def test_top_navigation_order_places_transactions_first() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state["atlas_active_page"] = "Transactions"
+
+    app._render_top_navigation(st, [st, st, st, st], None)
+
+    labels = [call["label"] for call in st.button_calls[:4]]
+    assert labels == ["Transactions", "Projects", "Knowledge", "Reports"]
 
 
 def test_group_for_page_keeps_internal_mission_control_compatibility() -> None:
@@ -1212,6 +1224,16 @@ def test_injected_styles_keep_red_for_error_not_primary_actions() -> None:
     )
 
 
+def test_injected_styles_include_transactions_primary_nav_contract() -> None:
+    st = _HomeContractStreamlit()
+
+    app._inject_styles(st)
+
+    stylesheet = "\n".join(st.markdowns)
+    assert ".st-key-atlas_header_nav_Transactions button" in stylesheet
+    assert "calc(var(--atlas-display-l-size) * 1.5)" in stylesheet
+
+
 def test_action_center_filters_to_high_priority_and_deduplicates() -> None:
     st = _HomeContractStreamlit()
     service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
@@ -1310,14 +1332,168 @@ def test_footer_shows_tenant_neutral_branding_without_diagnostics() -> None:
 
     app._render_status_bar(st, None, None)
 
-    assert any("Atlas workspace" in item for item in st.captions)
-    assert any("Atlas v" in item for item in st.captions)
+    assert any(
+        "©2026 Corsa Systems. All rights reserved." in item for item in st.captions
+    )
     assert all("commit" not in item for item in st.captions)
     assert all("tests" not in item for item in st.captions)
     assert all(
         phrase not in " ".join(st.captions)
         for phrase in ["Current workspace", "Section:", "Last intake", "Last review"]
     )
+
+
+def test_estimate_add_route_uses_dedicated_workspace_renderer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called: dict[str, bool] = {"value": False}
+
+    class _Metrics:
+        draft_documents = 0
+        pending_approval = 0
+        issued_documents = 0
+        open_purchase_orders = 0
+        partially_received_purchase_orders = 0
+        vendor_bills_pending_sync = 0
+        customer_invoices_pending_sync = 0
+        sync_failures = 0
+
+    class _Service:
+        def overview_metrics(self) -> _Metrics:
+            return _Metrics()
+
+    st = _HomeContractStreamlit()
+    st.session_state[app._navigation_secondary_state_key()] = "estimates"
+    st.session_state[app._navigation_tertiary_state_key()] = "add"
+
+    monkeypatch.setattr(app, "_render_page_header", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "_metric_card", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "_transactions_workspace_service", lambda _st: _Service())
+
+    def _capture(*args: Any, **kwargs: Any) -> None:
+        _ = (args, kwargs)
+        called["value"] = True
+
+    monkeypatch.setattr(app, "_render_estimate_add_workspace", _capture)
+
+    app._render_transactions_workspace_page(st, _FakeWorkspaceService([]))
+
+    assert called["value"] is True
+
+
+def test_estimate_add_workspace_does_not_expose_vendor_id_field() -> None:
+    source = inspect.getsource(app._render_estimate_add_workspace)
+    assert "Vendor ID" not in source
+
+
+def test_estimate_catalog_search_rows_supports_item_type_filters() -> None:
+    service = app.TransactionsWorkspaceService(
+        active_tenant_id="local",
+        active_organization_id="atlas",
+        serialized_catalog_state={
+            "catalog_items": {
+                "product:sku-a": {
+                    "catalog_item_id": "product:sku-a",
+                    "item_type": "product",
+                    "code": "SKU-A",
+                    "name": "Product A",
+                    "description": "Product line",
+                    "status": "active",
+                    "archived": False,
+                },
+                "service:svc-a": {
+                    "catalog_item_id": "service:svc-a",
+                    "item_type": "service",
+                    "code": "SVC-A",
+                    "name": "Service A",
+                    "description": "Service line",
+                    "status": "active",
+                    "archived": False,
+                },
+                "fee:fee-a": {
+                    "catalog_item_id": "fee:fee-a",
+                    "item_type": "fee",
+                    "code": "FEE-A",
+                    "name": "Fee A",
+                    "description": "Fee line",
+                    "status": "active",
+                    "archived": False,
+                },
+                "assembly:asm-a": {
+                    "catalog_item_id": "assembly:asm-a",
+                    "item_type": "assembly",
+                    "code": "ASM-A",
+                    "name": "Assembly A",
+                    "description": "Assembly line",
+                    "status": "active",
+                    "archived": False,
+                },
+            }
+        },
+    )
+
+    rows = app._estimate_catalog_search_rows(
+        service,
+        search="",
+        item_type="all",
+        include_archived=False,
+    )
+    assert {app._safe_text(row.get("item_type"), "") for row in rows} == {
+        "product",
+        "service",
+        "fee",
+        "assembly",
+    }
+
+    service_rows = app._estimate_catalog_search_rows(
+        service,
+        search="service",
+        item_type="service",
+        include_archived=False,
+    )
+    assert len(service_rows) == 1
+    assert service_rows[0]["catalog_item_id"] == "service:svc-a"
+
+
+def test_estimate_totals_support_manual_sales_price_override() -> None:
+    service = app.TransactionsWorkspaceService(
+        active_tenant_id="local",
+        active_organization_id="atlas",
+        serialized_catalog_state={
+            "catalog_items": {
+                "product:sku-a": {
+                    "catalog_item_id": "product:sku-a",
+                    "item_type": "product",
+                    "code": "SKU-A",
+                    "name": "Product A",
+                    "description": "Product line",
+                    "status": "active",
+                    "cost": 6.0,
+                    "default_sales_price": 10.0,
+                    "taxable": False,
+                    "archived": False,
+                }
+            }
+        },
+    )
+    draft = service.create_draft(
+        tenant_id="local",
+        organization_id="atlas",
+        document_type=app.CommercialDocumentType.ESTIMATE,
+        customer_id="cust-1",
+    )
+    service.add_catalog_line(
+        document_id=draft.document_id,
+        catalog_item_id="product:sku-a",
+        quantity=Decimal("2"),
+    )
+    document = service.get_document(draft.document_id)
+    assert document is not None
+    assert document.totals.subtotal == Decimal("20")
+
+    document.lines[0].unit_price = Decimal("12")
+    service._commercial_service.recompute_totals(document)
+    assert document.totals.subtotal == Decimal("24")
 
 
 def test_open_search_reference_routes_to_target_page() -> None:

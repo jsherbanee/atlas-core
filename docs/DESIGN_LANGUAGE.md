@@ -218,6 +218,26 @@ Remaining visual UX debt:
 - some data-dense tables still need progressive disclosure refinement for smaller split-screen use
 - additional width API alignment may continue across older or less frequently used UI surfaces
 
+## 8.5 Atlas Alpha UI Cleanup: Responsive Navigation and Estimate Creation UX
+
+This hardening pass keeps behavior-preserving scope while enforcing shell and transaction-entry consistency for tenant-facing alpha usage.
+
+Completed shell/presentation contracts:
+
+- Atlas remains the Home control at the far left of the header
+- primary navigation order is standardized to Transactions, Projects, Knowledge, Reports
+- Atlas wordmark presentation is increased to improve workstation-header legibility
+- tenant-facing footer text is restored to: `©2026 Corsa Systems. All rights reserved.`
+- internal diagnostics (for example commit/test indicators) remain hidden on normal tenant-facing surfaces
+
+Completed transaction-entry UX contract:
+
+- Transactions > Estimates > Add now uses a dedicated estimate-creation workspace
+- estimate details are dropdown-driven for customer, project, and project code
+- estimate add flow removes Vendor ID from the estimate entry surface
+- catalog-backed line entry supports Product, Service, Fee, and Assembly item types
+- manual service-line insertion remains available without changing issued-document immutability rules
+
 ## 8.5 Sprint X-09 Design System Foundation and Reusable Components
 
 Completion status:

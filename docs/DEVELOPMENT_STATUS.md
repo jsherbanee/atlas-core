@@ -76,6 +76,7 @@ Sprint S-01 completes Settings Workspace alpha scope with organization profile c
 Sprint U-01 completes commercial document usability and presentation polish across Transactions workflows by standardizing tertiary action contracts for Sales Orders, Return Orders, Credit Memos, and Customer Invoices; extending line-presentation sort parity (`unit_cost`, `discount`, `tax_rate`); consolidating export behavior to deterministic PDF actions; and improving source/lineage visibility in related-document views without introducing new transaction families, payments, inventory/procurement, or QuickBooks API transport.
 Sprint U-02 completes end-to-end application usability polish across Home, Projects, project lifecycle-facing surfaces, Transactions, Knowledge, Reports, and Settings by standardizing page-purpose identity captions, reducing development/prototype language in user-facing controls, improving roadmap-section guidance messaging, and validating responsive/state stability behavior without adding new features.
 Alpha UI Cleanup refines production-facing shell/navigation surfaces by tightening active vs deferred route clarity, removing tenant-facing implementation remnants, reducing duplicate action exposure, and preserving behavior contracts without adding new business workflows.
+Alpha UI Cleanup (Responsive Navigation and Estimate Creation UX) standardizes primary shell order to Transactions, Projects, Knowledge, Reports, restores tenant-facing footer copyright text, and adds a dedicated Transactions > Estimates > Add workflow with dropdown-driven estimate details and catalog-backed Product/Service/Fee/Assembly line controls.
 Sprint M-01 implements tenant manager and sandbox provisioning foundations for alpha infrastructure, including platform-admin sandbox lifecycle controls, deterministic isolated repository-path provisioning, tenant-scoped search/job/settings/preference containers, and guarded reset/export/delete workflows without introducing hosted infrastructure dependencies.
 Sprint A-02 implements controlled alpha deployment and test operations, including controlled-alpha environment labeling, administrator-only alpha health checks, tenant-scoped feedback/defect workflow capture, known-limitations access, and operator checklist guidance without introducing new product workflows.
 Sprint A-02 pt 2 implements centralized tenant-scoped application error logging and review workflow, including deterministic fingerprint grouping, occurrence history, user-facing Error IDs, status transitions with audit coverage, sanitized diagnostics export, and health-check unresolved-error/severity summaries.
@@ -112,6 +113,7 @@ Latest validated full-suite baseline in active sprint sequence: 1425 passing tes
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 
 Latest A-04 targeted validation baseline: 25 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
+Latest Alpha UI Cleanup navigation/estimate-add targeted validation baseline: 131 passing tests (`tests/test_phase2_global_search_working_set.py`, `tests/test_phase2_transactions_navigation.py`, `tests/test_phase2_settings_navigation.py`).
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces
@@ -146,6 +148,13 @@ Latest A-04 targeted validation baseline: 25 passing tests (`tests/test_tenant_m
 - validated Transactions shows active families and deferred/disabled families, with no standalone Change Orders navigation section
 - validated Settings shows deferred disabled sections (Integrations, Security, Billing, Advanced) and active Platform Management route
 - validated tenant footer/status surface remains neutral (no commit hash or test-count diagnostics shown in normal shell)
+
+## Manual UI Validation (Alpha UI Cleanup: Responsive Navigation and Estimate Creation UX)
+- validated primary header order as Transactions, Projects, Knowledge, Reports with Atlas as fixed Home control
+- validated tenant footer text `©2026 Corsa Systems. All rights reserved.` on shell routes under test
+- validated dedicated Transactions > Estimates > Add surface rendering and draft-estimate creation path
+- validated estimate-add controls include customer/project/project-code selectors and omit Vendor ID
+- validated catalog line-entry filtering controls for Product/Service/Fee/Assembly and assembly insertion mode selection
 
 ## Manual UI Validation (W-03)
 - validated Object Workspace search handoff with visible context banner and deterministic return behavior

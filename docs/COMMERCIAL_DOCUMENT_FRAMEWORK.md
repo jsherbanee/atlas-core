@@ -97,6 +97,8 @@ Implemented in U-01:
 - deterministic PDF export action parity across line-based commercial families (including Return Orders and Credit Memos through the shared `export_pdf` pattern)
 - source and related-document lineage visibility improvements in Transactions related-document views
 - line-presentation sort parity extension (`unit_cost`, `discount`, `tax_rate`) while preserving authoritative totals semantics
+- dedicated Transactions > Estimates > Add workspace for estimate draft creation with dropdown-driven customer/project/project-code capture and catalog-backed Product/Service/Fee/Assembly insertion
+- tenant-facing estimate creation excludes Vendor ID while preserving estimate lifecycle and numbering rules
 
 Preserved boundaries in U-01:
 - no new commercial document families

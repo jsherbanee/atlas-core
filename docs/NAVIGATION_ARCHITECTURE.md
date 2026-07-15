@@ -33,9 +33,9 @@ Sprint A-07 defines the future Transactions workspace navigation contract.
 
 Primary navigation target model:
 - Atlas
+- Transactions
 - Projects
 - Knowledge
-- Transactions
 - Reports
 - Search
 - Settings
@@ -75,12 +75,14 @@ Sprint T-02 implements the first production Transactions navigation surface.
 
 Implemented behavior:
 - Transactions added to top-level primary header navigation
+- top-header primary navigation order is Atlas (Home), Transactions, Projects, Knowledge, Reports
 - Transactions workspace uses the shared secondary/tertiary navigation contract model
 - active secondary sections: Overview, Estimates, Sales Orders, Return Orders, Credit Memos, Customer Invoices
 - deferred secondary sections (visible but disabled/deferred): Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills
 - Change Orders are not a standalone secondary route; change-order behavior is represented as a convention on Sales Orders and Return Orders
 - tertiary actions are compact and context-driven, with record-required actions hidden until a draft/record context exists
 - navigation continuity/state persistence uses existing shell state keys and workspace-state snapshot behavior
+- Estimates `Add` uses a dedicated creation workspace with customer/project/project-code selection and catalog-backed line insertion for Product/Service/Fee/Assembly item types
 
 ## Settings Navigation Implementation (T-04)
 

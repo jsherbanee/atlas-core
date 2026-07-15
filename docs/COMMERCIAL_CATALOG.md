@@ -61,6 +61,12 @@ Assembly insertion modes:
 - `expand`: component lines only
 - `grouped`: priced parent + visible component lines with snapshot metadata
 
+Estimate-entry workflow note:
+- Transactions > Estimates > Add uses a dedicated estimate-creation workspace rather than a generic transaction form
+- estimate details are captured with dropdown-driven customer/project/project-code controls
+- estimate add flow intentionally excludes Vendor ID on tenant-facing estimate entry
+- line insertion remains catalog-backed for Product, Service, Fee, and Assembly item types
+
 ## C-04 Seed Catalog Import and Alpha Validation
 
 Sprint C-04 adds a deterministic seed package and validation utility for alpha readiness.
