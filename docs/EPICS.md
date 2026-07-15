@@ -54,6 +54,7 @@ Status: Active
 - A-01 Final Alpha Readiness Audit and Release Candidate
 - A-02 Controlled Alpha Deployment and Test Operations
 - A-03 Alpha Tester Onboarding and Controlled Rollout
+- A-04 Alpha Launch, Feedback Triage, and Stabilization Loop
 
 ### A-07 Scope
 
@@ -187,6 +188,22 @@ Explicitly out of scope:
 - SSO, invitation automation, billing, or public signup flows
 - live QuickBooks transport execution
 - new commercial workflow-domain expansion
+
+### A-04 Scope
+
+- implement controlled alpha release records with lifecycle states and rollback references
+- implement tester cohort assignment to alpha releases
+- implement feedback triage queue and feedback-to-defect conversion workflow
+- implement defect severity/status/reproduction/retest/resolution-priority tracking with release-note linkage
+- implement platform-admin stabilization dashboard summaries and deterministic release history ordering
+- add regression coverage for lifecycle transitions, blocker rules, release assignment, tenant isolation, and audit events
+
+Explicitly out of scope:
+
+- new product feature development
+- inventory/procurement activation
+- live integrations, billing, public signup, or AI feature scope
+- enhancement-request auto-promotion into active sprint scope
 
 ### A-08 Scope
 

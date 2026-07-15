@@ -7239,6 +7239,12 @@ def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": None,
             },
             {
+                "tertiary_key": "alpha_release_stabilization",
+                "label": "Release & Stabilization",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
                 "tertiary_key": "error_log",
                 "label": "Error Log",
                 "action_type": "settings_view",
@@ -18127,18 +18133,63 @@ def _render_application_administration_page(
                     requester_tenant_id=tenant_id,
                     requester_organization_id=organization_id,
                 )
-                summary_cols = st.columns(3)
+                st.markdown("#### Alpha Launch and Stabilization Dashboard")
+                summary_cols = st.columns(5)
                 summary_cols[0].metric(
+                    "Current Alpha Version",
+                    _safe_text(dashboard.get("current_alpha_version"), "n/a"),
+                )
+                summary_cols[1].metric(
+                    "Release Status",
+                    _safe_text(dashboard.get("release_status"), "Draft"),
+                )
+                summary_cols[2].metric(
+                    "Active Tester Cohorts",
+                    int(dashboard.get("active_tester_cohorts") or 0),
+                )
+                summary_cols[3].metric(
                     "Active Testers",
                     int(dashboard.get("active_testers") or 0),
                 )
-                summary_cols[1].metric(
+                summary_cols[4].metric(
+                    "Scenario Completion",
+                    _safe_text(dashboard.get("scenario_completion"), "0/0"),
+                )
+
+                triage_cols = st.columns(5)
+                triage_cols[0].metric(
+                    "New Feedback",
+                    int(dashboard.get("new_feedback") or 0),
+                )
+                triage_cols[1].metric(
+                    "Confirmed Defects",
+                    int(dashboard.get("confirmed_defects") or 0),
+                )
+                triage_cols[2].metric(
+                    "Alpha Blockers",
+                    int(dashboard.get("alpha_blockers") or 0),
+                )
+                triage_cols[3].metric(
+                    "Ready for Retest",
+                    int(dashboard.get("ready_for_retest") or 0),
+                )
+                triage_cols[4].metric(
+                    "Unresolved Errors",
+                    int(dashboard.get("unresolved_errors") or 0),
+                )
+
+                health = dict(dashboard.get("sandbox_health") or {})
+                health_cols = st.columns(3)
+                health_cols[0].metric(
+                    "Sandboxes Active", int(health.get("active") or 0)
+                )
+                health_cols[1].metric(
+                    "Sandboxes Degraded",
+                    int(health.get("degraded") or 0),
+                )
+                health_cols[2].metric(
                     "Expiring Sandboxes (<=14d)",
                     int(dashboard.get("expiring_sandboxes") or 0),
-                )
-                summary_cols[2].metric(
-                    "Tenant Rows",
-                    len(list(dashboard.get("rows") or [])),
                 )
                 st.dataframe(
                     list(dashboard.get("rows") or []),
@@ -18494,6 +18545,482 @@ def _render_application_administration_page(
                         workspace="Settings",
                         route="Platform Management > Tester Onboarding",
                     )
+            return
+
+        if tertiary == "alpha_release_stabilization":
+            st.markdown("#### Alpha Release and Stabilization Loop")
+            dashboard = tenant_manager.alpha_operations_dashboard(
+                actor_id=user_id,
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+            )
+            st.caption(
+                f"Current Version: {_safe_text(dashboard.get('current_alpha_version'), 'n/a')} | "
+                f"Release Status: {_safe_text(dashboard.get('release_status'), 'Draft')}"
+            )
+
+            tester_rows = tenant_manager.list_alpha_testers(
+                actor_id=user_id,
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+                tenant_id=None,
+                limit=500,
+            )
+            tester_options = [
+                f"{_safe_text(item.get('tenant_id'), '')}::{_safe_text(item.get('tester_id'), '')}"
+                for item in tester_rows
+            ]
+            st.markdown("##### Tester Cohort")
+            with st.form("atlas_alpha_release_cohort_form"):
+                cohort_cols = st.columns(3)
+                cohort_name = cohort_cols[0].text_input("Cohort Name", value="")
+                cohort_notes = cohort_cols[1].text_input("Notes", value="")
+                cohort_members = cohort_cols[2].multiselect(
+                    "Members",
+                    options=tester_options,
+                    default=tester_options[:2],
+                )
+                create_cohort = st.form_submit_button("Create Cohort", width="stretch")
+            if create_cohort:
+                try:
+                    tenant_manager.create_alpha_tester_cohort(
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                        cohort_name=cohort_name,
+                        notes=cohort_notes or None,
+                        member_assignments=[
+                            {
+                                "tenant_id": _safe_text(item.split("::")[0], ""),
+                                "tester_id": _safe_text(item.split("::")[1], ""),
+                            }
+                            for item in cohort_members
+                            if "::" in item
+                        ],
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Tester cohort created.")
+                    st.rerun()
+                except Exception as exc:
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to create tester cohort",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Release & Stabilization",
+                    )
+
+            cohorts = tenant_manager.list_alpha_tester_cohorts(
+                actor_id=user_id,
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+            )
+            if cohorts:
+                st.dataframe(cohorts, width="stretch", hide_index=True)
+
+            st.markdown("##### Alpha Release Record")
+            cohort_ids = [_safe_text(item.get("cohort_id"), "") for item in cohorts]
+            with st.form("atlas_alpha_release_create_form"):
+                release_cols = st.columns(4)
+                release_version = release_cols[0].text_input(
+                    "Version Identifier",
+                    value=ALPHA_APP_VERSION_IDENTIFIER,
+                )
+                release_date = release_cols[1].text_input(
+                    "Release Date (ISO)",
+                    value=_now_iso(),
+                )
+                release_commit_hash = release_cols[2].text_input(
+                    "Commit Hash",
+                    value="",
+                )
+                release_status = release_cols[3].selectbox(
+                    "Release Status",
+                    options=[
+                        "Draft",
+                        "Approved",
+                        "Deployed to Sandbox",
+                        "Under Test",
+                        "Accepted",
+                        "Superseded",
+                        "Withdrawn",
+                    ],
+                    index=0,
+                )
+                release_supported_scenarios = st.text_input(
+                    "Supported Scenario Keys (comma-separated)",
+                    value="organization_settings,estimate_creation_pdf,error_reporting",
+                )
+                release_known_limits = st.text_input(
+                    "Known Limitations (comma-separated)",
+                    value="local deterministic architecture only",
+                )
+                release_fixes = st.text_input(
+                    "Included Fixes (comma-separated)",
+                    value="A-04 triage and stabilization workflow",
+                )
+                release_rollback = st.text_input(
+                    "Rollback Reference",
+                    value="git checkout <prior-hash>",
+                )
+                release_cohorts = st.multiselect(
+                    "Assigned Cohorts",
+                    options=cohort_ids,
+                    default=cohort_ids[:2],
+                )
+                create_release = st.form_submit_button(
+                    "Create Release Record",
+                    width="stretch",
+                )
+            if create_release:
+                try:
+                    tenant_manager.create_alpha_release_record(
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                        version_identifier=release_version,
+                        release_date=release_date,
+                        commit_hash=release_commit_hash,
+                        included_fixes=[
+                            item.strip()
+                            for item in release_fixes.split(",")
+                            if item.strip()
+                        ],
+                        known_limitations=[
+                            item.strip()
+                            for item in release_known_limits.split(",")
+                            if item.strip()
+                        ],
+                        supported_test_scenarios=[
+                            item.strip()
+                            for item in release_supported_scenarios.split(",")
+                            if item.strip()
+                        ],
+                        assigned_tester_cohort_ids=release_cohorts,
+                        rollback_reference=release_rollback,
+                        release_status=release_status,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Alpha release record created.")
+                    st.rerun()
+                except Exception as exc:
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to create alpha release record",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Release & Stabilization",
+                    )
+
+            release_rows = tenant_manager.list_alpha_release_records(
+                actor_id=user_id,
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+            )
+            if release_rows:
+                st.dataframe(release_rows, width="stretch", hide_index=True)
+                selected_release_id = st.selectbox(
+                    "Release",
+                    options=[
+                        _safe_text(item.get("release_id"), "") for item in release_rows
+                    ],
+                )
+                release_action_cols = st.columns(3)
+                updated_status = release_action_cols[0].selectbox(
+                    "Update Status",
+                    options=[
+                        "Draft",
+                        "Approved",
+                        "Deployed to Sandbox",
+                        "Under Test",
+                        "Accepted",
+                        "Superseded",
+                        "Withdrawn",
+                    ],
+                    index=3,
+                )
+                status_notes = release_action_cols[1].text_input(
+                    "Status Notes", value=""
+                )
+                update_release_cohorts = release_action_cols[2].multiselect(
+                    "Assigned Cohorts",
+                    options=cohort_ids,
+                    default=cohort_ids[:2],
+                )
+                release_update_cols = st.columns(2)
+                if release_update_cols[0].button(
+                    "Update Release Status", width="stretch"
+                ):
+                    try:
+                        tenant_manager.update_alpha_release_status(
+                            actor_id=user_id,
+                            requester_tenant_id=tenant_id,
+                            requester_organization_id=organization_id,
+                            release_id=selected_release_id,
+                            release_status=updated_status,
+                            notes=status_notes or None,
+                        )
+                        _save_tenant_manager_workspace_state(st, tenant_manager)
+                        st.success("Release status updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        _render_logged_error_message(
+                            st,
+                            summary="Unable to update release status",
+                            exception=exc,
+                            severity="medium",
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            user_id=user_id,
+                            workspace="Settings",
+                            route="Platform Management > Release & Stabilization",
+                        )
+                if release_update_cols[1].button(
+                    "Assign Cohorts to Release", width="stretch"
+                ):
+                    try:
+                        tenant_manager.assign_alpha_release_cohorts(
+                            actor_id=user_id,
+                            requester_tenant_id=tenant_id,
+                            requester_organization_id=organization_id,
+                            release_id=selected_release_id,
+                            cohort_ids=update_release_cohorts,
+                        )
+                        _save_tenant_manager_workspace_state(st, tenant_manager)
+                        st.success("Release cohorts assigned.")
+                        st.rerun()
+                    except Exception as exc:
+                        _render_logged_error_message(
+                            st,
+                            summary="Unable to assign release cohorts",
+                            exception=exc,
+                            severity="medium",
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            user_id=user_id,
+                            workspace="Settings",
+                            route="Platform Management > Release & Stabilization",
+                        )
+
+            st.markdown("##### Feedback Triage Queue")
+            triage = tenant_manager.alpha_feedback_triage_queue(
+                actor_id=user_id,
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+            )
+            feedback_queue = list(triage.get("feedback_queue") or [])
+            if feedback_queue:
+                st.dataframe(feedback_queue, width="stretch", hide_index=True)
+                queue_options = [
+                    f"{_safe_text(item.get('tenant_id'), '')}::{_safe_text(item.get('feedback_id'), '')}"
+                    for item in feedback_queue
+                ]
+                selected_feedback_ref = st.selectbox(
+                    "Feedback To Convert",
+                    options=queue_options,
+                )
+                triage_cols = st.columns(5)
+                defect_severity = triage_cols[0].selectbox(
+                    "Defect Severity",
+                    options=["Critical", "High", "Medium", "Low", "Enhancement"],
+                    index=2,
+                )
+                defect_status = triage_cols[1].selectbox(
+                    "Defect Status",
+                    options=[
+                        "New",
+                        "Needs Reproduction",
+                        "Confirmed",
+                        "In Progress",
+                        "Ready for Retest",
+                        "Verified",
+                        "Deferred",
+                        "Closed",
+                    ],
+                    index=2,
+                )
+                defect_priority = triage_cols[2].selectbox(
+                    "Resolution Priority",
+                    options=["P0", "P1", "P2", "P3", "Backlog"],
+                    index=2,
+                )
+                defect_blocking = triage_cols[3].checkbox("Alpha Blocking", value=False)
+                defect_release = triage_cols[4].text_input(
+                    "Assigned Sprint/Release",
+                    value="A-04",
+                )
+                if st.button("Convert Feedback To Defect", width="stretch"):
+                    try:
+                        selected_tenant, selected_feedback_id = (
+                            selected_feedback_ref.split("::", 1)
+                        )
+                        tenant_manager.create_alpha_defect_from_feedback(
+                            tenant_id=_safe_text(selected_tenant, ""),
+                            feedback_id=_safe_text(selected_feedback_id, ""),
+                            actor_id=user_id,
+                            requester_tenant_id=tenant_id,
+                            requester_organization_id=organization_id,
+                            application_version=_safe_text(
+                                dashboard.get("current_alpha_version"),
+                                ALPHA_APP_VERSION_IDENTIFIER,
+                            ),
+                            severity=defect_severity,
+                            defect_status=defect_status,
+                            alpha_blocking=bool(defect_blocking),
+                            assigned_sprint_or_release=defect_release,
+                            resolution_priority=defect_priority,
+                            regression_test_required=True,
+                            release_note_linkage="RELEASE_NOTES:A-04",
+                        )
+                        _save_tenant_manager_workspace_state(st, tenant_manager)
+                        st.success("Feedback converted to defect.")
+                        st.rerun()
+                    except Exception as exc:
+                        _render_logged_error_message(
+                            st,
+                            summary="Unable to convert feedback to defect",
+                            exception=exc,
+                            severity="high",
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            user_id=user_id,
+                            workspace="Settings",
+                            route="Platform Management > Release & Stabilization",
+                        )
+            else:
+                st.caption("No feedback records are waiting in triage queue.")
+
+            defects = tenant_manager.list_alpha_defects(
+                actor_id=user_id,
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+                tenant_id=None,
+                limit=500,
+            )
+            if defects:
+                st.markdown("##### Defect Triage")
+                st.dataframe(defects, width="stretch", hide_index=True)
+                selected_defect_ref = st.selectbox(
+                    "Defect",
+                    options=[
+                        f"{_safe_text(item.get('tenant_id'), '')}::{_safe_text(item.get('defect_id'), '')}"
+                        for item in defects
+                    ],
+                )
+                defect_update_cols = st.columns(5)
+                update_defect_status = defect_update_cols[0].selectbox(
+                    "Status",
+                    options=[
+                        "New",
+                        "Needs Reproduction",
+                        "Confirmed",
+                        "In Progress",
+                        "Ready for Retest",
+                        "Verified",
+                        "Deferred",
+                        "Closed",
+                    ],
+                    index=3,
+                )
+                update_defect_priority = defect_update_cols[1].selectbox(
+                    "Priority",
+                    options=["P0", "P1", "P2", "P3", "Backlog"],
+                    index=1,
+                )
+                update_retest_status = defect_update_cols[2].selectbox(
+                    "Retest",
+                    options=[
+                        "Not Started",
+                        "Ready for Retest",
+                        "Retest In Progress",
+                        "Passed",
+                        "Failed",
+                    ],
+                    index=1,
+                )
+                update_repro_status = defect_update_cols[3].selectbox(
+                    "Reproduction",
+                    options=[
+                        "Not Attempted",
+                        "Needs Reproduction",
+                        "Reproduced",
+                        "Not Reproduced",
+                    ],
+                    index=2,
+                )
+                update_blocking = defect_update_cols[4].checkbox(
+                    "Alpha Blocking",
+                    value=False,
+                )
+                update_resolution_notes = st.text_area(
+                    "Resolution Notes",
+                    value="",
+                    height=80,
+                )
+                update_verification = st.text_area(
+                    "Verification Evidence",
+                    value="",
+                    height=80,
+                )
+                update_regression_refs = st.text_input(
+                    "Regression Test References (comma-separated)",
+                    value="tests/test_tenant_manager_service.py",
+                )
+                if st.button("Update Defect", width="stretch"):
+                    try:
+                        defect_tenant_id, defect_id = selected_defect_ref.split("::", 1)
+                        tenant_manager.update_alpha_defect(
+                            tenant_id=_safe_text(defect_tenant_id, ""),
+                            defect_id=_safe_text(defect_id, ""),
+                            actor_id=user_id,
+                            requester_tenant_id=tenant_id,
+                            requester_organization_id=organization_id,
+                            defect_status=update_defect_status,
+                            resolution_priority=update_defect_priority,
+                            retest_status=update_retest_status,
+                            reproduction_status=update_repro_status,
+                            alpha_blocking=bool(update_blocking),
+                            regression_test_references=[
+                                item.strip()
+                                for item in update_regression_refs.split(",")
+                                if item.strip()
+                            ],
+                            release_note_linkage="RELEASE_NOTES:A-04",
+                            resolution_notes=update_resolution_notes or None,
+                            verification_evidence=update_verification or None,
+                        )
+                        _save_tenant_manager_workspace_state(st, tenant_manager)
+                        st.success("Defect updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        _render_logged_error_message(
+                            st,
+                            summary="Unable to update defect",
+                            exception=exc,
+                            severity="high",
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            user_id=user_id,
+                            workspace="Settings",
+                            route="Platform Management > Release & Stabilization",
+                        )
+
+            release_history = tenant_manager.alpha_stabilization_release_history(
+                actor_id=user_id,
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+            )
+            if release_history:
+                st.markdown("##### Stabilization Release History")
+                st.dataframe(release_history, width="stretch", hide_index=True)
             return
 
         if tertiary == "error_log":

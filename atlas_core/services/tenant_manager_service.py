@@ -130,6 +130,14 @@ def _sanitize_stack_trace(value: Any) -> str:
     return "\n".join(lines[-40:])
 
 
+def _normalize_choice(value: str, *, allowed: set[str], label: str) -> str:
+    token = _safe_text(value, "").replace("_", " ").lower()
+    for item in sorted(allowed):
+        if token == item.lower():
+            return item
+    raise ValueError(f"{label} is invalid")
+
+
 _ALPHA_TESTER_STATES = {
     "invited",
     "onboarding",
@@ -140,6 +148,52 @@ _ALPHA_TESTER_STATES = {
 }
 
 _ALPHA_SCENARIO_STATUS = {"pending", "in_progress", "completed"}
+
+_ALPHA_DEFECT_SEVERITY_CHOICES = {
+    "Critical",
+    "High",
+    "Medium",
+    "Low",
+    "Enhancement",
+}
+
+_ALPHA_DEFECT_STATUS_CHOICES = {
+    "New",
+    "Needs Reproduction",
+    "Confirmed",
+    "In Progress",
+    "Ready for Retest",
+    "Verified",
+    "Deferred",
+    "Closed",
+}
+
+_ALPHA_REPRODUCTION_STATUS_CHOICES = {
+    "Not Attempted",
+    "Needs Reproduction",
+    "Reproduced",
+    "Not Reproduced",
+}
+
+_ALPHA_RETEST_STATUS_CHOICES = {
+    "Not Started",
+    "Ready for Retest",
+    "Retest In Progress",
+    "Passed",
+    "Failed",
+}
+
+_ALPHA_RESOLUTION_PRIORITY_CHOICES = {"P0", "P1", "P2", "P3", "Backlog"}
+
+_ALPHA_RELEASE_STATUS_CHOICES = {
+    "Draft",
+    "Approved",
+    "Deployed to Sandbox",
+    "Under Test",
+    "Accepted",
+    "Superseded",
+    "Withdrawn",
+}
 
 _ALPHA_SCENARIO_TEMPLATES: list[dict[str, str]] = [
     {
@@ -235,6 +289,17 @@ class TenantManagerService:
         self.state: dict[str, Any] = {
             "tenants": dict(incoming.get("tenants") or {}),
             "tenant_data": dict(incoming.get("tenant_data") or {}),
+            "alpha_tester_cohorts": dict(incoming.get("alpha_tester_cohorts") or {}),
+            "alpha_release_records": [
+                dict(item)
+                for item in list(incoming.get("alpha_release_records") or [])
+                if isinstance(item, dict)
+            ],
+            "alpha_stabilization_history": [
+                dict(item)
+                for item in list(incoming.get("alpha_stabilization_history") or [])
+                if isinstance(item, dict)
+            ],
             "audit_events": [
                 dict(item)
                 for item in list(incoming.get("audit_events") or [])
@@ -254,6 +319,9 @@ class TenantManagerService:
         return {
             "tenants": {},
             "tenant_data": {},
+            "alpha_tester_cohorts": {},
+            "alpha_release_records": [],
+            "alpha_stabilization_history": [],
             "audit_events": [],
             "active_tenant_id": "",
             "active_organization_id": "",
@@ -274,6 +342,22 @@ class TenantManagerService:
                     dict(self.state.get("tenant_data") or {}).items()
                 )
             },
+            "alpha_tester_cohorts": {
+                key: deepcopy(dict(payload))
+                for key, payload in sorted(
+                    dict(self.state.get("alpha_tester_cohorts") or {}).items()
+                )
+            },
+            "alpha_release_records": [
+                deepcopy(dict(item))
+                for item in list(self.state.get("alpha_release_records") or [])
+                if isinstance(item, dict)
+            ],
+            "alpha_stabilization_history": [
+                deepcopy(dict(item))
+                for item in list(self.state.get("alpha_stabilization_history") or [])
+                if isinstance(item, dict)
+            ],
             "audit_events": [
                 dict(item)
                 for item in list(self.state.get("audit_events") or [])
@@ -1742,6 +1826,11 @@ class TenantManagerService:
         rows: list[dict[str, Any]] = []
         now = datetime.now(UTC)
         expiring_sandboxes = 0
+        all_defects: list[dict[str, Any]] = []
+        all_feedback: list[dict[str, Any]] = []
+        unresolved_errors_total = 0
+        completed_scenarios_total = 0
+        scenario_total_count = 0
         for tenant_payload in dict(self.state.get("tenants") or {}).values():
             tenant = Tenant.from_dict(dict(tenant_payload))
             if tenant.tenant_id == "local":
@@ -1765,7 +1854,12 @@ class TenantManagerService:
                 ]
             )
             scenario_total = len(all_scenarios)
+            completed_scenarios_total += scenario_completed
+            scenario_total_count += len(all_scenarios)
             feedback_rows = list(data.get("alpha_feedback") or [])
+            all_feedback.extend(
+                [dict(item) for item in feedback_rows if isinstance(item, dict)]
+            )
             open_defects = len(
                 [
                     item
@@ -1787,6 +1881,13 @@ class TenantManagerService:
                     }
                 ]
             )
+            unresolved_errors_total += int(unresolved_errors)
+            defects = [
+                dict(item)
+                for item in list(data.get("alpha_defects") or [])
+                if isinstance(item, dict)
+            ]
+            all_defects.extend(defects)
             sandbox_expiration = _safe_text(tenant.configuration.expiration_date, "")
             if sandbox_expiration:
                 try:
@@ -1814,6 +1915,18 @@ class TenantManagerService:
                     ),
                     "feedback_count": len(feedback_rows),
                     "open_defects": open_defects,
+                    "confirmed_defects": len(
+                        [
+                            item
+                            for item in defects
+                            if _safe_text(item.get("defect_status"), "")
+                            in {
+                                "Confirmed",
+                                "In Progress",
+                                "Ready for Retest",
+                            }
+                        ]
+                    ),
                     "unresolved_errors": unresolved_errors,
                     "last_activity": _safe_text(tenant.last_activity_at, ""),
                     "sandbox_expiration": sandbox_expiration,
@@ -1829,12 +1942,96 @@ class TenantManagerService:
                 _safe_text(item.get("tenant_id"), ""),
             )
         )
+        release_history = self.alpha_stabilization_release_history(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+        )
+        current_release = release_history[-1] if release_history else {}
+        current_release_id = _safe_text(current_release.get("release_id"), "")
+        active_cohorts = [
+            item
+            for item in list(current_release.get("assigned_tester_cohorts") or [])
+            if isinstance(item, dict)
+        ]
+        new_feedback = len(
+            [
+                item
+                for item in all_feedback
+                if _safe_text(item.get("status"), "") in {"open", "in_review"}
+            ]
+        )
+        confirmed_defects = len(
+            [
+                item
+                for item in all_defects
+                if _safe_text(item.get("defect_status"), "")
+                in {"Confirmed", "In Progress", "Ready for Retest"}
+            ]
+        )
+        alpha_blockers = len(
+            [
+                item
+                for item in all_defects
+                if bool(item.get("alpha_blocking", False))
+                and _safe_text(item.get("defect_status"), "")
+                not in {"Verified", "Closed", "Deferred"}
+            ]
+        )
+        ready_for_retest = len(
+            [
+                item
+                for item in all_defects
+                if _safe_text(item.get("defect_status"), "") == "Ready for Retest"
+            ]
+        )
+        active_sandboxes = len(
+            [
+                item
+                for item in rows
+                if _safe_text(item.get("sandbox_status"), "") == "active"
+            ]
+        )
+        degraded_sandboxes = len(
+            [
+                item
+                for item in rows
+                if _safe_text(item.get("sandbox_status"), "")
+                in {"suspended", "archived"}
+            ]
+        )
         return {
             "generated_at": now_iso(),
             "active_testers": sum(
                 int(item.get("active_testers") or 0) for item in rows
             ),
             "expiring_sandboxes": int(expiring_sandboxes),
+            "current_alpha_version": _safe_text(
+                current_release.get("version_identifier"),
+                "n/a",
+            ),
+            "active_tester_cohorts": len(active_cohorts),
+            "scenario_completion": (
+                (
+                    f"{completed_scenarios_total}/{scenario_total_count}"
+                    if scenario_total_count
+                    else "0/0"
+                )
+            ),
+            "new_feedback": int(new_feedback),
+            "confirmed_defects": int(confirmed_defects),
+            "alpha_blockers": int(alpha_blockers),
+            "ready_for_retest": int(ready_for_retest),
+            "unresolved_errors": int(unresolved_errors_total),
+            "release_status": _safe_text(
+                current_release.get("release_status"), "Draft"
+            ),
+            "current_release_id": current_release_id or None,
+            "sandbox_health": {
+                "active": int(active_sandboxes),
+                "degraded": int(degraded_sandboxes),
+                "total": len(rows),
+            },
             "rows": rows,
         }
 
@@ -1921,18 +2118,27 @@ class TenantManagerService:
         tenant_id: str,
         requester_tenant_id: str,
         requester_organization_id: str,
+        actor_id: str | None = None,
         statuses: list[str] | None = None,
         limit: int = 200,
     ) -> list[dict[str, Any]]:
-        self._assert_tenant_scope_request(
-            tenant_id=tenant_id,
-            requester_tenant_id=requester_tenant_id,
-            requester_organization_id=requester_organization_id,
+        is_platform_admin = self._is_platform_admin_scope_actor(
+            actor_id=_safe_text(actor_id, ""),
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
         )
+        if not is_platform_admin:
+            self._assert_tenant_scope_request(
+                tenant_id=tenant_id,
+                requester_tenant_id=requester_tenant_id,
+                requester_organization_id=requester_organization_id,
+            )
+            self._assert_operational_access(tenant_id)
         rows = list(self._tenant_data(tenant_id).get("alpha_feedback") or [])
         normalized = {
             _safe_text(item, "").lower() for item in list(statuses or []) if item
         }
+        actor_scope = _safe_text(actor_id, "")
         filtered = [
             deepcopy(dict(item))
             for item in rows
@@ -1940,6 +2146,11 @@ class TenantManagerService:
             and (
                 not normalized
                 or _safe_text(item.get("status"), "").lower() in normalized
+            )
+            and (
+                is_platform_admin
+                or not actor_scope
+                or _safe_text(item.get("user_id"), "") == actor_scope
             )
         ]
         filtered.sort(
@@ -2191,6 +2402,746 @@ class TenantManagerService:
             },
         )
         return health_payload
+
+    def create_alpha_tester_cohort(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        cohort_name: str,
+        member_assignments: list[dict[str, str]],
+        notes: str | None = None,
+    ) -> dict[str, Any]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        normalized_name = _safe_text(cohort_name, "")
+        if not normalized_name:
+            raise ValueError("cohort_name is required")
+        members: list[dict[str, str]] = []
+        for assignment in list(member_assignments or []):
+            tenant_id = _safe_text(dict(assignment).get("tenant_id"), "")
+            tester_id = _safe_text(dict(assignment).get("tester_id"), "")
+            if not tenant_id or not tester_id:
+                continue
+            _ = self._alpha_tester_record_mutable(
+                tenant_id=tenant_id, tester_id=tester_id
+            )
+            members.append(
+                {
+                    "tenant_id": tenant_id,
+                    "tester_id": tester_id,
+                }
+            )
+        if not members:
+            raise ValueError("cohort must include at least one tester assignment")
+        cohort_id = f"cohort:{hashlib.sha1(f'{normalized_name}:{now_iso()}'.encode('utf-8')).hexdigest()[:16]}"
+        payload = {
+            "cohort_id": cohort_id,
+            "cohort_name": normalized_name,
+            "member_assignments": members,
+            "notes": _safe_text(notes, "") or None,
+            "created_at": now_iso(),
+            "created_by": _safe_text(actor_id, "system"),
+            "updated_at": now_iso(),
+            "status": "active",
+        }
+        self.state.setdefault("alpha_tester_cohorts", {})
+        self.state["alpha_tester_cohorts"][cohort_id] = payload
+        self.state.setdefault("alpha_stabilization_history", [])
+        self.state["alpha_stabilization_history"].append(
+            {
+                "event_type": "cohort_created",
+                "occurred_at": now_iso(),
+                "actor_id": _safe_text(actor_id, "system"),
+                "cohort_id": cohort_id,
+            }
+        )
+        self._record_audit(
+            tenant_id="local",
+            actor_id=actor_id,
+            action="alpha.cohort.created",
+            details={"cohort_id": cohort_id, "member_count": len(members)},
+        )
+        return deepcopy(payload)
+
+    def list_alpha_tester_cohorts(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+    ) -> list[dict[str, Any]]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        rows = [
+            deepcopy(dict(item))
+            for item in dict(self.state.get("alpha_tester_cohorts") or {}).values()
+            if isinstance(item, dict)
+        ]
+        rows.sort(
+            key=lambda item: (
+                _safe_text(item.get("created_at"), ""),
+                _safe_text(item.get("cohort_id"), ""),
+            )
+        )
+        return rows
+
+    def create_alpha_release_record(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        version_identifier: str,
+        release_date: str,
+        commit_hash: str,
+        included_fixes: list[str],
+        known_limitations: list[str],
+        supported_test_scenarios: list[str],
+        assigned_tester_cohort_ids: list[str],
+        rollback_reference: str,
+        release_status: str = "Draft",
+    ) -> dict[str, Any]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        normalized_version = _safe_text(version_identifier, "")
+        if not normalized_version:
+            raise ValueError("version_identifier is required")
+        normalized_status = _normalize_choice(
+            release_status,
+            allowed=_ALPHA_RELEASE_STATUS_CHOICES,
+            label="release status",
+        )
+        cohorts = dict(self.state.get("alpha_tester_cohorts") or {})
+        assigned_cohorts = []
+        for cohort_id in list(assigned_tester_cohort_ids or []):
+            normalized = _safe_text(cohort_id, "")
+            payload = cohorts.get(normalized)
+            if isinstance(payload, dict):
+                assigned_cohorts.append(deepcopy(dict(payload)))
+        release_id = f"release:{hashlib.sha1(f'{normalized_version}:{now_iso()}'.encode('utf-8')).hexdigest()[:16]}"
+        payload = {
+            "release_id": release_id,
+            "version_identifier": normalized_version,
+            "release_date": _safe_text(release_date, now_iso()),
+            "commit_hash": _safe_text(commit_hash, "") or "unknown",
+            "included_fixes": [
+                _sanitize_free_text(item, max_length=280)
+                for item in list(included_fixes or [])
+                if _safe_text(item, "")
+            ],
+            "known_limitations": [
+                _sanitize_free_text(item, max_length=280)
+                for item in list(known_limitations or [])
+                if _safe_text(item, "")
+            ],
+            "supported_test_scenarios": [
+                _safe_text(item, "")
+                for item in list(supported_test_scenarios or [])
+                if _safe_text(item, "")
+            ],
+            "assigned_tester_cohorts": assigned_cohorts,
+            "rollback_reference": _safe_text(rollback_reference, "") or None,
+            "release_status": normalized_status,
+            "created_at": now_iso(),
+            "created_by": _safe_text(actor_id, "system"),
+            "updated_at": now_iso(),
+            "status_history": [
+                {
+                    "status": normalized_status,
+                    "occurred_at": now_iso(),
+                    "actor_id": _safe_text(actor_id, "system"),
+                    "notes": "release_created",
+                }
+            ],
+        }
+        self.state.setdefault("alpha_release_records", [])
+        self.state["alpha_release_records"].append(payload)
+        self.state.setdefault("alpha_stabilization_history", [])
+        self.state["alpha_stabilization_history"].append(
+            {
+                "event_type": "release_created",
+                "occurred_at": now_iso(),
+                "actor_id": _safe_text(actor_id, "system"),
+                "release_id": release_id,
+                "release_status": normalized_status,
+            }
+        )
+        self._record_audit(
+            tenant_id="local",
+            actor_id=actor_id,
+            action="alpha.release.created",
+            details={"release_id": release_id, "release_status": normalized_status},
+        )
+        return deepcopy(payload)
+
+    def list_alpha_release_records(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+    ) -> list[dict[str, Any]]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        rows = [
+            deepcopy(dict(item))
+            for item in list(self.state.get("alpha_release_records") or [])
+            if isinstance(item, dict)
+        ]
+        rows.sort(
+            key=lambda item: (
+                _safe_text(item.get("release_date"), ""),
+                _safe_text(item.get("version_identifier"), ""),
+                _safe_text(item.get("release_id"), ""),
+            )
+        )
+        return rows
+
+    def update_alpha_release_status(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        release_id: str,
+        release_status: str,
+        notes: str | None = None,
+    ) -> dict[str, Any]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        normalized_release_id = _safe_text(release_id, "")
+        normalized_status = _normalize_choice(
+            release_status,
+            allowed=_ALPHA_RELEASE_STATUS_CHOICES,
+            label="release status",
+        )
+        target: dict[str, Any] | None = None
+        for item in list(self.state.get("alpha_release_records") or []):
+            if _safe_text(dict(item).get("release_id"), "") == normalized_release_id:
+                if isinstance(item, dict):
+                    target = item
+                break
+        if target is None:
+            raise ValueError("alpha release record does not exist")
+        target["release_status"] = normalized_status
+        target["updated_at"] = now_iso()
+        history = list(target.get("status_history") or [])
+        history.append(
+            {
+                "status": normalized_status,
+                "occurred_at": now_iso(),
+                "actor_id": _safe_text(actor_id, "system"),
+                "notes": _sanitize_free_text(notes or "status_updated", max_length=240),
+            }
+        )
+        target["status_history"] = history
+        self.state.setdefault("alpha_stabilization_history", [])
+        self.state["alpha_stabilization_history"].append(
+            {
+                "event_type": "release_status_updated",
+                "occurred_at": now_iso(),
+                "actor_id": _safe_text(actor_id, "system"),
+                "release_id": normalized_release_id,
+                "release_status": normalized_status,
+            }
+        )
+        self._record_audit(
+            tenant_id="local",
+            actor_id=actor_id,
+            action="alpha.release.status_updated",
+            details={
+                "release_id": normalized_release_id,
+                "release_status": normalized_status,
+            },
+        )
+        return deepcopy(target)
+
+    def assign_alpha_release_cohorts(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        release_id: str,
+        cohort_ids: list[str],
+    ) -> dict[str, Any]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        normalized_release_id = _safe_text(release_id, "")
+        target: dict[str, Any] | None = None
+        for item in list(self.state.get("alpha_release_records") or []):
+            if _safe_text(dict(item).get("release_id"), "") == normalized_release_id:
+                if isinstance(item, dict):
+                    target = item
+                break
+        if target is None:
+            raise ValueError("alpha release record does not exist")
+        cohorts = dict(self.state.get("alpha_tester_cohorts") or {})
+        assigned = []
+        for cohort_id in list(cohort_ids or []):
+            payload = cohorts.get(_safe_text(cohort_id, ""))
+            if isinstance(payload, dict):
+                assigned.append(deepcopy(dict(payload)))
+        if not assigned:
+            raise ValueError("at least one valid tester cohort is required")
+        target["assigned_tester_cohorts"] = assigned
+        target["updated_at"] = now_iso()
+        self._record_audit(
+            tenant_id="local",
+            actor_id=actor_id,
+            action="alpha.release.cohorts_assigned",
+            details={
+                "release_id": normalized_release_id,
+                "cohort_count": len(assigned),
+            },
+        )
+        return deepcopy(target)
+
+    def create_alpha_defect_from_feedback(
+        self,
+        *,
+        tenant_id: str,
+        feedback_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        application_version: str,
+        tester_id: str | None = None,
+        severity: str = "Medium",
+        alpha_blocking: bool = False,
+        defect_status: str = "Confirmed",
+        assigned_sprint_or_release: str | None = None,
+        resolution_priority: str = "P2",
+        regression_test_required: bool = True,
+        release_note_linkage: str | None = None,
+        reproduction_status: str = "Reproduced",
+        resolution_notes: str | None = None,
+        verification_evidence: str | None = None,
+    ) -> dict[str, Any]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        self._assert_operational_access(tenant_id)
+        feedback_rows = list(self._tenant_data(tenant_id).get("alpha_feedback") or [])
+        feedback = None
+        normalized_feedback_id = _safe_text(feedback_id, "")
+        for item in feedback_rows:
+            if _safe_text(dict(item).get("feedback_id"), "") == normalized_feedback_id:
+                if isinstance(item, dict):
+                    feedback = item
+                break
+        if not isinstance(feedback, dict):
+            raise ValueError("feedback record does not exist")
+        normalized_severity = _normalize_choice(
+            severity,
+            allowed=_ALPHA_DEFECT_SEVERITY_CHOICES,
+            label="defect severity",
+        )
+        normalized_status = _normalize_choice(
+            defect_status,
+            allowed=_ALPHA_DEFECT_STATUS_CHOICES,
+            label="defect status",
+        )
+        normalized_priority = _normalize_choice(
+            resolution_priority,
+            allowed=_ALPHA_RESOLUTION_PRIORITY_CHOICES,
+            label="resolution priority",
+        )
+        normalized_reproduction = _normalize_choice(
+            reproduction_status,
+            allowed=_ALPHA_REPRODUCTION_STATUS_CHOICES,
+            label="reproduction status",
+        )
+        effective_tester = _safe_text(tester_id, "") or _safe_text(
+            feedback.get("user_id"),
+            "unknown",
+        )
+        effective_blocking = bool(alpha_blocking)
+        if normalized_severity == "Enhancement":
+            effective_blocking = False
+            normalized_status = "Deferred"
+        defect_id = f"defect:{hashlib.sha1(f'{tenant_id}:{normalized_feedback_id}:{now_iso()}'.encode('utf-8')).hexdigest()[:16]}"
+        record = {
+            "defect_id": defect_id,
+            "tenant_id": tenant_id,
+            "feedback_id": normalized_feedback_id,
+            "feedback_user_id": _safe_text(feedback.get("user_id"), "unknown"),
+            "tester_id": effective_tester,
+            "application_version": _safe_text(application_version, "unknown"),
+            "workspace": _safe_text(feedback.get("workspace"), "Unknown"),
+            "related_object": _safe_text(feedback.get("object_or_transaction"), ""),
+            "related_error_id": _safe_text(feedback.get("related_error_id"), "")
+            or None,
+            "reproduction_steps": _safe_text(feedback.get("reproduction_steps"), ""),
+            "expected_result": _safe_text(feedback.get("expected_result"), ""),
+            "actual_result": _safe_text(feedback.get("actual_result"), ""),
+            "defect_severity": normalized_severity,
+            "alpha_blocking": effective_blocking,
+            "defect_status": normalized_status,
+            "reproduction_status": normalized_reproduction,
+            "resolution_priority": normalized_priority,
+            "assigned_sprint_or_release": _safe_text(assigned_sprint_or_release, "")
+            or None,
+            "regression_test_required": bool(regression_test_required),
+            "regression_test_references": [],
+            "release_note_linkage": _safe_text(release_note_linkage, "") or None,
+            "retest_status": "Not Started",
+            "resolution_notes": _safe_text(resolution_notes, "") or None,
+            "verification_evidence": _safe_text(verification_evidence, "") or None,
+            "created_at": now_iso(),
+            "created_by": _safe_text(actor_id, "system"),
+            "updated_at": now_iso(),
+            "closed_at": None,
+            "status_history": [
+                {
+                    "status": normalized_status,
+                    "occurred_at": now_iso(),
+                    "actor_id": _safe_text(actor_id, "system"),
+                    "notes": "converted_from_feedback",
+                }
+            ],
+        }
+        data = self._tenant_data(tenant_id)
+        data.setdefault("alpha_defects", [])
+        data["alpha_defects"].append(record)
+        feedback["status"] = "in_review"
+        feedback["updated_at"] = now_iso()
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_defect.created",
+            details={
+                "defect_id": defect_id,
+                "feedback_id": normalized_feedback_id,
+                "severity": normalized_severity,
+                "status": normalized_status,
+            },
+        )
+        return deepcopy(record)
+
+    def update_alpha_defect(
+        self,
+        *,
+        tenant_id: str,
+        defect_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        defect_status: str | None = None,
+        defect_severity: str | None = None,
+        alpha_blocking: bool | None = None,
+        assigned_sprint_or_release: str | None = None,
+        resolution_priority: str | None = None,
+        release_note_linkage: str | None = None,
+        regression_test_references: list[str] | None = None,
+        reproduction_status: str | None = None,
+        retest_status: str | None = None,
+        resolution_notes: str | None = None,
+        verification_evidence: str | None = None,
+    ) -> dict[str, Any]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        self._assert_operational_access(tenant_id)
+        rows = list(self._tenant_data(tenant_id).get("alpha_defects") or [])
+        normalized_defect_id = _safe_text(defect_id, "")
+        defect = None
+        for item in rows:
+            if _safe_text(dict(item).get("defect_id"), "") == normalized_defect_id:
+                if isinstance(item, dict):
+                    defect = item
+                break
+        if not isinstance(defect, dict):
+            raise ValueError("alpha defect does not exist")
+        changes: dict[str, Any] = {}
+        if defect_status is not None:
+            normalized = _normalize_choice(
+                defect_status,
+                allowed=_ALPHA_DEFECT_STATUS_CHOICES,
+                label="defect status",
+            )
+            if _safe_text(defect.get("defect_status"), "") != normalized:
+                defect["defect_status"] = normalized
+                changes["defect_status"] = normalized
+                status_history = list(defect.get("status_history") or [])
+                status_history.append(
+                    {
+                        "status": normalized,
+                        "occurred_at": now_iso(),
+                        "actor_id": _safe_text(actor_id, "system"),
+                        "notes": "status_updated",
+                    }
+                )
+                defect["status_history"] = status_history
+                if normalized in {"Verified", "Closed", "Deferred"}:
+                    defect["closed_at"] = now_iso()
+                if normalized == "Ready for Retest":
+                    defect["retest_status"] = "Ready for Retest"
+                if normalized == "Verified" and not _safe_text(
+                    defect.get("retest_status"), ""
+                ):
+                    defect["retest_status"] = "Passed"
+        if defect_severity is not None:
+            normalized = _normalize_choice(
+                defect_severity,
+                allowed=_ALPHA_DEFECT_SEVERITY_CHOICES,
+                label="defect severity",
+            )
+            if _safe_text(defect.get("defect_severity"), "") != normalized:
+                defect["defect_severity"] = normalized
+                changes["defect_severity"] = normalized
+                if normalized == "Enhancement":
+                    defect["alpha_blocking"] = False
+        if alpha_blocking is not None:
+            if _safe_text(defect.get("defect_severity"), "") == "Enhancement":
+                defect["alpha_blocking"] = False
+            else:
+                defect["alpha_blocking"] = bool(alpha_blocking)
+            changes["alpha_blocking"] = bool(defect.get("alpha_blocking", False))
+        if assigned_sprint_or_release is not None:
+            defect["assigned_sprint_or_release"] = (
+                _safe_text(assigned_sprint_or_release, "") or None
+            )
+            changes["assigned_sprint_or_release"] = defect["assigned_sprint_or_release"]
+        if resolution_priority is not None:
+            normalized = _normalize_choice(
+                resolution_priority,
+                allowed=_ALPHA_RESOLUTION_PRIORITY_CHOICES,
+                label="resolution priority",
+            )
+            defect["resolution_priority"] = normalized
+            changes["resolution_priority"] = normalized
+        if release_note_linkage is not None:
+            defect["release_note_linkage"] = (
+                _safe_text(release_note_linkage, "") or None
+            )
+            changes["release_note_linkage"] = defect["release_note_linkage"]
+        if regression_test_references is not None:
+            defect["regression_test_references"] = [
+                _safe_text(item, "")
+                for item in list(regression_test_references)
+                if _safe_text(item, "")
+            ]
+            changes["regression_test_references"] = len(
+                list(defect.get("regression_test_references") or [])
+            )
+        if reproduction_status is not None:
+            normalized = _normalize_choice(
+                reproduction_status,
+                allowed=_ALPHA_REPRODUCTION_STATUS_CHOICES,
+                label="reproduction status",
+            )
+            defect["reproduction_status"] = normalized
+            changes["reproduction_status"] = normalized
+        if retest_status is not None:
+            normalized = _normalize_choice(
+                retest_status,
+                allowed=_ALPHA_RETEST_STATUS_CHOICES,
+                label="retest status",
+            )
+            defect["retest_status"] = normalized
+            changes["retest_status"] = normalized
+        if resolution_notes is not None:
+            defect["resolution_notes"] = _safe_text(resolution_notes, "") or None
+            changes["resolution_notes"] = bool(defect["resolution_notes"])
+        if verification_evidence is not None:
+            defect["verification_evidence"] = (
+                _safe_text(verification_evidence, "") or None
+            )
+            changes["verification_evidence"] = bool(defect["verification_evidence"])
+        defect["updated_at"] = now_iso()
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_defect.updated",
+            details={"defect_id": normalized_defect_id, "changes": changes},
+        )
+        return deepcopy(defect)
+
+    def list_alpha_defects(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        tenant_id: str | None = None,
+        defect_statuses: list[str] | None = None,
+        severities: list[str] | None = None,
+        limit: int = 500,
+    ) -> list[dict[str, Any]]:
+        is_platform_admin = self._is_platform_admin_scope_actor(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        requested_tenant = _safe_text(tenant_id, "")
+        if not is_platform_admin:
+            self._assert_tenant_scope_request(
+                tenant_id=requested_tenant or requester_tenant_id,
+                requester_tenant_id=requester_tenant_id,
+                requester_organization_id=requester_organization_id,
+            )
+            self._assert_operational_access(requested_tenant or requester_tenant_id)
+        tenant_ids = (
+            [requested_tenant]
+            if requested_tenant
+            else sorted(dict(self.state.get("tenants") or {}).keys())
+        )
+        if not is_platform_admin:
+            tenant_ids = [_safe_text(requester_tenant_id, "")]
+        allowed_status = {
+            _normalize_choice(
+                item, allowed=_ALPHA_DEFECT_STATUS_CHOICES, label="defect status"
+            )
+            for item in list(defect_statuses or [])
+            if _safe_text(item, "")
+        }
+        allowed_severity = {
+            _normalize_choice(
+                item, allowed=_ALPHA_DEFECT_SEVERITY_CHOICES, label="defect severity"
+            )
+            for item in list(severities or [])
+            if _safe_text(item, "")
+        }
+        rows: list[dict[str, Any]] = []
+        for current_tenant in tenant_ids:
+            if not current_tenant or current_tenant == "local":
+                continue
+            defects = list(self._tenant_data(current_tenant).get("alpha_defects") or [])
+            for item in defects:
+                if not isinstance(item, dict):
+                    continue
+                payload = dict(item)
+                if (
+                    allowed_status
+                    and _safe_text(payload.get("defect_status"), "")
+                    not in allowed_status
+                ):
+                    continue
+                if (
+                    allowed_severity
+                    and _safe_text(payload.get("defect_severity"), "")
+                    not in allowed_severity
+                ):
+                    continue
+                if not is_platform_admin and _safe_text(
+                    payload.get("feedback_user_id"), ""
+                ) != _safe_text(actor_id, ""):
+                    continue
+                rows.append(payload)
+        rows.sort(
+            key=lambda item: (
+                _safe_text(item.get("updated_at"), ""),
+                _safe_text(item.get("defect_id"), ""),
+            )
+        )
+        return [deepcopy(item) for item in rows[-max(1, int(limit)) :]]
+
+    def alpha_feedback_triage_queue(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+    ) -> dict[str, Any]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        feedback_queue: list[dict[str, Any]] = []
+        defect_queue: list[dict[str, Any]] = []
+        for tenant_payload in dict(self.state.get("tenants") or {}).values():
+            tenant = Tenant.from_dict(dict(tenant_payload))
+            if tenant.tenant_id == "local":
+                continue
+            data = self._tenant_data(tenant.tenant_id)
+            feedback_queue.extend(
+                [
+                    {"tenant_id": tenant.tenant_id, **dict(item)}
+                    for item in list(data.get("alpha_feedback") or [])
+                    if isinstance(item, dict)
+                    and _safe_text(item.get("status"), "") in {"open", "in_review"}
+                ]
+            )
+            defect_queue.extend(
+                [
+                    {"tenant_id": tenant.tenant_id, **dict(item)}
+                    for item in list(data.get("alpha_defects") or [])
+                    if isinstance(item, dict)
+                    and _safe_text(item.get("defect_status"), "")
+                    not in {"Verified", "Closed", "Deferred"}
+                ]
+            )
+        feedback_queue.sort(
+            key=lambda item: (
+                _safe_text(item.get("updated_at"), ""),
+                _safe_text(item.get("feedback_id"), ""),
+            )
+        )
+        defect_queue.sort(
+            key=lambda item: (
+                _safe_text(item.get("updated_at"), ""),
+                _safe_text(item.get("defect_id"), ""),
+            )
+        )
+        return {
+            "generated_at": now_iso(),
+            "feedback_queue": [deepcopy(item) for item in feedback_queue],
+            "defect_queue": [deepcopy(item) for item in defect_queue],
+        }
+
+    def alpha_stabilization_release_history(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+    ) -> list[dict[str, Any]]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        rows = [
+            deepcopy(dict(item))
+            for item in list(self.state.get("alpha_release_records") or [])
+            if isinstance(item, dict)
+        ]
+        rows.sort(
+            key=lambda item: (
+                _safe_text(item.get("release_date"), ""),
+                _safe_text(item.get("version_identifier"), ""),
+                _safe_text(item.get("release_id"), ""),
+            )
+        )
+        return rows
 
     def recent_tenant_audit_events(
         self, *, tenant_id: str, limit: int = 50
@@ -2468,6 +3419,7 @@ class TenantManagerService:
             "alpha_reset_requests": [],
             "alpha_export_requests": [],
             "alpha_feedback": [],
+            "alpha_defects": [],
             "application_errors": [],
             "export_history": {},
         }

@@ -1,10 +1,10 @@
-# Alpha Operations (A-03)
+# Alpha Operations (A-04)
 
 ## Purpose
-Define controlled alpha deployment, tester onboarding, and test-operations behavior for repeatable tenant-isolated validation.
+Define controlled alpha deployment, tester onboarding, release triage, and stabilization behavior for repeatable tenant-isolated validation.
 
 ## Scope
-A-03 extends controlled alpha operations for external tester onboarding without introducing new product workflows.
+A-04 extends controlled alpha operations with release and defect stabilization workflow controls without introducing new product workflows.
 
 Implemented:
 - controlled alpha environment marker and release-channel guard in the application shell
@@ -21,6 +21,11 @@ Implemented:
 - deterministic scenario assignment and completion tracking per tester
 - sandbox reset/export request intake tied to tester profiles
 - platform-admin operations dashboard for cross-tenant rollout visibility
+- alpha release record lifecycle and stabilization release history
+- tester cohort assignment to controlled alpha release records
+- feedback triage queue and feedback-to-defect conversion workflow
+- defect classification with reproduction and retest progression
+- release-note and regression-test linkage for stabilization evidence
 
 Out of scope:
 - commercial workflow expansion
@@ -52,6 +57,13 @@ Out of scope:
 - Deactivated and paused tester access checks are explicitly denied.
 - Scenario tracking is deterministic with constrained statuses: `pending`, `in_progress`, `completed`.
 - Sandbox reset/export requests are tracked per tester and surfaced in operations reporting.
+
+### A-04 Release and Stabilization Controls
+- Release records track version, date, commit hash, included fixes, known limitations, scenario coverage, cohort assignment, rollback reference, and release status.
+- Defects support severity and lifecycle statuses required for controlled triage and retest handoff.
+- Enhancements are classified as backlog/deferred work and do not enter stabilization by default.
+- Severity, status, assignment, release, and closure changes are auditable.
+- Tenant users may view status for their own submitted feedback/defects; cross-tenant triage remains platform-admin-only.
 
 ### Error Logging Controls
 - Unhandled exceptions are logged before user-facing error messaging.
@@ -98,6 +110,7 @@ Supported statuses:
 - `closed`
 
 ## Operator Runbook Links
+- [ALPHA_RELEASE_PROCESS.md](ALPHA_RELEASE_PROCESS.md)
 - [ALPHA_TEST_PLAN.md](ALPHA_TEST_PLAN.md)
 - [ALPHA_SANDBOX_GUIDE.md](ALPHA_SANDBOX_GUIDE.md)
 - [ALPHA_TESTER_ONBOARDING.md](ALPHA_TESTER_ONBOARDING.md)

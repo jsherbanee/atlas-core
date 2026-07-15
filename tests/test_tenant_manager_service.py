@@ -1104,3 +1104,363 @@ def test_alpha_operations_dashboard_and_requests_are_tracked(tmp_path: Path) -> 
             requester_tenant_id="tenant-a",
             requester_organization_id="org-tenant-a",
         )
+
+
+def test_alpha_release_management_and_deterministic_ordering(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=True,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-b",
+            sandbox_label="Tenant B",
+            owner_user_id="owner-b",
+            seed_data_profile="profile-b",
+            enable_seed_data=True,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.assign_alpha_tester(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        tester_id="tester-a",
+        display_name="Tester A",
+        email="tester-a@example.com",
+    )
+    service.assign_alpha_tester(
+        tenant_id="tenant-b",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        tester_id="tester-b",
+        display_name="Tester B",
+        email="tester-b@example.com",
+    )
+
+    cohort = service.create_alpha_tester_cohort(
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        cohort_name="Wave 1",
+        member_assignments=[
+            {"tenant_id": "tenant-a", "tester_id": "tester-a"},
+            {"tenant_id": "tenant-b", "tester_id": "tester-b"},
+        ],
+        notes="initial rollout",
+    )
+
+    release_a = service.create_alpha_release_record(
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        version_identifier="1.5.0-alpha-a03",
+        release_date="2026-07-10T00:00:00+00:00",
+        commit_hash="0b72d0f",
+        included_fixes=["A-03 rollout baseline"],
+        known_limitations=["local deterministic runtime only"],
+        supported_test_scenarios=["organization_settings"],
+        assigned_tester_cohort_ids=[cohort["cohort_id"]],
+        rollback_reference="git checkout 0b72d0f^",
+        release_status="Approved",
+    )
+    release_b = service.create_alpha_release_record(
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        version_identifier="1.5.0-alpha-a04",
+        release_date="2026-07-14T00:00:00+00:00",
+        commit_hash="head-a04",
+        included_fixes=["A-04 stabilization"],
+        known_limitations=["no hosted infrastructure"],
+        supported_test_scenarios=["error_reporting"],
+        assigned_tester_cohort_ids=[cohort["cohort_id"]],
+        rollback_reference="git checkout 0b72d0f",
+        release_status="Draft",
+    )
+    assert release_a["release_status"] == "Approved"
+    assert release_b["release_status"] == "Draft"
+
+    releases = service.list_alpha_release_records(
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    assert [row["version_identifier"] for row in releases][-2:] == [
+        "1.5.0-alpha-a03",
+        "1.5.0-alpha-a04",
+    ]
+
+    updated = service.update_alpha_release_status(
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        release_id=release_b["release_id"],
+        release_status="Under Test",
+        notes="assigned to sandboxes",
+    )
+    assert updated["release_status"] == "Under Test"
+
+    reassigned = service.assign_alpha_release_cohorts(
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        release_id=release_b["release_id"],
+        cohort_ids=[cohort["cohort_id"]],
+    )
+    assert len(reassigned["assigned_tester_cohorts"]) == 1
+
+    history = service.alpha_stabilization_release_history(
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    assert history[-1]["release_id"] == release_b["release_id"]
+
+    local_actions = {
+        item["action"] for item in service.recent_tenant_audit_events(tenant_id="local")
+    }
+    assert "alpha.release.created" in local_actions
+    assert "alpha.release.status_updated" in local_actions
+    assert "alpha.release.cohorts_assigned" in local_actions
+
+
+def test_alpha_feedback_to_defect_triage_and_retest_lifecycle(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=True,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.assign_alpha_tester(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        tester_id="tester-a",
+        display_name="Tester A",
+        email="tester-a@example.com",
+    )
+
+    error_row = service.log_application_error(
+        actor_id="owner-a",
+        tenant_id="tenant-a",
+        environment_label="Controlled Alpha",
+        application_version="1.5.0-alpha-a04",
+        severity="high",
+        exception_type="RuntimeError",
+        message="stabilization issue",
+        stack_trace="trace",
+        workspace="Transactions",
+        route="Transactions",
+    )
+    feedback = service.submit_alpha_feedback(
+        tenant_id="tenant-a",
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        user_id="tester-a",
+        workspace="Transactions",
+        object_or_transaction="estimate:EST-900",
+        severity="high",
+        reproduction_steps="1. Open estimate\n2. Save",
+        expected_result="Estimate saves successfully",
+        actual_result="Save throws runtime error",
+        related_error_id=error_row["error_id"],
+    )
+
+    triage = service.alpha_feedback_triage_queue(
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    assert any(
+        item["feedback_id"] == feedback["feedback_id"]
+        for item in triage["feedback_queue"]
+    )
+
+    defect = service.create_alpha_defect_from_feedback(
+        tenant_id="tenant-a",
+        feedback_id=feedback["feedback_id"],
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        application_version="1.5.0-alpha-a04",
+        severity="High",
+        alpha_blocking=True,
+        defect_status="Confirmed",
+        assigned_sprint_or_release="A-04",
+        resolution_priority="P1",
+        regression_test_required=True,
+        release_note_linkage="RELEASE_NOTES:A-04",
+    )
+    assert defect["defect_status"] == "Confirmed"
+    assert defect["alpha_blocking"] is True
+    assert defect["related_error_id"] == error_row["error_id"]
+
+    ready_for_retest = service.update_alpha_defect(
+        tenant_id="tenant-a",
+        defect_id=defect["defect_id"],
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        defect_status="Ready for Retest",
+        retest_status="Ready for Retest",
+        regression_test_references=[
+            "tests/test_tenant_manager_service.py::test_alpha_feedback_to_defect_triage_and_retest_lifecycle"
+        ],
+        resolution_notes="patched in A-04",
+    )
+    assert ready_for_retest["defect_status"] == "Ready for Retest"
+    assert ready_for_retest["retest_status"] == "Ready for Retest"
+
+    verified = service.update_alpha_defect(
+        tenant_id="tenant-a",
+        defect_id=defect["defect_id"],
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        defect_status="Verified",
+        retest_status="Passed",
+        verification_evidence="pytest tests/test_tenant_manager_service.py -q",
+    )
+    assert verified["defect_status"] == "Verified"
+    assert verified["retest_status"] == "Passed"
+    assert verified["verification_evidence"]
+
+    dashboard = service.alpha_operations_dashboard(
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    assert dashboard["unresolved_errors"] >= 1
+    assert "/" in dashboard["scenario_completion"]
+
+    tenant_actions = {
+        item["action"]
+        for item in service.recent_tenant_audit_events(tenant_id="tenant-a")
+    }
+    assert "tenant.alpha_defect.created" in tenant_actions
+    assert "tenant.alpha_defect.updated" in tenant_actions
+
+
+def test_alpha_enhancement_defect_rule_and_tenant_visibility(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=True,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-b",
+            sandbox_label="Tenant B",
+            owner_user_id="owner-b",
+            seed_data_profile="profile-b",
+            enable_seed_data=True,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+
+    feedback_owner_a = service.submit_alpha_feedback(
+        tenant_id="tenant-a",
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        user_id="owner-a",
+        workspace="Settings",
+        object_or_transaction="tenant_manager",
+        severity="medium",
+        reproduction_steps="step",
+        expected_result="ok",
+        actual_result="warn",
+    )
+    service.submit_alpha_feedback(
+        tenant_id="tenant-a",
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        user_id="owner-b",
+        workspace="Settings",
+        object_or_transaction="tenant_manager",
+        severity="medium",
+        reproduction_steps="step",
+        expected_result="ok",
+        actual_result="warn",
+    )
+    enhancement = service.create_alpha_defect_from_feedback(
+        tenant_id="tenant-a",
+        feedback_id=feedback_owner_a["feedback_id"],
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        application_version="1.5.0-alpha-a04",
+        severity="Enhancement",
+        alpha_blocking=True,
+        defect_status="Confirmed",
+        assigned_sprint_or_release="backlog",
+        resolution_priority="Backlog",
+        regression_test_required=False,
+    )
+    assert enhancement["defect_severity"] == "Enhancement"
+    assert enhancement["alpha_blocking"] is False
+    assert enhancement["defect_status"] == "Deferred"
+
+    owner_a_feedback = service.list_alpha_feedback(
+        tenant_id="tenant-a",
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        actor_id="owner-a",
+    )
+    assert all(item["user_id"] == "owner-a" for item in owner_a_feedback)
+
+    owner_a_defects = service.list_alpha_defects(
+        actor_id="owner-a",
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        tenant_id="tenant-a",
+    )
+    assert len(owner_a_defects) == 1
+    assert owner_a_defects[0]["feedback_user_id"] == "owner-a"
+
+    with pytest.raises(PermissionError, match="cross-tenant diagnostics"):
+        service.list_alpha_feedback(
+            tenant_id="tenant-a",
+            requester_tenant_id="tenant-b",
+            requester_organization_id="org-tenant-b",
+            actor_id="owner-b",
+        )
+
+    with pytest.raises(PermissionError, match="cross-tenant diagnostics"):
+        service.list_alpha_defects(
+            actor_id="owner-b",
+            requester_tenant_id="tenant-b",
+            requester_organization_id="org-tenant-b",
+            tenant_id="tenant-a",
+        )

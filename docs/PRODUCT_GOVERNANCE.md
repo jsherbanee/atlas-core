@@ -182,6 +182,14 @@ The following remain mandatory in every pass:
 - auditability
 - backward compatibility
 
+## Alpha Stabilization Governance Rules (A-04)
+- Confirmed defects may enter stabilization when they impact controlled-alpha release quality.
+- Enhancements must return to Product Backlog and must not automatically enter stabilization scope.
+- Tester requests do not automatically become active sprint scope; roadmap and backlog discipline still apply.
+- Critical security, tenant-isolation, data-loss, and broken-core-workflow issues are release blocking.
+- Every corrected confirmed defect should add regression evidence where practical.
+- Release notes must link to stabilized defect records before release acceptance.
+
 ## Roadmap Discipline
 Roadmaps approve direction. They do not automatically schedule execution.
 

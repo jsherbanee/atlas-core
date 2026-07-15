@@ -1,7 +1,7 @@
-# Alpha Test Plan (A-03)
+# Alpha Test Plan (A-04)
 
 ## Purpose
-Define the controlled alpha onboarding and rollout validation plan and record evidence for Sprint A-03.
+Define the controlled alpha launch, triage, and stabilization validation plan and record evidence for Sprint A-04.
 
 ## Scope Boundaries
 In scope:
@@ -20,6 +20,10 @@ In scope:
 - alpha tester assignment, acknowledgement, and lifecycle transitions
 - deterministic scenario assignment, progression, and completion tracking
 - tester deactivation access denial and platform-admin-only dashboard enforcement
+- alpha release records, cohort assignment, and stabilization history ordering
+- feedback triage queue and feedback-to-defect conversion workflow
+- defect lifecycle progression (confirmed -> ready for retest -> verified)
+- tenant-user feedback/defect visibility constraints and cross-tenant denial
 
 Out of scope:
 - AWS infrastructure provisioning
@@ -41,6 +45,9 @@ Out of scope:
 | Error status workflow | Acknowledged/investigating/resolved/reopened transitions with audit coverage | `tests/test_tenant_manager_service.py` | passing |
 | Alpha tester onboarding | Tester assignment, onboarding acknowledgement, scenario completion, and access checks | `tests/test_tenant_manager_service.py` | passing |
 | Alpha operations dashboard | Platform-admin-only rollout summary and request counters | `tests/test_tenant_manager_service.py` | passing |
+| Alpha release management | Release records, cohort assignment, deterministic ordering, and status history | `tests/test_tenant_manager_service.py` | passing |
+| Defect triage lifecycle | Feedback conversion, severity/blocker rules, retest and verification evidence | `tests/test_tenant_manager_service.py` | passing |
+| Tenant visibility constraints | Tenant user feedback/defect status restricted to own submissions | `tests/test_tenant_manager_service.py` | passing |
 | Immutable audit | Append-only chain and deterministic filtering/export | `tests/test_immutable_audit_service.py` | passing |
 | Attachment security | Tenant-scoped access and extension-policy enforcement | `tests/test_attachment_service.py` | passing |
 | Job reliability | Deterministic lifecycle and idempotent retry/cancel semantics | `tests/test_project_workspace_service.py` | passing |
@@ -51,28 +58,31 @@ Out of scope:
 | Universal object tenant safety | Relationship/activity tenant-boundary enforcement | `tests/test_universal_object_contract.py` | passing |
 
 ## Executed Commands
-Focused A-03 suites:
+Focused A-04 suites:
 - `.venv/bin/pytest -q tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py`
-- Result: `22 passed`
+- Result: `25 passed`
 
-Current Sprint A-03 validation commands executed in-session:
+Current Sprint A-04 validation commands executed in-session:
 - `black atlas_core/services/tenant_manager_service.py apps/phase2_review_app.py tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py`
 - `ruff check atlas_core/services/tenant_manager_service.py apps/phase2_review_app.py tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py`
 - `mypy atlas_core/services/tenant_manager_service.py apps/phase2_review_app.py`
 - `pytest tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py -q`
-- Result: `22 passed`
+- Result: `25 passed`
 
-## A-03 Operations Verification
+## A-04 Operations Verification
 - Controlled-alpha environment marker is visible in shell header/status and blocks accidental production designation.
 - Platform Management now includes alpha health-check, tenant-scoped feedback/defect capture, known-limitations access, and operator checklist guidance.
 - Seed loading, reset, and export remain available as explicit sandbox lifecycle operations.
 - Tenant feedback and diagnostics remain tenant-scoped with cross-tenant rejection and sensitive-key/path redaction.
 - Platform Management now includes tester-onboarding and operations-dashboard tertiary actions.
+- Platform Management now includes release and stabilization controls for cohort assignment, triage queue, and defect lifecycle updates.
 - Tester profiles can be assigned, acknowledged, and moved through deterministic lifecycle states.
 - Scenario assignments can be completed and linked to related feedback/Error IDs.
 - Deactivated testers are blocked by access assertions.
+- Release records support controlled status progression and deterministic release history ordering.
+- Confirmed defects can move to Ready for Retest and Verified with regression/verification evidence.
 
 ## Validation Outcome
 - Alpha blocker findings identified in A-02: 0
 - Remaining confirmed alpha blockers: 0
-- Recommendation: controlled alpha tester onboarding and rollout operations are ready for sandbox-based external alpha execution under local deterministic constraints.
+- Recommendation: controlled alpha launch and stabilization loop operations are ready for sandbox-based external alpha execution under local deterministic constraints.

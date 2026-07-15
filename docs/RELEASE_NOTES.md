@@ -19,6 +19,28 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Atlas Alpha Operations Sprint A-04 Alpha Launch, Feedback Triage, and Stabilization Loop)
+
+### Improved
+
+- Platform Management now includes release and stabilization controls for alpha release records, tester cohorts, feedback triage, and defect lifecycle updates.
+- Alpha operations now support release-state tracking (`Draft`, `Approved`, `Deployed to Sandbox`, `Under Test`, `Accepted`, `Superseded`, `Withdrawn`) with deterministic release ordering.
+- Feedback can now be converted into classified defects with severity, blocking posture, reproduction status, resolution priority, regression references, release-note linkage, retest state, and verification evidence.
+- Tenant-scoped visibility now supports own-submission status filtering for feedback and defects while preserving platform-admin-only cross-tenant triage.
+- Operations dashboard now summarizes current alpha version, release status, active cohorts, triage posture, blockers, retest queue, unresolved errors, and sandbox health.
+
+### Quality
+
+- targeted validation: `pytest tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py -q` -> `25 passed`
+- touched-file checks: `black`, `ruff`, and `mypy` passing
+
+### Scope Notes
+
+- no new product features
+- no inventory/procurement activation
+- no live integrations, billing, public signup, or AI scope expansion
+- enhancements remain backlog-bound and do not auto-enter stabilization
+
 ## Unreleased (Atlas Alpha Operations Sprint A-03 Alpha Tester Onboarding and Controlled Rollout)
 
 ### Improved

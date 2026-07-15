@@ -66,6 +66,7 @@ def test_settings_workspace_contract_has_expected_sections() -> None:
         "feedback",
         "alpha_tester_onboarding",
         "alpha_operations_dashboard",
+        "alpha_release_stabilization",
         "error_log",
         "known_limitations",
         "operator_checklist",

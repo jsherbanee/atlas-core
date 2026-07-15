@@ -112,6 +112,17 @@ Atlas interpretation:
 - Done requires implementation accuracy and documentation accuracy
 - Done is not satisfied by code changes alone
 
+## A-04 Controlled Alpha Stabilization Loop
+For controlled alpha release operations, sprint execution should include:
+1. create/update release record and assigned tester cohort
+2. triage incoming feedback into queue-ready status
+3. convert confirmed defects and classify severity/blocking posture
+4. assign stabilization target (sprint/release) and regression requirements
+5. move corrected defects through Ready for Retest and Verified with evidence
+6. reconcile release-note linkage before release acceptance
+
+This loop remains subject to Definition of Ready and Definition of Done, and does not bypass roadmap governance.
+
 ## Sprint Flow
 1. Select a roadmap-aligned backlog item.
 2. Confirm Definition of Ready.
