@@ -108,6 +108,10 @@ Sprint T-03 extends Object Workspace continuity for transaction estimates by pre
 
 Sprint T-09 extends transaction-object continuity for project change-order tracking by indexing shared change-order metadata on Sales Orders and Return Orders (for example `CO #n`, direction, and base-bid reference) without introducing a standalone Change Order object route.
 
+## T-08 Transactions Compatibility Note
+
+Sprint T-08 extends transaction-object continuity for Customer Invoices by preserving customer-invoice kind routing through Transactions and Object Workspace handoff while maintaining customer-invoice-specific sync and payment-status metadata visibility.
+
 ## Universal Object Workspace Shape
 Future workspace surfaces should be able to render a stable object shell using shared contract data for:
 - breadcrumb

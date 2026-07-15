@@ -38,6 +38,7 @@ Status: Active
 - T-05 Amendment Estimate and Sales Order Versioning, Duplication, and PDF Export
 - T-06 Return Orders and Credit Memos
 - T-07 Commercial Document Line Layout and Presentation
+- T-08 Customer Invoice Transactions
 - P-01 Roles and Permissions Foundation
 - P-02 Immutable Audit Foundation
 - P-03 Deterministic Background Job Framework

@@ -15474,15 +15474,79 @@ def _render_transactions_workspace_page(
             key=f"{prefix}_sync_failure_message",
             value=_safe_text(selected_document.sync_metadata.failure_message, ""),
         )
-        if st.button("Apply Sync Status", key=f"{prefix}_apply_sync", width="stretch"):
-            service.set_sync_status(
-                document_id=selected_document.document_id,
-                sync_status=SyncStatus(selected_sync),
-                failure_code=failure_code or None,
-                failure_message=failure_message or None,
+        if selected_document.document_type == CommercialDocumentType.CUSTOMER_INVOICE:
+            invoice_sync_cols = st.columns(3)
+            external_id = invoice_sync_cols[0].text_input(
+                "External Invoice ID",
+                value=_safe_text(selected_document.sync_metadata.external_id, ""),
+                key=f"{prefix}_invoice_sync_external_id",
             )
-            _save_transactions_workspace_state(st, service)
-            st.rerun()
+            external_revision = invoice_sync_cols[1].text_input(
+                "External Revision",
+                value=_safe_text(selected_document.sync_metadata.external_revision, ""),
+                key=f"{prefix}_invoice_sync_external_revision",
+            )
+            reconciliation_state = invoice_sync_cols[2].text_input(
+                "Reconciliation State",
+                value=_safe_text(
+                    selected_document.sync_metadata.reconciliation_state,
+                    "",
+                ),
+                key=f"{prefix}_invoice_sync_reconciliation_state",
+            )
+
+            invoice_payment_cols = st.columns(2)
+            quickbooks_payment_status = invoice_payment_cols[0].text_input(
+                "QuickBooks Payment Status",
+                value=_safe_text(
+                    (selected_document.document_metadata or {}).get(
+                        "quickbooks_payment_status"
+                    ),
+                    "",
+                ),
+                key=f"{prefix}_invoice_sync_payment_status",
+            )
+            quickbooks_payment_status_timestamp = invoice_payment_cols[1].text_input(
+                "QuickBooks Payment Timestamp",
+                value=_safe_text(
+                    (selected_document.document_metadata or {}).get(
+                        "quickbooks_payment_status_timestamp"
+                    ),
+                    "",
+                ),
+                key=f"{prefix}_invoice_sync_payment_status_timestamp",
+            )
+
+            if st.button(
+                "Apply Sync Status", key=f"{prefix}_apply_sync", width="stretch"
+            ):
+                service.record_customer_invoice_sync_event(
+                    document_id=selected_document.document_id,
+                    sync_status=SyncStatus(selected_sync),
+                    external_id=external_id or None,
+                    external_revision=external_revision or None,
+                    failure_code=failure_code or None,
+                    failure_message=failure_message or None,
+                    reconciliation_state=reconciliation_state or None,
+                    payment_status=quickbooks_payment_status or None,
+                    payment_status_timestamp=(
+                        quickbooks_payment_status_timestamp or None
+                    ),
+                )
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
+        else:
+            if st.button(
+                "Apply Sync Status", key=f"{prefix}_apply_sync", width="stretch"
+            ):
+                service.set_sync_status(
+                    document_id=selected_document.document_id,
+                    sync_status=SyncStatus(selected_sync),
+                    failure_code=failure_code or None,
+                    failure_message=failure_message or None,
+                )
+                _save_transactions_workspace_state(st, service)
+                st.rerun()
 
     if tertiary == "activity":
         _render_data_table(

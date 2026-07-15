@@ -157,6 +157,7 @@ Transactions integration:
 - transactions workspace service is initialized from serialized numbering policies supplied by settings
 - numbering policy updates that occur during transaction operations are synchronized back into settings state
 - Return Orders and Credit Memos consume the same tenant-scoped numbering policy infrastructure as other commercial documents
+- Customer Invoices consume the same tenant-scoped numbering policy infrastructure and retain non-reuse guarantees for issued invoice numbering
 
 ## Testing Expectations
 

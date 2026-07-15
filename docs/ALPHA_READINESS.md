@@ -87,6 +87,15 @@ Previously corrected in P-06 and retained:
 - explicit template scope enforcement.
 - attachment version extension allow-list enforcement.
 
+## T-08 Follow-Up Note
+
+Customer Invoice transaction hardening now includes:
+- explicit billing-strategy and overbilling-override evidence capture
+- lifecycle/payment-state transitions with immutable issued-document boundaries preserved
+- invoice-specific sync event tracking (external IDs/revisions, retry state, reconciliation state, returned payment status)
+
+No new blocker-class tenant-isolation or cross-scope regressions were identified in the T-08 customer-invoice paths.
+
 ## Security and Tenancy Findings
 - No active cross-tenant mutation regression remains in audited transactions paths with default service configuration.
 - Transactions service construction now fails fast when active tenant/org scope is omitted.

@@ -122,6 +122,27 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "export_pdf",
     ]
 
+    customer_invoice_section = next(
+        item for item in contract if item["secondary_key"] == "customer_invoices"
+    )
+    customer_invoice_actions = [
+        entry["tertiary_key"]
+        for entry in customer_invoice_section.get("supported_tertiary_actions", [])
+    ]
+    assert customer_invoice_actions == [
+        "add",
+        "browse",
+        "edit",
+        "lines",
+        "billing",
+        "revisions",
+        "approvals",
+        "issue",
+        "sync_status",
+        "activity",
+        "export_pdf",
+    ]
+
 
 def test_transactions_page_is_primary_workspace() -> None:
     assert app._active_primary_workspace("Transactions", None) == "Transactions"

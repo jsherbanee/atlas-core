@@ -21,6 +21,21 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Epic T Sprint T-08 Customer Invoice Transactions)
+
+### Improved
+
+- Transactions now supports Customer Invoice creation from standalone, project/milestone context, Sales Order, and Change Order source paths.
+- Customer Invoice billing now supports deterministic strategy metadata, requested-vs-available enforcement, and explicit overbilling override diagnostics.
+- Customer Invoice issue, revision, duplication, and deterministic PDF export paths are now available through existing commercial-document framework controls.
+- Customer Invoice sync controls now capture invoice-specific external identifiers/revisions, reconciliation state, retry behavior, and returned QuickBooks payment-status metadata.
+
+### Scope Notes
+
+- no live QuickBooks transport execution
+- no receivable-ledger ownership transfer from QuickBooks to Atlas
+- no customer-payment processing implementation
+
 ## Unreleased (Sprint P-07 Alpha Blocker Remediation)
 
 ### Improved

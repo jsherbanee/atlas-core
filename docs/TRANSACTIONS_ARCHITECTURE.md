@@ -100,6 +100,23 @@ Still deferred:
 - non-estimate transaction-family deep operational workflows
 - external sync transport execution and financial posting behavior
 
+## T-08 Implementation Note
+
+Sprint T-08 operationalizes Customer Invoices as a deep transaction-family workflow.
+
+Implemented in T-08:
+- customer invoice creation from standalone, project, milestone-context, Sales Order, and Change Order origins
+- billing controls for full/partial/milestone/progress/line/final strategies with deterministic requested-vs-available enforcement
+- explicit overbilling override diagnostics with required reason/actor evidence
+- approval and issue flow continuity with immutable issued behavior
+- payment-state transitions (`partially_paid`, `paid`, `overdue`, `voided`) on customer invoices
+- invoice-specific sync-status handling for external IDs/revisions, reconciliation state, retry behavior, and returned QuickBooks payment status
+- transactions navigation and object-workspace/search continuity for customer invoice records
+
+Still deferred:
+- live QuickBooks API transport and webhook implementation
+- receivable ledger ownership, payment application, and reconciliation accounting behavior
+
 ## T-09 Implementation Note
 
 Sprint T-09 introduces project-scoped change-order tracking without introducing a standalone Change Order transaction object.

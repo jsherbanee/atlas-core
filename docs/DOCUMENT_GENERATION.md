@@ -77,6 +77,7 @@ Key behavior:
 - export_document_pdf delegates to generate_document_artifact when no legacy section override is provided
 - generation records template assignment and template snapshot metadata in export activity
 - generation records output artifact metadata in document attachments
+- customer-invoice presentation exports use the same deterministic generation path and revision snapshot guarantees
 
 ## Background Job and Audit Alignment
 

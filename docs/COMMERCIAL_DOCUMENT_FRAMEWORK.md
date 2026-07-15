@@ -102,6 +102,23 @@ Deferred in P-05:
 - external delivery transport execution
 - e-signature and approval workflow expansion
 
+## T-08 Implementation Status
+
+Sprint T-08 operationalizes Customer Invoice transactions on top of the shared commercial-document framework.
+
+Implemented in T-08:
+- customer-invoice draft creation for standalone, project-driven, and source-linked flows (Sales Order and Change Order)
+- billing-strategy metadata capture with available-to-bill and requested-amount controls
+- explicit overbilling override diagnostics requiring actor and reason
+- lifecycle/payment-state transitions for `partially_paid`, `paid`, `overdue`, and `voided`
+- invoice-specific sync-event recording for external invoice IDs, reconciliation state, retry tracking, and returned payment-status metadata
+- customer-invoice revision, duplication, and deterministic PDF export continuity through the shared framework
+
+Out of scope in T-08:
+- live QuickBooks transport execution
+- accounting-ledger behavior
+- credit/adjustment automation beyond existing return/credit workflows
+
 ## T-09 Implementation Status
 
 Sprint T-09 implements project-scoped change-order tracking using existing Sales Orders and Return Orders instead of a separate Change Order document object.

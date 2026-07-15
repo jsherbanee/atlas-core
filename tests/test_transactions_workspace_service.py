@@ -362,6 +362,49 @@ def test_customer_invoice_issue_payment_and_sync_metadata() -> None:
     assert (synced.document_metadata or {}).get("quickbooks_payment_status") == "paid"
 
 
+def test_customer_invoice_sync_failure_increments_retry_and_tracks_metadata() -> None:
+    service = _service()
+    invoice = service.create_customer_invoice_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        source_type="standalone",
+        billing_strategy="full",
+        requested_amount=Decimal("200.00"),
+        available_to_bill=Decimal("200.00"),
+    )
+    service.set_approval_state(
+        document_id=invoice.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+    service.issue_document(document_id=invoice.document_id, reason="issue")
+
+    failed = service.record_customer_invoice_sync_event(
+        document_id=invoice.document_id,
+        sync_status=SyncStatus.FAILED,
+        external_id="qb-inv-900",
+        external_revision="rev-2",
+        failure_code="api_timeout",
+        failure_message="timed out",
+        reconciliation_state="awaiting_retry",
+        payment_status="partially_paid",
+        payment_status_timestamp="2026-01-03T12:00:00Z",
+    )
+
+    assert failed.sync_metadata.status == SyncStatus.FAILED
+    assert failed.sync_metadata.external_object_type == "invoice"
+    assert failed.sync_metadata.external_id == "qb-inv-900"
+    assert failed.sync_metadata.external_revision == "rev-2"
+    assert failed.sync_metadata.reconciliation_state == "awaiting_retry"
+    assert failed.sync_metadata.retry_count == 1
+    assert (failed.document_metadata or {}).get("quickbooks_payment_status") == (
+        "partially_paid"
+    )
+    assert (failed.document_metadata or {}).get(
+        "quickbooks_payment_status_timestamp"
+    ) == "2026-01-03T12:00:00Z"
+
+
 def test_customer_invoice_pdf_and_duplication_supported() -> None:
     service = _service()
     invoice = service.create_customer_invoice_draft(

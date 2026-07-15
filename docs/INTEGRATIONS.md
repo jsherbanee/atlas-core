@@ -80,6 +80,7 @@ Shared entities may include customers, vendors, purchase orders, bills, invoices
 Transactions architecture note:
 - Atlas should eventually originate and manage operational commercial documents such as estimates, proposals, sales orders, purchase orders, receiving records, vendor bills, and customer invoices before sync.
 - Atlas now also manages Return Order workflow and Credit Memo generation before sync.
+- Atlas now tracks customer-invoice sync readiness/status and returned QuickBooks payment-state metadata as synchronized reference data without changing QuickBooks financial ownership.
 - QuickBooks should own the post-sync financial state for payables, receivables, payments, ledger, and statutory reporting.
 - payment status may return from QuickBooks into Atlas as synchronized financial reference state.
 
