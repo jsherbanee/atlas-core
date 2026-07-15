@@ -76,8 +76,10 @@ Sprint T-02 implements the first production Transactions navigation surface.
 Implemented behavior:
 - Transactions added to top-level primary header navigation
 - Transactions workspace uses the shared secondary/tertiary navigation contract model
-- secondary sections: Overview, Estimates, Proposals, Sales Orders, Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills, Customer Invoices, Change Orders
-- tertiary actions: Add, Browse, Edit, Related Documents, Approvals, Sync Status, Activity, Export
+- active secondary sections: Overview, Estimates, Sales Orders, Return Orders, Credit Memos, Customer Invoices
+- deferred secondary sections (visible but disabled/deferred): Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills
+- Change Orders are not a standalone secondary route; change-order behavior is represented as a convention on Sales Orders and Return Orders
+- tertiary actions are compact and context-driven, with record-required actions hidden until a draft/record context exists
 - navigation continuity/state persistence uses existing shell state keys and workspace-state snapshot behavior
 
 ## Settings Navigation Implementation (T-04)
@@ -88,8 +90,8 @@ Implemented behavior:
 - Settings remains the public label while internal routing continues to use `Administration`
 - secondary settings groups: Organization Settings, Personal Preferences, Integrations, Security, Billing, Advanced
 - tertiary settings pages are contract-driven per selected settings group
-- active T-04 content is limited to Organization Settings and Personal Preferences
-- Integrations, Security, Billing, and Advanced remain visible and explicitly marked as future scope
+- active content is limited to Organization Settings, Personal Preferences, and authorized Platform Management surfaces
+- Integrations, Security, Billing, and Advanced remain visible but disabled/deferred for controlled alpha clarity
 
 W-03 implementation note:
 - Object Workspace is now a shared route that owns object-level tertiary navigation for migrated object families
@@ -109,4 +111,6 @@ W-01 implementation note:
 - Knowledge navigation defaults are deterministic
 - migrated object opens preserve object-level navigation context inside Object Workspace
 - context banner and return behavior remain deterministic across search and Working Set handoff paths
+- transaction deferred-route visibility and standalone Change Order removal are regression-covered
+- settings deferred-section disable behavior and platform-diagnostic scoping are regression-covered
 - The implementation is covered by app-level regression tests and full-suite validation

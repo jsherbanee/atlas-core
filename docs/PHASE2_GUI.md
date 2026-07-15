@@ -34,6 +34,7 @@ Atlas Workspace Sprint S-01 completes Settings alpha scope with Organization Pro
 Atlas Workspace Sprint U-01 completes Transactions commercial-document usability polish by normalizing tertiary actions across active commercial families, unifying export controls onto deterministic `export_pdf` paths, extending line-sort parity for presentation controls, and surfacing explicit source/lineage context in Related Documents.
 Atlas Workspace Sprint U-02 completes end-to-end UX and workflow polish across all primary workspaces with clearer page-purpose identity, tighter action language consistency, reduced prototype/developer terminology, improved settings roadmap-section guidance, and consistent responsive behavior validation at 820/980/1180/1366 widths.
 Atlas Workspace Sprint C-03 extends Transactions catalog-backed line insertion for Product/Service/Fee/Assembly item types, including assembly `expand` and `grouped` insertion options and credit memo compatibility, while preserving deterministic no-mutation behavior for issued revisions.
+Atlas Workspace Alpha UI Cleanup refines production-facing shell/navigation behavior by tightening active vs deferred route visibility, reducing duplicate action exposure, and removing tenant-facing implementation remnants without adding new business features.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.
@@ -448,7 +449,18 @@ Sprint X-04 home/search refinement notes:
 - Unknown object types are rendered after preferred groups in alphabetical order.
 - Removed Home sections: Application Areas, Portfolio Signals, Upcoming Timeline, Projects Requiring Attention, and Workspace Recommendations.
 - Action Center is limited to critical/high-priority deduplicated actions.
-- Recent Activity is the only secondary Home section.
+- Home remains operational with compact Continue Working, Recent Projects, Action Center, Notifications, and Favorites sections.
+
+Transactions alpha navigation posture:
+
+- active families: Overview, Estimates, Sales Orders, Return Orders, Credit Memos, Customer Invoices
+- Change Orders remain a convention/filter inside Sales Orders and Return Orders (not a standalone secondary family)
+- deferred families are visibly deferred/disabled: Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills
+
+Settings alpha visibility posture:
+
+- tenant-visible Settings avoids environment/build/test diagnostics
+- platform diagnostics and alpha operations controls remain in Platform Management surfaces
 
 ## Project Workspace Navigation
 When a project is opened, Atlas switches to project navigation.

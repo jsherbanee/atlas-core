@@ -290,6 +290,27 @@ The lifecycle timeline should feel like an engineering control surface:
 
 X-11 continues product hardening without architecture expansion:
 
+## 8.9 Alpha UI Cleanup Posture
+
+Alpha UI cleanup continues behavior-preserving hardening and production-surface refinement.
+
+Design rules for this pass:
+
+- preserve two-column workspace composition and align content start positions consistently
+- reduce excess whitespace and avoid repeated action exposure across navigation and content panes
+- keep Home operational and compact with Continue Working, Recent Projects, Action Center, Notifications, and Favorites
+- keep Knowledge summary language user-facing (data health and next actions), not implementation-status phrasing
+- keep Transactions limited to active families and treat change orders as a Sales Order/Return Order convention
+- keep deferred transaction families visibly deferred/disabled so they cannot be mistaken for active workflows
+- keep Reports output-oriented at application scope; project-workspace review routes remain in project context
+- keep tenant-facing shell surfaces free of build/test diagnostics; restrict diagnostics to authorized platform-admin surfaces
+
+Scope boundary remains unchanged:
+
+- no new product capabilities
+- no procurement/inventory activation
+- no integration transport activation
+
 ## T-07 Line Presentation UX Posture
 
 Commercial document line presentation controls should feel like precise document-layout tools, not spreadsheets.

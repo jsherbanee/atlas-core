@@ -31,7 +31,6 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "receiving",
         "vendor_bills",
         "customer_invoices",
-        "change_orders",
     ]
 
     estimate_section = next(
@@ -44,19 +43,7 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
     assert tertiary_keys == [
         "add",
         "browse",
-        "edit",
-        "duplicate",
-        "create_revision",
-        "revision_history",
-        "archive",
-        "restore",
         "lines",
-        "customer_view",
-        "internal_view",
-        "revisions",
-        "issue",
-        "accept",
-        "decline",
         "related_documents",
         "activity",
         "export_pdf",
@@ -72,16 +59,7 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
     assert sales_order_actions == [
         "add",
         "browse",
-        "edit",
-        "duplicate",
-        "create_revision",
-        "revision_history",
-        "archive",
-        "restore",
         "lines",
-        "demand",
-        "fulfillment",
-        "issue",
         "related_documents",
         "activity",
         "export_pdf",
@@ -97,18 +75,7 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
     assert return_order_actions == [
         "add",
         "browse",
-        "edit",
-        "duplicate",
-        "create_revision",
-        "revision_history",
-        "archive",
-        "restore",
         "lines",
-        "approvals",
-        "receiving",
-        "inspection",
-        "process",
-        "issue",
         "related_documents",
         "activity",
         "export_pdf",
@@ -124,16 +91,8 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
     assert credit_memo_actions == [
         "add",
         "browse",
-        "edit",
-        "duplicate",
-        "create_revision",
-        "revision_history",
-        "archive",
-        "restore",
         "lines",
-        "issue",
         "related_documents",
-        "sync_status",
         "activity",
         "export_pdf",
     ]
@@ -148,22 +107,43 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
     assert customer_invoice_actions == [
         "add",
         "browse",
-        "edit",
-        "duplicate",
         "lines",
-        "billing",
-        "revisions",
-        "approvals",
-        "issue",
-        "sync_status",
+        "related_documents",
         "activity",
         "export_pdf",
     ]
+
+    deferred_sections = {
+        "purchase_orders",
+        "rfqs",
+        "vendor_quotes",
+        "receiving",
+        "vendor_bills",
+    }
+    assert all(
+        item["enabled"] is False
+        for item in contract
+        if item["secondary_key"] in deferred_sections
+    )
+
+    deferred_actions = {
+        item["secondary_key"]: [
+            action["tertiary_key"]
+            for action in item.get("supported_tertiary_actions", [])
+        ]
+        for item in contract
+        if item["secondary_key"] in deferred_sections
+    }
+    assert all(keys == ["deferred"] for keys in deferred_actions.values())
 
 
 def test_transactions_page_is_primary_workspace() -> None:
     assert app._active_primary_workspace("Transactions", None) == "Transactions"
     assert app._active_workspace_mode("Transactions", None) == "application"
+
+
+def test_proposal_label_is_not_user_facing() -> None:
+    assert app._object_type_label("proposal") != "Proposal"
 
 
 def test_transactions_object_workspace_routes_and_adapter_keys() -> None:

@@ -15,7 +15,7 @@ import platform
 import re
 import subprocess
 import traceback
-from typing import Any
+from typing import Any, Callable
 
 from atlas_core import __version__
 from atlas_core.domain import (
@@ -75,9 +75,6 @@ from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 from atlas_core.services.permissions_service import PermissionsService
 from atlas_core.services.settings_service import SettingsService
 from atlas_core.services.tenant_manager_service import TenantManagerService
-from atlas_core.services.commercial_catalog_seed_service import (
-    CommercialCatalogSeedService,
-)
 from atlas_core.services.specification_intelligence import (
     SpecificationIntelligenceEngine,
     SpecificationReferenceType,
@@ -738,66 +735,6 @@ PROJECTS_LIBRARY_NAVIGATION_CONTRACT: list[dict[str, Any]] = [
                 "permission_hook": "future_permission_check",
                 "deterministic_fallback": "browse",
             },
-            {
-                "tertiary_key": "open",
-                "label": "Open",
-                "route": "Projects",
-                "action_type": "detail_view",
-                "visibility": True,
-                "enabled": True,
-                "required_selection": "project",
-                "empty_state_behavior": "Select a project in the library table before opening.",
-                "permission_hook": "future_permission_check",
-                "deterministic_fallback": "browse",
-            },
-            {
-                "tertiary_key": "archive",
-                "label": "Archive",
-                "route": "Projects",
-                "action_type": "operational_view",
-                "visibility": True,
-                "enabled": True,
-                "required_selection": "project",
-                "empty_state_behavior": "Select a project before archiving.",
-                "permission_hook": "future_permission_check",
-                "deterministic_fallback": "browse",
-            },
-            {
-                "tertiary_key": "duplicate",
-                "label": "Duplicate",
-                "route": "Projects",
-                "action_type": "operational_view",
-                "visibility": True,
-                "enabled": True,
-                "required_selection": "project",
-                "empty_state_behavior": "Select a project before duplicating.",
-                "permission_hook": "future_permission_check",
-                "deterministic_fallback": "browse",
-            },
-            {
-                "tertiary_key": "delete",
-                "label": "Delete",
-                "route": "Projects",
-                "action_type": "operational_view",
-                "visibility": True,
-                "enabled": True,
-                "required_selection": "project",
-                "empty_state_behavior": "Select a project before deleting.",
-                "permission_hook": "future_permission_check",
-                "deterministic_fallback": "browse",
-            },
-            {
-                "tertiary_key": "export",
-                "label": "Export",
-                "route": "Projects",
-                "action_type": "export_action",
-                "visibility": True,
-                "enabled": True,
-                "required_selection": "project",
-                "empty_state_behavior": "Select a project before export actions.",
-                "permission_hook": "future_permission_check",
-                "deterministic_fallback": "browse",
-            },
         ],
     },
     {
@@ -1355,20 +1292,12 @@ def _navigation_section_group(primary: str, mode: str, secondary_key: str) -> st
     if primary == "Transactions":
         if secondary_key in {
             "estimates",
-            "proposals",
             "sales_orders",
-            "change_orders",
+            "return_orders",
+            "credit_memos",
+            "customer_invoices",
         }:
-            return "Sales"
-        if secondary_key in {
-            "purchase_orders",
-            "rfqs",
-            "vendor_quotes",
-            "receiving",
-        }:
-            return "Procurement"
-        if secondary_key in {"vendor_bills", "customer_invoices"}:
-            return "Settlement"
+            return "Active"
         return "Overview"
     if primary == "Settings":
         if secondary_key in {
@@ -1377,7 +1306,7 @@ def _navigation_section_group(primary: str, mode: str, secondary_key: str) -> st
             "platform_management",
         }:
             return "Active"
-        return "Future"
+        return "Deferred"
     if primary != "Projects":
         return "Workspace"
     if mode == "library":
@@ -6543,554 +6472,11 @@ def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
 
 
 def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
-    actions: dict[str, list[dict[str, Any]]] = {
-        "overview": [
-            {
-                "tertiary_key": "summary",
-                "label": "Summary",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "activity",
-                "label": "Activity",
-                "action_type": "history_activity_view",
-                "required_selection": None,
-            },
-        ],
-        "estimates": [
-            {
-                "tertiary_key": "add",
-                "label": "Add",
-                "action_type": "create_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "browse",
-                "label": "Browse",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "edit",
-                "label": "Edit",
-                "action_type": "edit_action",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "duplicate",
-                "label": "Duplicate",
-                "action_type": "operational_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "create_revision",
-                "label": "Create Revision",
-                "action_type": "operational_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "revision_history",
-                "label": "Revision History",
-                "action_type": "history_activity_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "archive",
-                "label": "Archive",
-                "action_type": "operational_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "restore",
-                "label": "Restore",
-                "action_type": "operational_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "lines",
-                "label": "Lines",
-                "action_type": "detail_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "customer_view",
-                "label": "Customer View",
-                "action_type": "detail_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "internal_view",
-                "label": "Internal View",
-                "action_type": "detail_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "revisions",
-                "label": "Revisions",
-                "action_type": "detail_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "issue",
-                "label": "Issue",
-                "action_type": "operational_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "accept",
-                "label": "Accept",
-                "action_type": "operational_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "decline",
-                "label": "Decline",
-                "action_type": "operational_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "related_documents",
-                "label": "Related Documents",
-                "action_type": "relationship_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "activity",
-                "label": "Activity",
-                "action_type": "history_activity_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "export_pdf",
-                "label": "Export PDF",
-                "action_type": "export_action",
-                "required_selection": "entity",
-            },
-        ],
-    }
-    for secondary_key in TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE:
-        if secondary_key == "estimates":
-            continue
-        if secondary_key == "return_orders":
-            actions[secondary_key] = [
-                {
-                    "tertiary_key": "add",
-                    "label": "Add",
-                    "action_type": "create_action",
-                    "required_selection": None,
-                },
-                {
-                    "tertiary_key": "browse",
-                    "label": "Browse",
-                    "action_type": "collection_view",
-                    "required_selection": None,
-                },
-                {
-                    "tertiary_key": "edit",
-                    "label": "Edit",
-                    "action_type": "edit_action",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "duplicate",
-                    "label": "Duplicate",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "create_revision",
-                    "label": "Create Revision",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "revision_history",
-                    "label": "Revision History",
-                    "action_type": "history_activity_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "archive",
-                    "label": "Archive",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "restore",
-                    "label": "Restore",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "lines",
-                    "label": "Lines",
-                    "action_type": "detail_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "approvals",
-                    "label": "Approvals",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "receiving",
-                    "label": "Receiving",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "inspection",
-                    "label": "Inspection",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "process",
-                    "label": "Process",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "issue",
-                    "label": "Issue",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "related_documents",
-                    "label": "Related Documents",
-                    "action_type": "relationship_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "activity",
-                    "label": "Activity",
-                    "action_type": "history_activity_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "export_pdf",
-                    "label": "Export",
-                    "action_type": "export_action",
-                    "required_selection": "entity",
-                },
-            ]
-            continue
-        if secondary_key == "credit_memos":
-            actions[secondary_key] = [
-                {
-                    "tertiary_key": "add",
-                    "label": "Add",
-                    "action_type": "create_action",
-                    "required_selection": None,
-                },
-                {
-                    "tertiary_key": "browse",
-                    "label": "Browse",
-                    "action_type": "collection_view",
-                    "required_selection": None,
-                },
-                {
-                    "tertiary_key": "edit",
-                    "label": "Edit",
-                    "action_type": "edit_action",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "duplicate",
-                    "label": "Duplicate",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "create_revision",
-                    "label": "Create Revision",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "revision_history",
-                    "label": "Revision History",
-                    "action_type": "history_activity_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "archive",
-                    "label": "Archive",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "restore",
-                    "label": "Restore",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "lines",
-                    "label": "Lines",
-                    "action_type": "detail_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "issue",
-                    "label": "Issue",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "related_documents",
-                    "label": "Related Documents",
-                    "action_type": "relationship_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "sync_status",
-                    "label": "Sync Status",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "activity",
-                    "label": "Activity",
-                    "action_type": "history_activity_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "export_pdf",
-                    "label": "Export PDF",
-                    "action_type": "export_action",
-                    "required_selection": "entity",
-                },
-            ]
-            continue
-        if secondary_key == "sales_orders":
-            actions[secondary_key] = [
-                {
-                    "tertiary_key": "add",
-                    "label": "Add",
-                    "action_type": "create_action",
-                    "required_selection": None,
-                },
-                {
-                    "tertiary_key": "browse",
-                    "label": "Browse",
-                    "action_type": "collection_view",
-                    "required_selection": None,
-                },
-                {
-                    "tertiary_key": "edit",
-                    "label": "Edit",
-                    "action_type": "edit_action",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "duplicate",
-                    "label": "Duplicate",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "create_revision",
-                    "label": "Create Revision",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "revision_history",
-                    "label": "Revision History",
-                    "action_type": "history_activity_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "archive",
-                    "label": "Archive",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "restore",
-                    "label": "Restore",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "lines",
-                    "label": "Lines",
-                    "action_type": "detail_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "demand",
-                    "label": "Demand",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "fulfillment",
-                    "label": "Fulfillment",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "issue",
-                    "label": "Issue",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "related_documents",
-                    "label": "Related Documents",
-                    "action_type": "relationship_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "activity",
-                    "label": "Activity",
-                    "action_type": "history_activity_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "export_pdf",
-                    "label": "Export PDF",
-                    "action_type": "export_action",
-                    "required_selection": "entity",
-                },
-            ]
-            continue
-        if secondary_key == "customer_invoices":
-            actions[secondary_key] = [
-                {
-                    "tertiary_key": "add",
-                    "label": "Add",
-                    "action_type": "create_action",
-                    "required_selection": None,
-                },
-                {
-                    "tertiary_key": "browse",
-                    "label": "Browse",
-                    "action_type": "collection_view",
-                    "required_selection": None,
-                },
-                {
-                    "tertiary_key": "edit",
-                    "label": "Edit",
-                    "action_type": "edit_action",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "duplicate",
-                    "label": "Duplicate",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "lines",
-                    "label": "Lines",
-                    "action_type": "detail_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "billing",
-                    "label": "Billing",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "revisions",
-                    "label": "Revisions",
-                    "action_type": "history_activity_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "approvals",
-                    "label": "Approvals",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "issue",
-                    "label": "Issue",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "sync_status",
-                    "label": "Sync Status",
-                    "action_type": "operational_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "activity",
-                    "label": "Activity",
-                    "action_type": "history_activity_view",
-                    "required_selection": "entity",
-                },
-                {
-                    "tertiary_key": "export_pdf",
-                    "label": "Export PDF",
-                    "action_type": "export_action",
-                    "required_selection": "entity",
-                },
-            ]
-            continue
-        actions[secondary_key] = [
-            {
-                "tertiary_key": "add",
-                "label": "Add",
-                "action_type": "create_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "browse",
-                "label": "Browse",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "edit",
-                "label": "Edit",
-                "action_type": "edit_action",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "related_documents",
-                "label": "Related Documents",
-                "action_type": "relationship_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "approvals",
-                "label": "Approvals",
-                "action_type": "operational_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "sync_status",
-                "label": "Sync Status",
-                "action_type": "operational_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "activity",
-                "label": "Activity",
-                "action_type": "history_activity_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "export",
-                "label": "Export",
-                "action_type": "export_action",
-                "required_selection": "entity",
-            },
-        ]
-    actions["change_orders"] = [
+    active_with_document_actions: list[dict[str, Any]] = [
         {
-            "tertiary_key": "summary",
-            "label": "Summary",
-            "action_type": "collection_view",
+            "tertiary_key": "add",
+            "label": "Add",
+            "action_type": "create_action",
             "required_selection": None,
         },
         {
@@ -7100,13 +6486,86 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
             "required_selection": None,
         },
         {
+            "tertiary_key": "lines",
+            "label": "Lines",
+            "action_type": "detail_view",
+            "required_selection": "entity",
+        },
+        {
+            "tertiary_key": "related_documents",
+            "label": "Related Documents",
+            "action_type": "relationship_view",
+            "required_selection": "entity",
+        },
+        {
             "tertiary_key": "activity",
             "label": "Activity",
             "action_type": "history_activity_view",
-            "required_selection": None,
+            "required_selection": "entity",
+        },
+        {
+            "tertiary_key": "export_pdf",
+            "label": "Export PDF",
+            "action_type": "export_action",
+            "required_selection": "entity",
         },
     ]
-    return actions
+
+    return {
+        "overview": [
+            {
+                "tertiary_key": "summary",
+                "label": "Summary",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+        ],
+        "estimates": [item.copy() for item in active_with_document_actions],
+        "sales_orders": [item.copy() for item in active_with_document_actions],
+        "return_orders": [item.copy() for item in active_with_document_actions],
+        "credit_memos": [item.copy() for item in active_with_document_actions],
+        "customer_invoices": [item.copy() for item in active_with_document_actions],
+        "purchase_orders": [
+            {
+                "tertiary_key": "deferred",
+                "label": "Deferred",
+                "action_type": "collection_view",
+                "required_selection": None,
+            }
+        ],
+        "rfqs": [
+            {
+                "tertiary_key": "deferred",
+                "label": "Deferred",
+                "action_type": "collection_view",
+                "required_selection": None,
+            }
+        ],
+        "vendor_quotes": [
+            {
+                "tertiary_key": "deferred",
+                "label": "Deferred",
+                "action_type": "collection_view",
+                "required_selection": None,
+            }
+        ],
+        "receiving": [
+            {
+                "tertiary_key": "deferred",
+                "label": "Deferred",
+                "action_type": "collection_view",
+                "required_selection": None,
+            }
+        ],
+        "vendor_bills": [
+            {
+                "tertiary_key": "deferred",
+                "label": "Deferred",
+                "action_type": "collection_view",
+                "required_selection": None,
+            }
+        ],
+    }
 
 
 def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
@@ -7343,14 +6802,20 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             ("sales_orders", "Sales Orders"),
             ("return_orders", "Return Orders"),
             ("credit_memos", "Credit Memos"),
-            ("purchase_orders", "Purchase Orders"),
-            ("rfqs", "RFQs"),
-            ("vendor_quotes", "Vendor Quotes"),
-            ("receiving", "Receiving"),
-            ("vendor_bills", "Vendor Bills"),
+            ("purchase_orders", "Purchase Orders (Deferred)"),
+            ("rfqs", "RFQs (Deferred)"),
+            ("vendor_quotes", "Vendor Quotes (Deferred)"),
+            ("receiving", "Receiving (Deferred)"),
+            ("vendor_bills", "Vendor Bills (Deferred)"),
             ("customer_invoices", "Customer Invoices"),
-            ("change_orders", "Change Orders"),
         ]
+        deferred_secondary = {
+            "purchase_orders",
+            "rfqs",
+            "vendor_quotes",
+            "receiving",
+            "vendor_bills",
+        }
         built: list[dict[str, Any]] = []
         for secondary_key, label in sections:
             section_actions = templates.get(secondary_key, [])
@@ -7375,7 +6840,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                     "icon": None,
                     "route": "Transactions",
                     "visibility": True,
-                    "enabled": True,
+                    "enabled": secondary_key not in deferred_secondary,
                     "required_context": None,
                     "default_tertiary_action": default_action,
                     "supported_tertiary_actions": [
@@ -7389,9 +6854,13 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                                 action.get("action_type"), "collection_view"
                             ),
                             "visibility": True,
-                            "enabled": True,
+                            "enabled": secondary_key not in deferred_secondary,
                             "required_selection": action.get("required_selection"),
-                            "empty_state_behavior": "Use Browse to select a transaction draft before record-level actions.",
+                            "empty_state_behavior": (
+                                "This transaction family is deferred in controlled alpha."
+                                if secondary_key in deferred_secondary
+                                else "Use Browse to select a transaction draft before record-level actions."
+                            ),
                             "permission_hook": "future_permission_check",
                             "deterministic_fallback": "browse",
                         }
@@ -7416,6 +6885,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             ("platform_management", "Platform Management"),
         ]
         settings_sections: list[dict[str, Any]] = []
+        deferred_settings_sections = {"integrations", "security", "billing", "advanced"}
         for secondary_key, label in sections:
             section_actions = templates.get(secondary_key, [])
             default_action = (
@@ -7432,7 +6902,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                     "icon": None,
                     "route": "Administration",
                     "visibility": True,
-                    "enabled": True,
+                    "enabled": secondary_key not in deferred_settings_sections,
                     "required_context": None,
                     "default_tertiary_action": default_action,
                     "supported_tertiary_actions": [
@@ -7446,9 +6916,13 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                                 action.get("action_type"), "collection_view"
                             ),
                             "visibility": True,
-                            "enabled": True,
+                            "enabled": secondary_key not in deferred_settings_sections,
                             "required_selection": action.get("required_selection"),
-                            "empty_state_behavior": "Use the selected settings section controls to continue.",
+                            "empty_state_behavior": (
+                                "This settings section is deferred for a later alpha phase."
+                                if secondary_key in deferred_settings_sections
+                                else "Use the selected settings section controls to continue."
+                            ),
                             "permission_hook": "future_permission_check",
                             "deterministic_fallback": default_action,
                         }
@@ -7892,6 +7366,7 @@ def _tertiary_action_requires_selection(
 def _render_workspace_navigation(
     st: Any,
     record: ProjectWorkspaceRecord | None,
+    content_renderer: Callable[[], None] | None = None,
 ) -> None:
     primary = _safe_text(
         st.session_state.get(_navigation_primary_state_key()),
@@ -7910,8 +7385,8 @@ def _render_workspace_navigation(
     with shell_cols[0]:
         for group_index, (group_name, section_group) in enumerate(grouped_sections):
             if group_index > 0:
-                st.markdown("---")
-            st.caption(group_name.upper())
+                st.caption(" ")
+            st.caption(group_name)
             for section in section_group:
                 secondary_key = _safe_text(section.get("secondary_key"), "")
                 is_active = secondary_key == _safe_text(
@@ -7968,16 +7443,16 @@ def _render_workspace_navigation(
             for item in list(section.get("supported_tertiary_actions") or [])
             if bool(item.get("visibility", True))
         ]
+        actions = [
+            item
+            for item in actions
+            if not _tertiary_action_requires_selection(st, item, record)
+        ]
         if actions:
             action_cols = st.columns(max(1, min(6, len(actions))))
             for index, action in enumerate(actions):
                 key = _safe_text(action.get("tertiary_key"), "")
                 label = _safe_text(action.get("label"), key)
-                requires_selection = _tertiary_action_requires_selection(
-                    st,
-                    action,
-                    record,
-                )
                 if action_cols[index % len(action_cols)].button(
                     label,
                     key=f"atlas_tertiary_{primary}_{mode}_{_safe_text(section.get('secondary_key'), '')}_{key}",
@@ -7990,9 +7465,8 @@ def _render_workspace_navigation(
                         )
                         else "secondary"
                     ),
-                    disabled=requires_selection
-                    or not bool(action.get("enabled", True)),
-                    width="stretch",
+                    disabled=not bool(action.get("enabled", True)),
+                    width="content",
                 ):
                     st.session_state[_navigation_tertiary_state_key()] = key
                     st.session_state[_navigation_prior_route_key()] = {
@@ -8007,36 +7481,8 @@ def _render_workspace_navigation(
                         st.session_state["atlas_active_page"] = route
                     st.rerun()
 
-            active_action = next(
-                (
-                    item
-                    for item in actions
-                    if _safe_text(item.get("tertiary_key"), "")
-                    == _safe_text(
-                        st.session_state.get(_navigation_tertiary_state_key()), ""
-                    )
-                ),
-                actions[0],
-            )
-            if _tertiary_action_requires_selection(st, active_action, record):
-                st.caption(
-                    _safe_text(
-                        active_action.get("empty_state_behavior"),
-                        "Select a record in Browse to continue.",
-                    )
-                )
-                fallback = _safe_text(
-                    active_action.get("deterministic_fallback"), "browse"
-                )
-                if st.button(
-                    "Open Browse",
-                    key=(
-                        f"atlas_tertiary_fallback_{primary}_{mode}_{_safe_text(section.get('secondary_key'), '')}_{fallback}"
-                    ),
-                    width="content",
-                ):
-                    st.session_state[_navigation_tertiary_state_key()] = fallback
-                    st.rerun()
+        if content_renderer is not None:
+            content_renderer()
 
 
 def _render_navigation_menu(
@@ -8294,7 +7740,7 @@ def _object_type_label(kind: str) -> str:
         "model": "Product",
         "commercial_document": "Commercial Document",
         "estimate": "Estimate",
-        "proposal": "Proposal",
+        "proposal": "Commercial Document",
         "sales_order": "Sales Order",
         "purchase_order": "Purchase Order",
         "request_for_quote": "RFQ",
@@ -11146,57 +10592,51 @@ def _render_application_knowledge_page(
             [
                 {
                     "Knowledge Area": "Manufacturers",
-                    "State": (
-                        "Available" if manufacturer_rows else "Foundation in progress"
-                    ),
+                    "State": "Healthy" if manufacturer_rows else "No records yet",
                     "Why It Matters": "Standardized manufacturer identity supports deterministic product matching.",
                     "Next Action": "Review manufacturer tiers and preferred vendor paths.",
                 },
                 {
                     "Knowledge Area": "Vendors",
-                    "State": "Available" if vendor_rows else "Foundation in progress",
+                    "State": "Healthy" if vendor_rows else "No records yet",
                     "Why It Matters": "Vendor normalization improves price list reconciliation and availability context.",
                     "Next Action": "Review vendor types and active status.",
                 },
                 {
                     "Knowledge Area": "Customers",
                     "State": (
-                        "Available"
+                        "Healthy"
                         if customer_entities or project_customers
-                        else "Foundation in progress"
+                        else "No records yet"
                     ),
                     "Why It Matters": "Customer history supports portfolio-level context and repeatability.",
                     "Next Action": "Import or create projects to populate customer records.",
                 },
                 {
                     "Knowledge Area": "Services",
-                    "State": (
-                        "Available" if service_entities else "Foundation in progress"
-                    ),
+                    "State": "Healthy" if service_entities else "No records yet",
                     "Why It Matters": "Service entities model operational capabilities linked to customers and products.",
                     "Next Action": "Create reusable service definitions and connect them via Relationships.",
                 },
                 {
                     "Knowledge Area": "Products (Master Library)",
-                    "State": "Available" if product_rows else "Foundation in progress",
+                    "State": "Healthy" if product_rows else "No records yet",
                     "Why It Matters": "Canonical products reduce alias ambiguity across projects.",
                     "Next Action": "Run project analysis to generate equipment rows and master product mappings.",
                 },
                 {
                     "Knowledge Area": "Commercial Knowledge",
                     "State": (
-                        "Available"
+                        "Healthy"
                         if commercial_dashboard.get("active_price_sheets", 0)
-                        else "Foundation in progress"
+                        else "Needs data"
                     ),
                     "Why It Matters": "Immutable price-sheet versions preserve historical commercial context for deterministic bid recreation.",
                     "Next Action": "Upload manufacturer/vendor price lists and review Import History change reports.",
                 },
                 {
                     "Knowledge Area": "Knowledge Imports",
-                    "State": (
-                        "Available" if import_history else "Foundation in progress"
-                    ),
+                    "State": "Healthy" if import_history else "No records yet",
                     "Why It Matters": "Import history provides auditability for reusable knowledge.",
                     "Next Action": "Import project packages or document sets to create import events.",
                 },
@@ -13711,6 +13151,41 @@ def _render_transactions_workspace_page(
     )
     document_type = _transaction_document_type_for_secondary(secondary)
 
+    deferred_secondary = {
+        "purchase_orders",
+        "rfqs",
+        "vendor_quotes",
+        "receiving",
+        "vendor_bills",
+    }
+
+    if secondary == "change_orders":
+        st.session_state[_navigation_secondary_state_key()] = "sales_orders"
+        st.session_state[_navigation_tertiary_state_key()] = "browse"
+        st.info(
+            "Change Orders are managed as a filter convention on Sales Orders and Return Orders."
+        )
+        st.rerun()
+        return
+
+    if secondary in deferred_secondary:
+        _render_guided_empty_state(
+            st,
+            why_empty="This transaction family is deferred and is not active in controlled alpha.",
+            action_to_populate="Use Estimates, Sales Orders, Return Orders, Credit Memos, or Customer Invoices.",
+            next_location="Open Sales Orders or Return Orders for change-order workflows.",
+        )
+        if st.button(
+            "Open Sales Orders",
+            key=f"atlas_transactions_deferred_open_sales_orders_{secondary}",
+            type="primary",
+            width="content",
+        ):
+            st.session_state[_navigation_secondary_state_key()] = "sales_orders"
+            st.session_state[_navigation_tertiary_state_key()] = "browse"
+            st.rerun()
+        return
+
     if secondary == "change_orders":
         project_cols = st.columns([2, 2, 3])
         project_id = project_cols[0].text_input(
@@ -13882,8 +13357,17 @@ def _render_transactions_workspace_page(
                 st,
                 why_empty="No commercial transactions have been created.",
                 action_to_populate="Open any transaction family and use Add to create your first draft.",
-                next_location="Start with Estimates, Sales Orders, or Purchase Orders.",
+                next_location="Start with Estimates or Sales Orders.",
             )
+            if st.button(
+                "Open Estimates",
+                key="atlas_transactions_overview_open_estimates_empty",
+                type="primary",
+                width="content",
+            ):
+                st.session_state[_navigation_secondary_state_key()] = "estimates"
+                st.session_state[_navigation_tertiary_state_key()] = "browse"
+                st.rerun()
             return
         _render_data_table(st, [_transaction_row(item) for item in recent])
         return
@@ -16235,9 +15719,23 @@ def _render_application_reports_page(
             {
                 "Project": item.get("project"),
                 "Deliverable Readiness": item.get("status"),
-                "Next Output": item.get("destination"),
-                "Reason": item.get("reason"),
-                "Artifacts": item.get("review_artifacts"),
+                "Output Family": (
+                    "Project Summary"
+                    if _safe_text(item.get("review_artifacts"), "0") != "0"
+                    else "Deliverable Readiness"
+                ),
+                "Commercial Documents": "Available",
+                "Exports": (
+                    "Ready"
+                    if _safe_text(item.get("review_artifacts"), "0") != "0"
+                    else "Pending"
+                ),
+                "Processing": (
+                    "Attention Required"
+                    if _safe_text(item.get("status"), "")
+                    in {"Blocked", "Needs Attention"}
+                    else "Stable"
+                ),
                 "Updated": item.get("updated_at"),
             }
             for item in rows
@@ -16251,7 +15749,7 @@ def _render_application_reports_page(
             [
                 {
                     "Project": item.get("project"),
-                    "Recommended Output": item.get("destination"),
+                    "Recommended Output": "Project Summary",
                     "Artifacts": item.get("review_artifacts"),
                     "Updated": item.get("updated_at"),
                 }
@@ -16268,7 +15766,7 @@ def _render_application_reports_page(
                     "Project": item.get("project"),
                     "Status": item.get("status"),
                     "Reason": item.get("reason"),
-                    "Next Location": item.get("destination"),
+                    "Next Location": "Processing",
                 }
                 for item in attention_projects[:8]
             ],
@@ -16476,20 +15974,9 @@ def _render_application_administration_page(
     _render_workspace_section_header(
         st,
         workspace="Settings",
-        objective="Manage organization and personal settings without breaking tenant policy boundaries.",
-        current_focus="Organization Settings and Personal Preferences are active in this sprint.",
+        objective="Manage tenant and personal settings within deterministic policy boundaries.",
+        current_focus="Organization Settings and Personal Preferences are currently available.",
     )
-    alpha_marker = _alpha_environment_marker()
-    st.info(
-        f"Environment: {_safe_text(alpha_marker.get('label'), 'Controlled Alpha')} ({_safe_text(alpha_marker.get('effective_channel'), 'controlled-alpha')}) · Version: {ALPHA_APP_VERSION_IDENTIFIER}"
-    )
-    if bool(alpha_marker.get("blocked_production_designation")):
-        st.warning(
-            _safe_text(
-                alpha_marker.get("warning"),
-                "Production designation is blocked in this build.",
-            )
-        )
 
     secondary = _safe_text(
         st.session_state.get(_navigation_secondary_state_key()),
@@ -16580,106 +16067,14 @@ def _render_application_administration_page(
                         ),
                     }
                     for policy in policies.values()
+                    if policy.document_type != CommercialDocumentType.PROPOSAL
                 ],
                 width="stretch",
                 hide_index=True,
             )
-            with st.expander("Alpha Known Limitations", expanded=False):
-                st.dataframe(
-                    [{"Limitation": item} for item in ALPHA_KNOWN_LIMITATIONS],
-                    width="stretch",
-                    hide_index=True,
-                )
-                st.caption("Reference: docs/ALPHA_KNOWN_LIMITATIONS.md")
-
-            seed_actions_enabled = _safe_text(
-                os.getenv("ATLAS_ENABLE_SEED_DATA_ACTIONS"), ""
-            ).lower() in {"1", "true", "yes"}
-            if seed_actions_enabled:
-                with st.expander(
-                    "Sample Catalog Data (C-04)",
-                    expanded=False,
-                ):
-                    st.caption(
-                        "Administrator-only action for deterministic C-04 sample catalog load, validation, and reset."
-                    )
-                    seed_service = CommercialCatalogSeedService(
-                        _transactions_workspace_service(st).catalog_service
-                    )
-                    seed_summary = seed_service.seed_summary(tenant_id=tenant_id)
-                    st.json(seed_summary)
-                    seed_cols = st.columns(3)
-                    can_mutate_seed = settings_manage_access.allowed
-                    if seed_cols[0].button(
-                        "Load Seed Data",
-                        key="atlas_c04_seed_load",
-                        width="stretch",
-                        disabled=not can_mutate_seed,
-                    ):
-                        try:
-                            loader_workspace = _transactions_workspace_service(st)
-                            loader = CommercialCatalogSeedService(
-                                loader_workspace.catalog_service
-                            )
-                            result = loader.load_seed_data(
-                                tenant_id=tenant_id,
-                                organization_id=organization_id,
-                                imported_by="atlas-ui",
-                            )
-                            _save_transactions_workspace_state(st, loader_workspace)
-                            st.success("C-04 seed data loaded.")
-                            st.json(result)
-                            st.rerun()
-                        except Exception as exc:
-                            st.error(f"Unable to load C-04 seed data: {exc}")
-                    if seed_cols[1].button(
-                        "Validate Seed Flow",
-                        key="atlas_c04_seed_validate",
-                        width="stretch",
-                        disabled=not can_mutate_seed,
-                    ):
-                        try:
-                            validator_workspace = _transactions_workspace_service(st)
-                            validator = CommercialCatalogSeedService(
-                                validator_workspace.catalog_service
-                            )
-                            validation_result = (
-                                validator.validate_catalog_to_transaction_workflow(
-                                    tenant_id=tenant_id,
-                                    organization_id=organization_id,
-                                    actor="atlas-ui",
-                                )
-                            )
-                            _save_transactions_workspace_state(st, validator_workspace)
-                            st.success("C-04 workflow validation completed.")
-                            st.json(validation_result)
-                            st.rerun()
-                        except Exception as exc:
-                            st.error(f"Unable to validate C-04 seed workflow: {exc}")
-                    if seed_cols[2].button(
-                        "Reset Seed Data",
-                        key="atlas_c04_seed_reset",
-                        width="stretch",
-                        disabled=not can_mutate_seed,
-                    ):
-                        try:
-                            reset_workspace = _transactions_workspace_service(st)
-                            resetter = CommercialCatalogSeedService(
-                                reset_workspace.catalog_service
-                            )
-                            reset_result = resetter.reset_seed_data(tenant_id=tenant_id)
-                            _save_transactions_workspace_state(st, reset_workspace)
-                            st.success("C-04 seed data reset complete.")
-                            st.json(reset_result)
-                            st.rerun()
-                        except Exception as exc:
-                            st.error(f"Unable to reset C-04 seed data: {exc}")
-                    if not can_mutate_seed:
-                        st.caption(settings_manage_access.reason)
-            else:
-                st.caption(
-                    "Sample catalog actions are hidden. Set ATLAS_ENABLE_SEED_DATA_ACTIONS=true to enable administrator-only controls."
-                )
+            st.caption(
+                "Alpha operations diagnostics, known limitations, and seed-data controls are available in Platform Management."
+            )
 
         elif tertiary == "organization_profile":
             profile = settings_service.organization_profile(
@@ -16780,7 +16175,11 @@ def _render_application_administration_page(
                     st.error(f"Unable to save organization profile: {exc}")
 
         elif tertiary == "commercial_numbering":
-            document_type_labels = [item.value for item in CommercialDocumentType]
+            document_type_labels = [
+                item.value
+                for item in CommercialDocumentType
+                if item != CommercialDocumentType.PROPOSAL
+            ]
             selected_doc_type = st.selectbox(
                 "Document Family",
                 options=document_type_labels,
@@ -19921,29 +19320,16 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
             action_to_populate="Create a new project or import a .atlaspkg bundle.",
             next_location="Use Create New Project or Import Project Package below.",
         )
+        empty_cols = st.columns(2)
+        if empty_cols[0].button("Create New Project", type="primary", width="content"):
+            st.session_state["atlas_active_page"] = "Create New Project"
+            st.rerun()
+        if empty_cols[1].button("Import Project Package", width="content"):
+            st.session_state["atlas_active_page"] = "Projects"
+            st.session_state[_navigation_secondary_state_key()] = "import_project"
+            st.session_state[_navigation_tertiary_state_key()] = "import"
+            st.rerun()
         return
-
-    action_cols = _responsive_control_columns(st, [1.2, 1.2, 1.2, 2.4])
-    if action_cols[0].button("Create New Project", type="primary", width="stretch"):
-        st.session_state["atlas_active_page"] = "Create New Project"
-        st.rerun()
-
-    project_bundle = action_cols[1].file_uploader(
-        "Import Project Package",
-        type=["atlaspkg"],
-        accept_multiple_files=False,
-        key="atlas_projects_import_bundle",
-        label_visibility="collapsed",
-    )
-    if project_bundle is not None:
-        temp_path = Path("/tmp") / f"atlas-import-{project_bundle.name}"
-        temp_path.write_bytes(project_bundle.getvalue())
-        imported = workspace_service.import_project_bundle(str(temp_path))
-        _open_project_record(st, imported, workspace_service)
-
-    if action_cols[2].button("Open Existing Project", width="stretch"):
-        st.session_state["atlas_active_page"] = "Open Existing Project"
-        st.rerun()
 
     filter_cols = _responsive_control_columns(st, 5)
     search = filter_cols[0].text_input("Search", value="")
@@ -20044,47 +19430,60 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         selected_item = filtered[labels.index(selected_label)]
         selected = selected_item["record"]
 
-        action_cols = st.columns(5)
-        if action_cols[0].button("Open Project", type="primary", width="stretch"):
+        action_cols = st.columns([1.5, 1.0, 1.0])
+        if action_cols[0].button("Open Project", type="primary", width="content"):
             _open_project_record(st, selected, workspace_service)
 
         pin_label = "Unpin" if selected.pinned else "Pin"
-        if action_cols[1].button(pin_label, width="stretch"):
+        if action_cols[1].button(pin_label, width="content"):
             workspace_service.pin_project(
                 selected.workspace_id, pinned=not selected.pinned
             )
             st.rerun()
-
-        if action_cols[2].button("Duplicate Project", width="stretch"):
-            workspace_service.duplicate_project(
-                selected.workspace_id,
-                new_workspace_id=f"{selected.workspace_id}-copy",
-                new_name=f"{selected.project.name} Copy",
+        with action_cols[2].popover("Project Actions"):
+            rename_name = st.text_input(
+                "Rename project",
+                value=selected.project.name,
+                key=f"atlas_rename_name_{selected.workspace_id}",
             )
-            st.rerun()
-
-        archive_label = "Unarchive Project" if selected.archived else "Archive Project"
-        if action_cols[3].button(archive_label, width="stretch"):
-            workspace_service.archive_project(
-                selected.workspace_id,
-                archived=not selected.archived,
-            )
-            if selected.workspace_id == st.session_state.get(
-                "atlas_active_workspace_id"
+            if st.button(
+                "Save Name",
+                key=f"atlas_rename_btn_{selected.workspace_id}",
+                width="content",
             ):
-                st.session_state["atlas_active_workspace_id"] = None
-                st.session_state["atlas_active_page"] = "Mission Control"
-            st.rerun()
+                if rename_name.strip():
+                    workspace_service.rename_project(
+                        selected.workspace_id, rename_name.strip()
+                    )
+                    st.rerun()
 
-        delete_confirm = action_cols[4].checkbox(
-            "Confirm Delete",
-            key=f"atlas_confirm_delete_{selected.workspace_id}",
-        )
-        if action_cols[4].button("Delete Project", width="stretch"):
-            if not delete_confirm:
-                st.warning("Enable Confirm Delete before deleting a project.")
-            else:
-                workspace_service.delete_project(selected.workspace_id)
+            duplicate_name = st.text_input(
+                "Duplicate name",
+                value=f"{selected.project.name} Copy",
+                key=f"atlas_duplicate_name_{selected.workspace_id}",
+            )
+            if st.button(
+                "Duplicate",
+                key=f"atlas_duplicate_btn_{selected.workspace_id}",
+                width="content",
+            ):
+                workspace_service.duplicate_project(
+                    selected.workspace_id,
+                    new_workspace_id=f"{selected.workspace_id}-copy",
+                    new_name=duplicate_name.strip() or None,
+                )
+                st.rerun()
+
+            archive_label = "Unarchive" if selected.archived else "Archive"
+            if st.button(
+                archive_label,
+                key=f"atlas_archive_btn_{selected.workspace_id}",
+                width="content",
+            ):
+                workspace_service.archive_project(
+                    selected.workspace_id,
+                    archived=not selected.archived,
+                )
                 if selected.workspace_id == st.session_state.get(
                     "atlas_active_workspace_id"
                 ):
@@ -20092,40 +19491,25 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
                     st.session_state["atlas_active_page"] = "Mission Control"
                 st.rerun()
 
-        st.markdown("#### Rename Project")
-        rename_name = st.text_input(
-            "New project name",
-            value=selected.project.name,
-            key=f"atlas_rename_name_{selected.workspace_id}",
-        )
-        if st.button("Rename Project", key=f"atlas_rename_btn_{selected.workspace_id}"):
-            if rename_name.strip():
-                workspace_service.rename_project(
-                    selected.workspace_id, rename_name.strip()
-                )
-                st.rerun()
-
-        st.markdown("#### Duplicate Project")
-        duplicate_id = st.text_input(
-            "Duplicate project ID",
-            value=f"{selected.workspace_id}-copy",
-            key=f"atlas_duplicate_id_{selected.workspace_id}",
-        )
-        duplicate_name = st.text_input(
-            "Duplicate project name",
-            value=f"{selected.project.name} Copy",
-            key=f"atlas_duplicate_name_{selected.workspace_id}",
-        )
-        if st.button(
-            "Duplicate Project",
-            key=f"atlas_duplicate_btn_{selected.workspace_id}",
-        ):
-            workspace_service.duplicate_project(
-                selected.workspace_id,
-                new_workspace_id=duplicate_id.strip(),
-                new_name=duplicate_name.strip() or None,
+            delete_confirm = st.checkbox(
+                "Confirm Delete",
+                key=f"atlas_confirm_delete_{selected.workspace_id}",
             )
-            st.rerun()
+            if st.button(
+                "Delete",
+                key=f"atlas_delete_btn_{selected.workspace_id}",
+                width="content",
+            ):
+                if not delete_confirm:
+                    st.warning("Enable Confirm Delete before deleting a project.")
+                else:
+                    workspace_service.delete_project(selected.workspace_id)
+                    if selected.workspace_id == st.session_state.get(
+                        "atlas_active_workspace_id"
+                    ):
+                        st.session_state["atlas_active_workspace_id"] = None
+                        st.session_state["atlas_active_page"] = "Mission Control"
+                    st.rerun()
 
 
 def _render_project_folder_page(
@@ -20904,9 +20288,7 @@ def _render_estimate_page(
             width="stretch",
             hide_index=True,
         )
-        st.caption(
-            "Every estimate line is traceable to source engineering objects. Proposal, RFQ, and purchasing output is intentionally out of scope."
-        )
+        st.caption("Every estimate line is traceable to source engineering objects.")
         resolution_summary = _resolution_summary_rows(product_resolutions)
         st.dataframe(
             [
@@ -35543,6 +34925,30 @@ def _render_context_panel(st: Any, context: dict[str, Any] | None) -> None:
         )
 
 
+def _build_diagnostics_visible(st: Any) -> bool:
+    primary = _safe_text(st.session_state.get(_navigation_primary_state_key()), "")
+    secondary = _safe_text(st.session_state.get(_navigation_secondary_state_key()), "")
+    if not (primary == "Settings" and secondary == "platform_management"):
+        return False
+    transactions_state = _transactions_workspace_state(st)
+    tenant_id = _safe_text(transactions_state.get("tenant_id"), "local")
+    organization_id = _safe_text(transactions_state.get("organization_id"), "atlas")
+    user_id = _safe_text(st.session_state.get("atlas_settings_user_id"), "local-user")
+    try:
+        access = _permissions_workspace_service(st).evaluate(
+            AccessRequest(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                principal_id=user_id,
+                permission_key="platform.tenants.manage",
+                project_id=None,
+            )
+        )
+        return bool(access.allowed)
+    except Exception:
+        return False
+
+
 def _render_status_bar(
     st: Any,
     record: ProjectWorkspaceRecord | None,
@@ -35550,14 +34956,18 @@ def _render_status_bar(
 ) -> None:
     _ = (record, context)
     alpha_marker = _alpha_environment_marker()
+    show_diagnostics = _build_diagnostics_visible(st)
     st.markdown("<div class='atlas-statusbar'></div>", unsafe_allow_html=True)
     cols = st.columns([7, 3])
     cols[0].caption(
-        f"©2026 Corsa Systems. All rights reserved. · {_safe_text(alpha_marker.get('label'), 'Controlled Alpha')}"
+        f"Atlas workspace · {_safe_text(alpha_marker.get('label'), 'Controlled Alpha')}"
     )
-    cols[1].caption(
-        f"Atlas v{ALPHA_APP_VERSION_IDENTIFIER} · commit {_current_commit()} · tests {ALPHA_TEST_SUITE_BASELINE_REFERENCE}"
-    )
+    if show_diagnostics:
+        cols[1].caption(
+            f"Atlas v{ALPHA_APP_VERSION_IDENTIFIER} · commit {_current_commit()} · tests {ALPHA_TEST_SUITE_BASELINE_REFERENCE}"
+        )
+    else:
+        cols[1].caption(f"Atlas v{ALPHA_APP_VERSION_IDENTIFIER}")
 
 
 def _render_main_content(
@@ -35796,13 +35206,16 @@ def _render_shell(
         )
     else:
         _sync_workspace_navigation_state(st, record)
-        _render_workspace_navigation(st, record)
-        _render_main_content(
+        _render_workspace_navigation(
             st,
-            workspace_service,
             record,
-            context,
-            mission_control_payload,
+            content_renderer=lambda: _render_main_content(
+                st,
+                workspace_service,
+                record,
+                context,
+                mission_control_payload,
+            ),
         )
 
     _render_status_bar(st, record, context)

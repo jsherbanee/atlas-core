@@ -11,6 +11,9 @@ Provide explicit transparency for known alpha constraints that are non-blocking 
 - Controlled alpha release-channel marker is enforced; production designation is intentionally blocked in this build.
 - External ticketing integration is not enabled; defects remain in tenant-scoped alpha feedback records.
 - Error logging is repository-backed and local deterministic only; no external monitoring pipeline is enabled in this sprint.
+- Deferred commercial transaction families (Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills) remain visible as deferred/disabled surfaces and are not active workflows.
+- Change Orders are represented as Sales Order/Return Order convention metadata and not as a standalone transaction family.
+- Build/test diagnostics are hidden from normal tenant shell surfaces and are shown only in authorized platform-admin operations contexts.
 
 ## Deferred Beyond Alpha (Intentional)
 - SSO/Cognito/invitation lifecycle and production IAM controls.

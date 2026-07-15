@@ -72,6 +72,14 @@ def test_settings_workspace_contract_has_expected_sections() -> None:
         "operator_checklist",
     ]
 
+    deferred_sections = {"integrations", "security", "billing", "advanced"}
+    assert all(
+        item["enabled"] is False
+        for item in contract
+        if item["secondary_key"] in deferred_sections
+    )
+    assert platform_section["enabled"] is True
+
 
 def test_administration_routes_to_settings_primary() -> None:
     assert app._active_primary_workspace("Administration", None) == "Settings"

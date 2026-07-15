@@ -1303,15 +1303,17 @@ def test_recent_projects_empty_state_message_is_concise() -> None:
     assert "No recent projects." in st.captions
 
 
-def test_footer_shows_copyright_and_build_info_only() -> None:
+def test_footer_shows_tenant_neutral_branding_without_diagnostics() -> None:
     st = _HomeContractStreamlit()
+    st.session_state["atlas_active_primary_workspace"] = "Projects"
+    st.session_state["atlas_active_secondary_section"] = "overview"
 
     app._render_status_bar(st, None, None)
 
-    assert any(
-        "©2026 Corsa Systems. All rights reserved." in item for item in st.captions
-    )
-    assert any("Atlas v" in item and "commit" in item for item in st.captions)
+    assert any("Atlas workspace" in item for item in st.captions)
+    assert any("Atlas v" in item for item in st.captions)
+    assert all("commit" not in item for item in st.captions)
+    assert all("tests" not in item for item in st.captions)
     assert all(
         phrase not in " ".join(st.captions)
         for phrase in ["Current workspace", "Section:", "Last intake", "Last review"]
@@ -1396,6 +1398,106 @@ def test_open_search_reference_sets_projects_active_navigation_state() -> None:
     assert st.session_state["atlas_active_secondary_section"] == "project_details"
     assert st.session_state["atlas_active_page"] == "Object Workspace"
     assert st.rerun_called is True
+
+
+def test_workspace_navigation_uses_two_column_shell_contract() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state.update(
+        {
+            "atlas_active_primary_workspace": "Projects",
+            "atlas_active_workspace_mode": "library",
+            "atlas_active_secondary_section": "overview",
+            "atlas_active_tertiary_action": "browse",
+            "atlas_active_page": "Projects",
+        }
+    )
+    rendered = {"content": False}
+
+    app._render_workspace_navigation(
+        st,
+        record=None,
+        content_renderer=lambda: rendered.__setitem__("content", True),
+    )
+
+    assert [1.25, 4.75] in st.column_specs
+    assert rendered["content"] is True
+
+
+def test_application_reports_remain_output_oriented() -> None:
+    st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService([])
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        app,
+        "_collect_workspace_signals",
+        lambda *_args, **_kwargs: [
+            {
+                "project": "MAW",
+                "status": "Ready",
+                "destination": "Estimate",
+                "reason": "Ready for export",
+                "review_artifacts": 3,
+                "updated_at": "2026-01-01T10:00:00+00:00",
+            }
+        ],
+    )
+    try:
+        app._render_application_reports_page(st, service)
+    finally:
+        monkeypatch.undo()
+
+    assert st.dataframes
+    first_row = st.dataframes[0][0]
+    assert "Output Family" in first_row
+    assert "Commercial Documents" in first_row
+    assert "Exports" in first_row
+    assert "Processing" in first_row
+    assert "Next Output" not in first_row
+
+
+def test_status_bar_shows_diagnostics_only_for_platform_admin() -> None:
+    class _PermissionService:
+        def __init__(self, allowed: bool) -> None:
+            self._allowed = allowed
+
+        def evaluate(self, _request: Any) -> Any:
+            return SimpleNamespace(allowed=self._allowed)
+
+    base_state = {
+        "atlas_active_primary_workspace": "Settings",
+        "atlas_active_secondary_section": "platform_management",
+        "atlas_settings_user_id": "admin-user",
+    }
+
+    tenant_view = _HomeContractStreamlit()
+    tenant_view.session_state.update(base_state)
+    admin_view = _HomeContractStreamlit()
+    admin_view.session_state.update(base_state)
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        app,
+        "_permissions_workspace_service",
+        lambda _st: _PermissionService(allowed=False),
+    )
+    try:
+        app._render_status_bar(tenant_view, None, None)
+    finally:
+        monkeypatch.undo()
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        app,
+        "_permissions_workspace_service",
+        lambda _st: _PermissionService(allowed=True),
+    )
+    try:
+        app._render_status_bar(admin_view, None, None)
+    finally:
+        monkeypatch.undo()
+
+    assert all("commit" not in item for item in tenant_view.captions)
+    assert any("commit" in item for item in admin_view.captions)
 
 
 def test_open_search_reference_project_updates_recency() -> None:

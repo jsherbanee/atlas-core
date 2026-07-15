@@ -75,6 +75,7 @@ Sprint T-09 implements project-scoped change-order tracking convention on Sales 
 Sprint S-01 completes Settings Workspace alpha scope with organization profile controls, tax/surcharge deterministic rule preview, integrations metadata hooks (secret-reference enforcement), security policy metadata controls, expanded terms families for return orders/customer invoices, and document template duplicate/preview workflows.
 Sprint U-01 completes commercial document usability and presentation polish across Transactions workflows by standardizing tertiary action contracts for Sales Orders, Return Orders, Credit Memos, and Customer Invoices; extending line-presentation sort parity (`unit_cost`, `discount`, `tax_rate`); consolidating export behavior to deterministic PDF actions; and improving source/lineage visibility in related-document views without introducing new transaction families, payments, inventory/procurement, or QuickBooks API transport.
 Sprint U-02 completes end-to-end application usability polish across Home, Projects, project lifecycle-facing surfaces, Transactions, Knowledge, Reports, and Settings by standardizing page-purpose identity captions, reducing development/prototype language in user-facing controls, improving roadmap-section guidance messaging, and validating responsive/state stability behavior without adding new features.
+Alpha UI Cleanup refines production-facing shell/navigation surfaces by tightening active vs deferred route clarity, removing tenant-facing implementation remnants, reducing duplicate action exposure, and preserving behavior contracts without adding new business workflows.
 Sprint M-01 implements tenant manager and sandbox provisioning foundations for alpha infrastructure, including platform-admin sandbox lifecycle controls, deterministic isolated repository-path provisioning, tenant-scoped search/job/settings/preference containers, and guarded reset/export/delete workflows without introducing hosted infrastructure dependencies.
 Sprint A-02 implements controlled alpha deployment and test operations, including controlled-alpha environment labeling, administrator-only alpha health checks, tenant-scoped feedback/defect workflow capture, known-limitations access, and operator checklist guidance without introducing new product workflows.
 Sprint A-02 pt 2 implements centralized tenant-scoped application error logging and review workflow, including deterministic fingerprint grouping, occurrence history, user-facing Error IDs, status transitions with audit coverage, sanitized diagnostics export, and health-check unresolved-error/severity summaries.
@@ -104,9 +105,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1415 tests)
+- pytest: full suite passing (1425 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1415 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1425 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 
@@ -138,6 +139,13 @@ Latest A-04 targeted validation baseline: 25 passing tests (`tests/test_tenant_m
 - validated focused search mode and shared-shell navigation continuity
 - viewport checks passed at widths 820, 980, 1180, and current desktop-width validation with no horizontal overflow observed on validated surfaces
 - duplicate Knowledge page navigation scaffolding was removed so the shared shell now owns Knowledge navigation presentation
+
+## Manual UI Validation (Alpha UI Cleanup)
+- validated top-level routing for Home, Projects, Knowledge, Transactions, Reports, and Settings via shared shell controls
+- validated viewport widths 820, 980, 1180, and 1366 with no horizontal overflow observed on validated surfaces
+- validated Transactions shows active families and deferred/disabled families, with no standalone Change Orders navigation section
+- validated Settings shows deferred disabled sections (Integrations, Security, Billing, Advanced) and active Platform Management route
+- validated tenant footer/status surface remains neutral (no commit hash or test-count diagnostics shown in normal shell)
 
 ## Manual UI Validation (W-03)
 - validated Object Workspace search handoff with visible context banner and deterministic return behavior
