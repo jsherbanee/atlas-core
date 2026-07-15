@@ -6,6 +6,8 @@ Sprint P-05 extends Settings with deterministic document-template management for
 
 Sprint S-01 extends Settings to complete the alpha baseline for organization controls and integration metadata governance.
 
+Sprint C-03 extends Settings with organization-scoped commercial defaults used by catalog pricing/tax behaviors.
+
 ## Purpose
 
 Provide a deterministic, tenant-aware settings surface for organization controls and user preferences while preserving existing runtime and numbering guarantees.
@@ -42,6 +44,10 @@ S-01 extension:
 - security policy metadata controls for MFA/session/policy references
 - terms document family expansion to Return Orders and Customer Invoices
 - document template duplication and preview controls
+
+C-03 extension:
+- organization commercial defaults (`default_pricing_policy`, `default_markup_percent`, `default_margin_percent`, `default_tax_nexus`, `currency`, `rounding_policy`)
+- deterministic validation for commercial default policy values and rounding/currency constraints
 
 ## Navigation Contract
 
@@ -88,6 +94,7 @@ Settings state is modeled in two explicit scope layers:
   - authoritative for tenant-governed controls
   - includes commercial document numbering policies
   - includes organization profile, tax/surcharge rules, integration connection metadata, and security policy metadata
+  - includes organization commercial defaults consumed by catalog line pricing/tax flows
 
 - Personal preferences
   - scoped by tenant, organization, and user
@@ -163,6 +170,7 @@ Persisted areas:
 - organization numbering policy list/update/replace/export
 - organization terms and conditions block create/edit/version/assign-default/archive/restore/resolve/export
 - organization profile read/update
+- organization commercial defaults read/update
 - tax and surcharge rule create/list/update/preview
 - integration connection list/upsert with secret-reference validation
 - security policy read/update

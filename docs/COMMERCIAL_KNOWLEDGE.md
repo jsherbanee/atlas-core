@@ -3,6 +3,9 @@
 ## Purpose
 Commercial Knowledge is Atlas's immutable commercial reference layer for deterministic estimating readiness, historical bid recreation, and future procurement integrations.
 
+C-03 extension note:
+- Commercial Knowledge now includes a catalog foundation for deterministic item reuse across transactions and settings-driven pricing/tax defaults.
+
 This layer is intentionally:
 
 - not procurement
@@ -29,6 +32,56 @@ Commercial availability and pricing flow through this hierarchy:
 Each object has stable identifiers.
 
 ## Object Model
+
+### Catalog Item (C-03)
+Catalog Item is the reusable transaction-facing commercial identity for products, services, and fees.
+
+Key fields:
+
+- catalog_item_id
+- item_type (`product`, `service`, `fee`)
+- code
+- name
+- manufacturer
+- vendor
+- uom
+- cost
+- msrp
+- map_price
+- manual_unit_price
+- taxable
+- default_tax_nexus
+- archived
+
+Catalog items are deterministic references and do not mutate previously issued commercial-document snapshots.
+
+### Tax Nexus Rule (C-03)
+Tax Nexus Rule models deterministic tax selection by nexus and item applicability.
+
+Key fields:
+
+- tax_rule_id
+- nexus
+- title
+- rate
+- priority
+- compound
+- taxable_item_types
+- exemption_flags
+- effective_date
+- expiration_date
+- archived
+
+Rules are evaluated by priority and filtered by effective window, item type, and exemption flags.
+
+### Pricing Policy Defaults (C-03)
+Commercial Knowledge stores tenant pricing defaults for deterministic quote behavior:
+
+- default_policy (`msrp`, `map`, `cost_plus_percent`, `margin_percent`, `multiplier`, `manual`)
+- default_markup_percent
+- default_margin_percent
+- default_multiplier
+- rounding_policy
 
 ### Vendor Offering
 Vendor Offering is the commercial availability object tied to vendor-specific product identity.
@@ -258,6 +311,16 @@ No estimate pricing calculation is performed in this layer.
 - `atlas_core/domain/commercial_knowledge.py`
 - `atlas_core/services/commercial_knowledge_service.py`
 - `atlas_core/domain/commercial_product.py`
+
+## C-03 Import Coverage
+
+Catalog foundation import coverage now includes:
+
+- manufacturers (CSV/XLSX)
+- vendors (CSV/XLSX)
+- products (CSV/XLSX)
+- services (CSV/XLSX)
+- fees (CSV/XLSX)
 - `atlas_core/services/master_library/commercial_product_service.py`
 - `apps/phase2_review_app.py`
 - `tests/test_commercial_knowledge_service.py`

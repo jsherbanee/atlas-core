@@ -21,6 +21,24 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Atlas Epic C Sprint C-03 Commercial Catalog Foundation)
+
+### Improved
+
+- Commercial Knowledge now includes a unified catalog item foundation supporting `product`, `service`, and `fee` item types with deterministic archive/restore behavior.
+- Commercial catalog pricing now supports policy-based quote behavior (MSRP, MAP, Cost+%, Margin%, Multiplier, Manual), including explicit manual line override precedence.
+- Nexus-based tax foundation now supports deterministic rule selection with effective date windows, priority ordering, compound behavior, item-type applicability, and exemption flags.
+- Settings now supports tenant-scoped organization commercial defaults for pricing policy, markup/margin, default tax nexus, currency, and rounding behavior.
+- Transactions now supports catalog-backed line insertion for Estimates, Sales Orders, Return Orders, and Customer Invoices while preserving manual line workflows.
+- Commercial catalog imports now support CSV/XLSX ingestion for manufacturers, vendors, products, services, and fees with deterministic import summaries.
+
+### Quality
+
+- black --check .: passing
+- ruff check .: passing
+- mypy .: passing
+- pytest: full suite passing (1385 tests)
+
 ## Unreleased (Atlas Alpha Completion Sprint U-02 End-to-End Application UX and Workflow Polish)
 
 ### Improved

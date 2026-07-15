@@ -129,6 +129,24 @@ _ALLOWED_RULE_CALCULATION_TYPES = {
 }
 
 
+_ALLOWED_PRICING_POLICIES = {
+    "msrp",
+    "map",
+    "cost_plus_percent",
+    "margin_percent",
+    "multiplier",
+    "manual",
+}
+
+
+_ALLOWED_ROUNDING_POLICIES = {
+    "currency_2dp",
+    "currency_4dp",
+    "nearest_cent",
+    "bankers_rounding",
+}
+
+
 _ALLOWED_TEMPLATE_STATUS = {"draft", "active"}
 
 
@@ -219,6 +237,56 @@ class OrganizationProfile:
             "default_timezone": self.default_timezone,
             "country": self.country,
             "tax_identification_reference": self.tax_identification_reference,
+        }
+
+
+@dataclass(frozen=True)
+class OrganizationCommercialDefaults:
+    default_pricing_policy: str = "manual"
+    default_markup_percent: str = "0"
+    default_margin_percent: str = "0"
+    default_tax_nexus: str = ""
+    currency: str = "USD"
+    rounding_policy: str = "currency_2dp"
+
+    @staticmethod
+    def from_dict(payload: dict[str, Any]) -> "OrganizationCommercialDefaults":
+        pricing_policy = _normalize_text(
+            payload.get("default_pricing_policy") or "manual"
+        ).lower()
+        if pricing_policy not in _ALLOWED_PRICING_POLICIES:
+            raise ValueError("unsupported default_pricing_policy")
+        markup = str(payload.get("default_markup_percent") or "0")
+        margin = str(payload.get("default_margin_percent") or "0")
+        if Decimal(markup) < Decimal("0"):
+            raise ValueError("default_markup_percent cannot be negative")
+        if Decimal(margin) < Decimal("0"):
+            raise ValueError("default_margin_percent cannot be negative")
+        currency = _normalize_text(payload.get("currency") or "USD").upper()
+        if len(currency) != 3:
+            raise ValueError("currency must be a 3-letter code")
+        rounding_policy = _normalize_text(
+            payload.get("rounding_policy") or "currency_2dp"
+        ).lower()
+        if rounding_policy not in _ALLOWED_ROUNDING_POLICIES:
+            raise ValueError("unsupported rounding_policy")
+        return OrganizationCommercialDefaults(
+            default_pricing_policy=pricing_policy,
+            default_markup_percent=str(Decimal(markup)),
+            default_margin_percent=str(Decimal(margin)),
+            default_tax_nexus=_normalize_text(payload.get("default_tax_nexus")),
+            currency=currency,
+            rounding_policy=rounding_policy,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "default_pricing_policy": self.default_pricing_policy,
+            "default_markup_percent": self.default_markup_percent,
+            "default_margin_percent": self.default_margin_percent,
+            "default_tax_nexus": self.default_tax_nexus,
+            "currency": self.currency,
+            "rounding_policy": self.rounding_policy,
         }
 
 
@@ -838,6 +906,66 @@ class SettingsService:
             organization_id=organization_id,
             actor=actor,
             action="organization.profile.updated",
+            details={"prior": prior.to_dict(), "current": current.to_dict()},
+        )
+        return current
+
+    def organization_commercial_defaults(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+    ) -> OrganizationCommercialDefaults:
+        scoped = self._scope_payload(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        payload = dict(scoped.get("commercial_defaults") or {})
+        if not payload:
+            profile = self.organization_profile(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+            )
+            payload = {
+                "default_pricing_policy": "manual",
+                "default_markup_percent": "0",
+                "default_margin_percent": "0",
+                "default_tax_nexus": "",
+                "currency": profile.default_currency,
+                "rounding_policy": "currency_2dp",
+            }
+        return OrganizationCommercialDefaults.from_dict(payload)
+
+    def update_organization_commercial_defaults(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        actor: str,
+        updates: dict[str, Any],
+    ) -> OrganizationCommercialDefaults:
+        prior = self.organization_commercial_defaults(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        merged = prior.to_dict()
+        merged.update(dict(updates or {}))
+        current = OrganizationCommercialDefaults.from_dict(merged)
+        scoped = self._scope_payload(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        scoped["commercial_defaults"] = current.to_dict()
+        self._store_scope_payload(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            payload=scoped,
+        )
+        self._append_audit(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            action="organization.commercial_defaults.updated",
             details={"prior": prior.to_dict(), "current": current.to_dict()},
         )
         return current

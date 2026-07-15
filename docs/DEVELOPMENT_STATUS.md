@@ -75,6 +75,7 @@ Sprint T-09 implements project-scoped change-order tracking convention on Sales 
 Sprint S-01 completes Settings Workspace alpha scope with organization profile controls, tax/surcharge deterministic rule preview, integrations metadata hooks (secret-reference enforcement), security policy metadata controls, expanded terms families for return orders/customer invoices, and document template duplicate/preview workflows.
 Sprint U-01 completes commercial document usability and presentation polish across Transactions workflows by standardizing tertiary action contracts for Sales Orders, Return Orders, Credit Memos, and Customer Invoices; extending line-presentation sort parity (`unit_cost`, `discount`, `tax_rate`); consolidating export behavior to deterministic PDF actions; and improving source/lineage visibility in related-document views without introducing new transaction families, payments, inventory/procurement, or QuickBooks API transport.
 Sprint U-02 completes end-to-end application usability polish across Home, Projects, project lifecycle-facing surfaces, Transactions, Knowledge, Reports, and Settings by standardizing page-purpose identity captions, reducing development/prototype language in user-facing controls, improving roadmap-section guidance messaging, and validating responsive/state stability behavior without adding new features.
+Sprint C-03 implements the Commercial Catalog Foundation with unified catalog item types (product/service/fee), tenant-scoped pricing policy defaults, nexus-based tax rule selection with effective-date/priority/compound behavior, catalog import support for CSV/XLSX (manufacturers/vendors/products/services/fees), and transaction-level catalog line integration for Estimates, Sales Orders, Return Orders, and Customer Invoices while preserving manual line workflows.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 
 X-01 through X-13 are closed.
@@ -97,9 +98,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1377 tests)
+- pytest: full suite passing (1385 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1377 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1385 passing tests.
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces

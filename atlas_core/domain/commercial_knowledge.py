@@ -29,6 +29,21 @@ class KnowledgeFreshnessStatus(str, Enum):
     MISSING = "missing"
 
 
+class CatalogItemType(str, Enum):
+    PRODUCT = "product"
+    SERVICE = "service"
+    FEE = "fee"
+
+
+class PricingPolicyType(str, Enum):
+    MSRP = "msrp"
+    MAP = "map"
+    COST_PLUS_PERCENT = "cost_plus_percent"
+    MARGIN_PERCENT = "margin_percent"
+    MULTIPLIER = "multiplier"
+    MANUAL = "manual"
+
+
 @dataclass
 class VendorOffering:
     vendor_offering_id: str
@@ -243,6 +258,124 @@ class PriceRecord:
         }
 
 
+@dataclass
+class CatalogItem:
+    catalog_item_id: str
+    item_type: CatalogItemType
+    code: str
+    name: str
+    description: str = ""
+    manufacturer: str | None = None
+    vendor: str | None = None
+    uom: str = "ea"
+    cost: float | None = None
+    msrp: float | None = None
+    map_price: float | None = None
+    manual_unit_price: float | None = None
+    taxable: bool = True
+    default_tax_nexus: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    archived: bool = False
+    created_at: str = field(default_factory=_now_iso)
+    updated_at: str = field(default_factory=_now_iso)
+
+    def __post_init__(self) -> None:
+        self.catalog_item_id = _required("catalog_item_id", self.catalog_item_id)
+        if not isinstance(self.item_type, CatalogItemType):
+            self.item_type = CatalogItemType(_required("item_type", self.item_type))
+        self.code = _required("code", self.code)
+        self.name = _required("name", self.name)
+        self.description = _safe(self.description)
+        self.manufacturer = _safe(self.manufacturer) or None
+        self.vendor = _safe(self.vendor) or None
+        self.uom = _safe(self.uom, "ea")
+        self.cost = _non_negative_float_or_none("cost", self.cost)
+        self.msrp = _non_negative_float_or_none("msrp", self.msrp)
+        self.map_price = _non_negative_float_or_none("map_price", self.map_price)
+        self.manual_unit_price = _non_negative_float_or_none(
+            "manual_unit_price", self.manual_unit_price
+        )
+        self.taxable = bool(self.taxable)
+        self.default_tax_nexus = _safe(self.default_tax_nexus) or None
+        self.metadata = dict(self.metadata or {})
+        self.archived = bool(self.archived)
+        self.created_at = _required("created_at", self.created_at)
+        self.updated_at = _required("updated_at", self.updated_at)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "catalog_item_id": self.catalog_item_id,
+            "item_type": self.item_type.value,
+            "code": self.code,
+            "name": self.name,
+            "description": self.description,
+            "manufacturer": self.manufacturer,
+            "vendor": self.vendor,
+            "uom": self.uom,
+            "cost": self.cost,
+            "msrp": self.msrp,
+            "map_price": self.map_price,
+            "manual_unit_price": self.manual_unit_price,
+            "taxable": self.taxable,
+            "default_tax_nexus": self.default_tax_nexus,
+            "metadata": dict(self.metadata),
+            "archived": self.archived,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+
+@dataclass
+class TaxNexusRule:
+    tax_rule_id: str
+    nexus: str
+    title: str
+    rate: float
+    priority: int = 100
+    compound: bool = False
+    taxable_item_types: list[CatalogItemType | str] = field(default_factory=list)
+    exemption_flags: list[str] = field(default_factory=list)
+    effective_date: str | None = None
+    expiration_date: str | None = None
+    archived: bool = False
+
+    def __post_init__(self) -> None:
+        self.tax_rule_id = _required("tax_rule_id", self.tax_rule_id)
+        self.nexus = _required("nexus", self.nexus)
+        self.title = _required("title", self.title)
+        self.rate = _non_negative_float("rate", self.rate)
+        self.priority = _non_negative_int("priority", self.priority)
+        self.compound = bool(self.compound)
+        self.taxable_item_types = [
+            CatalogItemType(_required("taxable_item_type", item)).value
+            for item in list(self.taxable_item_types or [])
+        ]
+        if not self.taxable_item_types:
+            self.taxable_item_types = [item.value for item in CatalogItemType]
+        self.exemption_flags = [
+            _required("exemption_flag", item).lower()
+            for item in list(self.exemption_flags or [])
+        ]
+        self.effective_date = _safe(self.effective_date) or None
+        self.expiration_date = _safe(self.expiration_date) or None
+        self.archived = bool(self.archived)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "tax_rule_id": self.tax_rule_id,
+            "nexus": self.nexus,
+            "title": self.title,
+            "rate": self.rate,
+            "priority": self.priority,
+            "compound": self.compound,
+            "taxable_item_types": list(self.taxable_item_types),
+            "exemption_flags": list(self.exemption_flags),
+            "effective_date": self.effective_date,
+            "expiration_date": self.expiration_date,
+            "archived": self.archived,
+        }
+
+
 def _safe(value: Any, default: str = "") -> str:
     if value is None:
         return default
@@ -275,3 +408,18 @@ def _non_negative_int(field_name: str, value: Any) -> int:
     if value < 0:
         raise ValueError(f"{field_name} must be non-negative")
     return value
+
+
+def _non_negative_float(field_name: str, value: Any) -> float:
+    if not isinstance(value, (int, float)):
+        raise ValueError(f"{field_name} must be numeric")
+    normalized = round(float(value), 4)
+    if normalized < 0:
+        raise ValueError(f"{field_name} must be non-negative")
+    return normalized
+
+
+def _non_negative_float_or_none(field_name: str, value: Any) -> float | None:
+    if value is None:
+        return None
+    return _non_negative_float(field_name, value)

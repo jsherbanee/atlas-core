@@ -30,6 +30,7 @@ from atlas_core.services.commercial_document_pdf_export_service import (
     PdfSectionConfig,
 )
 from atlas_core.services.document_generation_service import DocumentGenerationService
+from atlas_core.services.commercial_knowledge_service import CommercialKnowledgeService
 
 
 def _utc_now() -> str:
@@ -99,11 +100,13 @@ class TransactionsWorkspaceService:
         serialized_numbering_policies: list[dict[str, Any]] | None = None,
         serialized_terms_blocks: list[dict[str, Any]] | None = None,
         serialized_document_templates: list[dict[str, Any]] | None = None,
+        serialized_catalog_state: dict[str, Any] | None = None,
         serialized_project_commercial_state: dict[str, Any] | None = None,
         active_tenant_id: str | None = None,
         active_organization_id: str | None = None,
         enforce_active_scope: bool = True,
         commercial_service: CommercialDocumentService | None = None,
+        commercial_catalog_service: CommercialKnowledgeService | None = None,
     ) -> None:
         self._commercial_service = commercial_service or CommercialDocumentService(
             numbering_service=CommercialNumberingService(
@@ -123,6 +126,10 @@ class TransactionsWorkspaceService:
         self._pdf_export_service = CommercialDocumentPdfExportService()
         self._document_generation_service = DocumentGenerationService(
             serialized_templates=serialized_document_templates
+        )
+        self._commercial_catalog_service = (
+            commercial_catalog_service
+            or CommercialKnowledgeService(state=serialized_catalog_state)
         )
         self._project_commercial_state: dict[str, dict[str, Any]] = {
             str(project_id): dict(payload)
@@ -524,6 +531,96 @@ class TransactionsWorkspaceService:
             )
         return document
 
+    def add_catalog_line(
+        self,
+        *,
+        document_id: str,
+        catalog_item_id: str,
+        quantity: Decimal,
+        manual_unit_price: Decimal | None = None,
+        pricing_policy: str | None = None,
+        markup_percent: float | None = None,
+        margin_percent: float | None = None,
+        multiplier: float | None = None,
+        tax_nexus: str | None = None,
+        exemption_flags: list[str] | None = None,
+        description_override: str | None = None,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.document_type not in {
+            CommercialDocumentType.ESTIMATE,
+            CommercialDocumentType.SALES_ORDER,
+            CommercialDocumentType.RETURN_ORDER,
+            CommercialDocumentType.CUSTOMER_INVOICE,
+        }:
+            raise ValueError(
+                "catalog lines are supported for estimates, sales orders, return orders, and customer invoices"
+            )
+        item = self._commercial_catalog_service.catalog_item(catalog_item_id)
+        if item is None:
+            raise ValueError("catalog item was not found")
+
+        quote = self._commercial_catalog_service.quote_catalog_item(
+            catalog_item_id=catalog_item_id,
+            quantity=float(quantity),
+            policy=pricing_policy,
+            markup_percent=markup_percent,
+            margin_percent=margin_percent,
+            multiplier=multiplier,
+            manual_unit_price=(
+                float(manual_unit_price) if manual_unit_price is not None else None
+            ),
+            tax_nexus=tax_nexus,
+            exemption_flags=exemption_flags,
+        )
+        effective_tax_rate = Decimal(str(quote["tax"]["effective_tax_rate"]))
+        line_metadata = {
+            "line_type": self._catalog_line_type(item),
+            "catalog": {
+                "catalog_item_id": quote["catalog_item_id"],
+                "catalog_code": quote["code"],
+                "catalog_item_type": quote["item_type"],
+                "pricing_policy": quote["policy"],
+                "manual_override_applied": quote["manual_override_applied"],
+                "tax_nexus": quote["tax"]["nexus"],
+                "tax_rule_ids": [
+                    rule["tax_rule_id"]
+                    for rule in list(quote["tax"].get("applied_rules") or [])
+                ],
+            },
+        }
+        if document.document_type == CommercialDocumentType.RETURN_ORDER:
+            line_metadata.update(
+                {
+                    "requested_return_quantity": str(quantity),
+                    "approved_return_quantity": str(quantity),
+                    "original_unit_price": str(Decimal(str(quote["unit_price"]))),
+                    "approved_credit_amount": str(
+                        Decimal(str(quote["unit_price"])) * quantity
+                    ),
+                    "restocking_fee": "0",
+                    "tax_adjustment": "0",
+                }
+            )
+
+        self._commercial_service.add_line(
+            document,
+            description=_safe_text(description_override, "")
+            or _safe_text(item.get("name"), "")
+            or _safe_text(item.get("code"), "Catalog Item"),
+            quantity=quantity,
+            unit_price=Decimal(str(quote["unit_price"])),
+            unit_cost=Decimal(str(item.get("cost") or "0")),
+            unit_of_measure=_safe_text(quote.get("uom"), "ea"),
+            tax_rate=effective_tax_rate,
+            product_or_service_reference=_safe_text(quote.get("code"), "")
+            or quote["catalog_item_id"],
+            line_metadata=line_metadata,
+        )
+        if document.document_type == CommercialDocumentType.RETURN_ORDER:
+            self._recalculate_return_order_financials(document)
+        return document
+
     def preview_next_change_order_number(
         self,
         *,
@@ -919,6 +1016,9 @@ class TransactionsWorkspaceService:
             project_id: dict(payload)
             for project_id, payload in self._project_commercial_state.items()
         }
+
+    def catalog_state_payload(self) -> dict[str, Any]:
+        return self._commercial_catalog_service.to_dict()
 
     def add_return_order_line(
         self,
@@ -2678,6 +2778,13 @@ class TransactionsWorkspaceService:
         if line is None:
             raise ValueError("line was not found")
         return line
+
+    @staticmethod
+    def _catalog_line_type(item: dict[str, Any]) -> str:
+        item_type = _safe_text(item.get("item_type"), "product").lower()
+        if item_type == "service":
+            return "service"
+        return "product"
 
     def _assert_presentation_supported(self, document: CommercialDocument) -> None:
         if document.document_type not in self._PRESENTATION_DOCUMENT_TYPES:

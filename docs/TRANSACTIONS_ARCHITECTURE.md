@@ -104,6 +104,21 @@ Still deferred:
 - accounting ledger and payment processing behavior
 - inventory/procurement workflow activation
 
+## C-03 Implementation Note
+
+Sprint C-03 integrates commercial catalog foundation behavior into existing transaction families.
+
+Implemented in C-03:
+- catalog-backed line insertion for Estimates, Sales Orders, Return Orders, and Customer Invoices
+- catalog line metadata persistence (`catalog_item_id`, pricing policy, manual override flag, tax nexus, applied tax rules)
+- policy-based unit-price selection through catalog pricing defaults with explicit manual override precedence
+- nexus-based tax-rate derivation for transaction line insertion
+- compatibility-safe preservation of manual line workflows and existing line-presentation behavior
+
+Still deferred:
+- procurement execution and inventory activation
+- live QuickBooks transport execution and accounting-ledger ownership
+
 Implemented in T-03:
 - estimate-specific tertiary workflow actions: Add, Browse, Edit, Lines, Revisions, Issue, Approvals, Related Documents, Activity, Export
 - deterministic reuse of the existing estimate engine for estimate line editing, validation, revision history, and issue readiness

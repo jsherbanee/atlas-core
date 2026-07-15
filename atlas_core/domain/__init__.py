@@ -145,11 +145,15 @@ from atlas_core.domain.product_resolution import (
     ProductResolutionManualOverride,
 )
 from atlas_core.domain.commercial_knowledge import (
+    CatalogItem,
+    CatalogItemType,
     CommercialProductLifecycleStatus,
     KnowledgeFreshnessStatus,
+    PricingPolicyType,
     PriceRecord,
     PriceSheet,
     PriceSheetVersion,
+    TaxNexusRule,
     VendorOffering,
 )
 from atlas_core.domain.pricing_engine import (
@@ -302,6 +306,10 @@ __all__ = [
     "ProductResolutionManualOverride",
     "CommercialProductLifecycleStatus",
     "KnowledgeFreshnessStatus",
+    "CatalogItemType",
+    "PricingPolicyType",
+    "CatalogItem",
+    "TaxNexusRule",
     "PriceSheet",
     "PriceSheetVersion",
     "PriceRecord",

@@ -377,7 +377,7 @@ Status: Active
 
 - C-01 Commercial Product Foundation
 - C-02 Commercial Knowledge Completion
-- C-03 Product Resolution
+- C-03 Commercial Catalog Foundation
 
 ### C-01 Scope Boundaries
 
@@ -424,9 +424,25 @@ Implemented in C-02:
 - Manual draft/manual-record insertion support inside the same immutable finalization path.
 
 Deferred beyond C-02:
-- Product Resolution workflows (C-03).
+- Product Resolution workflows (later C-series scope).
 - Deterministic Pricing/Costing workflow execution (D-series).
 - Commercial Intelligence automation, procurement execution, accounting, and ERP integrations.
+
+### C-03 Scope Boundaries
+
+Implemented in C-03:
+- Unified commercial catalog item model with deterministic type support for `product`, `service`, and `fee` items.
+- Catalog lifecycle controls for archive/restore without destructive mutation of historical references.
+- Pricing policy foundation for MSRP, MAP, Cost+%, Margin%, Multiplier, and Manual semantics with explicit manual line override precedence.
+- Nexus-based tax rule engine foundation with effective-date windows, deterministic priority ordering, compound-tax behavior, taxable item-type constraints, and exemption-flag filtering.
+- Tenant-scoped organization commercial defaults for pricing policy, markup/margin, tax nexus, currency, and rounding policy.
+- Catalog import workflows for manufacturers, vendors, products, services, and fees from CSV/XLSX sources.
+- Transaction integration for adding catalog-backed lines to Estimates, Sales Orders, Return Orders, and Customer Invoices while preserving manual line behavior.
+
+Deferred beyond C-03:
+- Product Resolution workflows now move to later C-series scope.
+- Procurement execution workflows, inventory activation, payment workflows, and external accounting transport.
+- Commercial intelligence automation and ERP synchronization.
 
 ## Epic D: Deterministic Estimating
 

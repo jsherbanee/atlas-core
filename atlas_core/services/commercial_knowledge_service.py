@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
+import csv
 from datetime import UTC, date, datetime
 import hashlib
+import io
 import json
 from typing import Any
+import zipfile
+import xml.etree.ElementTree as ET
 
 from atlas_core.domain.commercial_knowledge import (
+    CatalogItem,
+    CatalogItemType,
     CommercialProductLifecycleStatus,
     KnowledgeFreshnessStatus,
+    PricingPolicyType,
     PriceRecord,
     PriceSheet,
     PriceSheetVersion,
+    TaxNexusRule,
     VendorOffering,
 )
 
@@ -41,6 +49,18 @@ class CommercialKnowledgeService:
             "product_lifecycle": {},
             "import_history": [],
             "change_reports": [],
+            "catalog_items": {},
+            "manufacturers": {},
+            "vendors": {},
+            "tax_nexus_rules": {},
+            "pricing_defaults": {
+                "default_policy": PricingPolicyType.MANUAL.value,
+                "default_markup_percent": 0.0,
+                "default_margin_percent": 0.0,
+                "default_multiplier": 1.0,
+                "rounding_policy": "currency_2dp",
+            },
+            "catalog_import_history": [],
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -407,6 +427,461 @@ class CommercialKnowledgeService:
             "referenced_projects": list(history.get("referenced_projects") or []),
         }
 
+    def list_catalog_items(
+        self,
+        *,
+        item_type: CatalogItemType | str | None = None,
+        include_archived: bool = False,
+    ) -> list[dict[str, Any]]:
+        normalized_item_type = self._safe(item_type, "").lower() or None
+        rows: list[dict[str, Any]] = []
+        for payload in self.state["catalog_items"].values():
+            if not isinstance(payload, dict):
+                continue
+            if (
+                normalized_item_type
+                and self._safe(payload.get("item_type"), "") != normalized_item_type
+            ):
+                continue
+            if not include_archived and bool(payload.get("archived", False)):
+                continue
+            rows.append(dict(payload))
+        rows.sort(
+            key=lambda item: (
+                self._safe(item.get("item_type"), ""),
+                self._safe(item.get("code"), ""),
+                self._safe(item.get("name"), ""),
+            )
+        )
+        return rows
+
+    def catalog_item(self, catalog_item_id: str) -> dict[str, Any] | None:
+        key = self._safe(catalog_item_id, "")
+        if not key:
+            return None
+        payload = self.state["catalog_items"].get(key)
+        if not isinstance(payload, dict):
+            return None
+        return dict(payload)
+
+    def upsert_catalog_item(
+        self,
+        *,
+        catalog_item_id: str | None,
+        item_type: CatalogItemType | str,
+        code: str,
+        name: str,
+        description: str = "",
+        manufacturer: str | None = None,
+        vendor: str | None = None,
+        uom: str = "ea",
+        cost: float | None = None,
+        msrp: float | None = None,
+        map_price: float | None = None,
+        manual_unit_price: float | None = None,
+        taxable: bool = True,
+        default_tax_nexus: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        archived: bool = False,
+    ) -> dict[str, Any]:
+        item_type_value = CatalogItemType(self._safe(item_type, "")).value
+        now = self._now_iso()
+        item_id = self._safe(catalog_item_id, "")
+        if not item_id:
+            item_id = self._catalog_item_id(item_type_value, code)
+        existing = dict(self.state["catalog_items"].get(item_id) or {})
+        created_at = self._safe(existing.get("created_at"), now)
+        item = CatalogItem(
+            catalog_item_id=item_id,
+            item_type=CatalogItemType(item_type_value),
+            code=code,
+            name=name,
+            description=description,
+            manufacturer=manufacturer,
+            vendor=vendor,
+            uom=uom,
+            cost=cost,
+            msrp=msrp,
+            map_price=map_price,
+            manual_unit_price=manual_unit_price,
+            taxable=taxable,
+            default_tax_nexus=default_tax_nexus,
+            metadata=dict(metadata or {}),
+            archived=archived,
+            created_at=created_at,
+            updated_at=now,
+        ).to_dict()
+        self.state["catalog_items"][item_id] = item
+        return dict(item)
+
+    def archive_catalog_item(self, catalog_item_id: str) -> dict[str, Any]:
+        item = self.catalog_item(catalog_item_id)
+        if item is None:
+            raise ValueError("catalog item was not found")
+        item["archived"] = True
+        item["updated_at"] = self._now_iso()
+        self.state["catalog_items"][item["catalog_item_id"]] = item
+        return dict(item)
+
+    def restore_catalog_item(self, catalog_item_id: str) -> dict[str, Any]:
+        item = self.catalog_item(catalog_item_id)
+        if item is None:
+            raise ValueError("catalog item was not found")
+        item["archived"] = False
+        item["updated_at"] = self._now_iso()
+        self.state["catalog_items"][item["catalog_item_id"]] = item
+        return dict(item)
+
+    def set_pricing_defaults(
+        self,
+        *,
+        default_policy: PricingPolicyType | str,
+        default_markup_percent: float,
+        default_margin_percent: float,
+        default_multiplier: float,
+        rounding_policy: str,
+    ) -> dict[str, Any]:
+        policy = PricingPolicyType(self._safe(default_policy, "")).value
+        defaults = {
+            "default_policy": policy,
+            "default_markup_percent": max(0.0, round(float(default_markup_percent), 4)),
+            "default_margin_percent": max(0.0, round(float(default_margin_percent), 4)),
+            "default_multiplier": max(0.0, round(float(default_multiplier), 6)),
+            "rounding_policy": self._safe(rounding_policy, "currency_2dp"),
+        }
+        self.state["pricing_defaults"] = defaults
+        return dict(defaults)
+
+    def pricing_defaults(self) -> dict[str, Any]:
+        return dict(self.state.get("pricing_defaults") or {})
+
+    def create_or_update_tax_nexus_rule(
+        self,
+        *,
+        tax_rule_id: str | None,
+        nexus: str,
+        title: str,
+        rate: float,
+        priority: int = 100,
+        compound: bool = False,
+        taxable_item_types: list[CatalogItemType | str] | None = None,
+        exemption_flags: list[str] | None = None,
+        effective_date: str | None = None,
+        expiration_date: str | None = None,
+        archived: bool = False,
+    ) -> dict[str, Any]:
+        key = self._safe(tax_rule_id, "")
+        if not key:
+            key = self._tax_rule_id(nexus=nexus, title=title, priority=priority)
+        row = TaxNexusRule(
+            tax_rule_id=key,
+            nexus=nexus,
+            title=title,
+            rate=rate,
+            priority=priority,
+            compound=compound,
+            taxable_item_types=list(taxable_item_types or []),
+            exemption_flags=list(exemption_flags or []),
+            effective_date=effective_date,
+            expiration_date=expiration_date,
+            archived=archived,
+        ).to_dict()
+        self.state["tax_nexus_rules"][key] = row
+        return dict(row)
+
+    def list_tax_nexus_rules(
+        self,
+        *,
+        nexus: str | None = None,
+        include_archived: bool = False,
+    ) -> list[dict[str, Any]]:
+        normalized_nexus = self._safe(nexus, "").lower() or None
+        rows: list[dict[str, Any]] = []
+        for payload in self.state["tax_nexus_rules"].values():
+            if not isinstance(payload, dict):
+                continue
+            if (
+                normalized_nexus
+                and self._safe(payload.get("nexus"), "").lower() != normalized_nexus
+            ):
+                continue
+            if not include_archived and bool(payload.get("archived", False)):
+                continue
+            rows.append(dict(payload))
+        rows.sort(
+            key=lambda item: (
+                int(item.get("priority", 100) or 100),
+                self._safe(item.get("tax_rule_id"), ""),
+            )
+        )
+        return rows
+
+    def tax_quote_for_line(
+        self,
+        *,
+        nexus: str,
+        item_type: CatalogItemType | str,
+        taxable_amount: float,
+        exemption_flags: list[str] | None = None,
+        as_of: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_nexus = self._safe(nexus, "")
+        if not normalized_nexus:
+            return {
+                "nexus": "",
+                "taxable_amount": round(float(taxable_amount), 4),
+                "effective_tax_rate": 0.0,
+                "tax_amount": 0.0,
+                "applied_rules": [],
+            }
+        normalized_type = CatalogItemType(self._safe(item_type, "")).value
+        amount = max(0.0, round(float(taxable_amount), 6))
+        as_of_date = self._date_from_iso(self._safe(as_of, "")) or self._as_of
+        flags = {
+            self._safe(item, "").lower()
+            for item in list(exemption_flags or [])
+            if self._safe(item, "")
+        }
+        applicable_rules: list[dict[str, Any]] = []
+        for rule in self.list_tax_nexus_rules(
+            nexus=normalized_nexus,
+            include_archived=False,
+        ):
+            types = {
+                self._safe(item, "")
+                for item in list(rule.get("taxable_item_types") or [])
+                if self._safe(item, "")
+            }
+            if normalized_type not in types:
+                continue
+            if flags.intersection(
+                {
+                    self._safe(item, "").lower()
+                    for item in list(rule.get("exemption_flags") or [])
+                }
+            ):
+                continue
+            if not self._is_rule_effective(rule=rule, as_of=as_of_date):
+                continue
+            applicable_rules.append(rule)
+
+        total_tax = 0.0
+        applied: list[dict[str, Any]] = []
+        for rule in applicable_rules:
+            rate = max(0.0, float(rule.get("rate", 0.0) or 0.0))
+            basis = amount + total_tax if bool(rule.get("compound", False)) else amount
+            rule_tax = round(basis * (rate / 100.0), 6)
+            total_tax = round(total_tax + rule_tax, 6)
+            applied.append(
+                {
+                    "tax_rule_id": self._safe(rule.get("tax_rule_id"), ""),
+                    "title": self._safe(rule.get("title"), ""),
+                    "rate": rate,
+                    "compound": bool(rule.get("compound", False)),
+                    "tax_amount": round(rule_tax, 4),
+                }
+            )
+
+        effective_rate = 0.0
+        if amount > 0:
+            effective_rate = round(total_tax / amount, 6)
+        return {
+            "nexus": normalized_nexus,
+            "taxable_amount": round(amount, 4),
+            "effective_tax_rate": effective_rate,
+            "tax_amount": round(total_tax, 4),
+            "applied_rules": applied,
+        }
+
+    def quote_catalog_item(
+        self,
+        *,
+        catalog_item_id: str,
+        quantity: float,
+        policy: PricingPolicyType | str | None = None,
+        markup_percent: float | None = None,
+        margin_percent: float | None = None,
+        multiplier: float | None = None,
+        manual_unit_price: float | None = None,
+        tax_nexus: str | None = None,
+        exemption_flags: list[str] | None = None,
+        as_of: str | None = None,
+    ) -> dict[str, Any]:
+        item = self.catalog_item(catalog_item_id)
+        if item is None or bool(item.get("archived", False)):
+            raise ValueError("catalog item was not found")
+        qty = max(0.0, round(float(quantity), 6))
+        defaults = self.pricing_defaults()
+        selected_policy = PricingPolicyType(
+            self._safe(
+                policy,
+                self._safe(
+                    defaults.get("default_policy"), PricingPolicyType.MANUAL.value
+                ),
+            )
+        ).value
+
+        base_cost = self._float_or_none(item.get("cost"))
+        msrp = self._float_or_none(item.get("msrp"))
+        map_price = self._float_or_none(item.get("map_price"))
+        manual_default = self._float_or_none(item.get("manual_unit_price"))
+
+        resolved_markup = (
+            float(markup_percent)
+            if markup_percent is not None
+            else float(defaults.get("default_markup_percent", 0.0) or 0.0)
+        )
+        resolved_margin = (
+            float(margin_percent)
+            if margin_percent is not None
+            else float(defaults.get("default_margin_percent", 0.0) or 0.0)
+        )
+        resolved_multiplier = (
+            float(multiplier)
+            if multiplier is not None
+            else float(defaults.get("default_multiplier", 1.0) or 1.0)
+        )
+
+        resolved_manual_price = self._float_or_none(manual_unit_price)
+        manual_override_applied = resolved_manual_price is not None
+        if manual_override_applied:
+            unit_price = resolved_manual_price
+            selected_policy = PricingPolicyType.MANUAL.value
+        elif selected_policy == PricingPolicyType.MSRP.value:
+            unit_price = msrp if msrp is not None else base_cost or 0.0
+        elif selected_policy == PricingPolicyType.MAP.value:
+            unit_price = map_price if map_price is not None else base_cost or 0.0
+        elif selected_policy == PricingPolicyType.COST_PLUS_PERCENT.value:
+            unit_price = (base_cost or 0.0) * (1.0 + max(0.0, resolved_markup) / 100.0)
+        elif selected_policy == PricingPolicyType.MARGIN_PERCENT.value:
+            margin_ratio = max(0.0, min(99.99, resolved_margin)) / 100.0
+            denominator = max(0.0001, 1.0 - margin_ratio)
+            unit_price = (base_cost or 0.0) / denominator
+        elif selected_policy == PricingPolicyType.MULTIPLIER.value:
+            unit_price = (base_cost or 0.0) * max(0.0, resolved_multiplier)
+        else:
+            unit_price = manual_default
+            if unit_price is None:
+                unit_price = msrp if msrp is not None else base_cost or 0.0
+
+        if unit_price is None:
+            unit_price = 0.0
+        unit_price = round(max(0.0, float(unit_price)), 4)
+        line_subtotal = round(qty * unit_price, 4)
+        resolved_nexus = self._safe(
+            tax_nexus,
+            self._safe(item.get("default_tax_nexus"), ""),
+        )
+        tax_quote = self.tax_quote_for_line(
+            nexus=resolved_nexus,
+            item_type=self._safe(item.get("item_type"), CatalogItemType.PRODUCT.value),
+            taxable_amount=(line_subtotal if bool(item.get("taxable", True)) else 0.0),
+            exemption_flags=exemption_flags,
+            as_of=as_of,
+        )
+        line_total = round(line_subtotal + float(tax_quote.get("tax_amount", 0.0)), 4)
+
+        return {
+            "catalog_item_id": self._safe(item.get("catalog_item_id"), ""),
+            "code": self._safe(item.get("code"), ""),
+            "item_type": self._safe(item.get("item_type"), ""),
+            "quantity": qty,
+            "unit_price": unit_price,
+            "policy": selected_policy,
+            "manual_override_applied": manual_override_applied,
+            "line_subtotal": line_subtotal,
+            "tax": tax_quote,
+            "line_total": line_total,
+            "uom": self._safe(item.get("uom"), "ea"),
+            "manufacturer": self._safe(item.get("manufacturer"), "") or None,
+            "vendor": self._safe(item.get("vendor"), "") or None,
+        }
+
+    def import_catalog_entities(
+        self,
+        *,
+        source_filename: str,
+        file_bytes: bytes,
+        entity_type: str,
+        imported_by: str,
+    ) -> dict[str, Any]:
+        rows = self._parse_tabular_rows(
+            source_filename=source_filename,
+            file_bytes=file_bytes,
+        )
+        return self.import_catalog_entities_from_rows(
+            entity_type=entity_type,
+            rows=rows,
+            imported_by=imported_by,
+            source_filename=source_filename,
+        )
+
+    def import_catalog_entities_from_rows(
+        self,
+        *,
+        entity_type: str,
+        rows: list[dict[str, Any]],
+        imported_by: str,
+        source_filename: str,
+    ) -> dict[str, Any]:
+        normalized_type = self._safe(entity_type, "").lower()
+        if normalized_type not in {
+            "manufacturers",
+            "vendors",
+            "products",
+            "services",
+            "fees",
+        }:
+            raise ValueError("unsupported entity_type")
+
+        inserted = 0
+        updated = 0
+        rejected = 0
+        warnings: list[str] = []
+        for index, row in enumerate(list(rows or []), start=1):
+            normalized_row = {
+                self._safe(key, "").lower(): value
+                for key, value in dict(row or {}).items()
+            }
+            try:
+                if normalized_type == "manufacturers":
+                    is_insert = self._upsert_manufacturer(normalized_row)
+                    inserted += 1 if is_insert else 0
+                    updated += 0 if is_insert else 1
+                elif normalized_type == "vendors":
+                    is_insert = self._upsert_vendor(normalized_row)
+                    inserted += 1 if is_insert else 0
+                    updated += 0 if is_insert else 1
+                else:
+                    item_type = {
+                        "products": CatalogItemType.PRODUCT.value,
+                        "services": CatalogItemType.SERVICE.value,
+                        "fees": CatalogItemType.FEE.value,
+                    }[normalized_type]
+                    upserted = self._upsert_catalog_item_from_row(
+                        item_type=item_type,
+                        row=normalized_row,
+                    )
+                    inserted += 1 if upserted["is_insert"] else 0
+                    updated += 0 if upserted["is_insert"] else 1
+            except ValueError as exc:
+                rejected += 1
+                warnings.append(f"row {index}: {exc}")
+
+        summary = {
+            "entity_type": normalized_type,
+            "source_filename": self._safe(source_filename, "upload"),
+            "imported_by": self._safe(imported_by, "atlas"),
+            "imported_at": self._now_iso(),
+            "rows_received": len(list(rows or [])),
+            "inserted": inserted,
+            "updated": updated,
+            "rejected": rejected,
+            "warnings": warnings,
+        }
+        self.state["catalog_import_history"].append(summary)
+        return dict(summary)
+
     def _normalized_state(self, state: dict[str, Any]) -> dict[str, Any]:
         normalized = self.empty_state()
         for key in normalized:
@@ -712,6 +1187,217 @@ class CommercialKnowledgeService:
             }
         )
         self.state["product_history"][product] = history
+
+    def _is_rule_effective(self, *, rule: dict[str, Any], as_of: date) -> bool:
+        effective = self._date_from_iso(self._safe(rule.get("effective_date"), ""))
+        expiration = self._date_from_iso(self._safe(rule.get("expiration_date"), ""))
+        if effective is not None and as_of < effective:
+            return False
+        if expiration is not None and as_of > expiration:
+            return False
+        return True
+
+    @staticmethod
+    def _catalog_item_id(item_type: str, code: str) -> str:
+        digest = hashlib.sha1(
+            f"{item_type}|{code.strip().upper()}".encode("utf-8")
+        ).hexdigest()[:16]
+        return f"catalog-item:{digest}"
+
+    @staticmethod
+    def _tax_rule_id(*, nexus: str, title: str, priority: int) -> str:
+        digest = hashlib.sha1(
+            f"{nexus.strip().lower()}|{title.strip().lower()}|{priority}".encode(
+                "utf-8"
+            )
+        ).hexdigest()[:16]
+        return f"tax-nexus-rule:{digest}"
+
+    def _upsert_manufacturer(self, row: dict[str, Any]) -> bool:
+        code = self._safe(row.get("manufacturer_code"), "") or self._safe(
+            row.get("code"), ""
+        )
+        name = self._safe(row.get("manufacturer_name"), "") or self._safe(
+            row.get("name"), ""
+        )
+        if not code or not name:
+            raise ValueError("manufacturer imports require code and name")
+        key = code.upper()
+        is_insert = key not in self.state["manufacturers"]
+        self.state["manufacturers"][key] = {
+            "manufacturer_code": key,
+            "manufacturer_name": name,
+            "website": self._safe(row.get("website"), "") or None,
+            "status": self._safe(row.get("status"), "active") or "active",
+            "updated_at": self._now_iso(),
+        }
+        return is_insert
+
+    def _upsert_vendor(self, row: dict[str, Any]) -> bool:
+        code = self._safe(row.get("vendor_code"), "") or self._safe(row.get("code"), "")
+        name = self._safe(row.get("vendor_name"), "") or self._safe(row.get("name"), "")
+        if not code or not name:
+            raise ValueError("vendor imports require code and name")
+        key = code.upper()
+        is_insert = key not in self.state["vendors"]
+        self.state["vendors"][key] = {
+            "vendor_code": key,
+            "vendor_name": name,
+            "vendor_type": self._safe(row.get("vendor_type"), "other") or "other",
+            "status": self._safe(row.get("status"), "active") or "active",
+            "updated_at": self._now_iso(),
+        }
+        return is_insert
+
+    def _upsert_catalog_item_from_row(
+        self,
+        *,
+        item_type: str,
+        row: dict[str, Any],
+    ) -> dict[str, Any]:
+        code = self._safe(row.get("code"), "") or self._safe(row.get("sku"), "")
+        name = self._safe(row.get("name"), "") or self._safe(row.get("description"), "")
+        if not code or not name:
+            raise ValueError("catalog imports require code and name")
+        item_id = self._catalog_item_id(item_type, code)
+        is_insert = item_id not in self.state["catalog_items"]
+        self.upsert_catalog_item(
+            catalog_item_id=item_id,
+            item_type=item_type,
+            code=code,
+            name=name,
+            description=self._safe(row.get("description"), ""),
+            manufacturer=self._safe(row.get("manufacturer"), "") or None,
+            vendor=self._safe(row.get("vendor"), "") or None,
+            uom=self._safe(row.get("uom"), "ea"),
+            cost=self._float_or_none(row.get("cost") or row.get("unit_cost")),
+            msrp=self._float_or_none(row.get("msrp") or row.get("list_price")),
+            map_price=self._float_or_none(row.get("map") or row.get("map_price")),
+            manual_unit_price=self._float_or_none(row.get("manual_unit_price")),
+            taxable=self._safe(row.get("taxable"), "true").lower()
+            not in {"0", "false", "no"},
+            default_tax_nexus=self._safe(row.get("default_tax_nexus"), "") or None,
+            metadata={
+                "source": "catalog_import",
+                "raw_row": dict(row),
+            },
+            archived=self._safe(row.get("archived"), "false").lower()
+            in {"1", "true", "yes"},
+        )
+        return {"catalog_item_id": item_id, "is_insert": is_insert}
+
+    def _parse_tabular_rows(
+        self,
+        *,
+        source_filename: str,
+        file_bytes: bytes,
+    ) -> list[dict[str, Any]]:
+        lower_name = self._safe(source_filename, "").lower()
+        if lower_name.endswith(".csv"):
+            text = file_bytes.decode("utf-8-sig", errors="replace")
+            reader = csv.DictReader(io.StringIO(text))
+            return [dict(row) for row in reader]
+        if lower_name.endswith(".xlsx"):
+            return self._parse_xlsx_rows(file_bytes)
+        raise ValueError("unsupported file format; expected .csv or .xlsx")
+
+    def _parse_xlsx_rows(self, file_bytes: bytes) -> list[dict[str, Any]]:
+        try:
+            archive = zipfile.ZipFile(io.BytesIO(file_bytes))
+        except zipfile.BadZipFile as exc:
+            raise ValueError("invalid xlsx payload") from exc
+
+        with archive:
+            workbook_xml = archive.read("xl/workbook.xml")
+            workbook = ET.fromstring(workbook_xml)
+            workbook_ns = {
+                "x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+            }
+            rel_ns = {
+                "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            }
+            relationship_xml = archive.read("xl/_rels/workbook.xml.rels")
+            relationship_tree = ET.fromstring(relationship_xml)
+            rels = {
+                rel.attrib.get("Id"): rel.attrib.get("Target")
+                for rel in relationship_tree
+                if rel.attrib.get("Id") and rel.attrib.get("Target")
+            }
+
+            shared_strings = self._xlsx_shared_strings(archive)
+            sheets = workbook.findall("x:sheets/x:sheet", workbook_ns)
+            if not sheets:
+                return []
+            first_sheet = sheets[0]
+            rel_id = first_sheet.attrib.get(f"{{{rel_ns['r']}}}id")
+            target = rels.get(rel_id)
+            if not target:
+                return []
+            normalized_target = target.lstrip("/")
+            if not normalized_target.startswith("xl/"):
+                normalized_target = f"xl/{normalized_target}"
+            if normalized_target not in archive.namelist():
+                return []
+            worksheet = ET.fromstring(archive.read(normalized_target))
+            sheet_data = worksheet.find("x:sheetData", workbook_ns)
+            if sheet_data is None:
+                return []
+
+            matrix: list[list[str]] = []
+            for row in sheet_data.findall("x:row", workbook_ns):
+                values: list[str] = []
+                for cell in row.findall("x:c", workbook_ns):
+                    values.append(
+                        self._xlsx_cell_text(cell, workbook_ns, shared_strings)
+                    )
+                matrix.append(values)
+            if not matrix:
+                return []
+            header = [self._safe(item, "") for item in matrix[0]]
+            data_rows: list[dict[str, Any]] = []
+            for value_row in matrix[1:]:
+                if not any(self._safe(value, "") for value in value_row):
+                    continue
+                payload: dict[str, Any] = {}
+                for index, column in enumerate(header):
+                    if not column:
+                        continue
+                    payload[column] = value_row[index] if index < len(value_row) else ""
+                data_rows.append(payload)
+            return data_rows
+
+    @staticmethod
+    def _xlsx_shared_strings(archive: zipfile.ZipFile) -> list[str]:
+        shared_path = "xl/sharedStrings.xml"
+        if shared_path not in archive.namelist():
+            return []
+        tree = ET.fromstring(archive.read(shared_path))
+        namespace = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        values: list[str] = []
+        for item in tree.findall("x:si", namespace):
+            parts = [node.text or "" for node in item.findall(".//x:t", namespace)]
+            values.append("".join(parts))
+        return values
+
+    @staticmethod
+    def _xlsx_cell_text(
+        cell: ET.Element,
+        namespace: dict[str, str],
+        shared_strings: list[str],
+    ) -> str:
+        raw_value = cell.find("x:v", namespace)
+        if raw_value is None or raw_value.text is None:
+            return ""
+        value = raw_value.text
+        if cell.attrib.get("t") == "s":
+            try:
+                index = int(value)
+            except ValueError:
+                return ""
+            if 0 <= index < len(shared_strings):
+                return shared_strings[index]
+            return ""
+        return value
 
     @staticmethod
     def _price_trend(history: list[dict[str, Any]]) -> str:
