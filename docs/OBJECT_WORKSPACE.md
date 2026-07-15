@@ -104,6 +104,10 @@ Read-only object-workspace compatibility families:
 
 Sprint T-03 extends Object Workspace continuity for transaction estimates by preserving estimate-record selection identity and route handoff from Transactions browse/actions into the shared Object Workspace shell.
 
+## T-09 Transactions Compatibility Note
+
+Sprint T-09 extends transaction-object continuity for project change-order tracking by indexing shared change-order metadata on Sales Orders and Return Orders (for example `CO #n`, direction, and base-bid reference) without introducing a standalone Change Order object route.
+
 ## Universal Object Workspace Shape
 Future workspace surfaces should be able to render a stable object shell using shared contract data for:
 - breadcrumb

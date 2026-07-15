@@ -28,6 +28,7 @@ Atlas Workspace Sprint T-02 adds the first Transactions workspace UI/navigation 
 Atlas Workspace Sprint T-03 makes Transactions > Estimates the first fully operational transaction family with estimate-specific tertiary controls (Lines, Revisions, Issue) while reusing the existing deterministic estimate engine.
 Atlas Workspace Sprint T-04 introduces the Settings workspace foundation with reusable secondary/tertiary navigation, active Organization Settings and Personal Preferences content, and tenant-level commercial document numbering preferences.
 Atlas Workspace Sprint T-05 amendment introduces tenant Terms and Conditions settings blocks (browse/add/edit/version/default/archive/preview), estimate internal/customer view presentation controls over a shared revision, explicit draft terms refresh behavior, and sales-order-from-estimate terms snapshot inheritance/default resolution.
+Atlas Workspace Sprint T-09 adds change-order tracking controls to Sales Order and Return Order creation/edit flows (mark-as-change-order, project-required guardrails, `CO #n` preview, reason/approval/base-bid fields) and introduces a project commercial summary view for base bid and additive/deductive rollups.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.

@@ -336,6 +336,327 @@ def test_customer_invoice_pdf_and_duplication_supported() -> None:
     assert duplicate.source_document_id == invoice.document_id
 
 
+def test_additive_change_order_from_sales_order_tracks_metadata() -> None:
+    service = _service()
+    sales_order = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        project_code="P-A",
+        customer_id="customer-a",
+    )
+    service._commercial_service.add_line(
+        sales_order,
+        description="Add equipment",
+        quantity=Decimal("1"),
+        unit_price=Decimal("500.00"),
+    )
+
+    configured = service.configure_change_order_tracking(
+        document_id=sales_order.document_id,
+        is_change_order=True,
+        base_bid_reference="accepted_estimate:est-1",
+        change_reason="Client requested expansion",
+        requested_by="pm",
+        approved_by="director",
+        approval_date="2026-07-14",
+        effective_date="2026-07-20",
+        source_document="est-1",
+        related_documents=["est-1"],
+    )
+
+    metadata = configured.document_metadata or {}
+    assert metadata.get("is_change_order") is True
+    assert metadata.get("change_order_direction") == "additive"
+    assert metadata.get("change_order_number") == "CO #1"
+    assert metadata.get("change_order_sequence") == 1
+
+
+def test_deductive_change_order_from_return_order_tracks_metadata() -> None:
+    service = _service()
+    return_order = service.create_return_order(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        project_id="project-a",
+        project_code="P-A",
+        return_reason="scope reduction",
+        return_type="service",
+    )
+
+    configured = service.configure_change_order_tracking(
+        document_id=return_order.document_id,
+        is_change_order=True,
+        change_reason="Scope reduction",
+        requested_by="pm",
+    )
+
+    metadata = configured.document_metadata or {}
+    assert metadata.get("is_change_order") is True
+    assert metadata.get("change_order_direction") == "deductive"
+    assert metadata.get("change_order_number") == "CO #1"
+    assert metadata.get("change_order_sequence") == 1
+
+
+def test_change_order_preview_non_consuming_and_duplicate_rejection() -> None:
+    service = _service()
+    first = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    second = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+
+    preview_1 = service.preview_next_change_order_number(
+        tenant_id="tenant-1",
+        project_id="project-a",
+    )
+    preview_2 = service.preview_next_change_order_number(
+        tenant_id="tenant-1",
+        project_id="project-a",
+    )
+    assert preview_1["change_order_sequence"] == 1
+    assert preview_2["change_order_sequence"] == 1
+
+    service.configure_change_order_tracking(
+        document_id=first.document_id,
+        is_change_order=True,
+        change_order_sequence=1,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="change-order sequence is already allocated for this project",
+    ):
+        service.configure_change_order_tracking(
+            document_id=second.document_id,
+            is_change_order=True,
+            change_order_sequence=1,
+        )
+
+
+def test_change_order_sequence_is_project_scoped_and_not_reused_after_archive() -> None:
+    service = _service()
+    first_project_a = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    first_project_b = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-b",
+        customer_id="customer-a",
+    )
+    service.configure_change_order_tracking(
+        document_id=first_project_a.document_id,
+        is_change_order=True,
+    )
+    service.configure_change_order_tracking(
+        document_id=first_project_b.document_id,
+        is_change_order=True,
+    )
+
+    service.archive_document(first_project_a.document_id)
+    second_project_a = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    configured = service.configure_change_order_tracking(
+        document_id=second_project_a.document_id,
+        is_change_order=True,
+    )
+    assert (configured.document_metadata or {}).get("change_order_sequence") == 2
+
+
+def test_project_base_bid_and_net_contract_value_summary() -> None:
+    service = _service()
+    estimate = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.ESTIMATE,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service._commercial_service.add_line(
+        estimate,
+        description="Base scope",
+        quantity=Decimal("1"),
+        unit_price=Decimal("1000.00"),
+    )
+    service.set_approval_state(
+        document_id=estimate.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+    service.set_project_base_bid(
+        tenant_id="tenant-1",
+        project_id="project-a",
+        project_code="P-A",
+        reference_type="accepted_estimate",
+        reference_document_id=estimate.document_id,
+        actor="qa",
+    )
+
+    additive = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service._commercial_service.add_line(
+        additive,
+        description="Add scope",
+        quantity=Decimal("1"),
+        unit_price=Decimal("250.00"),
+    )
+    service.configure_change_order_tracking(
+        document_id=additive.document_id,
+        is_change_order=True,
+    )
+
+    deductive = service.create_return_order(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        project_id="project-a",
+        project_code="P-A",
+    )
+    service.add_return_order_line(
+        return_order_document_id=deductive.document_id,
+        description="Deduct scope",
+        quantity=Decimal("1"),
+        original_unit_price=Decimal("50.00"),
+        line_type="service",
+    )
+    service.configure_change_order_tracking(
+        document_id=deductive.document_id,
+        is_change_order=True,
+    )
+
+    summary = service.project_commercial_summary(
+        tenant_id="tenant-1",
+        project_id="project-a",
+    )
+    assert summary["base_bid_value"] == "1000.00"
+    assert summary["additive_change_total"] == "250.00"
+    assert summary["deductive_change_total"] == "50.00"
+    assert summary["net_change_total"] == "200.00"
+    assert summary["revised_contract_value"] == "1200.00"
+    assert len(summary["ordered_change_list"]) == 2
+
+
+def test_change_order_revision_behavior_and_audit_diagnostics() -> None:
+    service = _service()
+    sales_order = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service.configure_change_order_tracking(
+        document_id=sales_order.document_id,
+        is_change_order=True,
+        change_reason="Adjustment",
+    )
+    assert any(
+        diagnostic.code == "change_order_configured"
+        for diagnostic in sales_order.diagnostics
+    )
+
+    service.set_approval_state(
+        document_id=sales_order.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+    service.issue_document(document_id=sales_order.document_id, reason="issue")
+    revised = service.create_draft_revision(
+        document_id=sales_order.document_id,
+        reason="post-issue revision",
+    )
+    assert revised.lifecycle_state == CommercialDocumentLifecycleState.DRAFT
+    assert (revised.document_metadata or {}).get("is_change_order") is True
+    assert (revised.document_metadata or {}).get("change_order_number") == "CO #1"
+
+
+def test_change_order_tenant_isolation_numbering() -> None:
+    service = _service()
+    tenant_a = service.create_draft(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    tenant_b = service.create_draft(
+        tenant_id="tenant-b",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service.configure_change_order_tracking(
+        document_id=tenant_a.document_id,
+        is_change_order=True,
+    )
+    service.configure_change_order_tracking(
+        document_id=tenant_b.document_id,
+        is_change_order=True,
+    )
+    assert (tenant_a.document_metadata or {}).get("change_order_sequence") == 1
+    assert (tenant_b.document_metadata or {}).get("change_order_sequence") == 1
+
+
+def test_change_order_pdf_export_and_search_metadata() -> None:
+    service = _service()
+    sales_order = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service._commercial_service.add_line(
+        sales_order,
+        description="CO line",
+        quantity=Decimal("1"),
+        unit_price=Decimal("100.00"),
+    )
+    service.configure_change_order_tracking(
+        document_id=sales_order.document_id,
+        is_change_order=True,
+    )
+    service.set_approval_state(
+        document_id=sales_order.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+    service.issue_document(document_id=sales_order.document_id, reason="issue")
+
+    export_payload = service.export_document_pdf(
+        document_id=sales_order.document_id,
+        presentation="sales_order",
+        actor="qa",
+    )
+    assert export_payload["payload"]
+    search_rows = service.list_documents(query="CO #1")
+    assert any(row.document_id == sales_order.document_id for row in search_rows)
+
+
 def test_estimate_standalone_requires_customer() -> None:
     service = _service()
 

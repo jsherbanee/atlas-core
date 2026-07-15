@@ -533,7 +533,6 @@ TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE: dict[str, CommercialDocumentType] = {
     "receiving": CommercialDocumentType.RECEIVING_RECORD,
     "vendor_bills": CommercialDocumentType.VENDOR_BILL,
     "customer_invoices": CommercialDocumentType.CUSTOMER_INVOICE,
-    "change_orders": CommercialDocumentType.CHANGE_ORDER,
 }
 
 TRANSACTION_TYPE_TO_KIND: dict[CommercialDocumentType, str] = {
@@ -3474,6 +3473,7 @@ def _save_commercial_product_state(st: Any, service: CommercialProductService) -
 def _default_transactions_workspace_state() -> dict[str, Any]:
     return {
         "documents": [],
+        "project_commercial_state": {},
         "tenant_id": "local",
         "organization_id": "atlas",
     }
@@ -3549,6 +3549,9 @@ def _transactions_workspace_service(st: Any) -> TransactionsWorkspaceService:
             tenant_id=tenant_id,
             organization_id=organization_id,
         ),
+        serialized_project_commercial_state=dict(
+            state.get("project_commercial_state") or {}
+        ),
     )
 
 
@@ -3558,6 +3561,7 @@ def _save_transactions_workspace_state(
 ) -> None:
     state = _transactions_workspace_state(st)
     state["documents"] = service.to_payload()
+    state["project_commercial_state"] = service.project_commercial_state_payload()
     st.session_state["atlas_transactions_workspace"] = state
     settings_service = _settings_workspace_service(st)
     settings_service.replace_numbering_policies(
@@ -6737,6 +6741,26 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": "entity",
             },
         ]
+    actions["change_orders"] = [
+        {
+            "tertiary_key": "summary",
+            "label": "Summary",
+            "action_type": "collection_view",
+            "required_selection": None,
+        },
+        {
+            "tertiary_key": "browse",
+            "label": "Browse",
+            "action_type": "collection_view",
+            "required_selection": None,
+        },
+        {
+            "tertiary_key": "activity",
+            "label": "Activity",
+            "action_type": "history_activity_view",
+            "required_selection": None,
+        },
+    ]
     return actions
 
 
@@ -12962,9 +12986,12 @@ def _transaction_kind_for_document_type(document_type: CommercialDocumentType) -
 
 
 def _transaction_row(document: Any) -> dict[str, Any]:
+    metadata = dict(document.document_metadata or {})
+    change_order_number = _safe_text(metadata.get("change_order_number"), "")
     return {
         "Document Number": _safe_text(document.document_number, "n/a"),
         "Type": _safe_text(document.document_type.value, "n/a"),
+        "CO": change_order_number,
         "Lifecycle": _safe_text(document.lifecycle_state.value, "n/a"),
         "Approval": _safe_text(document.approval_state.value, "n/a"),
         "Sync": _safe_text(document.sync_metadata.status.value, "n/a"),
@@ -13260,6 +13287,138 @@ def _render_transactions_workspace_page(
     )
     document_type = _transaction_document_type_for_secondary(secondary)
 
+    if secondary == "change_orders":
+        project_cols = st.columns([2, 2, 3])
+        project_id = project_cols[0].text_input(
+            "Project ID",
+            key="atlas_transactions_change_orders_project_id",
+        )
+        project_code = project_cols[1].text_input(
+            "Project Code",
+            key="atlas_transactions_change_orders_project_code",
+        )
+        project_search = project_cols[2].text_input(
+            "Search Change Orders",
+            key="atlas_transactions_change_orders_search",
+            placeholder="CO #, reason, document number",
+        )
+
+        if not _safe_text(project_id, ""):
+            _render_guided_empty_state(
+                st,
+                why_empty="Change-order tracking is project-scoped.",
+                action_to_populate="Enter a Project ID to view/additive and deductive change-order activity.",
+                next_location="Use Sales Orders and Return Orders to create change orders.",
+            )
+            return
+
+        base_bid_cols = st.columns(4)
+        reference_type = base_bid_cols[0].selectbox(
+            "Base Bid Source",
+            options=[
+                "accepted_estimate",
+                "originating_sales_order",
+                "imported_contract_amount",
+            ],
+            key="atlas_transactions_change_orders_base_bid_source",
+        )
+        reference_document_id = base_bid_cols[1].text_input(
+            "Base Bid Document ID",
+            key="atlas_transactions_change_orders_base_bid_document_id",
+        )
+        imported_contract_amount = Decimal(
+            str(
+                base_bid_cols[2].number_input(
+                    "Imported Contract Amount",
+                    min_value=0.0,
+                    value=0.0,
+                    step=100.0,
+                    key="atlas_transactions_change_orders_base_bid_amount",
+                )
+            )
+        )
+        if base_bid_cols[3].button(
+            "Set Base Bid",
+            key="atlas_transactions_change_orders_set_base_bid",
+            width="stretch",
+        ):
+            try:
+                service.set_project_base_bid(
+                    tenant_id="local",
+                    project_id=project_id,
+                    project_code=project_code or None,
+                    reference_type=reference_type,
+                    reference_document_id=reference_document_id or None,
+                    imported_contract_amount=(
+                        imported_contract_amount
+                        if reference_type == "imported_contract_amount"
+                        else None
+                    ),
+                    actor="atlas-ui",
+                )
+                _save_transactions_workspace_state(st, service)
+                st.success("Base bid reference assigned for project.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to assign base bid: {exc}")
+
+        try:
+            summary = service.project_commercial_summary(
+                tenant_id="local",
+                project_id=project_id,
+            )
+        except Exception as exc:
+            st.error(f"Unable to load project commercial summary: {exc}")
+            return
+
+        st.dataframe(
+            [
+                {
+                    "Project": _safe_text(summary.get("project_code"), project_id),
+                    "Base Bid": _safe_text(summary.get("base_bid_value"), "0"),
+                    "Additive Change Total": _safe_text(
+                        summary.get("additive_change_total"), "0"
+                    ),
+                    "Deductive Change Total": _safe_text(
+                        summary.get("deductive_change_total"), "0"
+                    ),
+                    "Net Change": _safe_text(summary.get("net_change_total"), "0"),
+                    "Revised Contract": _safe_text(
+                        summary.get("revised_contract_value"), "0"
+                    ),
+                    "Change-Order Status": _safe_text(
+                        summary.get("change_order_status"), "none"
+                    ),
+                }
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+        ordered_change_list = list(summary.get("ordered_change_list") or [])
+        if project_search.strip():
+            needle = project_search.strip().lower()
+            ordered_change_list = [
+                item
+                for item in ordered_change_list
+                if needle
+                in " ".join(
+                    [
+                        _safe_text(item.get("change_order_number"), ""),
+                        _safe_text(item.get("document_id"), ""),
+                        _safe_text(item.get("related_sales_order_or_return_order"), ""),
+                    ]
+                ).lower()
+            ]
+
+        if not ordered_change_list:
+            st.caption(
+                "No additive or deductive change orders are recorded for this project yet."
+            )
+            return
+        st.dataframe(ordered_change_list, width="stretch", hide_index=True)
+        return
+
     if secondary == "overview":
         recent = service.list_documents(include_archived=True)[:30]
         if not recent:
@@ -13342,10 +13501,70 @@ def _render_transactions_workspace_page(
                 "Source Invoice",
                 key=f"{prefix}_source_invoice_id",
             )
+
+            change_cols = st.columns(4)
+            mark_change_order = change_cols[0].checkbox(
+                "Mark as Change Order",
+                key=f"{prefix}_mark_change_order",
+                value=False,
+            )
+            preview_payload: dict[str, Any] = {}
+            if mark_change_order and (project_id or "").strip():
+                try:
+                    preview_payload = service.preview_next_change_order_number(
+                        tenant_id="local",
+                        project_id=project_id,
+                    )
+                    change_cols[1].text_input(
+                        "Next Number Preview",
+                        value=_safe_text(
+                            preview_payload.get("change_order_number"), "CO #1"
+                        ),
+                        disabled=True,
+                        key=f"{prefix}_co_preview",
+                    )
+                except Exception as exc:
+                    change_cols[1].text_input(
+                        "Next Number Preview",
+                        value=f"Unavailable: {exc}",
+                        disabled=True,
+                        key=f"{prefix}_co_preview",
+                    )
+            change_reason = change_cols[2].text_input(
+                "Change Reason",
+                key=f"{prefix}_change_reason",
+            )
+            base_bid_reference = change_cols[3].text_input(
+                "Base Bid Reference",
+                key=f"{prefix}_base_bid_reference",
+            )
+
+            approval_cols = st.columns(4)
+            requested_by = approval_cols[0].text_input(
+                "Requested By",
+                key=f"{prefix}_requested_by",
+            )
+            approved_by = approval_cols[1].text_input(
+                "Approved By",
+                key=f"{prefix}_approved_by",
+            )
+            approval_date = approval_cols[2].text_input(
+                "Approval Date",
+                key=f"{prefix}_approval_date",
+            )
+            effective_date = approval_cols[3].text_input(
+                "Effective Date",
+                key=f"{prefix}_effective_date",
+            )
+
             if st.button(
                 "Create Return Order", key=f"{prefix}_create", width="stretch"
             ):
                 try:
+                    if mark_change_order and not (project_id or "").strip():
+                        raise ValueError(
+                            "Project ID is required when marking a change order"
+                        )
                     created = service.create_return_order(
                         tenant_id="local",
                         organization_id="atlas",
@@ -13358,6 +13577,32 @@ def _render_transactions_workspace_page(
                         return_type=return_type,
                         requested_date=requested_date or None,
                     )
+                    if mark_change_order:
+                        service.configure_change_order_tracking(
+                            document_id=created.document_id,
+                            is_change_order=True,
+                            base_bid_reference=base_bid_reference or None,
+                            change_reason=change_reason or None,
+                            requested_by=requested_by or None,
+                            approved_by=approved_by or None,
+                            approval_date=approval_date or None,
+                            effective_date=effective_date or None,
+                            source_document=(
+                                source_sales_order_id
+                                or source_invoice_id
+                                or created.source_document_id
+                            ),
+                            related_documents=[
+                                item
+                                for item in [source_sales_order_id, source_invoice_id]
+                                if item
+                            ],
+                            change_order_sequence=(
+                                int(preview_payload["change_order_sequence"])
+                                if preview_payload.get("change_order_sequence")
+                                else None
+                            ),
+                        )
                     st.session_state["atlas_transactions_selected_document_id"] = (
                         created.document_id
                     )
@@ -13490,24 +13735,134 @@ def _render_transactions_workspace_page(
             vendor_id = create_cols[3].text_input(
                 "Vendor ID", key=f"{prefix}_vendor_id"
             )
+            mark_change_order = False
+            sales_preview_payload: dict[str, Any] = {}
+            change_reason = ""
+            base_bid_reference = ""
+            requested_by = ""
+            approved_by = ""
+            approval_date = ""
+            effective_date = ""
+            source_document = ""
+            related_documents_text = ""
+            if document_type == CommercialDocumentType.SALES_ORDER:
+                change_cols = st.columns(4)
+                mark_change_order = change_cols[0].checkbox(
+                    "Mark as Change Order",
+                    key=f"{prefix}_mark_change_order",
+                    value=False,
+                )
+                if mark_change_order and (project_id or "").strip():
+                    try:
+                        sales_preview_payload = (
+                            service.preview_next_change_order_number(
+                                tenant_id="local",
+                                project_id=project_id,
+                            )
+                        )
+                        change_cols[1].text_input(
+                            "Next Number Preview",
+                            value=_safe_text(
+                                sales_preview_payload.get("change_order_number"),
+                                "CO #1",
+                            ),
+                            disabled=True,
+                            key=f"{prefix}_co_preview",
+                        )
+                    except Exception as exc:
+                        change_cols[1].text_input(
+                            "Next Number Preview",
+                            value=f"Unavailable: {exc}",
+                            disabled=True,
+                            key=f"{prefix}_co_preview",
+                        )
+                change_reason = change_cols[2].text_input(
+                    "Change Reason",
+                    key=f"{prefix}_change_reason",
+                )
+                base_bid_reference = change_cols[3].text_input(
+                    "Base Bid Reference",
+                    key=f"{prefix}_base_bid_reference",
+                )
+
+                approval_cols = st.columns(4)
+                requested_by = approval_cols[0].text_input(
+                    "Requested By",
+                    key=f"{prefix}_requested_by",
+                )
+                approved_by = approval_cols[1].text_input(
+                    "Approved By",
+                    key=f"{prefix}_approved_by",
+                )
+                approval_date = approval_cols[2].text_input(
+                    "Approval Date",
+                    key=f"{prefix}_approval_date",
+                )
+                effective_date = approval_cols[3].text_input(
+                    "Effective Date",
+                    key=f"{prefix}_effective_date",
+                )
+
+                source_cols = st.columns(2)
+                source_document = source_cols[0].text_input(
+                    "Source Document",
+                    key=f"{prefix}_source_document",
+                )
+                related_documents_text = source_cols[1].text_input(
+                    "Related Documents (comma separated)",
+                    key=f"{prefix}_related_documents",
+                )
             if st.button("Create Draft", key=f"{prefix}_create", width="stretch"):
-                created = service.create_draft(
-                    tenant_id="local",
-                    organization_id="atlas",
-                    document_type=document_type,
-                    project_id=project_id,
-                    project_code=project_code,
-                    customer_id=customer_id,
-                    vendor_id=vendor_id,
-                )
-                st.session_state["atlas_transactions_selected_document_id"] = (
-                    created.document_id
-                )
-                _save_transactions_workspace_state(st, service)
-                st.success(
-                    f"Draft created: {_safe_text(created.document_number, created.document_id)}"
-                )
-                st.rerun()
+                try:
+                    if mark_change_order and not (project_id or "").strip():
+                        raise ValueError(
+                            "Project ID is required when marking a change order"
+                        )
+                    created = service.create_draft(
+                        tenant_id="local",
+                        organization_id="atlas",
+                        document_type=document_type,
+                        project_id=project_id,
+                        project_code=project_code,
+                        customer_id=customer_id,
+                        vendor_id=vendor_id,
+                    )
+                    if (
+                        mark_change_order
+                        and document_type == CommercialDocumentType.SALES_ORDER
+                    ):
+                        related_documents = [
+                            item.strip()
+                            for item in related_documents_text.split(",")
+                            if item.strip()
+                        ]
+                        service.configure_change_order_tracking(
+                            document_id=created.document_id,
+                            is_change_order=True,
+                            base_bid_reference=base_bid_reference or None,
+                            change_reason=change_reason or None,
+                            requested_by=requested_by or None,
+                            approved_by=approved_by or None,
+                            approval_date=approval_date or None,
+                            effective_date=effective_date or None,
+                            source_document=source_document or None,
+                            related_documents=related_documents,
+                            change_order_sequence=(
+                                int(sales_preview_payload["change_order_sequence"])
+                                if sales_preview_payload.get("change_order_sequence")
+                                else None
+                            ),
+                        )
+                    st.session_state["atlas_transactions_selected_document_id"] = (
+                        created.document_id
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.success(
+                        f"Draft created: {_safe_text(created.document_number, created.document_id)}"
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create draft: {exc}")
 
     if not rows:
         _render_guided_empty_state(
@@ -13904,6 +14259,136 @@ def _render_transactions_workspace_page(
                 st.rerun()
             except Exception as exc:
                 st.error(f"Unable to update draft: {exc}")
+
+        if selected_document.document_type in {
+            CommercialDocumentType.SALES_ORDER,
+            CommercialDocumentType.RETURN_ORDER,
+        }:
+            metadata = dict(selected_document.document_metadata or {})
+            change_cols = st.columns(4)
+            mark_change_order = change_cols[0].checkbox(
+                "Mark as Change Order",
+                value=bool(metadata.get("is_change_order", False)),
+                key=f"{prefix}_edit_mark_change_order",
+            )
+            if mark_change_order and _safe_text(next_project_id, ""):
+                try:
+                    edit_preview_payload = service.preview_next_change_order_number(
+                        tenant_id=selected_document.tenant_id,
+                        project_id=next_project_id,
+                    )
+                    change_cols[1].text_input(
+                        "Next Number Preview",
+                        value=_safe_text(
+                            edit_preview_payload.get("change_order_number"), "CO #1"
+                        ),
+                        disabled=True,
+                        key=f"{prefix}_edit_co_preview",
+                    )
+                except Exception as exc:
+                    change_cols[1].text_input(
+                        "Next Number Preview",
+                        value=f"Unavailable: {exc}",
+                        disabled=True,
+                        key=f"{prefix}_edit_co_preview",
+                    )
+            else:
+                change_cols[1].text_input(
+                    "Direction",
+                    value=(
+                        "additive"
+                        if selected_document.document_type
+                        == CommercialDocumentType.SALES_ORDER
+                        else "deductive"
+                    ),
+                    disabled=True,
+                    key=f"{prefix}_edit_co_direction",
+                )
+            change_reason = change_cols[2].text_input(
+                "Change Reason",
+                value=_safe_text(metadata.get("change_reason"), ""),
+                key=f"{prefix}_edit_change_reason",
+            )
+            base_bid_reference = change_cols[3].text_input(
+                "Base Bid Reference",
+                value=_safe_text(metadata.get("base_bid_reference"), ""),
+                key=f"{prefix}_edit_base_bid_reference",
+            )
+
+            approval_cols = st.columns(4)
+            requested_by = approval_cols[0].text_input(
+                "Requested By",
+                value=_safe_text(metadata.get("requested_by"), ""),
+                key=f"{prefix}_edit_requested_by",
+            )
+            approved_by = approval_cols[1].text_input(
+                "Approved By",
+                value=_safe_text(metadata.get("approved_by"), ""),
+                key=f"{prefix}_edit_approved_by",
+            )
+            approval_date = approval_cols[2].text_input(
+                "Approval Date",
+                value=_safe_text(metadata.get("approval_date"), ""),
+                key=f"{prefix}_edit_approval_date",
+            )
+            effective_date = approval_cols[3].text_input(
+                "Effective Date",
+                value=_safe_text(metadata.get("effective_date"), ""),
+                key=f"{prefix}_edit_effective_date",
+            )
+
+            relation_cols = st.columns(2)
+            source_document = relation_cols[0].text_input(
+                "Source Document",
+                value=_safe_text(metadata.get("source_document"), ""),
+                key=f"{prefix}_edit_source_document",
+            )
+            related_documents_value = relation_cols[1].text_input(
+                "Related Documents (comma separated)",
+                value=", ".join(
+                    [
+                        _safe_text(item, "")
+                        for item in list(metadata.get("related_documents") or [])
+                        if _safe_text(item, "")
+                    ]
+                ),
+                key=f"{prefix}_edit_related_documents",
+            )
+
+            if st.button(
+                "Apply Change Order Tracking",
+                key=f"{prefix}_apply_change_order_tracking",
+                width="stretch",
+            ):
+                try:
+                    service.update_draft_metadata(
+                        document_id=selected_document.document_id,
+                        project_id=next_project_id,
+                        project_code=next_project_code,
+                        customer_id=next_customer_id,
+                        vendor_id=next_vendor_id,
+                    )
+                    service.configure_change_order_tracking(
+                        document_id=selected_document.document_id,
+                        is_change_order=bool(mark_change_order),
+                        base_bid_reference=base_bid_reference or None,
+                        change_reason=change_reason or None,
+                        requested_by=requested_by or None,
+                        approved_by=approved_by or None,
+                        approval_date=approval_date or None,
+                        effective_date=effective_date or None,
+                        source_document=source_document or None,
+                        related_documents=[
+                            item.strip()
+                            for item in related_documents_value.split(",")
+                            if item.strip()
+                        ],
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.success("Change-order tracking updated.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to apply change-order tracking: {exc}")
 
     if (
         tertiary in {"internal_view", "customer_view"}

@@ -102,6 +102,37 @@ Deferred in P-05:
 - external delivery transport execution
 - e-signature and approval workflow expansion
 
+## T-09 Implementation Status
+
+Sprint T-09 implements project-scoped change-order tracking using existing Sales Orders and Return Orders instead of a separate Change Order document object.
+
+Implemented in T-09:
+- additive change orders are tracked on Sales Orders (`is_change_order=true`, direction `additive`)
+- deductive change orders are tracked on Return Orders (`is_change_order=true`, direction `deductive`)
+- shared change-order metadata contract on Sales Orders and Return Orders:
+	- `is_change_order`
+	- `change_order_number`
+	- `change_order_sequence`
+	- `change_order_direction`
+	- `base_bid_reference`
+	- `project_id`
+	- `project_code`
+	- `change_reason`
+	- `requested_by`
+	- `approved_by`
+	- `approval_date`
+	- `effective_date`
+	- `source_document`
+	- `related_documents`
+- project-scoped authoritative sequence behavior for `CO #n` numbering with non-consuming preview and consuming allocation
+- no change-order sequence reuse within a project, including archived documents
+- project commercial summary contract for base-bid value, additive/deductive totals, net change, revised contract value, ordered change list, and change-order status
+
+Out of scope in T-09:
+- standalone Change Order document-type workflows
+- automatic invoicing or live QuickBooks sync
+- inventory workflows
+
 Related documents:
 - [TRANSACTIONS_ARCHITECTURE.md](TRANSACTIONS_ARCHITECTURE.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)

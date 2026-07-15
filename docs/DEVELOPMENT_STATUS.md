@@ -68,6 +68,7 @@ Sprint P-02 introduces immutable audit contracts and service integration with co
 Sprint P-03 implements the Deterministic Background Job Framework with storage-agnostic contracts, local repository persistence, deterministic local execution, representative import/export workflow integration, Processing UI visibility, and permission-gated retry/cancel controls.
 Sprint P-04 implements the Unified Attachment Framework with tenant-scoped attachment contracts/services, repository and local adapter support, Object Workspace Documents integration, compatibility registration of legacy project documents, and deterministic attachment audit/hook emission.
 Sprint P-05 implements the Document Generation and Template Engine with deterministic template contracts, template precedence resolution, revision template snapshots, settings template versioning/default behavior, and generation-backed transactions export artifact metadata.
+Sprint T-09 implements project-scoped change-order tracking convention on Sales Orders (additive) and Return Orders (deductive), including shared change-order metadata, project-level `CO #n` sequence allocation/preview guarantees, base-bid assignment, and project commercial summary rollups without creating a standalone Change Order document object.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 
 X-01 through X-13 are closed.
@@ -90,7 +91,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1351 tests)
+- pytest: full suite passing (1363 tests)
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces

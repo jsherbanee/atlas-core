@@ -100,6 +100,23 @@ Still deferred:
 - non-estimate transaction-family deep operational workflows
 - external sync transport execution and financial posting behavior
 
+## T-09 Implementation Note
+
+Sprint T-09 introduces project-scoped change-order tracking without introducing a standalone Change Order transaction object.
+
+Implemented in T-09:
+- additive changes are authored as Sales Orders and tracked with shared change-order metadata
+- deductive changes are authored as Return Orders and tracked with shared change-order metadata
+- change-order numbering is project-scoped (`CO #n`) with non-consuming preview and consuming allocation
+- duplicate change-order sequence allocation is blocked within a project
+- archived change-order numbers remain consumed and are not reused
+- project commercial summary behavior is available for base bid, additive total, deductive total, net change, revised contract value, and ordered change list
+
+Boundary preserved in T-09:
+- no separate Change Order document family workflow
+- no automatic invoicing behavior
+- no live QuickBooks transport behavior
+
 It must support documents that are:
 - linked to a Project
 - linked to a Customer or Vendor
@@ -121,6 +138,10 @@ Initial transaction families:
 - Customer Invoices
 - Credit Memos
 - Subcontracts
+
+Change-order tracking convention:
+- Change Orders are represented operationally by Sales Orders (additive) and Return Orders (deductive)
+- `change_orders` workspace views are aggregation/reporting views over those document families, not a separate authoritative document object
 
 Each family should be modeled as a first-class business object rather than a one-off page artifact.
 

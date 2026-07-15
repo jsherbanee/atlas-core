@@ -96,6 +96,7 @@ class TransactionsWorkspaceService:
         serialized_numbering_policies: list[dict[str, Any]] | None = None,
         serialized_terms_blocks: list[dict[str, Any]] | None = None,
         serialized_document_templates: list[dict[str, Any]] | None = None,
+        serialized_project_commercial_state: dict[str, Any] | None = None,
         commercial_service: CommercialDocumentService | None = None,
     ) -> None:
         self._commercial_service = commercial_service or CommercialDocumentService(
@@ -117,6 +118,13 @@ class TransactionsWorkspaceService:
         self._document_generation_service = DocumentGenerationService(
             serialized_templates=serialized_document_templates
         )
+        self._project_commercial_state: dict[str, dict[str, Any]] = {
+            str(project_id): dict(payload)
+            for project_id, payload in dict(
+                serialized_project_commercial_state or {}
+            ).items()
+            if str(project_id).strip() and isinstance(payload, dict)
+        }
 
     def _document_family(self, document_type: CommercialDocumentType) -> str:
         return document_type.value
@@ -293,6 +301,22 @@ class TransactionsWorkspaceService:
                         document.project_code or "",
                         document.customer_id or "",
                         document.vendor_id or "",
+                        _safe_text(
+                            (document.document_metadata or {}).get(
+                                "change_order_number"
+                            ),
+                            "",
+                        ),
+                        _safe_text(
+                            (document.document_metadata or {}).get("change_reason"),
+                            "",
+                        ),
+                        _safe_text(
+                            (document.document_metadata or {}).get(
+                                "base_bid_reference"
+                            ),
+                            "",
+                        ),
                     ]
                 ).lower()
                 if normalized_query not in corpus:
@@ -426,6 +450,358 @@ class TransactionsWorkspaceService:
                 related_document_id=source_invoice.document_id,
             )
         return document
+
+    def preview_next_change_order_number(
+        self,
+        *,
+        tenant_id: str,
+        project_id: str,
+    ) -> dict[str, Any]:
+        normalized_project_id = _safe_text(project_id, "")
+        if not normalized_project_id:
+            raise ValueError("project_id is required for change-order preview")
+        next_sequence = self._next_change_order_sequence(
+            tenant_id=tenant_id,
+            project_id=normalized_project_id,
+        )
+        return {
+            "project_id": normalized_project_id,
+            "change_order_sequence": next_sequence,
+            "change_order_number": self._format_change_order_number(next_sequence),
+        }
+
+    def configure_change_order_tracking(
+        self,
+        *,
+        document_id: str,
+        is_change_order: bool,
+        base_bid_reference: str | None = None,
+        change_reason: str | None = None,
+        requested_by: str | None = None,
+        approved_by: str | None = None,
+        approval_date: str | None = None,
+        effective_date: str | None = None,
+        source_document: str | None = None,
+        related_documents: list[str] | None = None,
+        change_order_sequence: int | None = None,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.document_type not in {
+            CommercialDocumentType.SALES_ORDER,
+            CommercialDocumentType.RETURN_ORDER,
+        }:
+            raise ValueError(
+                "change-order tracking is only supported on sales and return orders"
+            )
+        if not document.is_mutable:
+            raise ValueError("only mutable drafts/review documents can be edited")
+
+        if not is_change_order:
+            self._commercial_service.set_document_metadata(
+                document,
+                metadata={
+                    "is_change_order": False,
+                    "change_order_number": None,
+                    "change_order_sequence": None,
+                    "change_order_direction": None,
+                    "base_bid_reference": None,
+                    "change_reason": None,
+                    "requested_by": None,
+                    "approved_by": None,
+                    "approval_date": None,
+                    "effective_date": None,
+                    "source_document": None,
+                    "related_documents": [],
+                },
+            )
+            return document
+
+        normalized_project_id = _safe_text(document.project_id, "")
+        if not normalized_project_id:
+            raise ValueError("project_id is required when marking a change order")
+        direction = self._change_order_direction(document.document_type)
+
+        if change_order_sequence is None:
+            existing_sequence = (document.document_metadata or {}).get(
+                "change_order_sequence"
+            )
+            if existing_sequence is not None:
+                sequence = int(existing_sequence)
+            else:
+                sequence = self._next_change_order_sequence(
+                    tenant_id=document.tenant_id,
+                    project_id=normalized_project_id,
+                )
+        else:
+            sequence = int(change_order_sequence)
+            if sequence <= 0:
+                raise ValueError("change_order_sequence must be greater than zero")
+
+        self._assert_change_order_sequence_available(
+            tenant_id=document.tenant_id,
+            project_id=normalized_project_id,
+            sequence=sequence,
+            excluding_document_id=document.document_id,
+        )
+        number = self._format_change_order_number(sequence)
+        related = [_safe_text(item, "") for item in list(related_documents or [])]
+        related = [item for item in related if item]
+
+        self._commercial_service.set_document_metadata(
+            document,
+            metadata={
+                "is_change_order": True,
+                "change_order_number": number,
+                "change_order_sequence": sequence,
+                "change_order_direction": direction,
+                "base_bid_reference": _safe_text(base_bid_reference, "") or None,
+                "project_id": normalized_project_id,
+                "project_code": _safe_text(document.project_code, "") or None,
+                "change_reason": _safe_text(change_reason, "") or None,
+                "requested_by": _safe_text(requested_by, "") or None,
+                "approved_by": _safe_text(approved_by, "") or None,
+                "approval_date": _safe_text(approval_date, "") or None,
+                "effective_date": _safe_text(effective_date, "") or None,
+                "source_document": _safe_text(source_document, "")
+                or _safe_text(document.source_document_id, "")
+                or None,
+                "related_documents": related,
+            },
+        )
+        source_document_id = _safe_text(source_document, "")
+        if source_document_id:
+            self._commercial_service.add_relationship(
+                document,
+                relationship_type="change_order_source_document",
+                related_document_id=source_document_id,
+            )
+        for related_document_id in related:
+            self._commercial_service.add_relationship(
+                document,
+                relationship_type="change_order_related_document",
+                related_document_id=related_document_id,
+            )
+        self._commercial_service.add_diagnostic(
+            document,
+            CommercialDocumentDiagnostic(
+                code="change_order_configured",
+                message="Document configured for project-scoped change-order tracking",
+                details={
+                    "change_order_number": number,
+                    "change_order_sequence": sequence,
+                    "change_order_direction": direction,
+                    "project_id": normalized_project_id,
+                },
+            ),
+        )
+        return document
+
+    def set_project_base_bid(
+        self,
+        *,
+        tenant_id: str,
+        project_id: str,
+        project_code: str | None,
+        reference_type: str,
+        reference_document_id: str | None = None,
+        imported_contract_amount: Decimal | None = None,
+        actor: str,
+    ) -> dict[str, Any]:
+        normalized_project_id = _safe_text(project_id, "")
+        normalized_reference_type = _safe_text(reference_type, "").lower()
+        if not normalized_project_id:
+            raise ValueError("project_id is required")
+        if normalized_reference_type not in {
+            "accepted_estimate",
+            "originating_sales_order",
+            "imported_contract_amount",
+        }:
+            raise ValueError("unsupported base bid reference_type")
+
+        base_bid_value = Decimal("0")
+        if normalized_reference_type in {
+            "accepted_estimate",
+            "originating_sales_order",
+        }:
+            source_id = _safe_text(reference_document_id, "")
+            if not source_id:
+                raise ValueError(
+                    "reference_document_id is required for document-linked base bid"
+                )
+            source_document = self._required_document(source_id)
+            if source_document.tenant_id != tenant_id:
+                raise ValueError("cross-tenant base bid assignment is not allowed")
+            expected_type = (
+                CommercialDocumentType.ESTIMATE
+                if normalized_reference_type == "accepted_estimate"
+                else CommercialDocumentType.SALES_ORDER
+            )
+            if source_document.document_type != expected_type:
+                raise ValueError(
+                    "base bid source document type does not match reference_type"
+                )
+            if (
+                source_document.document_type == CommercialDocumentType.ESTIMATE
+                and source_document.approval_state != ApprovalState.APPROVED
+                and source_document.lifecycle_state
+                not in {
+                    CommercialDocumentLifecycleState.APPROVED,
+                    CommercialDocumentLifecycleState.ISSUED,
+                }
+            ):
+                raise ValueError(
+                    "accepted estimate base bid requires approved/issued estimate"
+                )
+            base_bid_value = source_document.totals.grand_total
+        else:
+            if imported_contract_amount is None:
+                raise ValueError(
+                    "imported_contract_amount is required for imported base bid"
+                )
+            base_bid_value = Decimal(str(imported_contract_amount))
+            if base_bid_value < Decimal("0"):
+                raise ValueError("imported_contract_amount cannot be negative")
+
+        self._project_commercial_state[normalized_project_id] = {
+            "tenant_id": _safe_text(tenant_id, ""),
+            "project_id": normalized_project_id,
+            "project_code": _safe_text(project_code, "") or None,
+            "reference_type": normalized_reference_type,
+            "reference_document_id": _safe_text(reference_document_id, "") or None,
+            "base_bid_value": str(base_bid_value),
+            "assigned_by": _safe_text(actor, "") or "atlas-ui",
+            "assigned_at": _utc_now(),
+        }
+        return dict(self._project_commercial_state[normalized_project_id])
+
+    def project_commercial_summary(
+        self,
+        *,
+        tenant_id: str,
+        project_id: str,
+    ) -> dict[str, Any]:
+        normalized_project_id = _safe_text(project_id, "")
+        if not normalized_project_id:
+            raise ValueError("project_id is required")
+        project_documents = [
+            document
+            for document in self._documents
+            if document.tenant_id == tenant_id
+            and _safe_text(document.project_id, "") == normalized_project_id
+            and document.document_type
+            in {
+                CommercialDocumentType.SALES_ORDER,
+                CommercialDocumentType.RETURN_ORDER,
+            }
+        ]
+        change_orders = [
+            document
+            for document in project_documents
+            if bool((document.document_metadata or {}).get("is_change_order", False))
+        ]
+        change_orders.sort(
+            key=lambda document: (
+                int(
+                    (document.document_metadata or {}).get("change_order_sequence") or 0
+                ),
+                document.updated_at,
+            )
+        )
+
+        additive_total = Decimal("0")
+        deductive_total = Decimal("0")
+        ordered_change_list: list[dict[str, Any]] = []
+        for document in change_orders:
+            metadata = dict(document.document_metadata or {})
+            direction = _safe_text(metadata.get("change_order_direction"), "")
+            amount = Decimal(str(document.totals.grand_total or Decimal("0")))
+            if direction == "additive":
+                additive_total += amount
+            elif direction == "deductive":
+                deductive_total += amount
+            ordered_change_list.append(
+                {
+                    "document_id": document.document_id,
+                    "document_type": document.document_type.value,
+                    "change_order_number": _safe_text(
+                        metadata.get("change_order_number"), ""
+                    ),
+                    "change_order_sequence": int(
+                        metadata.get("change_order_sequence") or 0
+                    ),
+                    "change_order_direction": direction,
+                    "amount": str(amount),
+                    "approval_state": document.approval_state.value,
+                    "lifecycle_state": document.lifecycle_state.value,
+                    "related_sales_order_or_return_order": document.document_number
+                    or document.document_id,
+                    "invoice_status": _safe_text(
+                        metadata.get("quickbooks_payment_status")
+                        or metadata.get("payment_status"),
+                        "",
+                    ),
+                }
+            )
+
+        base_bid_payload = dict(
+            self._project_commercial_state.get(normalized_project_id) or {}
+        )
+        if (
+            base_bid_payload
+            and _safe_text(base_bid_payload.get("tenant_id"), "") != tenant_id
+        ):
+            base_bid_payload = {}
+        base_bid_value = Decimal(str(base_bid_payload.get("base_bid_value") or "0"))
+        net_change_total = additive_total - deductive_total
+        revised_contract_value = base_bid_value + net_change_total
+
+        status = "none"
+        if ordered_change_list:
+            if any(
+                item["approval_state"] == ApprovalState.PENDING.value
+                for item in ordered_change_list
+            ):
+                status = "pending_approval"
+            elif all(
+                item["approval_state"] == ApprovalState.APPROVED.value
+                for item in ordered_change_list
+            ):
+                status = "approved"
+            else:
+                status = "mixed"
+
+        return {
+            "project_id": normalized_project_id,
+            "project_code": _safe_text(
+                base_bid_payload.get("project_code"),
+                _safe_text(
+                    next(
+                        (
+                            document.project_code
+                            for document in project_documents
+                            if _safe_text(document.project_code, "")
+                        ),
+                        "",
+                    ),
+                    "",
+                ),
+            )
+            or None,
+            "base_bid_reference": base_bid_payload,
+            "base_bid_value": str(base_bid_value),
+            "additive_change_total": str(additive_total),
+            "deductive_change_total": str(deductive_total),
+            "net_change_total": str(net_change_total),
+            "revised_contract_value": str(revised_contract_value),
+            "ordered_change_list": ordered_change_list,
+            "change_order_status": status,
+        }
+
+    def project_commercial_state_payload(self) -> dict[str, dict[str, Any]]:
+        return {
+            project_id: dict(payload)
+            for project_id, payload in self._project_commercial_state.items()
+        }
 
     def add_return_order_line(
         self,
@@ -1171,6 +1547,14 @@ class TransactionsWorkspaceService:
         duplicate.numbering_policy_snapshot = deepcopy(source.numbering_policy_snapshot)
         duplicate.attachments = deepcopy(list(source.attachments or []))
         duplicate.document_metadata = deepcopy(dict(source.document_metadata or {}))
+        if bool((duplicate.document_metadata or {}).get("is_change_order", False)):
+            duplicate.document_metadata.update(
+                {
+                    "is_change_order": False,
+                    "change_order_number": None,
+                    "change_order_sequence": None,
+                }
+            )
         duplicate.source_sales_order_id = source.source_sales_order_id
         duplicate.source_invoice_id = source.source_invoice_id
 
@@ -1913,6 +2297,60 @@ class TransactionsWorkspaceService:
 
     def numbering_policy_payload(self) -> list[dict[str, Any]]:
         return self._commercial_service.numbering_service.to_payload()
+
+    def _change_order_direction(self, document_type: CommercialDocumentType) -> str:
+        if document_type == CommercialDocumentType.SALES_ORDER:
+            return "additive"
+        if document_type == CommercialDocumentType.RETURN_ORDER:
+            return "deductive"
+        raise ValueError("unsupported document_type for change-order direction")
+
+    def _format_change_order_number(self, sequence: int) -> str:
+        return f"CO #{sequence}"
+
+    def _next_change_order_sequence(
+        self,
+        *,
+        tenant_id: str,
+        project_id: str,
+    ) -> int:
+        highest_sequence = 0
+        for document in self._documents:
+            if document.tenant_id != tenant_id:
+                continue
+            if _safe_text(document.project_id, "") != project_id:
+                continue
+            metadata = dict(document.document_metadata or {})
+            if not bool(metadata.get("is_change_order", False)):
+                continue
+            sequence = int(metadata.get("change_order_sequence") or 0)
+            if sequence > highest_sequence:
+                highest_sequence = sequence
+        return highest_sequence + 1
+
+    def _assert_change_order_sequence_available(
+        self,
+        *,
+        tenant_id: str,
+        project_id: str,
+        sequence: int,
+        excluding_document_id: str,
+    ) -> None:
+        for document in self._documents:
+            if document.document_id == excluding_document_id:
+                continue
+            if document.tenant_id != tenant_id:
+                continue
+            if _safe_text(document.project_id, "") != project_id:
+                continue
+            metadata = dict(document.document_metadata or {})
+            if not bool(metadata.get("is_change_order", False)):
+                continue
+            existing_sequence = int(metadata.get("change_order_sequence") or 0)
+            if existing_sequence == sequence:
+                raise ValueError(
+                    "change-order sequence is already allocated for this project"
+                )
 
     def _required_document(self, document_id: str) -> CommercialDocument:
         document = self.get_document(document_id)

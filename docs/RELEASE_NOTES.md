@@ -21,6 +21,23 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Epic T Sprint T-09 Change Order Tracking Convention)
+
+### Improved
+
+- Project change-order tracking now uses existing Sales Orders (additive) and Return Orders (deductive) instead of a standalone Change Order object.
+- Sales Order and Return Order workflows now support shared change-order metadata (`is_change_order`, `CO #n`, direction, reason, approval fields, base-bid reference, source/related documents).
+- Change-order numbering is now project-scoped with non-consuming preview and consuming allocation semantics.
+- Duplicate change-order sequence allocation is blocked within a project and archived numbers remain consumed.
+- Transactions now includes a project commercial summary view with base bid, additive total, deductive total, net change, revised contract value, and ordered change-list reporting.
+
+### Scope Notes
+
+- no standalone Change Order document workflow
+- no automatic invoicing
+- no live QuickBooks sync
+- no inventory workflow implementation
+
 ## Unreleased (Sprint P-05 Document Generation and Template Engine)
 
 ### Improved

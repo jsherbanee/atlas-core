@@ -44,6 +44,8 @@ Sprint T-03 reuses this same deterministic estimate engine inside Transactions f
 
 Sprint T-05 extends Transactions estimates with presentation controls for Internal Estimate and Customer Estimate views over the same revision identity, preserving one estimate source of truth.
 
+Sprint T-09 adds Base Bid linkage behavior for project commercial tracking, allowing approved Estimate totals to be referenced as the primary Base Bid input for project change-order rollups without creating a separate Base Bid document type.
+
 ## 3.1 Estimate Presentation and Terms (T-05)
 
 Estimate presentation behavior:
