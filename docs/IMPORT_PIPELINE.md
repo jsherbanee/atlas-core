@@ -110,6 +110,21 @@ Reprocessing should be deterministic and should not overwrite historical facts w
 ## Future Direction
 The desired architecture is a unified ingestion framework with content-type specific adapters for documents, price sheets, correspondence, and service artifacts.
 
+## P-04 Attachment Framework Alignment
+
+Sprint P-04 introduces a shared attachment domain and orchestration layer that aligns with import-pipeline requirements for provenance, duplicate detection, and versioned source handling.
+
+Current P-04 alignment:
+- deterministic hash and size duplicate detection
+- immutable attachment version append model
+- tenant-scoped attachment records and links
+- compatibility-safe registration of existing project document files into the unified attachment model
+
+Deferred from P-04:
+- quarantine pipeline implementation
+- asynchronous worker execution
+- malware scanning engine integration
+
 ## Current P-03 Execution Note
 Sprint P-03 introduces deterministic background-job orchestration for representative import/export workflows.
 

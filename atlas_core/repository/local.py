@@ -9,10 +9,12 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+from typing import Any
 import zipfile
 
 from atlas_core import __version__
 from atlas_core.repository.contracts import (
+    AttachmentRepository,
     DocumentRepository,
     HistoryRepository,
     JobRepository,
@@ -34,6 +36,10 @@ _WORKSPACE_FILE = "workspace.json"
 _MANIFEST_FILE = "project_manifest.json"
 _HISTORY_FILE = "history/events.jsonl"
 _JOBS_FILE = "jobs/jobs.jsonl"
+_ATTACHMENTS_ROOT = ".atlas_attachments"
+_ATTACHMENTS_FILE = "attachments.jsonl"
+_ATTACHMENT_LINKS_FILE = "links.jsonl"
+_ATTACHMENT_ACTIVITY_FILE = "activity.jsonl"
 _BID_SEQUENCE_FILE = ".atlas_bid_id_sequence.json"
 _SCHEMA_VERSION = "1.0"
 _STORAGE_VERSION = "1.0"
@@ -948,6 +954,367 @@ class LocalJobRepository(JobRepository):
             reverse=True,
         )
         return rows[:limit]
+
+
+class LocalAttachmentRepository(AttachmentRepository):
+    """Local tenant-scoped attachment repository with separate metadata and blob storage."""
+
+    def __init__(self, project_repository: ProjectRepository) -> None:
+        self.project_repository = project_repository
+        root = getattr(project_repository, "root", Path("AtlasProjects"))
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def save_attachment(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        attachment_payload: JsonDict,
+    ) -> None:
+        rows = self.list_attachments(
+            tenant_id,
+            organization_id,
+            include_archived=True,
+            limit=20000,
+        )
+        attachment_id = self._required_text(
+            "attachment_id", attachment_payload.get("attachment_id")
+        )
+        retained = [
+            dict(item)
+            for item in rows
+            if self._safe_text(item.get("attachment_id")) != attachment_id
+        ]
+        retained.append(dict(attachment_payload))
+        retained.sort(
+            key=lambda item: (
+                self._safe_text(item.get("created_at")),
+                self._safe_text(item.get("attachment_id")),
+            )
+        )
+        self._write_jsonl(
+            self._scope_dir(tenant_id, organization_id) / _ATTACHMENTS_FILE,
+            retained,
+        )
+
+    def load_attachment(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        attachment_id: str,
+    ) -> JsonDict | None:
+        target = self._safe_text(attachment_id)
+        if not target:
+            return None
+        for item in self.list_attachments(
+            tenant_id,
+            organization_id,
+            include_archived=True,
+            limit=20000,
+        ):
+            if self._safe_text(item.get("attachment_id")) == target:
+                return dict(item)
+        return None
+
+    def list_attachments(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        include_archived: bool = True,
+        limit: int = 1000,
+    ) -> list[JsonDict]:
+        rows = self._read_jsonl(
+            self._scope_dir(tenant_id, organization_id) / _ATTACHMENTS_FILE
+        )
+        if not include_archived:
+            rows = [
+                item
+                for item in rows
+                if self._safe_text(dict(item).get("status"), "active") != "archived"
+            ]
+        rows.sort(
+            key=lambda item: (
+                self._safe_text(item.get("created_at")),
+                self._safe_text(item.get("attachment_id")),
+            ),
+            reverse=True,
+        )
+        return rows[: max(1, int(limit))]
+
+    def find_attachment_by_hash(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        file_hash: str,
+        size_bytes: int,
+    ) -> JsonDict | None:
+        target_hash = self._safe_text(file_hash).lower()
+        target_size = int(size_bytes)
+        for item in self.list_attachments(
+            tenant_id,
+            organization_id,
+            include_archived=True,
+            limit=20000,
+        ):
+            versions = list(dict(item).get("versions") or [])
+            if not versions:
+                continue
+            latest = sorted(
+                [dict(row) for row in versions if isinstance(row, dict)],
+                key=lambda row: int(row.get("version_number") or 0),
+            )[-1]
+            metadata = dict(latest.get("metadata") or {})
+            if (
+                self._safe_text(metadata.get("file_hash")).lower() == target_hash
+                and int(metadata.get("size_bytes") or 0) == target_size
+            ):
+                return dict(item)
+        return None
+
+    def write_blob(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        attachment_id: str,
+        version_id: str,
+        filename: str,
+        data: bytes,
+    ) -> str:
+        safe_name = self._safe_blob_filename(filename)
+        blob_dir = (
+            self._scope_dir(tenant_id, organization_id)
+            / "blobs"
+            / self._safe_path_segment(attachment_id)
+            / self._safe_path_segment(version_id)
+        )
+        blob_dir.mkdir(parents=True, exist_ok=True)
+        path = blob_dir / safe_name
+        with path.open("wb") as file:
+            file.write(bytes(data or b""))
+        return str(path.relative_to(self._scope_dir(tenant_id, organization_id)))
+
+    def read_blob(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        storage_reference: str,
+    ) -> bytes:
+        scope = self._scope_dir(tenant_id, organization_id)
+        reference = self._safe_text(storage_reference)
+        if not reference:
+            raise FileNotFoundError("storage_reference is required")
+        path = (scope / reference).resolve()
+        if scope.resolve() not in path.parents and path != scope.resolve():
+            raise ValueError("storage_reference is outside tenant scope")
+        if not path.exists() or not path.is_file():
+            raise FileNotFoundError("attachment blob was not found")
+        return path.read_bytes()
+
+    def save_link(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        link_payload: JsonDict,
+    ) -> None:
+        rows = self.list_links(
+            tenant_id,
+            organization_id,
+            include_inactive=True,
+            limit=50000,
+        )
+        link_id = self._required_text("link_id", link_payload.get("link_id"))
+        retained = [
+            dict(item)
+            for item in rows
+            if self._safe_text(item.get("link_id")) != link_id
+        ]
+        retained.append(dict(link_payload))
+        retained.sort(
+            key=lambda item: (
+                self._safe_text(item.get("linked_at")),
+                self._safe_text(item.get("link_id")),
+            )
+        )
+        self._write_jsonl(
+            self._scope_dir(tenant_id, organization_id) / _ATTACHMENT_LINKS_FILE,
+            retained,
+        )
+
+    def list_links(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        attachment_id: str | None = None,
+        object_type: str | None = None,
+        object_id: str | None = None,
+        include_inactive: bool = False,
+        limit: int = 5000,
+    ) -> list[JsonDict]:
+        target_attachment = self._safe_text(attachment_id)
+        target_object_type = self._safe_text(object_type)
+        target_object_id = self._safe_text(object_id)
+        rows = self._read_jsonl(
+            self._scope_dir(tenant_id, organization_id) / _ATTACHMENT_LINKS_FILE
+        )
+        filtered: list[JsonDict] = []
+        for item in rows:
+            if (
+                target_attachment
+                and self._safe_text(item.get("attachment_id")) != target_attachment
+            ):
+                continue
+            if (
+                target_object_type
+                and self._safe_text(item.get("object_type")) != target_object_type
+            ):
+                continue
+            if (
+                target_object_id
+                and self._safe_text(item.get("object_id")) != target_object_id
+            ):
+                continue
+            if not include_inactive and not bool(item.get("active", True)):
+                continue
+            filtered.append(dict(item))
+        filtered.sort(
+            key=lambda item: (
+                self._safe_text(item.get("linked_at")),
+                self._safe_text(item.get("link_id")),
+            ),
+            reverse=True,
+        )
+        return filtered[: max(1, int(limit))]
+
+    def save_activity(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        activity_payload: JsonDict,
+    ) -> None:
+        rows = self.list_activity(
+            tenant_id,
+            organization_id,
+            attachment_id=None,
+            limit=100000,
+        )
+        activity_id = self._required_text(
+            "activity_id", activity_payload.get("activity_id")
+        )
+        retained = [
+            dict(item)
+            for item in rows
+            if self._safe_text(item.get("activity_id")) != activity_id
+        ]
+        retained.append(dict(activity_payload))
+        retained.sort(
+            key=lambda item: (
+                self._safe_text(item.get("occurred_at")),
+                self._safe_text(item.get("activity_id")),
+            )
+        )
+        self._write_jsonl(
+            self._scope_dir(tenant_id, organization_id) / _ATTACHMENT_ACTIVITY_FILE,
+            retained,
+        )
+
+    def list_activity(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        attachment_id: str | None = None,
+        limit: int = 200,
+    ) -> list[JsonDict]:
+        target = self._safe_text(attachment_id)
+        rows = self._read_jsonl(
+            self._scope_dir(tenant_id, organization_id) / _ATTACHMENT_ACTIVITY_FILE
+        )
+        filtered = [
+            dict(item)
+            for item in rows
+            if (not target) or self._safe_text(item.get("attachment_id")) == target
+        ]
+        filtered.sort(
+            key=lambda item: (
+                self._safe_text(item.get("occurred_at")),
+                self._safe_text(item.get("activity_id")),
+            ),
+            reverse=True,
+        )
+        return filtered[: max(1, int(limit))]
+
+    def _scope_dir(self, tenant_id: str, organization_id: str) -> Path:
+        tenant = self._safe_path_segment(tenant_id)
+        organization = self._safe_path_segment(organization_id)
+        path = self.root / _ATTACHMENTS_ROOT / tenant / organization
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @staticmethod
+    def _safe_path_segment(value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise ValueError("path segment cannot be blank")
+        cleaned = re.sub(r"[^a-zA-Z0-9_.-]+", "_", normalized)
+        cleaned = cleaned.strip("._")
+        if not cleaned:
+            raise ValueError("path segment cannot be blank")
+        return cleaned
+
+    @staticmethod
+    def _safe_blob_filename(filename: str) -> str:
+        normalized = str(filename or "").strip()
+        if not normalized:
+            raise ValueError("filename is required")
+        if "/" in normalized or "\\" in normalized or ".." in normalized:
+            raise ValueError("unsafe filename")
+        return normalized
+
+    @staticmethod
+    def _required_text(field_name: str, value: Any) -> str:
+        normalized = LocalAttachmentRepository._safe_text(value)
+        if not normalized:
+            raise ValueError(f"{field_name} is required")
+        return normalized
+
+    @staticmethod
+    def _safe_text(value: Any, default: str = "") -> str:
+        if value is None:
+            return default
+        if not isinstance(value, str):
+            value = str(value)
+        normalized = value.strip()
+        return normalized or default
+
+    @staticmethod
+    def _read_jsonl(path: Path) -> list[JsonDict]:
+        if not path.exists() or not path.is_file():
+            return []
+        rows: list[JsonDict] = []
+        with path.open(encoding="utf-8") as file:
+            for line in file:
+                value = line.strip()
+                if not value:
+                    continue
+                try:
+                    parsed = json.loads(value)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict):
+                    rows.append(parsed)
+        return rows
+
+    @staticmethod
+    def _write_jsonl(path: Path, rows: list[JsonDict]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as file:
+            for item in rows:
+                file.write(json.dumps(dict(item), sort_keys=True) + "\n")
 
 
 def _utc_now() -> str:

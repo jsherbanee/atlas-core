@@ -8819,6 +8819,42 @@ def _authorized_object_actions(
     return actions
 
 
+def _attachment_access_decision(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    *,
+    universal_object: Any,
+    kind: str,
+    action_key: str,
+    project_id: str | None,
+) -> tuple[Any, str]:
+    transactions_state = _transactions_workspace_state(st)
+    tenant_id = _safe_text(st.session_state.get(_tenant_scope_key()), "local")
+    organization_id = _safe_text(transactions_state.get("organization_id"), "atlas")
+    principal_id = _safe_text(
+        st.session_state.get("atlas_settings_user_id"), "local-user"
+    )
+    permissions_service = _permissions_workspace_service(st)
+    scope = _permission_scope_for_object(universal_object, kind)
+    access = permissions_service.action_access(
+        tenant_id=tenant_id,
+        organization_id=organization_id,
+        principal_id=principal_id,
+        permission_hook=None,
+        action_key=action_key,
+        workspace_scope=scope,
+        project_id=project_id,
+    )
+    decision = workspace_service.manager.attachment_service.decision_from_permissions(
+        allowed=bool(access.enabled),
+        permission_key=_safe_text(access.permission_key, f"{scope}.view"),
+        reason=_safe_text(access.reason, "") or None,
+        decision_code="allowed" if bool(access.enabled) else "denied",
+        surface=str(getattr(access.decision, "surface", "")) or None,
+    )
+    return decision, _safe_text(access.reason, "")
+
+
 def _render_object_workspace_actions(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -9361,6 +9397,210 @@ def _render_universal_object_workspace_page(
 
     elif selected_view == "Documents":
         st.markdown("### Documents")
+        transactions_state = _transactions_workspace_state(st)
+        tenant_id = _safe_text(st.session_state.get(_tenant_scope_key()), "local")
+        organization_id = _safe_text(transactions_state.get("organization_id"), "atlas")
+        object_type = _safe_text(getattr(identity, "object_type", None), kind)
+        object_id = _safe_text(
+            getattr(identity, "object_id", None),
+            _object_id_for_selection(kind, data),
+        )
+        scoped_project_id = record.workspace_id if record is not None else None
+
+        attachment_rows: list[dict[str, Any]] = []
+        if object_id:
+            try:
+                attachment_rows = workspace_service.list_object_attachments(
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                    object_type=object_type,
+                    object_id=object_id,
+                    include_archived=True,
+                    limit=200,
+                )
+            except Exception as exc:
+                st.warning(f"Unable to load unified attachments: {exc}")
+
+        if attachment_rows:
+            table_rows = [
+                {
+                    "Attachment ID": _safe_text(item.get("attachment_id"), "n/a"),
+                    "Filename": _safe_text(item.get("filename"), "n/a"),
+                    "Type": _safe_text(item.get("mime_type"), "n/a"),
+                    "Status": _safe_text(item.get("status"), "active"),
+                    "Version": int(item.get("version_number", 1) or 1),
+                    "Uploaded": _safe_text(item.get("uploaded_at"), "n/a"),
+                }
+                for item in attachment_rows
+            ]
+            _render_data_table(st, table_rows[:120])
+
+            selected_label_map: dict[str, dict[str, Any]] = {}
+            labels: list[str] = []
+            for item in attachment_rows:
+                label = (
+                    f"{_safe_text(item.get('filename'), 'attachment')} "
+                    f"[{_safe_text(item.get('attachment_id'), '')[:16]}]"
+                )
+                selected_label_map[label] = dict(item)
+                labels.append(label)
+            selected_label = st.selectbox(
+                "Attachment Actions",
+                options=labels,
+                key="atlas_object_workspace_documents_attachment_selector",
+            )
+            selected_attachment = dict(selected_label_map.get(selected_label) or {})
+            selected_attachment_id = _safe_text(
+                selected_attachment.get("attachment_id"), ""
+            )
+            selected_link_id = _safe_text(selected_attachment.get("link_id"), "")
+            selected_status = _safe_text(selected_attachment.get("status"), "active")
+
+            download_payload_key = "atlas_object_workspace_attachment_download_payload"
+            action_cols = st.columns(4)
+            if action_cols[0].button(
+                "Open / Download",
+                key=f"atlas_attachment_open_{selected_attachment_id}",
+                width="stretch",
+                disabled=not bool(selected_attachment_id),
+            ):
+                decision, reason = _attachment_access_decision(
+                    st,
+                    workspace_service,
+                    universal_object=universal_object,
+                    kind=kind,
+                    action_key="view_documents",
+                    project_id=scoped_project_id,
+                )
+                if not decision.allowed:
+                    st.warning(
+                        reason or "You do not have permission to download attachments."
+                    )
+                elif selected_attachment_id:
+                    try:
+                        payload = workspace_service.read_object_attachment(
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            attachment_id=selected_attachment_id,
+                            actor_id=_safe_text(
+                                st.session_state.get("atlas_settings_user_id"),
+                                "atlas-ui",
+                            ),
+                            access_decision=decision,
+                            project_id=scoped_project_id,
+                        )
+                        st.session_state[download_payload_key] = payload
+                        st.success("Attachment is ready for download.")
+                    except Exception as exc:
+                        st.error(f"Unable to open attachment: {exc}")
+
+            archive_label = "Restore" if selected_status == "archived" else "Archive"
+            if action_cols[1].button(
+                archive_label,
+                key=f"atlas_attachment_archive_{selected_attachment_id}",
+                width="stretch",
+                disabled=not bool(selected_attachment_id),
+            ):
+                decision, reason = _attachment_access_decision(
+                    st,
+                    workspace_service,
+                    universal_object=universal_object,
+                    kind=kind,
+                    action_key=(
+                        "archive" if selected_status != "archived" else "restore"
+                    ),
+                    project_id=scoped_project_id,
+                )
+                if not decision.allowed:
+                    st.warning(
+                        reason or "You do not have permission for archive actions."
+                    )
+                else:
+                    try:
+                        if selected_status == "archived":
+                            workspace_service.restore_object_attachment(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                attachment_id=selected_attachment_id,
+                                actor_id=_safe_text(
+                                    st.session_state.get("atlas_settings_user_id"),
+                                    "atlas-ui",
+                                ),
+                                access_decision=decision,
+                                project_id=scoped_project_id,
+                            )
+                            st.success("Attachment restored.")
+                        else:
+                            workspace_service.archive_object_attachment(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                attachment_id=selected_attachment_id,
+                                actor_id=_safe_text(
+                                    st.session_state.get("atlas_settings_user_id"),
+                                    "atlas-ui",
+                                ),
+                                access_decision=decision,
+                                project_id=scoped_project_id,
+                            )
+                            st.success("Attachment archived.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to update attachment status: {exc}")
+
+            if action_cols[2].button(
+                "Unlink",
+                key=f"atlas_attachment_unlink_{selected_link_id}",
+                width="stretch",
+                disabled=not bool(selected_link_id),
+            ):
+                decision, reason = _attachment_access_decision(
+                    st,
+                    workspace_service,
+                    universal_object=universal_object,
+                    kind=kind,
+                    action_key="edit",
+                    project_id=scoped_project_id,
+                )
+                if not decision.allowed:
+                    st.warning(
+                        reason or "You do not have permission to unlink attachments."
+                    )
+                else:
+                    try:
+                        workspace_service.unlink_object_attachment(
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            link_id=selected_link_id,
+                            actor_id=_safe_text(
+                                st.session_state.get("atlas_settings_user_id"),
+                                "atlas-ui",
+                            ),
+                            access_decision=decision,
+                            project_id=scoped_project_id,
+                        )
+                        st.success("Attachment unlinked from object.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to unlink attachment: {exc}")
+
+            prepared_payload = dict(st.session_state.get(download_payload_key) or {})
+            if (
+                _safe_text(prepared_payload.get("attachment_id"), "")
+                == selected_attachment_id
+            ):
+                action_cols[3].download_button(
+                    "Download File",
+                    data=prepared_payload.get("data") or b"",
+                    file_name=_safe_text(
+                        prepared_payload.get("filename"), "attachment.bin"
+                    ),
+                    mime=_safe_text(
+                        prepared_payload.get("mime_type"), "application/octet-stream"
+                    ),
+                    key=f"atlas_attachment_download_{selected_attachment_id}",
+                    width="stretch",
+                )
+
         source_refs = list(metadata.get("source_references") or [])
         if kind in OBJECT_WORKSPACE_READ_ONLY_KINDS:
             source_refs.extend(
@@ -9371,8 +9611,9 @@ def _render_universal_object_workspace_page(
             )
         source_refs = [item for item in source_refs if _safe_text(item, "")]
         if source_refs:
+            st.markdown("#### Legacy Source References")
             _render_data_table(st, [{"document": item} for item in source_refs[:80]])
-        else:
+        elif not attachment_rows:
             _render_guided_empty_state(
                 st,
                 why_empty="No document links are available for this object.",

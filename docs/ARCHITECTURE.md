@@ -20,6 +20,7 @@
 - [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md)
 - [BACKGROUND_JOBS.md](BACKGROUND_JOBS.md)
 - [AUDIT_ENGINE.md](AUDIT_ENGINE.md)
+- [ATTACHMENT_FRAMEWORK.md](ATTACHMENT_FRAMEWORK.md)
 
 Future assistant behavior is documented in [AI_ASSISTANT.md](AI_ASSISTANT.md), and staged AWS hosting direction is documented in [AWS_ARCHITECTURE.md](AWS_ARCHITECTURE.md).
 
@@ -124,6 +125,21 @@ T-01 boundary posture remains unchanged:
 - no transactions UI implementation
 - no QuickBooks API implementation
 - no payment/ledger/accounting subsystem behavior
+
+## Sprint P-04 Unified Attachment Framework
+
+P-04 introduces a unified, tenant-scoped attachment architecture as an engine-first capability.
+
+Architecture posture:
+- one shared attachment contract set for metadata, versions, links, activity, and access decisions
+- one shared attachment orchestration service reused by workspace and object surfaces
+- repository abstraction with local deterministic adapter
+- compatibility-safe bridging from legacy project document references into unified attachment links
+
+Boundary notes:
+- local deterministic persistence only in current implementation
+- background hooks are emitted as callback payloads only
+- no external worker, scanning engine, or cloud object store is introduced in this sprint
 
 ## Core Principle
 Business logic should live once in the Atlas engine and be reused by all callers:

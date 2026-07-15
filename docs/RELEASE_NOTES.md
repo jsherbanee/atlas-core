@@ -21,6 +21,23 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Sprint P-04 Unified Attachment Framework)
+
+### Improved
+
+- Atlas now includes unified attachment contracts and orchestration for tenant-scoped attachment lifecycle operations.
+- Project repository architecture now includes attachment repository contracts and deterministic local attachment adapter storage.
+- Project Workspace now exposes object-scoped attachment wrappers for upload, versioning, listing, unlink, archive, restore, and read/download behavior.
+- Object Workspace Documents now renders unified attachments and supports permission-aware open/download, archive/restore, and unlink actions.
+- Project document compatibility paths now register legacy project files as unified attachments without replacing current intake flows.
+- Attachment lifecycle actions now emit immutable audit-linked events and deterministic background-hook intents.
+
+### Scope Notes
+
+- no cloud object-store adapter implementation
+- no external worker deployment for attachment hooks
+- no malware-scanner engine integration
+
 ### Improved
 
 - Atlas now includes deterministic background-job contracts and orchestration for tenant-scoped local execution.

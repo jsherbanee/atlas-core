@@ -211,3 +211,113 @@ class JobRepository(ABC):
     @abstractmethod
     def list_jobs(self, project_id: str, limit: int = 200) -> list[JsonDict]:
         raise NotImplementedError
+
+
+class AttachmentRepository(ABC):
+    """Persistence contract for unified tenant-scoped attachments."""
+
+    @abstractmethod
+    def save_attachment(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        attachment_payload: JsonDict,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_attachment(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        attachment_id: str,
+    ) -> JsonDict | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_attachments(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        include_archived: bool = True,
+        limit: int = 1000,
+    ) -> list[JsonDict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def find_attachment_by_hash(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        file_hash: str,
+        size_bytes: int,
+    ) -> JsonDict | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def write_blob(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        attachment_id: str,
+        version_id: str,
+        filename: str,
+        data: bytes,
+    ) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def read_blob(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        storage_reference: str,
+    ) -> bytes:
+        raise NotImplementedError
+
+    @abstractmethod
+    def save_link(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        link_payload: JsonDict,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_links(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        attachment_id: str | None = None,
+        object_type: str | None = None,
+        object_id: str | None = None,
+        include_inactive: bool = False,
+        limit: int = 5000,
+    ) -> list[JsonDict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def save_activity(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        activity_payload: JsonDict,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_activity(
+        self,
+        tenant_id: str,
+        organization_id: str,
+        *,
+        attachment_id: str | None = None,
+        limit: int = 200,
+    ) -> list[JsonDict]:
+        raise NotImplementedError

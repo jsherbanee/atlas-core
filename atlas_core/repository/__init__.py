@@ -1,6 +1,7 @@
 """Atlas Project Repository interfaces and local adapters."""
 
 from atlas_core.repository.contracts import (
+    AttachmentRepository,
     DocumentRepository,
     HistoryRepository,
     JobRepository,
@@ -10,6 +11,7 @@ from atlas_core.repository.contracts import (
     WorkspaceRepository,
 )
 from atlas_core.repository.local import (
+    LocalAttachmentRepository,
     LocalDocumentRepository,
     LocalHistoryRepository,
     LocalJobRepository,
@@ -23,6 +25,7 @@ from atlas_core.repository.project_manager import AtlasProjectManager
 
 __all__ = [
     "DocumentRepository",
+    "AttachmentRepository",
     "HistoryRepository",
     "JobRepository",
     "KnowledgeRepository",
@@ -30,6 +33,7 @@ __all__ = [
     "ReviewRepository",
     "WorkspaceRepository",
     "LocalDocumentRepository",
+    "LocalAttachmentRepository",
     "LocalHistoryRepository",
     "LocalJobRepository",
     "LocalKnowledgeRepository",

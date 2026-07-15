@@ -218,6 +218,20 @@ Scope boundaries remain:
 - no replacement of authoritative transaction workflows
 - no financial-system behavior introduced in Object Workspace
 
+## P-04 Documents View Integration
+
+Sprint P-04 extends Object Workspace `Documents` behavior with unified attachment integration.
+
+Implemented in P-04:
+- document listing can resolve unified object attachments through the shared attachment service
+- Object Workspace exposes permission-aware attachment actions: open/download, archive/restore, and unlink
+- legacy source-reference rendering remains as compatibility fallback for existing object adapters
+
+Out of scope in this sprint:
+- inline document preview rendering
+- cloud-backed object storage
+- AI/semantic extraction over attachment contents
+
 ## L-01 Project Lifecycle Context
 
 Sprint L-01 extends Project Object Workspace compatibility by projecting lifecycle-engine context through the shared object shell.

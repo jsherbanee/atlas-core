@@ -111,3 +111,14 @@ Contract compatibility requirements:
 - preserve audit linkage
 - preserve tenant-scope enforcement
 - preserve idempotency semantics
+
+## P-04 Attachment Hook Integration
+
+Sprint P-04 attachment lifecycle events emit deterministic background-hook request payloads for future processing.
+
+Current emitted hook intents:
+- malware scan
+- preview generation
+- search indexing
+
+These hooks are callback payload emissions only in current implementation and do not introduce worker orchestration changes.

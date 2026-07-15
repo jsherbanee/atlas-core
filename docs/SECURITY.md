@@ -84,3 +84,18 @@ Security boundary expectations:
 Current P-03 constraints preserve local deterministic execution only:
 - no external queue infrastructure
 - no external worker deployment
+
+## P-04 Unified Attachment Security Notes
+
+Sprint P-04 adds tenant-scoped attachment controls with deterministic local enforcement.
+
+Security controls include:
+- tenant and organization scope validation for all attachment operations
+- prohibited credential-like filename pattern blocking
+- unsafe path and traversal protections for attachment filenames and blob references
+- allow-list MIME and extension validation
+- explicit maximum attachment size enforcement and empty-payload rejection
+
+Current P-04 constraints:
+- local deterministic persistence only
+- no external malware scanner integration in this sprint

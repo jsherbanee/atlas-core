@@ -41,6 +41,7 @@ Status: Active
 - P-01 Roles and Permissions Foundation
 - P-02 Immutable Audit Foundation
 - P-03 Deterministic Background Job Framework
+- P-04 Unified Attachment Framework
 
 ### A-07 Scope
 
@@ -100,6 +101,20 @@ Explicitly out of scope:
 - AWS queue implementation
 - external worker deployment
 - cloud scheduler orchestration
+
+### P-04 Scope
+
+- implement unified attachment contracts for metadata, versions, links, diagnostics, activity, and access decisions
+- implement shared attachment orchestration service for upload/version/link/unlink/archive/restore/read behavior
+- add tenant-scoped attachment repository contract and deterministic local adapter
+- integrate Object Workspace Documents with permission-aware attachment actions
+- add compatibility adapter that registers legacy project documents as unified attachments
+
+Explicitly out of scope:
+
+- cloud object-store adapters
+- malware scanning engines
+- external worker execution for attachment hooks
 
 ## Epic G: Product Governance And Delivery Discipline
 

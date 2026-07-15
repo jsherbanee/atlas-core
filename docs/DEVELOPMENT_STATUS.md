@@ -66,6 +66,7 @@ Sprint T-07 implements line presentation controls for commercial documents, incl
 Sprint P-01 implements the Roles and Permissions Foundation, including deterministic tenant-scoped role and permission contracts/services, deny-by-default evaluation with explicit deny precedence, universal-object action permission-hook gating, and a minimal Settings surface for role assignment and effective-access diagnostics.
 Sprint P-02 introduces immutable audit contracts and service integration with compatibility-safe history persistence and scoped audit export behavior.
 Sprint P-03 implements the Deterministic Background Job Framework with storage-agnostic contracts, local repository persistence, deterministic local execution, representative import/export workflow integration, Processing UI visibility, and permission-gated retry/cancel controls.
+Sprint P-04 implements the Unified Attachment Framework with tenant-scoped attachment contracts/services, repository and local adapter support, Object Workspace Documents integration, compatibility registration of legacy project documents, and deterministic attachment audit/hook emission.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 
 X-01 through X-13 are closed.
@@ -85,10 +86,10 @@ X-11 scope remains behavior-preserving and does not start Epic E.
 X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 
 ## Quality Status (Latest Full Run)
-- black .: passing
+- black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1332 tests baseline at P-03 start)
+- pytest: full suite passing (1346 tests)
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces

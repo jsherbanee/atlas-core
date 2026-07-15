@@ -6,6 +6,7 @@ from typing import Any
 
 from atlas_core.repository.contracts import ProjectRepository
 from atlas_core.repository.local import (
+    LocalAttachmentRepository,
     LocalDocumentRepository,
     LocalHistoryRepository,
     LocalJobRepository,
@@ -15,6 +16,7 @@ from atlas_core.repository.local import (
     LocalWorkspaceRepository,
 )
 from atlas_core.services.background_job_service import BackgroundJobService
+from atlas_core.services.attachment_service import AttachmentService
 from atlas_core.services.immutable_audit_service import ImmutableAuditService
 
 
@@ -33,9 +35,14 @@ class AtlasProjectManager:
         self.knowledge_repository = LocalKnowledgeRepository(self.project_repository)
         self.history_repository = LocalHistoryRepository(self.project_repository)
         self.job_repository = LocalJobRepository(self.project_repository)
+        self.attachment_repository = LocalAttachmentRepository(self.project_repository)
         self.audit_service = ImmutableAuditService(self.history_repository)
         self.background_job_service = BackgroundJobService(
             repository=self.job_repository,
+            audit_callback=self.record_audit_event,
+        )
+        self.attachment_service = AttachmentService(
+            repository=self.attachment_repository,
             audit_callback=self.record_audit_event,
         )
 

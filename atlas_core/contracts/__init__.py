@@ -57,6 +57,17 @@ from atlas_core.contracts.background_job_contracts import (
     JobRetryPolicy,
     JobStatus,
 )
+from atlas_core.contracts.attachment_contracts import (
+    AttachmentAccessDecision,
+    AttachmentActivity,
+    AttachmentDiagnostic,
+    AttachmentLink,
+    AttachmentMetadata,
+    AttachmentRecord,
+    AttachmentScanStatus,
+    AttachmentStatus,
+    AttachmentVersion,
+)
 
 __all__ = [
     "PlanReviewRequest",
@@ -104,4 +115,13 @@ __all__ = [
     "JobResult",
     "JobRetryPolicy",
     "JobStatus",
+    "AttachmentAccessDecision",
+    "AttachmentActivity",
+    "AttachmentDiagnostic",
+    "AttachmentLink",
+    "AttachmentMetadata",
+    "AttachmentRecord",
+    "AttachmentScanStatus",
+    "AttachmentStatus",
+    "AttachmentVersion",
 ]

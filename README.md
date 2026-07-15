@@ -15,5 +15,6 @@ Start with the documentation index in [docs/README.md](docs/README.md) for produ
 Current implementation status:
 - Epic X is completed and formally closed (X-01 through X-11).
 - Phase 2 Bid Intelligence remains the active product phase.
-- Current focus is Architecture review and planning for Epic E.
+- Sprint P-04 Unified Attachment Framework is now implemented in the engine and Object Workspace compatibility surfaces.
+- Current focus includes hardening and validation across unified attachments, permissions, audit, and deterministic background hooks.
 - Epic E has not started and begins only after explicit approval.

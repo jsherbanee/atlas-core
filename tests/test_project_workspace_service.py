@@ -603,7 +603,9 @@ def test_workspace_service_rejects_atlas_bid_id_mutation_after_create(
         service.save_record(loaded)
 
 
-def test_workspace_service_runs_document_import_as_background_job(tmp_path: Path) -> None:
+def test_workspace_service_runs_document_import_as_background_job(
+    tmp_path: Path,
+) -> None:
     service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
     record = service.create_manual_record(
         project_id="job-import-1",

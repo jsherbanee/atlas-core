@@ -221,6 +221,11 @@ Future releases should follow this structure.
 - Audience: Platform, repository, workspace, and observability contributors.
 - When to reference: When changing async-capable workflow orchestration or job execution semantics.
 
+### [ATTACHMENT_FRAMEWORK.md](ATTACHMENT_FRAMEWORK.md)
+- Purpose: Defines the unified tenant-scoped attachment contracts, service model, repository boundaries, and object-workspace integration behavior.
+- Audience: Workspace, repository, platform, and security contributors.
+- When to reference: When changing attachment lifecycle behavior, object document links, or attachment persistence boundaries.
+
 ### [AUDIT_ENGINE.md](AUDIT_ENGINE.md)
 - Purpose: Defines immutable audit contracts, persistence model, redaction behavior, and compatibility normalization.
 - Audience: Security, platform, observability, and workflow contributors.

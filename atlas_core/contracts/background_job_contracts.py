@@ -77,7 +77,9 @@ class JobAuditReference:
     event_ids: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"event_ids": [str(item) for item in self.event_ids if str(item).strip()]}
+        return {
+            "event_ids": [str(item) for item in self.event_ids if str(item).strip()]
+        }
 
     @staticmethod
     def from_dict(payload: dict[str, Any]) -> "JobAuditReference":
@@ -93,7 +95,9 @@ class JobDefinition:
     cancellable: bool = False
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "handler_key", _required_text("handler_key", self.handler_key))
+        object.__setattr__(
+            self, "handler_key", _required_text("handler_key", self.handler_key)
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -143,7 +147,9 @@ class JobProgress:
         object.__setattr__(self, "percent", percent_value)
         object.__setattr__(self, "message", _required_text("message", self.message))
         object.__setattr__(self, "step", _optional_text(self.step))
-        object.__setattr__(self, "updated_at", _required_text("updated_at", self.updated_at))
+        object.__setattr__(
+            self, "updated_at", _required_text("updated_at", self.updated_at)
+        )
         if self.current is not None and int(self.current) < 0:
             raise ValueError("current cannot be negative")
         if self.total is not None and int(self.total) <= 0:
@@ -186,7 +192,9 @@ class JobAttempt:
     def __post_init__(self) -> None:
         if int(self.attempt_number) <= 0:
             raise ValueError("attempt_number must be >= 1")
-        object.__setattr__(self, "started_at", _required_text("started_at", self.started_at))
+        object.__setattr__(
+            self, "started_at", _required_text("started_at", self.started_at)
+        )
         object.__setattr__(self, "completed_at", _optional_text(self.completed_at))
 
     def to_dict(self) -> dict[str, Any]:
@@ -259,21 +267,27 @@ class JobRequest:
     retry_policy: JobRetryPolicy = field(default_factory=JobRetryPolicy)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "tenant_id", _required_text("tenant_id", self.tenant_id))
+        object.__setattr__(
+            self, "tenant_id", _required_text("tenant_id", self.tenant_id)
+        )
         object.__setattr__(
             self,
             "organization_id",
             _required_text("organization_id", self.organization_id),
         )
         object.__setattr__(self, "actor_id", _required_text("actor_id", self.actor_id))
-        object.__setattr__(self, "idempotency_key", _optional_text(self.idempotency_key))
+        object.__setattr__(
+            self, "idempotency_key", _optional_text(self.idempotency_key)
+        )
         object.__setattr__(self, "correlation_id", _optional_text(self.correlation_id))
         object.__setattr__(
             self,
             "related_object_type",
             _optional_text(self.related_object_type),
         )
-        object.__setattr__(self, "related_object_id", _optional_text(self.related_object_id))
+        object.__setattr__(
+            self, "related_object_id", _optional_text(self.related_object_id)
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -311,8 +325,12 @@ class JobRecord:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "job_id", _required_text("job_id", self.job_id))
-        object.__setattr__(self, "project_id", _required_text("project_id", self.project_id))
-        object.__setattr__(self, "created_at", _required_text("created_at", self.created_at))
+        object.__setattr__(
+            self, "project_id", _required_text("project_id", self.project_id)
+        )
+        object.__setattr__(
+            self, "created_at", _required_text("created_at", self.created_at)
+        )
         object.__setattr__(self, "started_at", _optional_text(self.started_at))
         object.__setattr__(self, "completed_at", _optional_text(self.completed_at))
         object.__setattr__(self, "next_retry_at", _optional_text(self.next_retry_at))
@@ -412,7 +430,9 @@ class JobRecord:
                 for item in list(payload.get("diagnostics") or [])
                 if isinstance(item, dict)
             ],
-            cancellation=JobCancellation.from_dict(dict(payload.get("cancellation") or {})),
+            cancellation=JobCancellation.from_dict(
+                dict(payload.get("cancellation") or {})
+            ),
             audit_reference=JobAuditReference.from_dict(
                 dict(payload.get("audit_reference") or {})
             ),

@@ -14,7 +14,6 @@ from atlas_core.contracts.background_job_contracts import (
     JobAuditReference,
     JobCancellation,
     JobCategory,
-    JobDefinition,
     JobDiagnostic,
     JobProgress,
     JobRecord,
@@ -34,7 +33,9 @@ class BackgroundJobRepository(Protocol):
 
 
 class BackgroundJobExecutor(Protocol):
-    def execute(self, operation: Callable[["JobExecutionContext"], dict[str, Any]]) -> dict[str, Any]: ...
+    def execute(
+        self, operation: Callable[["JobExecutionContext"], dict[str, Any]]
+    ) -> dict[str, Any]: ...
 
 
 class LocalDeterministicExecutor:
@@ -78,7 +79,9 @@ class BackgroundJobService:
         self.repository = repository
         self.executor = executor or LocalDeterministicExecutor()
         self.audit_callback = audit_callback
-        self._handlers: dict[JobCategory, Callable[[JobExecutionContext], dict[str, Any]]] = {}
+        self._handlers: dict[
+            JobCategory, Callable[[JobExecutionContext], dict[str, Any]]
+        ] = {}
 
     @staticmethod
     def _active_statuses() -> set[JobStatus]:
@@ -98,12 +101,16 @@ class BackgroundJobService:
         project_id: str,
         request: JobRequest,
     ) -> dict[str, Any]:
-        active = self._find_active_idempotent_job(project_id=project_id, request=request)
+        active = self._find_active_idempotent_job(
+            project_id=project_id, request=request
+        )
         if active is not None:
             return active.to_dict()
 
         created_at = now_iso()
-        job_id = self._stable_job_id(project_id=project_id, request=request, created_at=created_at)
+        job_id = self._stable_job_id(
+            project_id=project_id, request=request, created_at=created_at
+        )
         record = JobRecord(
             job_id=job_id,
             project_id=project_id,
@@ -121,7 +128,11 @@ class BackgroundJobService:
             next_retry_at=None,
         )
         self._save(record)
-        self._audit(record, "background_job.created", context={"category": request.category.value})
+        self._audit(
+            record,
+            "background_job.created",
+            context={"category": request.category.value},
+        )
         return record.to_dict()
 
     def list_jobs(
@@ -229,7 +240,9 @@ class BackgroundJobService:
             request=running_record.request,
             attempt_number=attempt_number,
             progress=_progress,
-            is_cancelled=lambda: self._is_cancellation_requested(project_id=project_id, job_id=job_id),
+            is_cancelled=lambda: self._is_cancellation_requested(
+                project_id=project_id, job_id=job_id
+            ),
         )
 
         try:
@@ -389,7 +402,9 @@ class BackgroundJobService:
         if schedule_retry:
             retry_at = (
                 datetime.now(UTC)
-                + timedelta(seconds=int(record.request.retry_policy.retry_delay_seconds))
+                + timedelta(
+                    seconds=int(record.request.retry_policy.retry_delay_seconds)
+                )
             ).isoformat()
             updated = self._replace_record(
                 record,
@@ -460,7 +475,9 @@ class BackgroundJobService:
         request: JobRequest,
         created_at: str,
     ) -> str:
-        canonical_input = json.dumps(request.input_payload, sort_keys=True, separators=(",", ":"))
+        canonical_input = json.dumps(
+            request.input_payload, sort_keys=True, separators=(",", ":")
+        )
         token = json.dumps(
             {
                 "project_id": project_id,
@@ -490,7 +507,10 @@ class BackgroundJobService:
         if not isinstance(payload, dict):
             raise ValueError("job was not found")
         record = JobRecord.from_dict(payload)
-        if record.request.tenant_id != tenant_id or record.request.organization_id != organization_id:
+        if (
+            record.request.tenant_id != tenant_id
+            or record.request.organization_id != organization_id
+        ):
             raise ValueError("job tenant scope mismatch")
         return record
 

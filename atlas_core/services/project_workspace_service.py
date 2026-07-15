@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import mimetypes
 import hashlib
 from pathlib import Path
 import base64
@@ -28,6 +29,7 @@ from atlas_core.contracts.background_job_contracts import (
     JobRetryPolicy,
     JobStatus,
 )
+from atlas_core.contracts.attachment_contracts import AttachmentAccessDecision
 from atlas_core.repository import AtlasProjectManager
 from atlas_core.services.background_job_service import JobExecutionContext
 from atlas_core.services.document_intake_service import (
@@ -241,7 +243,9 @@ class ProjectWorkspaceService:
         return hashlib.sha1(canonical.encode("utf-8")).hexdigest()[:20]
 
     @staticmethod
-    def _encode_uploaded_files(uploaded_files: list[tuple[str, bytes]]) -> list[dict[str, Any]]:
+    def _encode_uploaded_files(
+        uploaded_files: list[tuple[str, bytes]],
+    ) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for name, data in uploaded_files:
             rows.append(
@@ -255,7 +259,9 @@ class ProjectWorkspaceService:
         return rows
 
     @staticmethod
-    def _decode_uploaded_files(payload_rows: list[dict[str, Any]]) -> list[tuple[str, bytes]]:
+    def _decode_uploaded_files(
+        payload_rows: list[dict[str, Any]],
+    ) -> list[tuple[str, bytes]]:
         rows: list[tuple[str, bytes]] = []
         for item in payload_rows:
             name = str(item.get("name") or "")
@@ -271,13 +277,17 @@ class ProjectWorkspaceService:
     ) -> dict[str, Any]:
         payload = dict(context.request.input_payload or {})
         workspace_id = str(payload.get("workspace_id") or context.project_id)
-        uploaded = self._decode_uploaded_files(list(payload.get("uploaded_files") or []))
+        uploaded = self._decode_uploaded_files(
+            list(payload.get("uploaded_files") or [])
+        )
         context.progress(10, "Preparing import", "prepare", 0, max(len(uploaded), 1))
         updated_record = self.import_uploaded_documents(
             workspace_id=workspace_id,
             uploaded_files=uploaded,
         )
-        context.progress(100, "Import completed", "completed", len(uploaded), len(uploaded))
+        context.progress(
+            100, "Import completed", "completed", len(uploaded), len(uploaded)
+        )
         return {
             "summary": "Document import completed",
             "payload": {
@@ -297,9 +307,9 @@ class ProjectWorkspaceService:
         out_path = str(payload.get("out_path") or "")
         if not out_path:
             raise ValueError("out_path is required for export job")
-        context.progress(10, "Preparing export", "prepare")
+        context.progress(10, "Preparing export", "prepare", None, None)
         bundle_path = self.export_project_bundle(workspace_id, out_path)
-        context.progress(100, "Export completed", "completed")
+        context.progress(100, "Export completed", "completed", None, None)
         return {
             "summary": "Project bundle export completed",
             "payload": {
@@ -922,6 +932,10 @@ class ProjectWorkspaceService:
                 "uploaded_file_names": [name for name, _ in uploaded_files],
             },
         )
+        self.link_existing_project_documents_as_attachments(
+            workspace_id,
+            actor_id="atlas-ui",
+        )
         return record
 
     def save_review_artifact(
@@ -949,6 +963,198 @@ class ProjectWorkspaceService:
 
     def list_history(self, workspace_id: str, limit: int = 100) -> list[dict[str, Any]]:
         return self.manager.history_repository.list_events(workspace_id, limit=limit)
+
+    def upload_object_attachment(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        object_type: str,
+        object_id: str,
+        filename: str,
+        data: bytes,
+        mime_type: str,
+        actor_id: str,
+        source: str = "manual_upload",
+        source_reference: str | None = None,
+        provenance: dict[str, Any] | None = None,
+        access_decision: AttachmentAccessDecision | None = None,
+        project_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self.manager.attachment_service.upload_attachment(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            object_type=object_type,
+            object_id=object_id,
+            filename=filename,
+            data=data,
+            mime_type=mime_type,
+            actor_id=actor_id,
+            source=source,
+            source_reference=source_reference,
+            provenance=dict(provenance or {}),
+            access_decision=access_decision,
+            project_id=project_id,
+        )
+
+    def create_object_attachment_version(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        attachment_id: str,
+        filename: str,
+        data: bytes,
+        mime_type: str,
+        actor_id: str,
+        source: str = "version_upload",
+        source_reference: str | None = None,
+        access_decision: AttachmentAccessDecision | None = None,
+        project_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self.manager.attachment_service.create_attachment_version(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            attachment_id=attachment_id,
+            filename=filename,
+            data=data,
+            mime_type=mime_type,
+            actor_id=actor_id,
+            source=source,
+            source_reference=source_reference,
+            access_decision=access_decision,
+            project_id=project_id,
+        )
+
+    def list_object_attachments(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        object_type: str,
+        object_id: str,
+        include_archived: bool = True,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        return self.manager.attachment_service.list_object_attachments(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            object_type=object_type,
+            object_id=object_id,
+            include_archived=include_archived,
+            limit=limit,
+        )
+
+    def unlink_object_attachment(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        link_id: str,
+        actor_id: str,
+        access_decision: AttachmentAccessDecision | None = None,
+        project_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self.manager.attachment_service.unlink_attachment(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            link_id=link_id,
+            actor_id=actor_id,
+            access_decision=access_decision,
+            project_id=project_id,
+        )
+
+    def archive_object_attachment(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        attachment_id: str,
+        actor_id: str,
+        access_decision: AttachmentAccessDecision | None = None,
+        project_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self.manager.attachment_service.archive_attachment(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            attachment_id=attachment_id,
+            actor_id=actor_id,
+            access_decision=access_decision,
+            project_id=project_id,
+        )
+
+    def restore_object_attachment(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        attachment_id: str,
+        actor_id: str,
+        access_decision: AttachmentAccessDecision | None = None,
+        project_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self.manager.attachment_service.restore_attachment(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            attachment_id=attachment_id,
+            actor_id=actor_id,
+            access_decision=access_decision,
+            project_id=project_id,
+        )
+
+    def read_object_attachment(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        attachment_id: str,
+        actor_id: str,
+        version_id: str | None = None,
+        access_decision: AttachmentAccessDecision | None = None,
+        project_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self.manager.attachment_service.read_attachment_version(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            attachment_id=attachment_id,
+            version_id=version_id,
+            access_decision=access_decision,
+            project_id=project_id,
+            actor_id=actor_id,
+        )
+
+    def link_existing_project_documents_as_attachments(
+        self,
+        workspace_id: str,
+        *,
+        actor_id: str = "atlas-ui",
+    ) -> list[dict[str, Any]]:
+        record = self.load_record(workspace_id)
+        tenant_id, organization_id = self._tenant_scope_for_record(record)
+        location = Path(self.project_location(workspace_id))
+        documents_root = location / "documents"
+        if not documents_root.exists() or not documents_root.is_dir():
+            return []
+
+        linked: list[dict[str, Any]] = []
+        for path in sorted(documents_root.rglob("*")):
+            if not path.is_file():
+                continue
+            mime_type, _ = mimetypes.guess_type(str(path))
+            result = self.manager.attachment_service.register_existing_file_reference(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                object_type="project",
+                object_id=workspace_id,
+                filename=path.name,
+                data=path.read_bytes(),
+                mime_type=mime_type or "application/octet-stream",
+                actor_id=actor_id,
+                source_reference=str(path.relative_to(location)),
+                project_id=workspace_id,
+            )
+            linked.append(result)
+        return linked
 
     def list_background_jobs(
         self,

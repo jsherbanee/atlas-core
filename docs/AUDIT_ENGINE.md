@@ -70,3 +70,18 @@ Out of scope:
 - external SIEM transport
 - real-time streaming pipelines
 - cloud-native audit bus deployment
+
+## P-04 Attachment Audit Integration
+
+Sprint P-04 unified attachment operations emit immutable audit actions when project context is available.
+
+Representative attachment audit actions:
+- `attachment.uploaded`
+- `attachment.version.created`
+- `attachment.linked`
+- `attachment.unlinked`
+- `attachment.archived`
+- `attachment.restored`
+- `attachment.downloaded`
+
+Attachment activity records retain linked audit event IDs for deterministic traceability.

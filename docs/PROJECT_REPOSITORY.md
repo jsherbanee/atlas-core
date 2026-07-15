@@ -46,6 +46,7 @@ Contracts:
 - KnowledgeRepository
 - HistoryRepository
 - JobRepository
+- AttachmentRepository
 
 Project identity contract notes (X-02):
 - `allocate_bid_id(year=None)` reserves the next available deterministic Atlas Bid ID.
@@ -64,6 +65,7 @@ Current adapter implementation:
 - LocalKnowledgeRepository
 - LocalHistoryRepository
 - LocalJobRepository
+- LocalAttachmentRepository
 
 The local adapters are the development-time stand-in for future cloud-hosted tenant-scoped storage adapters.
 
@@ -111,6 +113,17 @@ Directory structure:
     - jobs/
       - jobs.jsonl
     - cache/
+
+Attachment storage (tenant scoped, shared framework):
+
+- AtlasProjects/
+  - .atlas_attachments/
+    - <tenant_id>/
+      - <organization_id>/
+        - attachments.jsonl
+        - links.jsonl
+        - activity.jsonl
+        - blobs/
 
 ## Canonical Manifest
 Each project includes project_manifest.json with deterministic storage summary fields:
@@ -177,6 +190,10 @@ history/events.jsonl:
 
 jobs/jobs.jsonl:
 - Deterministic background job records, attempts, progress, diagnostics, and audit references.
+
+.atlas_attachments/*:
+- Unified attachment records, links, activity logs, and blob references scoped by tenant and organization.
+- Deterministic local storage adapter for the shared attachment framework.
 
 project_manifest.json:
 - Canonical deterministic repository summary for health checks, bundle validation, and future adapter migration.

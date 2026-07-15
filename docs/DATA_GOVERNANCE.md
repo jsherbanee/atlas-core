@@ -57,3 +57,13 @@ Financial data synchronized from accounting systems must not be treated as autho
 
 ## AI and Tenant Boundaries
 AI grounding, response provenance, and source attribution should follow the rules in [AI_FOUNDATIONAL_KNOWLEDGE.md](AI_FOUNDATIONAL_KNOWLEDGE.md) and [MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md).
+
+## P-04 Unified Attachment Governance Note
+
+Sprint P-04 introduces a shared attachment framework with governance-aligned controls:
+- tenant-scoped attachment ownership and linkage
+- immutable version history for attachment revisions
+- explicit provenance fields for source and source references
+- activity and audit linkage for lifecycle events
+
+Current implementation is deterministic local persistence and does not alter existing customer ownership boundaries.
