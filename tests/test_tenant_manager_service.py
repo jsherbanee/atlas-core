@@ -362,3 +362,205 @@ def test_suspended_tenant_cannot_access_operational_data(tmp_path: Path) -> None
         )
     with pytest.raises(PermissionError, match="active status"):
         service.assert_active_tenant_context("tenant-a")
+
+
+def test_alpha_feedback_is_tenant_scoped_and_structured(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=True,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+
+    created = service.submit_alpha_feedback(
+        tenant_id="tenant-a",
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        user_id="owner-a",
+        workspace="Transactions",
+        object_or_transaction="estimate:EST-001",
+        severity="high",
+        reproduction_steps="1. Open draft\n2. Click issue",
+        expected_result="Issue action warns only when invalid.",
+        actual_result="Issue action failed with generic error.",
+        attachment_references=["att-1"],
+        environment_diagnostics={"token": "secret://token", "page": "Transactions"},
+    )
+    assert created["tenant_id"] == "tenant-a"
+    assert created["workspace"] == "Transactions"
+    assert created["status"] == "open"
+    assert created["environment_diagnostics"]["token"] == "[redacted]"
+
+    listed = service.list_alpha_feedback(
+        tenant_id="tenant-a",
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+    )
+    assert len(listed) == 1
+    assert listed[0]["feedback_id"] == created["feedback_id"]
+
+    with pytest.raises(PermissionError, match="cross-tenant diagnostics"):
+        service.list_alpha_feedback(
+            tenant_id="tenant-a",
+            requester_tenant_id="tenant-b",
+            requester_organization_id="org-tenant-b",
+        )
+
+
+def test_alpha_health_check_requires_platform_admin_and_redacts(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=True,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.append_job_record(
+        tenant_id="tenant-a",
+        job_payload={
+            "job_id": "job-1",
+            "status": "failed",
+            "error": "/Users/tester/private/path failure",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+        },
+    )
+
+    with pytest.raises(PermissionError):
+        service.alpha_health_check(
+            tenant_id="tenant-a",
+            actor_id="owner-a",
+            requester_tenant_id="tenant-a",
+            requester_organization_id="org-tenant-a",
+            application_version="1.5.0-alpha-a02",
+            environment_label="Controlled Alpha",
+            test_suite_baseline_reference="1408 passing",
+        )
+
+    payload = service.alpha_health_check(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        application_version="1.5.0-alpha-a02",
+        environment_label="Controlled Alpha",
+        test_suite_baseline_reference="1408 passing",
+    )
+    assert payload["application_version"] == "1.5.0-alpha-a02"
+    assert payload["tenant_id"] == "tenant-a"
+    assert payload["tenant_status"] == "active"
+    assert payload["test_suite_baseline_reference"] == "1408 passing"
+    assert payload["background_job_health"]["failed_jobs"] == 1
+    assert payload["recent_errors"][0]["message"] == "[redacted-path]"
+
+
+def test_two_sandbox_alpha_operations_are_isolated(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="alpha-basic",
+            enable_seed_data=True,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-b",
+            sandbox_label="Tenant B",
+            owner_user_id="owner-b",
+            seed_data_profile="alpha-commercial",
+            enable_seed_data=True,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+
+    feedback_a = service.submit_alpha_feedback(
+        tenant_id="tenant-a",
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        user_id="owner-a",
+        workspace="Settings",
+        object_or_transaction="tenant_manager",
+        severity="medium",
+        reproduction_steps="open",
+        expected_result="ok",
+        actual_result="ok",
+    )
+    feedback_b = service.submit_alpha_feedback(
+        tenant_id="tenant-b",
+        requester_tenant_id="tenant-b",
+        requester_organization_id="org-tenant-b",
+        user_id="owner-b",
+        workspace="Transactions",
+        object_or_transaction="invoice:INV-1",
+        severity="high",
+        reproduction_steps="issue",
+        expected_result="ok",
+        actual_result="warning",
+    )
+    assert feedback_a["tenant_id"] == "tenant-a"
+    assert feedback_b["tenant_id"] == "tenant-b"
+
+    export_b = service.export_tenant_data(
+        tenant_id="tenant-b",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    assert "tenant-b" in str(export_b)
+    assert "tenant-a" not in str(export_b)
+
+    before_b = service.storage_usage_summary(tenant_id="tenant-b")
+    service.reset_sandbox_data(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        confirmation="RESET tenant-a",
+    )
+    after_b = service.storage_usage_summary(tenant_id="tenant-b")
+    assert after_b["catalog_items"] == before_b["catalog_items"]
+
+    tenant_a_feedback = service.list_alpha_feedback(
+        tenant_id="tenant-a",
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+    )
+    tenant_b_feedback = service.list_alpha_feedback(
+        tenant_id="tenant-b",
+        requester_tenant_id="tenant-b",
+        requester_organization_id="org-tenant-b",
+    )
+    assert len(tenant_a_feedback) == 0
+    assert len(tenant_b_feedback) == 1
+
+    health_a = service.alpha_health_check(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        application_version="1.5.0-alpha-a02",
+        environment_label="Controlled Alpha",
+        test_suite_baseline_reference="1408 passing",
+    )
+    assert health_a["tenant_id"] == "tenant-a"
+    assert health_a["last_backup_or_export"]["last_export_at"] == ""

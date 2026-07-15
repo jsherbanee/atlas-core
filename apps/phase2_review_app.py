@@ -257,6 +257,15 @@ REPORT_PAGES = [
 ]
 SETTINGS_PAGES = ["Project Settings", "Application Settings"]
 
+ALPHA_APP_VERSION_IDENTIFIER = f"{__version__}-a02"
+ALPHA_TEST_SUITE_BASELINE_REFERENCE = "1408 passing"
+ALPHA_KNOWN_LIMITATIONS = [
+    "Background jobs are local deterministic only in controlled alpha.",
+    "Attachment malware scanning and quarantine adapters are not active in this release candidate.",
+    "Hosted infrastructure automation, SSO/Cognito, billing, and self-service signup are out of scope.",
+    "Inventory, procurement, and live QuickBooks transport remain outside controlled alpha scope.",
+]
+
 NOTEBOOK_ENTRY_TYPES = [
     "Engineering Note",
     "Observation",
@@ -4141,6 +4150,76 @@ def _current_commit() -> str:
     return result.stdout.strip() or "n/a"
 
 
+def _alpha_environment_marker() -> dict[str, str | bool]:
+    configured = _safe_text(os.getenv("ATLAS_RELEASE_CHANNEL"), "controlled-alpha")
+    normalized = configured.lower()
+    blocked_production_designation = normalized in {"production", "prod"}
+    return {
+        "configured_channel": configured or "controlled-alpha",
+        "effective_channel": "controlled-alpha",
+        "label": "Controlled Alpha",
+        "blocked_production_designation": blocked_production_designation,
+        "warning": (
+            "Production designation is blocked in this build; Atlas remains in controlled alpha mode."
+            if blocked_production_designation
+            else ""
+        ),
+    }
+
+
+def _alpha_environment_diagnostics(
+    st: Any,
+    *,
+    tenant_id: str,
+    organization_id: str,
+    user_id: str,
+) -> dict[str, Any]:
+    marker = _alpha_environment_marker()
+    return {
+        "tenant_id": _safe_text(tenant_id, "local"),
+        "organization_id": _safe_text(organization_id, "atlas"),
+        "user_id": _safe_text(user_id, "local-user"),
+        "active_page": _safe_text(st.session_state.get("atlas_active_page"), ""),
+        "workspace_primary": _safe_text(
+            st.session_state.get(_navigation_primary_state_key()), "Atlas"
+        ),
+        "workspace_secondary": _safe_text(
+            st.session_state.get(_navigation_secondary_state_key()), "overview"
+        ),
+        "workspace_tertiary": _safe_text(
+            st.session_state.get(_navigation_tertiary_state_key()), "browse"
+        ),
+        "os": _safe_text(st.session_state.get("atlas_os"), "other"),
+        "environment_label": _safe_text(marker.get("label"), "Controlled Alpha"),
+        "effective_channel": _safe_text(
+            marker.get("effective_channel"), "controlled-alpha"
+        ),
+        "application_version": ALPHA_APP_VERSION_IDENTIFIER,
+        "commit": _current_commit(),
+        "captured_at": _now_iso(),
+    }
+
+
+def _alpha_feedback_defect_template() -> str:
+    return "\n".join(
+        [
+            "Title:",
+            "Tenant:",
+            "User:",
+            "Workspace:",
+            "Object or Transaction:",
+            "Severity (low|medium|high|critical):",
+            "Reproduction Steps:",
+            "Expected Result:",
+            "Actual Result:",
+            "Attachment References:",
+            "Environment Diagnostics:",
+            "Status (open|in_review|resolved|closed):",
+            "Resolution Notes:",
+        ]
+    )
+
+
 def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_active_workspace_id", None)
     st.session_state.setdefault("atlas_active_page", "Mission Control")
@@ -7035,7 +7114,31 @@ def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "label": "Tenant Manager",
                 "action_type": "settings_view",
                 "required_selection": None,
-            }
+            },
+            {
+                "tertiary_key": "alpha_health_check",
+                "label": "Alpha Health Check",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "feedback",
+                "label": "Alpha Feedback",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "known_limitations",
+                "label": "Known Limitations",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "operator_checklist",
+                "label": "Operator Checklist",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
         ],
     }
 
@@ -7888,6 +7991,7 @@ def _render_header(
     context: dict[str, Any] | None,
 ) -> None:
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
+    alpha_marker = _alpha_environment_marker()
 
     header_cols = st.columns([1.05, 3.2, 3.6, 0.55])
     if header_cols[0].button(
@@ -7901,6 +8005,9 @@ def _render_header(
     _render_top_navigation(st, nav_cols, record)
     _render_global_search_control(st, header_cols[2])
     _render_header_menu(st, header_cols[3])
+    header_cols[0].caption(
+        f"{_safe_text(alpha_marker.get('label'), 'Controlled Alpha')} · {ALPHA_APP_VERSION_IDENTIFIER}"
+    )
 
     if record is None or current_page == "Mission Control":
         st.session_state["atlas_active_project_name"] = ""
@@ -16249,6 +16356,17 @@ def _render_application_administration_page(
         objective="Manage organization and personal settings without breaking tenant policy boundaries.",
         current_focus="Organization Settings and Personal Preferences are active in this sprint.",
     )
+    alpha_marker = _alpha_environment_marker()
+    st.info(
+        f"Environment: {_safe_text(alpha_marker.get('label'), 'Controlled Alpha')} ({_safe_text(alpha_marker.get('effective_channel'), 'controlled-alpha')}) · Version: {ALPHA_APP_VERSION_IDENTIFIER}"
+    )
+    if bool(alpha_marker.get("blocked_production_designation")):
+        st.warning(
+            _safe_text(
+                alpha_marker.get("warning"),
+                "Production designation is blocked in this build.",
+            )
+        )
 
     secondary = _safe_text(
         st.session_state.get(_navigation_secondary_state_key()),
@@ -16343,6 +16461,13 @@ def _render_application_administration_page(
                 width="stretch",
                 hide_index=True,
             )
+            with st.expander("Alpha Known Limitations", expanded=False):
+                st.dataframe(
+                    [{"Limitation": item} for item in ALPHA_KNOWN_LIMITATIONS],
+                    width="stretch",
+                    hide_index=True,
+                )
+                st.caption("Reference: docs/ALPHA_KNOWN_LIMITATIONS.md")
 
             seed_actions_enabled = _safe_text(
                 os.getenv("ATLAS_ENABLE_SEED_DATA_ACTIONS"), ""
@@ -17826,10 +17951,6 @@ def _render_application_administration_page(
             return
 
         tenant_manager = _tenant_manager_workspace_service(st)
-        if tertiary != "tenant_manager":
-            st.info("Select Tenant Manager to continue.")
-            return
-
         tenants = tenant_manager.list_tenants(
             actor_id=user_id,
             requester_tenant_id=tenant_id,
@@ -17859,6 +17980,261 @@ def _render_application_administration_page(
             )
         else:
             st.info("No sandbox tenants are provisioned yet.")
+
+        selectable_tenants = [
+            item for item in tenants if item.get("tenant_id") != "local"
+        ]
+        selected_tenant_id = ""
+        selected_payload: dict[str, Any] = {}
+        if selectable_tenants:
+            selected_tenant_id = st.selectbox(
+                "Select Sandbox Tenant",
+                options=[
+                    _safe_text(item.get("tenant_id"), "") for item in selectable_tenants
+                ],
+                key="atlas_tenant_manager_selected_tenant",
+            )
+            selected_payload = next(
+                (
+                    item
+                    for item in selectable_tenants
+                    if _safe_text(item.get("tenant_id"), "") == selected_tenant_id
+                ),
+                {},
+            )
+
+        if tertiary == "known_limitations":
+            st.markdown("#### Controlled Alpha Known Limitations")
+            st.dataframe(
+                [{"Limitation": item} for item in ALPHA_KNOWN_LIMITATIONS],
+                width="stretch",
+                hide_index=True,
+            )
+            st.caption("Reference: docs/ALPHA_KNOWN_LIMITATIONS.md")
+            return
+
+        if tertiary == "operator_checklist":
+            st.markdown("#### Test-User Onboarding")
+            st.markdown(
+                "\n".join(
+                    [
+                        "1. Confirm operator is using Controlled Alpha environment label in the header.",
+                        "2. Provision sandbox tenant with explicit owner and seed profile.",
+                        "3. Open sandbox context and verify tenant scope in Transactions workspace.",
+                        "4. Run seed-data validation and capture health-check snapshot before testing.",
+                        "5. Submit feedback using the tenant-scoped template before reset/export actions.",
+                    ]
+                )
+            )
+            st.markdown("#### Provisioning and Recovery Checklist")
+            st.dataframe(
+                [
+                    {
+                        "Step": "Provision",
+                        "Action": "Create sandbox with owner, expiration, and seed profile.",
+                    },
+                    {
+                        "Step": "Seed",
+                        "Action": "Load or verify seed-data profile before workflow tests.",
+                    },
+                    {
+                        "Step": "Validate",
+                        "Action": "Run alpha health check and capture diagnostics snapshot.",
+                    },
+                    {
+                        "Step": "Feedback",
+                        "Action": "Submit tenant-scoped defect or workflow feedback record.",
+                    },
+                    {
+                        "Step": "Recover",
+                        "Action": "Reset sandbox with confirmation phrase and verify tenant isolation.",
+                    },
+                    {
+                        "Step": "Export",
+                        "Action": "Generate tenant-scoped export before archive/delete actions.",
+                    },
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            st.download_button(
+                "Download Defect Report Template",
+                data=_alpha_feedback_defect_template(),
+                file_name="alpha-defect-template.txt",
+                mime="text/plain",
+                width="stretch",
+            )
+            st.caption("Reference: docs/ALPHA_SANDBOX_GUIDE.md")
+            return
+
+        if tertiary == "alpha_health_check":
+            if not selected_tenant_id:
+                st.info("Provision a sandbox tenant to view alpha health checks.")
+                return
+            try:
+                health_payload = tenant_manager.alpha_health_check(
+                    tenant_id=selected_tenant_id,
+                    actor_id=user_id,
+                    requester_tenant_id=tenant_id,
+                    requester_organization_id=organization_id,
+                    application_version=ALPHA_APP_VERSION_IDENTIFIER,
+                    environment_label=_safe_text(
+                        _alpha_environment_marker().get("label"), "Controlled Alpha"
+                    ),
+                    test_suite_baseline_reference=ALPHA_TEST_SUITE_BASELINE_REFERENCE,
+                )
+                st.json(health_payload)
+                st.download_button(
+                    "Download Health Snapshot",
+                    data=json.dumps(health_payload, indent=2, sort_keys=True),
+                    file_name=f"alpha-health-{selected_tenant_id}.json",
+                    mime="application/json",
+                    width="stretch",
+                )
+            except Exception as exc:
+                st.error(f"Unable to build alpha health check: {exc}")
+            return
+
+        if tertiary == "feedback":
+            if not selected_tenant_id:
+                st.info("Provision a sandbox tenant to submit feedback.")
+                return
+
+            diagnostics_default = _alpha_environment_diagnostics(
+                st,
+                tenant_id=selected_tenant_id,
+                organization_id=f"org-{selected_tenant_id}",
+                user_id=user_id,
+            )
+            with st.form("atlas_alpha_feedback_form"):
+                feedback_cols = st.columns(4)
+                feedback_user = feedback_cols[0].text_input("User", value=user_id)
+                feedback_workspace = feedback_cols[1].text_input(
+                    "Workspace", value="Transactions"
+                )
+                feedback_object = feedback_cols[2].text_input(
+                    "Object or Transaction", value=""
+                )
+                feedback_severity = feedback_cols[3].selectbox(
+                    "Severity",
+                    options=["low", "medium", "high", "critical"],
+                    index=1,
+                )
+                reproduction_steps = st.text_area("Reproduction Steps", height=120)
+                expected_result = st.text_area("Expected Result", height=80)
+                actual_result = st.text_area("Actual Result", height=80)
+                attachment_refs = st.text_input(
+                    "Attachment References (comma-separated)", value=""
+                )
+                diagnostics_json = st.text_area(
+                    "Environment Diagnostics (JSON)",
+                    value=json.dumps(diagnostics_default, indent=2, sort_keys=True),
+                    height=180,
+                )
+                feedback_status = st.selectbox(
+                    "Status",
+                    options=["open", "in_review", "resolved", "closed"],
+                    index=0,
+                )
+                resolution_notes = st.text_area("Resolution Notes", height=80)
+                submitted = st.form_submit_button("Submit Feedback", width="stretch")
+
+            st.download_button(
+                "Download Defect Report Template",
+                data=_alpha_feedback_defect_template(),
+                file_name="alpha-defect-template.txt",
+                mime="text/plain",
+                width="stretch",
+            )
+
+            if submitted:
+                try:
+                    parsed_diagnostics = json.loads(diagnostics_json)
+                    if not isinstance(parsed_diagnostics, dict):
+                        raise ValueError(
+                            "Environment diagnostics must be a JSON object."
+                        )
+                    tenant_manager.submit_alpha_feedback(
+                        tenant_id=selected_tenant_id,
+                        requester_tenant_id=selected_tenant_id,
+                        requester_organization_id=f"org-{selected_tenant_id}",
+                        user_id=feedback_user,
+                        workspace=feedback_workspace,
+                        object_or_transaction=feedback_object,
+                        severity=feedback_severity,
+                        reproduction_steps=reproduction_steps,
+                        expected_result=expected_result,
+                        actual_result=actual_result,
+                        attachment_references=[
+                            item.strip()
+                            for item in attachment_refs.split(",")
+                            if item.strip()
+                        ],
+                        environment_diagnostics=parsed_diagnostics,
+                        status=feedback_status,
+                        resolution_notes=resolution_notes or None,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Feedback submitted.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to submit feedback: {exc}")
+
+            feedback_rows = tenant_manager.list_alpha_feedback(
+                tenant_id=selected_tenant_id,
+                requester_tenant_id=selected_tenant_id,
+                requester_organization_id=f"org-{selected_tenant_id}",
+                limit=200,
+            )
+            if feedback_rows:
+                st.markdown("#### Feedback Records")
+                st.dataframe(feedback_rows, width="stretch", hide_index=True)
+                status_rows = [
+                    item
+                    for item in feedback_rows
+                    if _safe_text(item.get("status"), "") not in {"resolved", "closed"}
+                ]
+                if status_rows:
+                    update_cols = st.columns(3)
+                    selected_feedback_id = update_cols[0].selectbox(
+                        "Feedback ID",
+                        options=[
+                            _safe_text(item.get("feedback_id"), "")
+                            for item in status_rows
+                        ],
+                    )
+                    selected_feedback_status = update_cols[1].selectbox(
+                        "Update Status",
+                        options=["open", "in_review", "resolved", "closed"],
+                        index=1,
+                    )
+                    selected_feedback_resolution = update_cols[2].text_input(
+                        "Resolution Notes",
+                        value="",
+                    )
+                    if st.button("Update Feedback Status", width="stretch"):
+                        try:
+                            tenant_manager.update_alpha_feedback_status(
+                                tenant_id=selected_tenant_id,
+                                requester_tenant_id=selected_tenant_id,
+                                requester_organization_id=f"org-{selected_tenant_id}",
+                                actor_id=user_id,
+                                feedback_id=selected_feedback_id,
+                                status=selected_feedback_status,
+                                resolution_notes=selected_feedback_resolution or None,
+                            )
+                            _save_tenant_manager_workspace_state(st, tenant_manager)
+                            st.success("Feedback updated.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to update feedback: {exc}")
+            else:
+                st.caption("No feedback records have been submitted for this tenant.")
+            return
+
+        if tertiary != "tenant_manager":
+            st.info("Select a valid platform-management subsection.")
+            return
 
         with st.form("atlas_tenant_manager_create_form"):
             create_cols = st.columns(3)
@@ -17903,27 +18279,9 @@ def _render_application_administration_page(
             except Exception as exc:
                 st.error(f"Unable to create sandbox: {exc}")
 
-        selectable_tenants = [
-            item for item in tenants if item.get("tenant_id") != "local"
-        ]
         if selectable_tenants:
-            selected_tenant_id = st.selectbox(
-                "Select Sandbox Tenant",
-                options=[
-                    _safe_text(item.get("tenant_id"), "") for item in selectable_tenants
-                ],
-                key="atlas_tenant_manager_selected_tenant",
-            )
-            selected_payload = next(
-                (
-                    item
-                    for item in selectable_tenants
-                    if _safe_text(item.get("tenant_id"), "") == selected_tenant_id
-                ),
-                {},
-            )
 
-            action_cols = st.columns(5)
+            action_cols = st.columns(6)
             if action_cols[0].button("Open Sandbox", width="stretch"):
                 try:
                     opened = tenant_manager.open_sandbox(
@@ -17990,8 +18348,28 @@ def _render_application_administration_page(
                 except Exception as exc:
                     st.error(f"Unable to archive sandbox: {exc}")
 
+            if action_cols[4].button("Load Seed Data", width="stretch"):
+                try:
+                    tenant_manager.load_seed_data(
+                        tenant_id=selected_tenant_id,
+                        profile=_safe_text(
+                            dict(selected_payload.get("configuration") or {}).get(
+                                "seed_data_profile"
+                            ),
+                            "none",
+                        ),
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Seed data loaded for sandbox.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to load seed data: {exc}")
+
             export_cache_key = f"atlas_tenant_export_payload::{selected_tenant_id}"
-            if st.button("Export Sandbox Data", width="stretch"):
+            if action_cols[5].button("Export Sandbox Data", width="stretch"):
                 try:
                     st.session_state[export_cache_key] = (
                         tenant_manager.export_tenant_data(
@@ -33863,10 +34241,15 @@ def _render_status_bar(
     context: dict[str, Any] | None,
 ) -> None:
     _ = (record, context)
+    alpha_marker = _alpha_environment_marker()
     st.markdown("<div class='atlas-statusbar'></div>", unsafe_allow_html=True)
     cols = st.columns([7, 3])
-    cols[0].caption("©2026 Corsa Systems. All rights reserved.")
-    cols[1].caption(f"Atlas v{__version__} · commit {_current_commit()}")
+    cols[0].caption(
+        f"©2026 Corsa Systems. All rights reserved. · {_safe_text(alpha_marker.get('label'), 'Controlled Alpha')}"
+    )
+    cols[1].caption(
+        f"Atlas v{ALPHA_APP_VERSION_IDENTIFIER} · commit {_current_commit()} · tests {ALPHA_TEST_SUITE_BASELINE_REFERENCE}"
+    )
 
 
 def _render_main_content(

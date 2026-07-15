@@ -16,6 +16,7 @@ Operator runbook for provisioning and validating isolated tenant sandboxes in th
 - Confirm create.
 3. Create sandbox B with a distinct tenant ID/label.
 4. Confirm both tenants are listed as active and each has isolated repository paths.
+5. Confirm shell header shows `Controlled Alpha` environment label and alpha version identifier.
 
 ## Isolation Validation Steps
 1. Open sandbox A and seed/load representative records.
@@ -33,17 +34,22 @@ Operator runbook for provisioning and validating isolated tenant sandboxes in th
 8. Validate guarded delete workflow:
 - Attempt delete with incorrect confirmation phrase (expect failure).
 - Export tenant and then delete with exact confirmation phrase.
+9. Submit one feedback record from sandbox A and one feedback record from sandbox B.
+10. Validate feedback lists are tenant-scoped and do not show cross-tenant records.
+11. Run alpha health check for each tenant and verify tenant-specific output.
 
 ## Lifecycle Guardrails
 - Suspended sandboxes should not accept operational helper access until restored.
 - Archived sandboxes remain non-operational and should require explicit lifecycle action before operational use.
 - Platform tenant-management actions must be run from platform scope only.
+- Alpha health checks must be administrator-only and should never expose internal paths or secret references.
 
 ## Evidence Mapping
 Primary automated evidence for this runbook:
 - `tests/test_tenant_manager_service.py`
 - `tests/test_permissions_service.py`
 - `tests/test_universal_object_contract.py`
+- `tests/test_phase2_settings_navigation.py`
 
 ## Troubleshooting
 - PermissionError for tenant manager actions:
@@ -56,3 +62,4 @@ Primary automated evidence for this runbook:
 ## Operational Notes
 - This guide is for controlled alpha operations only.
 - Cloud-provisioning, SSO, and billing workflows are intentionally out of scope.
+- External ticketing integrations are intentionally out of scope; use tenant-scoped alpha feedback records.

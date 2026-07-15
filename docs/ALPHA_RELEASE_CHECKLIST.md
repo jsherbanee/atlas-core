@@ -1,17 +1,17 @@
-# Alpha Release Checklist
+# Alpha Release Checklist (A-02)
 
 ## Purpose
-Final release-candidate checklist for Sprint A-01.
+Controlled alpha deployment and test-operations checklist for Sprint A-02.
 
 ## Governance And Scope
-- [x] Sprint objective explicitly defined and scoped to blocker-only hardening.
+- [x] Sprint objective explicitly defined and scoped to controlled alpha operations.
 - [x] No new feature expansion introduced.
 - [x] Out-of-scope constraints preserved (AWS/SSO/billing/inventory/live QuickBooks).
 
 ## Readiness Evidence
-- [x] Focused readiness suites executed and passing (`258 passed`).
+- [x] Focused A-02 suites executed and passing (`16 passed`).
 - [x] Full quality gates executed and passing (`black`, `ruff`, `mypy`, `pytest -q`).
-- [x] Full-suite baseline validated (`1408 passed`).
+- [x] Full-suite baseline validated (`1412 passed`).
 - [x] Alpha blocker findings classified and tracked.
 - [x] Confirmed blocker findings remediated with regression coverage.
 
@@ -20,16 +20,18 @@ Final release-candidate checklist for Sprint A-01.
 - [x] Suspended tenant operational access denied for helper surfaces.
 - [x] Cross-tenant reference/attachment rejection remains enforced.
 - [x] Guarded reset/export/delete controls remain confirmation-gated.
+- [x] Alpha health checks are administrator-only and redact sensitive diagnostics.
+- [x] Feedback workflow is tenant-scoped and rejects cross-tenant diagnostics access.
 
 ## Documentation Package
-- [x] `ALPHA_READINESS.md` updated with A-01 outcomes.
-- [x] `ALPHA_TEST_PLAN.md` created.
-- [x] `ALPHA_KNOWN_LIMITATIONS.md` created.
-- [x] `ALPHA_RELEASE_CHECKLIST.md` created.
-- [x] `ALPHA_SANDBOX_GUIDE.md` created.
+- [x] `ALPHA_OPERATIONS.md` created.
+- [x] `ALPHA_TEST_PLAN.md` updated for A-02.
+- [x] `ALPHA_KNOWN_LIMITATIONS.md` updated for A-02 operations clarity.
+- [x] `ALPHA_RELEASE_CHECKLIST.md` updated.
+- [x] `ALPHA_SANDBOX_GUIDE.md` updated.
 - [x] `DEVELOPMENT_STATUS.md` reconciled to latest validated baseline.
-- [x] `EPICS.md`, `ENGINEERING_ROADMAP.md`, `PRODUCT_ROADMAP.md`, `RELEASE_NOTES.md`, and `README.md` updated.
+- [x] `EPICS.md`, `RELEASE_NOTES.md`, and `README.md` updated.
 
 ## Release Recommendation
-- [x] Recommendation: proceed with controlled alpha release candidate.
+- [x] Recommendation: proceed with controlled alpha deployment and repeatable sandbox test operations.
 - [x] Constraints acknowledged: local deterministic architecture and documented known limitations.

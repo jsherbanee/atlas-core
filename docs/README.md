@@ -12,6 +12,8 @@ Alpha infrastructure update: Sprint M-01 adds platform-admin tenant sandbox prov
 
 Alpha release-candidate update: Sprint A-01 completes the final alpha readiness audit and release package, including blocker-class tenancy hardening, full quality-gate validation, and release-candidate documentation. See [ALPHA_READINESS.md](ALPHA_READINESS.md), [ALPHA_TEST_PLAN.md](ALPHA_TEST_PLAN.md), [ALPHA_KNOWN_LIMITATIONS.md](ALPHA_KNOWN_LIMITATIONS.md), [ALPHA_RELEASE_CHECKLIST.md](ALPHA_RELEASE_CHECKLIST.md), and [ALPHA_SANDBOX_GUIDE.md](ALPHA_SANDBOX_GUIDE.md).
 
+Alpha operations update: Sprint A-02 operationalizes controlled alpha deployment workflows with visible environment/version labeling, administrator health-check surfaces, tenant-scoped feedback capture, and operator runbook guidance. See [ALPHA_OPERATIONS.md](ALPHA_OPERATIONS.md).
+
 Current workspace-continuity stream: Epic W Workspace Intelligence.
 Scope: deterministic context persistence, cross-workspace continuity, search handoff, Working Set continuity, and repository-backed return context for already-implemented capabilities only.
 

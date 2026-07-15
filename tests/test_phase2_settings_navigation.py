@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 import sys
 
+import pytest
+
 _MODULE_PATH = Path(__file__).resolve().parents[1] / "apps" / "phase2_review_app.py"
 _SPEC = importlib.util.spec_from_file_location(
     "phase2_review_app_settings_nav_tests",
@@ -51,6 +53,21 @@ def test_settings_workspace_contract_has_expected_sections() -> None:
         "audit",
     ]
 
+    platform_section = next(
+        item for item in contract if item["secondary_key"] == "platform_management"
+    )
+    platform_tertiary = [
+        item["tertiary_key"]
+        for item in platform_section.get("supported_tertiary_actions", [])
+    ]
+    assert platform_tertiary == [
+        "tenant_manager",
+        "alpha_health_check",
+        "feedback",
+        "known_limitations",
+        "operator_checklist",
+    ]
+
 
 def test_administration_routes_to_settings_primary() -> None:
     assert app._active_primary_workspace("Administration", None) == "Settings"
@@ -69,3 +86,14 @@ def test_sync_workspace_navigation_state_sets_settings_defaults() -> None:
     assert st.session_state["atlas_active_primary_workspace"] == "Settings"
     assert st.session_state["atlas_active_workspace_mode"] == "application"
     assert st.session_state["atlas_active_secondary_section"] == "organization_settings"
+
+
+def test_alpha_environment_marker_blocks_production_designation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ATLAS_RELEASE_CHANNEL", "production")
+
+    marker = app._alpha_environment_marker()
+
+    assert marker["effective_channel"] == "controlled-alpha"
+    assert marker["blocked_production_designation"] is True

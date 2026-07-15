@@ -39,6 +39,43 @@ def _slug(value: str) -> str:
     return lowered.strip("-") or "sandbox"
 
 
+def _redact_diagnostic_value(key: str, value: Any) -> Any:
+    key_lower = _safe_text(key, "").lower()
+    if any(
+        token in key_lower
+        for token in (
+            "secret",
+            "token",
+            "password",
+            "credential",
+            "storage_root",
+            "repository_paths",
+        )
+    ):
+        return "[redacted]"
+    if isinstance(value, dict):
+        return {
+            str(child_key): _redact_diagnostic_value(str(child_key), child_value)
+            for child_key, child_value in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_diagnostic_value(key, item) for item in value]
+    if isinstance(value, str):
+        text = _safe_text(value, "")
+        if "secret://" in text:
+            return "[redacted-secret-reference]"
+        if (
+            text.startswith("/")
+            or text.startswith("~")
+            or text.startswith(".atlas_tenants")
+            or "/Users/" in text
+            or "\\" in text
+        ):
+            return "[redacted-path]"
+        return text[:240]
+    return value
+
+
 class TenantManagerService:
     """Deterministic tenant sandbox lifecycle and data-boundary controls."""
 
@@ -651,6 +688,295 @@ class TenantManagerService:
             "search_indexes": len(dict(data.get("search_indexes") or {})),
         }
 
+    def submit_alpha_feedback(
+        self,
+        *,
+        tenant_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        user_id: str,
+        workspace: str,
+        object_or_transaction: str,
+        severity: str,
+        reproduction_steps: str,
+        expected_result: str,
+        actual_result: str,
+        attachment_references: list[str] | None = None,
+        environment_diagnostics: dict[str, Any] | None = None,
+        status: str = "open",
+        resolution_notes: str | None = None,
+    ) -> dict[str, Any]:
+        self._assert_tenant_scope_request(
+            tenant_id=tenant_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+        )
+        self._assert_operational_access(tenant_id)
+        normalized_status = _safe_text(status, "open").lower()
+        if normalized_status not in {"open", "in_review", "resolved", "closed"}:
+            raise ValueError("feedback status is invalid")
+        feedback_id = f"feedback:{hashlib.sha1(f'{tenant_id}:{user_id}:{now_iso()}'.encode('utf-8')).hexdigest()[:16]}"
+        record = {
+            "feedback_id": feedback_id,
+            "tenant_id": tenant_id,
+            "user_id": _safe_text(user_id, "unknown"),
+            "workspace": _safe_text(workspace, "Unknown"),
+            "object_or_transaction": _safe_text(object_or_transaction, ""),
+            "severity": _safe_text(severity, "medium").lower(),
+            "reproduction_steps": _safe_text(reproduction_steps, ""),
+            "expected_result": _safe_text(expected_result, ""),
+            "actual_result": _safe_text(actual_result, ""),
+            "attachment_references": [
+                _safe_text(item, "")
+                for item in list(attachment_references or [])
+                if _safe_text(item, "")
+            ],
+            "environment_diagnostics": _redact_diagnostic_value(
+                "environment_diagnostics", dict(environment_diagnostics or {})
+            ),
+            "status": normalized_status,
+            "resolution_notes": _safe_text(resolution_notes, "") or None,
+            "created_at": now_iso(),
+            "updated_at": now_iso(),
+        }
+        data = self._tenant_data(tenant_id)
+        data.setdefault("alpha_feedback", [])
+        data["alpha_feedback"].append(record)
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=user_id,
+            action="tenant.alpha_feedback.submitted",
+            details={
+                "feedback_id": feedback_id,
+                "severity": record["severity"],
+                "status": normalized_status,
+            },
+        )
+        return deepcopy(record)
+
+    def list_alpha_feedback(
+        self,
+        *,
+        tenant_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        statuses: list[str] | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        self._assert_tenant_scope_request(
+            tenant_id=tenant_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+        )
+        rows = list(self._tenant_data(tenant_id).get("alpha_feedback") or [])
+        normalized = {
+            _safe_text(item, "").lower() for item in list(statuses or []) if item
+        }
+        filtered = [
+            deepcopy(dict(item))
+            for item in rows
+            if isinstance(item, dict)
+            and (
+                not normalized
+                or _safe_text(item.get("status"), "").lower() in normalized
+            )
+        ]
+        filtered.sort(
+            key=lambda item: (
+                _safe_text(item.get("updated_at"), ""),
+                _safe_text(item.get("feedback_id"), ""),
+            )
+        )
+        return filtered[-max(1, int(limit)) :]
+
+    def update_alpha_feedback_status(
+        self,
+        *,
+        tenant_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        actor_id: str,
+        feedback_id: str,
+        status: str,
+        resolution_notes: str | None = None,
+    ) -> dict[str, Any]:
+        self._assert_tenant_scope_request(
+            tenant_id=tenant_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+        )
+        normalized_status = _safe_text(status, "").lower()
+        if normalized_status not in {"open", "in_review", "resolved", "closed"}:
+            raise ValueError("feedback status is invalid")
+        rows = list(self._tenant_data(tenant_id).get("alpha_feedback") or [])
+        target = None
+        for item in rows:
+            if _safe_text(dict(item).get("feedback_id"), "") == _safe_text(
+                feedback_id, ""
+            ):
+                target = item
+                break
+        if not isinstance(target, dict):
+            raise ValueError("feedback record does not exist")
+        target["status"] = normalized_status
+        if resolution_notes is not None:
+            target["resolution_notes"] = _safe_text(resolution_notes, "") or None
+        target["updated_at"] = now_iso()
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_feedback.updated",
+            details={
+                "feedback_id": _safe_text(feedback_id, ""),
+                "status": normalized_status,
+            },
+        )
+        return deepcopy(dict(target))
+
+    def alpha_health_check(
+        self,
+        *,
+        tenant_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        application_version: str,
+        environment_label: str,
+        test_suite_baseline_reference: str,
+    ) -> dict[str, Any]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        tenant = self._tenant_required(tenant_id)
+        data = self._tenant_data(tenant_id)
+        jobs = [
+            dict(item)
+            for item in list(data.get("jobs") or [])
+            if isinstance(item, dict)
+        ]
+        failed_jobs = [
+            item
+            for item in jobs
+            if _safe_text(item.get("status"), "").lower()
+            in {"failed", "error", "cancelled"}
+        ]
+        search_indexes = dict(data.get("search_indexes") or {})
+        search_record_count = sum(
+            len(list(records or []))
+            for records in search_indexes.values()
+            if isinstance(records, list)
+        )
+        feedback_rows = [
+            dict(item)
+            for item in list(data.get("alpha_feedback") or [])
+            if isinstance(item, dict)
+        ]
+        high_feedback = [
+            item
+            for item in feedback_rows
+            if _safe_text(item.get("severity"), "").lower() in {"high", "critical"}
+            and _safe_text(item.get("status"), "").lower() not in {"resolved", "closed"}
+        ]
+        export_meta = dict(data.get("export_history") or {})
+        recent_errors = [
+            {
+                "source": "job",
+                "status": _safe_text(item.get("status"), "unknown"),
+                "message": _safe_text(item.get("error"), ""),
+                "updated_at": _safe_text(item.get("updated_at"), ""),
+            }
+            for item in failed_jobs[-5:]
+        ] + [
+            {
+                "source": "feedback",
+                "feedback_id": _safe_text(item.get("feedback_id"), ""),
+                "severity": _safe_text(item.get("severity"), ""),
+                "workspace": _safe_text(item.get("workspace"), ""),
+                "status": _safe_text(item.get("status"), ""),
+                "updated_at": _safe_text(item.get("updated_at"), ""),
+            }
+            for item in high_feedback[-5:]
+        ]
+        health_payload = {
+            "application_version": _safe_text(application_version, "n/a"),
+            "environment_label": _safe_text(environment_label, "Controlled Alpha"),
+            "tenant_id": tenant.tenant_id,
+            "tenant_status": tenant.status.value,
+            "repository_health": {
+                "status": (
+                    "healthy" if tenant.status == TenantStatus.ACTIVE else "degraded"
+                ),
+                "projects": len(list(data.get("projects") or [])),
+                "knowledge_records": len(list(data.get("knowledge") or [])),
+                "transactions": len(
+                    list(dict(data.get("transactions") or {}).get("documents") or [])
+                ),
+            },
+            "seed_data_status": {
+                "enabled": bool(dict(data.get("catalog") or {}).get("items")),
+                "profile": _safe_text(
+                    dict(data.get("catalog") or {}).get("seed_profile"), "none"
+                ),
+                "catalog_item_count": len(
+                    list(dict(data.get("catalog") or {}).get("items") or [])
+                ),
+                "last_seeded_by": _safe_text(
+                    dict(
+                        dict(data.get("transactions") or {}).get("seed_metadata") or {}
+                    ).get("seeded_by"),
+                    "",
+                ),
+                "last_seeded_at": _safe_text(
+                    dict(
+                        dict(data.get("transactions") or {}).get("seed_metadata") or {}
+                    ).get("applied_at"),
+                    "",
+                ),
+            },
+            "background_job_health": {
+                "total_jobs": len(jobs),
+                "failed_jobs": len(failed_jobs),
+                "running_jobs": len(
+                    [
+                        item
+                        for item in jobs
+                        if _safe_text(item.get("status"), "").lower()
+                        in {"queued", "running", "retry_scheduled"}
+                    ]
+                ),
+            },
+            "attachment_storage_health": {
+                "attachment_count": len(list(data.get("attachments") or [])),
+                "status": "healthy",
+            },
+            "search_index_status": {
+                "index_count": len(search_indexes),
+                "record_count": int(search_record_count),
+            },
+            "recent_errors": _redact_diagnostic_value("recent_errors", recent_errors),
+            "last_backup_or_export": {
+                "last_export_at": _safe_text(export_meta.get("last_export_at"), ""),
+                "last_export_by": _safe_text(export_meta.get("last_export_by"), ""),
+            },
+            "test_suite_baseline_reference": _safe_text(
+                test_suite_baseline_reference, "1408 passing"
+            ),
+        }
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_health_check.viewed",
+            details={
+                "tenant_status": tenant.status.value,
+                "failed_jobs": len(failed_jobs),
+            },
+        )
+        return health_payload
+
     def recent_tenant_audit_events(
         self, *, tenant_id: str, limit: int = 50
     ) -> list[dict[str, Any]]:
@@ -765,6 +1091,7 @@ class TenantManagerService:
             "search_indexes": {},
             "working_set": {},
             "user_preferences": {},
+            "alpha_feedback": [],
             "export_history": {},
         }
 
@@ -857,6 +1184,20 @@ class TenantManagerService:
         self.state.setdefault("audit_events", [])
         self.state["audit_events"].append(event.to_dict())
         self.state["audit_events"] = list(self.state["audit_events"])[-5000:]
+
+    def _assert_tenant_scope_request(
+        self,
+        *,
+        tenant_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+    ) -> None:
+        normalized_tenant = _safe_text(tenant_id, "")
+        if normalized_tenant != _safe_text(requester_tenant_id, ""):
+            raise PermissionError("cross-tenant diagnostics are not allowed")
+        expected_organization = self._organization_id_for_tenant(normalized_tenant)
+        if expected_organization != _safe_text(requester_organization_id, ""):
+            raise PermissionError("request organization scope is invalid")
 
     def _assert_operational_access(self, tenant_id: str) -> None:
         tenant = self._tenant_required(tenant_id)

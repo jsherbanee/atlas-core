@@ -8,6 +8,8 @@ Provide explicit transparency for known alpha constraints that are non-blocking 
 - Attachment security does not yet include malware scanning/quarantine engine integration.
 - Tenant manager provisioning is local sandbox path provisioning only (no hosted infrastructure automation).
 - Navigation/manual viewport validation evidence is contract- and regression-led in this release candidate; broader exploratory UX sweeps continue in follow-through hardening.
+- Controlled alpha release-channel marker is enforced; production designation is intentionally blocked in this build.
+- External ticketing integration is not enabled; defects remain in tenant-scoped alpha feedback records.
 
 ## Deferred Beyond Alpha (Intentional)
 - SSO/Cognito/invitation lifecycle and production IAM controls.
@@ -24,3 +26,4 @@ Provide explicit transparency for known alpha constraints that are non-blocking 
 - Primary readiness source: `ALPHA_READINESS.md`
 - Validation evidence: `ALPHA_TEST_PLAN.md`
 - Operator procedures: `ALPHA_SANDBOX_GUIDE.md`
+- Operational controls: `ALPHA_OPERATIONS.md`

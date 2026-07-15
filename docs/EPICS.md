@@ -52,6 +52,7 @@ Status: Active
 - U-02 End-to-End Application UX and Workflow Polish
 - M-01 Tenant Manager and Sandbox Provisioning
 - A-01 Final Alpha Readiness Audit and Release Candidate
+- A-02 Controlled Alpha Deployment and Test Operations
 
 ### A-07 Scope
 
@@ -151,6 +152,22 @@ Explicitly out of scope:
 - new feature expansion beyond approved alpha scope
 - AWS/SSO/billing/procurement/inventory/live QuickBooks transport activation
 - roadmap expansion beyond approved Phase 2 and alpha hardening boundaries
+
+### A-02 Scope
+
+- implement controlled alpha environment labeling/version visibility and production-designation guard behavior
+- operationalize sandbox test workflows for seed, reset, export, health checks, and tenant-scoped feedback capture
+- provide administrator-only alpha health-check view with redacted diagnostics and tenant-boundary-safe summaries
+- provide settings-accessible known-limitations and operator checklist guidance for repeatable alpha execution
+- add regression coverage for environment labeling, health-check enforcement, diagnostics redaction, feedback scoping, and sandbox isolation operations
+
+Explicitly out of scope:
+
+- new commercial workflow capability expansion
+- inventory/procurement activation
+- live QuickBooks transport execution
+- external ticketing integration
+- hosted production deployment claims
 
 ### A-08 Scope
 

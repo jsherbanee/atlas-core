@@ -19,6 +19,25 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Atlas Alpha Operations Sprint A-02 Controlled Alpha Deployment and Test Operations)
+
+### Improved
+
+- Atlas now displays a controlled-alpha environment label and alpha version identifier in the shell.
+- Atlas now blocks accidental production release-channel designation and preserves controlled-alpha mode behavior.
+- Platform Management now provides administrator-only Alpha Health Check views with tenant-specific health summaries and redacted diagnostics.
+- Platform Management now supports tenant-scoped Alpha Feedback and Defect records, including structured fields, status updates, and defect-template download.
+- Settings now provides direct known-limitations visibility and an operator checklist section for provisioning/recovery guidance.
+- Tenant sandbox operations now include explicit load-seed action in the tenant-manager operational controls.
+
+### Scope Notes
+
+- no new commercial workflow features
+- no inventory/procurement activation
+- no live QuickBooks sync execution
+- no external ticketing integration
+- no hosted production deployment claims
+
 ## Unreleased (Atlas Alpha Completion Sprint A-01 Final Alpha Readiness Audit and Release Candidate)
 
 ### Improved
