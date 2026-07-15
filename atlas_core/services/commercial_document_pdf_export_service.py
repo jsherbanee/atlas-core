@@ -11,6 +11,7 @@ from typing import Any
 from atlas_core.domain.commercial_document import (
     CommercialDocument,
     CommercialDocumentRevision,
+    CommercialDocumentType,
 )
 
 
@@ -169,6 +170,47 @@ class CommercialDocumentPdfExportService:
         if section_config.include_project:
             lines.append(f"Project: {_safe_text(document.project_id) or 'n/a'}")
             lines.append(f"Project Code: {_safe_text(document.project_code) or 'n/a'}")
+            lines.append("")
+
+        metadata = dict(document.document_metadata or {})
+        if bool(metadata.get("is_change_order", False)) and document.document_type in {
+            CommercialDocumentType.SALES_ORDER,
+            CommercialDocumentType.RETURN_ORDER,
+        }:
+            lines.append("CHANGE ORDER")
+            lines.append(
+                f"CO Number: {_safe_text(metadata.get('change_order_number')) or 'n/a'}"
+            )
+            lines.append(
+                "Change Type: "
+                + (
+                    _safe_text(
+                        metadata.get("change_order_type")
+                        or metadata.get("change_order_direction")
+                    )
+                    or "n/a"
+                )
+            )
+            lines.append(
+                "Base Bid Reference: "
+                + (_safe_text(metadata.get("base_bid_reference")) or "n/a")
+            )
+            lines.append(
+                "Owner Change Reference: "
+                + (_safe_text(metadata.get("owner_change_reference")) or "n/a")
+            )
+            lines.append(
+                "Revised Contract Value: "
+                + (_safe_text(metadata.get("revised_contract_value")) or "n/a")
+            )
+            lines.append(
+                "Change Summary: "
+                + (
+                    _safe_text(metadata.get("change_reason"))
+                    or _safe_text(metadata.get("internal_notes"))
+                    or "n/a"
+                )
+            )
             lines.append("")
 
         sorted_lines = sorted(

@@ -130,6 +130,7 @@ Implemented in T-09:
 	- `is_change_order`
 	- `change_order_number`
 	- `change_order_sequence`
+	- `change_order_type`
 	- `change_order_direction`
 	- `base_bid_reference`
 	- `project_id`
@@ -139,11 +140,13 @@ Implemented in T-09:
 	- `approved_by`
 	- `approval_date`
 	- `effective_date`
+	- `owner_change_reference`
+	- `internal_notes`
 	- `source_document`
 	- `related_documents`
 - project-scoped authoritative sequence behavior for `CO #n` numbering with non-consuming preview and consuming allocation
 - no change-order sequence reuse within a project, including archived documents
-- project commercial summary contract for base-bid value, additive/deductive totals, net change, revised contract value, ordered change list, and change-order status
+- project commercial summary contract for base-bid value, additive/deductive totals, net change, revised contract value, pending/approved/invoiced/outstanding change values, ordered change list, and change-order status
 
 Out of scope in T-09:
 - standalone Change Order document-type workflows

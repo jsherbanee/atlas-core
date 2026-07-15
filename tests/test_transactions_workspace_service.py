@@ -466,6 +466,8 @@ def test_additive_change_order_from_sales_order_tracks_metadata() -> None:
         approved_by="director",
         approval_date="2026-07-14",
         effective_date="2026-07-20",
+        owner_change_reference="owner-co-17",
+        internal_notes="Field labor and controls delta",
         source_document="est-1",
         related_documents=["est-1"],
     )
@@ -473,8 +475,11 @@ def test_additive_change_order_from_sales_order_tracks_metadata() -> None:
     metadata = configured.document_metadata or {}
     assert metadata.get("is_change_order") is True
     assert metadata.get("change_order_direction") == "additive"
+    assert metadata.get("change_order_type") == "additive"
     assert metadata.get("change_order_number") == "CO #1"
     assert metadata.get("change_order_sequence") == 1
+    assert metadata.get("owner_change_reference") == "owner-co-17"
+    assert metadata.get("internal_notes") == "Field labor and controls delta"
 
 
 def test_deductive_change_order_from_return_order_tracks_metadata() -> None:
@@ -494,13 +499,18 @@ def test_deductive_change_order_from_return_order_tracks_metadata() -> None:
         is_change_order=True,
         change_reason="Scope reduction",
         requested_by="pm",
+        owner_change_reference="owner-ded-4",
+        internal_notes="Credit expected after inspection",
     )
 
     metadata = configured.document_metadata or {}
     assert metadata.get("is_change_order") is True
     assert metadata.get("change_order_direction") == "deductive"
+    assert metadata.get("change_order_type") == "deductive"
     assert metadata.get("change_order_number") == "CO #1"
     assert metadata.get("change_order_sequence") == 1
+    assert metadata.get("owner_change_reference") == "owner-ded-4"
+    assert metadata.get("internal_notes") == "Credit expected after inspection"
 
 
 def test_change_order_preview_non_consuming_and_duplicate_rejection() -> None:
@@ -662,7 +672,102 @@ def test_project_base_bid_and_net_contract_value_summary() -> None:
     assert summary["deductive_change_total"] == "50.00"
     assert summary["net_change_total"] == "200.00"
     assert summary["revised_contract_value"] == "1200.00"
+    assert summary["pending_change_value"] == "0"
+    assert summary["approved_change_value"] == "0"
+    assert summary["invoiced_change_value"] == "0"
+    assert summary["outstanding_change_value"] == "0"
     assert len(summary["ordered_change_list"]) == 2
+
+
+def test_project_change_order_summary_financial_breakouts() -> None:
+    service = _service()
+    service.set_project_base_bid(
+        tenant_id="tenant-1",
+        project_id="project-a",
+        project_code="P-A",
+        reference_type="imported_contract_amount",
+        imported_contract_amount=Decimal("1000.00"),
+        actor="qa",
+    )
+
+    pending = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service._commercial_service.add_line(
+        pending,
+        description="Pending add",
+        quantity=Decimal("1"),
+        unit_price=Decimal("100.00"),
+    )
+    service.configure_change_order_tracking(
+        document_id=pending.document_id,
+        is_change_order=True,
+    )
+    service.set_approval_state(
+        document_id=pending.document_id,
+        approval_state=ApprovalState.PENDING,
+    )
+
+    approved = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service._commercial_service.add_line(
+        approved,
+        description="Approved add",
+        quantity=Decimal("1"),
+        unit_price=Decimal("60.00"),
+    )
+    service.configure_change_order_tracking(
+        document_id=approved.document_id,
+        is_change_order=True,
+    )
+    service.set_approval_state(
+        document_id=approved.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+
+    invoiced = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        customer_id="customer-a",
+    )
+    service._commercial_service.add_line(
+        invoiced,
+        description="Invoiced add",
+        quantity=Decimal("1"),
+        unit_price=Decimal("40.00"),
+    )
+    service.configure_change_order_tracking(
+        document_id=invoiced.document_id,
+        is_change_order=True,
+    )
+    service.set_approval_state(
+        document_id=invoiced.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+    service._commercial_service.set_document_metadata(
+        invoiced,
+        metadata={"quickbooks_payment_status": "paid"},
+    )
+
+    summary = service.project_commercial_summary(
+        tenant_id="tenant-1",
+        project_id="project-a",
+    )
+    assert summary["pending_change_value"] == "100.00"
+    assert summary["approved_change_value"] == "100.00"
+    assert summary["invoiced_change_value"] == "40.00"
+    assert summary["outstanding_change_value"] == "60.00"
 
 
 def test_change_order_revision_behavior_and_audit_diagnostics() -> None:
@@ -744,6 +849,8 @@ def test_change_order_pdf_export_and_search_metadata() -> None:
     service.configure_change_order_tracking(
         document_id=sales_order.document_id,
         is_change_order=True,
+        owner_change_reference="owner-co-8",
+        internal_notes="Final owner sign-off pending",
     )
     service.set_approval_state(
         document_id=sales_order.document_id,
@@ -757,7 +864,11 @@ def test_change_order_pdf_export_and_search_metadata() -> None:
         actor="qa",
     )
     assert export_payload["payload"]
+    assert b"CHANGE ORDER" in export_payload["payload"]
+    assert b"CO Number: CO #1" in export_payload["payload"]
     search_rows = service.list_documents(query="CO #1")
+    assert any(row.document_id == sales_order.document_id for row in search_rows)
+    search_rows = service.list_documents(query="owner-co-8")
     assert any(row.document_id == sales_order.document_id for row in search_rows)
 
 

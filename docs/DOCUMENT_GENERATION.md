@@ -78,6 +78,7 @@ Key behavior:
 - generation records template assignment and template snapshot metadata in export activity
 - generation records output artifact metadata in document attachments
 - customer-invoice presentation exports use the same deterministic generation path and revision snapshot guarantees
+- sales-order and return-order revisions marked as change orders render explicit change-order labels in PDF output (`CHANGE ORDER`, `CO #n`, project/base-bid references, and change summary context) while preserving existing template-resolution behavior
 
 ## Background Job and Audit Alignment
 

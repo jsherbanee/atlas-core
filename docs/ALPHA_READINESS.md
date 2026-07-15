@@ -96,6 +96,15 @@ Customer Invoice transaction hardening now includes:
 
 No new blocker-class tenant-isolation or cross-scope regressions were identified in the T-08 customer-invoice paths.
 
+## T-09 Follow-Up Note
+
+Project-scoped change-order hardening now includes:
+- strict project-scoped `CO #n` allocation/non-reuse behavior on Sales Orders and Return Orders
+- additional change-order metadata fields for owner change references and internal notes
+- deterministic project commercial summary financial breakouts (pending/approved/invoiced/outstanding values)
+
+No new blocker-class tenant-isolation or cross-scope regressions were identified in validated T-09 change-order flows.
+
 ## Security and Tenancy Findings
 - No active cross-tenant mutation regression remains in audited transactions paths with default service configuration.
 - Transactions service construction now fails fast when active tenant/org scope is omitted.

@@ -127,7 +127,8 @@ Implemented in T-09:
 - change-order numbering is project-scoped (`CO #n`) with non-consuming preview and consuming allocation
 - duplicate change-order sequence allocation is blocked within a project
 - archived change-order numbers remain consumed and are not reused
-- project commercial summary behavior is available for base bid, additive total, deductive total, net change, revised contract value, and ordered change list
+- shared metadata now includes change-order type/direction, owner change reference, and internal notes on Sales/Return order change orders
+- project commercial summary behavior is available for base bid, additive total, deductive total, net change, revised contract value, pending/approved/invoiced/outstanding change values, and ordered change list
 
 Boundary preserved in T-09:
 - no separate Change Order document family workflow

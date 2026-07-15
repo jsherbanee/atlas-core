@@ -231,6 +231,10 @@ Project lifecycle and transaction lifecycle are separate concerns.
 
 Sprint A-07 defines that architecture boundary but does not introduce a transaction lifecycle engine implementation.
 
+T-09 alignment note:
+- project change-order tracking metadata on Sales Orders and Return Orders remains part of commercial-document lifecycle state, not Project lifecycle-stage authority
+- Project lifecycle stage transitions must not be inferred or mutated solely from change-order metadata updates
+
 ## A-08 Commercial Document Lifecycle Alignment
 
 Sprint A-08 defines a common commercial-document lifecycle vocabulary:

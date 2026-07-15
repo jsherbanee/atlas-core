@@ -365,6 +365,16 @@ class TransactionsWorkspaceService:
                             ),
                             "",
                         ),
+                        _safe_text(
+                            (document.document_metadata or {}).get(
+                                "owner_change_reference"
+                            ),
+                            "",
+                        ),
+                        _safe_text(
+                            (document.document_metadata or {}).get("internal_notes"),
+                            "",
+                        ),
                     ]
                 ).lower()
                 if normalized_query not in corpus:
@@ -541,6 +551,8 @@ class TransactionsWorkspaceService:
         approved_by: str | None = None,
         approval_date: str | None = None,
         effective_date: str | None = None,
+        owner_change_reference: str | None = None,
+        internal_notes: str | None = None,
         source_document: str | None = None,
         related_documents: list[str] | None = None,
         change_order_sequence: int | None = None,
@@ -563,6 +575,7 @@ class TransactionsWorkspaceService:
                     "is_change_order": False,
                     "change_order_number": None,
                     "change_order_sequence": None,
+                    "change_order_type": None,
                     "change_order_direction": None,
                     "base_bid_reference": None,
                     "change_reason": None,
@@ -570,6 +583,8 @@ class TransactionsWorkspaceService:
                     "approved_by": None,
                     "approval_date": None,
                     "effective_date": None,
+                    "owner_change_reference": None,
+                    "internal_notes": None,
                     "source_document": None,
                     "related_documents": [],
                 },
@@ -613,6 +628,7 @@ class TransactionsWorkspaceService:
                 "is_change_order": True,
                 "change_order_number": number,
                 "change_order_sequence": sequence,
+                "change_order_type": direction,
                 "change_order_direction": direction,
                 "base_bid_reference": _safe_text(base_bid_reference, "") or None,
                 "project_id": normalized_project_id,
@@ -622,6 +638,9 @@ class TransactionsWorkspaceService:
                 "approved_by": _safe_text(approved_by, "") or None,
                 "approval_date": _safe_text(approval_date, "") or None,
                 "effective_date": _safe_text(effective_date, "") or None,
+                "owner_change_reference": _safe_text(owner_change_reference, "")
+                or None,
+                "internal_notes": _safe_text(internal_notes, "") or None,
                 "source_document": _safe_text(source_document, "")
                 or _safe_text(document.source_document_id, "")
                 or None,
@@ -777,15 +796,33 @@ class TransactionsWorkspaceService:
 
         additive_total = Decimal("0")
         deductive_total = Decimal("0")
+        pending_change_value = Decimal("0")
+        approved_change_value = Decimal("0")
+        invoiced_change_value = Decimal("0")
         ordered_change_list: list[dict[str, Any]] = []
         for document in change_orders:
             metadata = dict(document.document_metadata or {})
-            direction = _safe_text(metadata.get("change_order_direction"), "")
+            direction = _safe_text(
+                metadata.get("change_order_type")
+                or metadata.get("change_order_direction"),
+                "",
+            )
             amount = Decimal(str(document.totals.grand_total or Decimal("0")))
             if direction == "additive":
                 additive_total += amount
             elif direction == "deductive":
                 deductive_total += amount
+            if document.approval_state == ApprovalState.PENDING:
+                pending_change_value += amount
+            if document.approval_state == ApprovalState.APPROVED:
+                approved_change_value += amount
+            invoice_status = _safe_text(
+                metadata.get("quickbooks_payment_status")
+                or metadata.get("payment_status"),
+                "",
+            ).lower()
+            if invoice_status and invoice_status not in {"unpaid", "none"}:
+                invoiced_change_value += amount
             ordered_change_list.append(
                 {
                     "document_id": document.document_id,
@@ -796,17 +833,20 @@ class TransactionsWorkspaceService:
                     "change_order_sequence": int(
                         metadata.get("change_order_sequence") or 0
                     ),
+                    "description": _safe_text(
+                        metadata.get("change_reason"),
+                        _safe_text(document.document_number, document.document_id),
+                    ),
+                    "change_order_type": direction,
                     "change_order_direction": direction,
+                    "status": _safe_text(document.lifecycle_state.value, ""),
                     "amount": str(amount),
+                    "customer_id": _safe_text(document.customer_id, ""),
                     "approval_state": document.approval_state.value,
                     "lifecycle_state": document.lifecycle_state.value,
                     "related_sales_order_or_return_order": document.document_number
                     or document.document_id,
-                    "invoice_status": _safe_text(
-                        metadata.get("quickbooks_payment_status")
-                        or metadata.get("payment_status"),
-                        "",
-                    ),
+                    "invoice_status": invoice_status,
                 }
             )
 
@@ -821,6 +861,9 @@ class TransactionsWorkspaceService:
         base_bid_value = Decimal(str(base_bid_payload.get("base_bid_value") or "0"))
         net_change_total = additive_total - deductive_total
         revised_contract_value = base_bid_value + net_change_total
+        outstanding_change_value = approved_change_value - invoiced_change_value
+        if outstanding_change_value < Decimal("0"):
+            outstanding_change_value = Decimal("0")
 
         status = "none"
         if ordered_change_list:
@@ -860,6 +903,10 @@ class TransactionsWorkspaceService:
             "deductive_change_total": str(deductive_total),
             "net_change_total": str(net_change_total),
             "revised_contract_value": str(revised_contract_value),
+            "pending_change_value": str(pending_change_value),
+            "approved_change_value": str(approved_change_value),
+            "invoiced_change_value": str(invoiced_change_value),
+            "outstanding_change_value": str(outstanding_change_value),
             "ordered_change_list": ordered_change_list,
             "change_order_status": status,
         }

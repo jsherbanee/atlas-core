@@ -13302,7 +13302,7 @@ def _render_transactions_workspace_page(
         project_search = project_cols[2].text_input(
             "Search Change Orders",
             key="atlas_transactions_change_orders_search",
-            placeholder="CO #, reason, document number",
+            placeholder="CO #, reason, document number, customer",
         )
 
         if not _safe_text(project_id, ""):
@@ -13377,16 +13377,28 @@ def _render_transactions_workspace_page(
             [
                 {
                     "Project": _safe_text(summary.get("project_code"), project_id),
-                    "Base Bid": _safe_text(summary.get("base_bid_value"), "0"),
-                    "Additive Change Total": _safe_text(
+                    "Original Contract": _safe_text(summary.get("base_bid_value"), "0"),
+                    "Net Additions": _safe_text(
                         summary.get("additive_change_total"), "0"
                     ),
-                    "Deductive Change Total": _safe_text(
+                    "Net Deductions": _safe_text(
                         summary.get("deductive_change_total"), "0"
                     ),
                     "Net Change": _safe_text(summary.get("net_change_total"), "0"),
-                    "Revised Contract": _safe_text(
+                    "Current Contract Value": _safe_text(
                         summary.get("revised_contract_value"), "0"
+                    ),
+                    "Pending Change Value": _safe_text(
+                        summary.get("pending_change_value"), "0"
+                    ),
+                    "Approved Change Value": _safe_text(
+                        summary.get("approved_change_value"), "0"
+                    ),
+                    "Invoiced Change Value": _safe_text(
+                        summary.get("invoiced_change_value"), "0"
+                    ),
+                    "Outstanding Change Value": _safe_text(
+                        summary.get("outstanding_change_value"), "0"
                     ),
                     "Change-Order Status": _safe_text(
                         summary.get("change_order_status"), "none"
@@ -13409,6 +13421,8 @@ def _render_transactions_workspace_page(
                         _safe_text(item.get("change_order_number"), ""),
                         _safe_text(item.get("document_id"), ""),
                         _safe_text(item.get("related_sales_order_or_return_order"), ""),
+                        _safe_text(item.get("description"), ""),
+                        _safe_text(item.get("customer_id"), ""),
                     ]
                 ).lower()
             ]
@@ -13418,7 +13432,25 @@ def _render_transactions_workspace_page(
                 "No additive or deductive change orders are recorded for this project yet."
             )
             return
-        st.dataframe(ordered_change_list, width="stretch", hide_index=True)
+        st.dataframe(
+            [
+                {
+                    "CO #": _safe_text(item.get("change_order_number"), ""),
+                    "Description": _safe_text(item.get("description"), ""),
+                    "Type": _safe_text(item.get("change_order_type"), ""),
+                    "Status": _safe_text(item.get("status"), ""),
+                    "Amount": _safe_text(item.get("amount"), "0"),
+                    "Invoice Status": _safe_text(item.get("invoice_status"), ""),
+                    "Sales/Return Document": _safe_text(
+                        item.get("related_sales_order_or_return_order"), ""
+                    ),
+                    "Customer": _safe_text(item.get("customer_id"), ""),
+                }
+                for item in ordered_change_list
+            ],
+            width="stretch",
+            hide_index=True,
+        )
         return
 
     if secondary == "overview":
@@ -13559,6 +13591,16 @@ def _render_transactions_workspace_page(
                 key=f"{prefix}_effective_date",
             )
 
+            metadata_cols = st.columns(2)
+            owner_change_reference = metadata_cols[0].text_input(
+                "Owner Change Reference",
+                key=f"{prefix}_owner_change_reference",
+            )
+            internal_notes = metadata_cols[1].text_input(
+                "Internal Notes",
+                key=f"{prefix}_internal_notes",
+            )
+
             if st.button(
                 "Create Return Order", key=f"{prefix}_create", width="stretch"
             ):
@@ -13589,6 +13631,8 @@ def _render_transactions_workspace_page(
                             approved_by=approved_by or None,
                             approval_date=approval_date or None,
                             effective_date=effective_date or None,
+                            owner_change_reference=owner_change_reference or None,
+                            internal_notes=internal_notes or None,
                             source_document=(
                                 source_sales_order_id
                                 or source_invoice_id
@@ -13805,6 +13849,16 @@ def _render_transactions_workspace_page(
                     key=f"{prefix}_effective_date",
                 )
 
+                metadata_cols = st.columns(2)
+                owner_change_reference = metadata_cols[0].text_input(
+                    "Owner Change Reference",
+                    key=f"{prefix}_owner_change_reference",
+                )
+                internal_notes = metadata_cols[1].text_input(
+                    "Internal Notes",
+                    key=f"{prefix}_internal_notes",
+                )
+
                 source_cols = st.columns(2)
                 source_document = source_cols[0].text_input(
                     "Source Document",
@@ -13847,6 +13901,8 @@ def _render_transactions_workspace_page(
                             approved_by=approved_by or None,
                             approval_date=approval_date or None,
                             effective_date=effective_date or None,
+                            owner_change_reference=owner_change_reference or None,
+                            internal_notes=internal_notes or None,
                             source_document=source_document or None,
                             related_documents=related_documents,
                             change_order_sequence=(
@@ -14339,6 +14395,18 @@ def _render_transactions_workspace_page(
                 key=f"{prefix}_edit_effective_date",
             )
 
+            metadata_cols = st.columns(2)
+            owner_change_reference = metadata_cols[0].text_input(
+                "Owner Change Reference",
+                value=_safe_text(metadata.get("owner_change_reference"), ""),
+                key=f"{prefix}_edit_owner_change_reference",
+            )
+            internal_notes = metadata_cols[1].text_input(
+                "Internal Notes",
+                value=_safe_text(metadata.get("internal_notes"), ""),
+                key=f"{prefix}_edit_internal_notes",
+            )
+
             relation_cols = st.columns(2)
             source_document = relation_cols[0].text_input(
                 "Source Document",
@@ -14379,6 +14447,8 @@ def _render_transactions_workspace_page(
                         approved_by=approved_by or None,
                         approval_date=approval_date or None,
                         effective_date=effective_date or None,
+                        owner_change_reference=owner_change_reference or None,
+                        internal_notes=internal_notes or None,
                         source_document=source_document or None,
                         related_documents=[
                             item.strip()

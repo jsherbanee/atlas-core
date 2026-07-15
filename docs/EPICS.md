@@ -65,6 +65,19 @@ Explicitly out of scope:
 - procurement execution
 - Epic E implementation
 
+### T-09 Scope
+
+- implement project-scoped change-order tracking over existing Sales Orders (additive) and Return Orders (deductive)
+- enforce non-consuming preview and consuming `CO #n` allocation semantics with no duplicate reuse per project
+- capture shared change-order metadata including owner change reference and internal notes
+- provide project commercial summary rollups for base bid, additive/deductive totals, net/current contract values, and pending/approved/invoiced/outstanding change values
+
+Explicitly out of scope:
+
+- standalone Change Order document type workflow
+- live QuickBooks synchronization transport
+- inventory and procurement workflow activation
+
 ### A-08 Scope
 
 - define one common framework for all commercial documents
