@@ -30,6 +30,7 @@ Atlas Workspace Sprint T-04 introduces the Settings workspace foundation with re
 Atlas Workspace Sprint T-05 amendment introduces tenant Terms and Conditions settings blocks (browse/add/edit/version/default/archive/preview), estimate internal/customer view presentation controls over a shared revision, explicit draft terms refresh behavior, and sales-order-from-estimate terms snapshot inheritance/default resolution.
 Atlas Workspace Sprint T-08 operationalizes Transactions > Customer Invoices with add/browse/edit/lines/billing/revisions/approvals/issue/sync-status/activity/export flows and invoice-specific sync/payment metadata controls.
 Atlas Workspace Sprint T-09 adds change-order tracking controls to Sales Order and Return Order creation/edit flows (mark-as-change-order, project-required guardrails, `CO #n` preview, reason/approval/base-bid fields, owner change reference, internal notes) and introduces a project commercial summary view for original contract, net additions, net deductions, current contract value, and pending/approved/invoiced/outstanding change totals.
+Atlas Workspace Sprint S-01 completes Settings alpha scope with Organization Profile, Taxes and Surcharges, expanded Terms families (Return Order and Customer Invoice), Document Templates management (create/list/duplicate/preview), Integrations metadata hooks, and Security policy metadata controls with permission-gated mutation paths.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.

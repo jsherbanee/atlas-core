@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from atlas_core.domain.commercial_document import CommercialDocumentType
 from atlas_core.services.commercial_document_service import CommercialNumberingService
 from atlas_core.services.settings_service import SettingsService
@@ -622,3 +624,217 @@ def test_document_template_export_replace_and_tenant_scope() -> None:
         )
         is None
     )
+
+
+def test_terms_supports_return_order_and_customer_invoice_families() -> None:
+    service = _service()
+    return_terms = service.create_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Return Terms",
+        document_family="return_order",
+        status="active",
+        content="return terms",
+        effective_date=None,
+        expiration_date=None,
+        is_default=True,
+    )
+    invoice_terms = service.create_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Invoice Terms",
+        document_family="customer_invoice",
+        status="active",
+        content="invoice terms",
+        effective_date=None,
+        expiration_date=None,
+        is_default=True,
+    )
+
+    resolved_return = service.resolve_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_family="return_order",
+    )
+    resolved_invoice = service.resolve_terms_and_conditions_block(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_family="customer_invoice",
+    )
+
+    assert resolved_return is not None
+    assert resolved_return.block_id == return_terms.block_id
+    assert resolved_invoice is not None
+    assert resolved_invoice.block_id == invoice_terms.block_id
+
+
+def test_organization_profile_update_and_validation() -> None:
+    service = _service()
+    updated = service.update_organization_profile(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        updates={
+            "legal_name": "Atlas Core LLC",
+            "display_name": "Atlas Core",
+            "email": "ops@atlas.example",
+            "website": "https://atlas.example",
+            "default_currency": "usd",
+            "tax_identification_reference": "secret://vault/tax-id",
+        },
+    )
+
+    assert updated.legal_name == "Atlas Core LLC"
+    assert updated.default_currency == "USD"
+
+    with pytest.raises(ValueError, match="must contain @"):
+        service.update_organization_profile(
+            tenant_id="tenant-a",
+            organization_id="org-1",
+            actor="tester",
+            updates={"email": "invalid-email"},
+        )
+
+
+def test_tax_surcharge_preview_supports_percentage_fixed_and_compound() -> None:
+    service = _service()
+    service.create_tax_surcharge_rule(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="State Tax",
+        applicability_type="state",
+        calculation_type="percentage",
+        value=Decimal("10"),
+        effective_date=None,
+        expiration_date=None,
+        exemptions=[],
+        document_types=["estimate"],
+        line_applicability="all",
+        priority=1,
+        compound=False,
+    )
+    service.create_tax_surcharge_rule(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Municipal Surcharge",
+        applicability_type="municipal",
+        calculation_type="fixed",
+        value=Decimal("5"),
+        effective_date=None,
+        expiration_date=None,
+        exemptions=[],
+        document_types=["estimate"],
+        line_applicability="all",
+        priority=2,
+        compound=True,
+    )
+
+    preview = service.preview_tax_surcharge_calculation(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_type="estimate",
+        subtotal=Decimal("100.00"),
+    )
+
+    assert preview["tax_surcharge_total"] == "15.00"
+    assert preview["grand_total"] == "115.00"
+    assert len(preview["applied_rules"]) == 2
+
+
+def test_integration_connections_require_secret_references_and_audit_redacts_values() -> (
+    None
+):
+    service = _service()
+
+    with pytest.raises(ValueError, match="secret://"):
+        service.upsert_integration_connection(
+            tenant_id="tenant-a",
+            organization_id="org-1",
+            actor="tester",
+            provider="quickbooks_online",
+            enabled=True,
+            status="configured",
+            connection_metadata={"realm_id": "123"},
+            secret_references={"client_secret": "plain-text"},
+        )
+
+    saved = service.upsert_integration_connection(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        provider="quickbooks_online",
+        enabled=True,
+        status="configured",
+        connection_metadata={"realm_id": "123"},
+        secret_references={"client_secret": "secret://vault/qbo/client-secret"},
+    )
+    assert saved.provider == "quickbooks_online"
+
+    audit_rows = service.audit_events(tenant_id="tenant-a", organization_id="org-1")
+    integration_rows = [
+        item
+        for item in audit_rows
+        if str(item.get("action", "")).startswith("organization.integration")
+    ]
+    assert integration_rows
+    assert integration_rows[-1]["details"]["secret_reference_keys"] == ["client_secret"]
+    assert "secret://" not in str(integration_rows[-1]["details"])
+
+
+def test_security_policy_update_and_validation() -> None:
+    service = _service()
+    policy = service.update_security_policy(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        updates={
+            "require_mfa": True,
+            "session_timeout_minutes": 60,
+            "allowed_ip_ranges": ["10.0.0.0/8"],
+        },
+    )
+    assert policy.require_mfa is True
+    assert policy.session_timeout_minutes == 60
+
+    with pytest.raises(ValueError, match="at least 15"):
+        service.update_security_policy(
+            tenant_id="tenant-a",
+            organization_id="org-1",
+            actor="tester",
+            updates={"session_timeout_minutes": 5},
+        )
+
+
+def test_document_template_duplicate_preview_and_customer_invoice_family() -> None:
+    service = _service()
+    created = service.create_document_template(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Invoice Default",
+        document_family="customer_invoice",
+        status="active",
+        content="invoice template content",
+        section_config={"show_totals": True},
+        is_default=True,
+    )
+    duplicated = service.duplicate_document_template(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        template_id=created.template_id,
+        actor="tester",
+    )
+    preview = service.document_template_preview(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        template_id=duplicated.template_id,
+    )
+
+    assert duplicated.template_id != created.template_id
+    assert duplicated.document_family == "customer_invoice"
+    assert preview["document_family"] == "customer_invoice"
+    assert preview["content_preview"] == "invoice template content"

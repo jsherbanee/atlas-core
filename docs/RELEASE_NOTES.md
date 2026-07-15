@@ -21,6 +21,24 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Atlas Alpha Completion Sprint S-01 Settings Workspace Completion)
+
+### Improved
+
+- Settings now supports Organization Profile metadata management with deterministic tenant scoping.
+- Settings now supports tax and surcharge rule management with decimal-safe preview calculation behavior.
+- Terms and Conditions settings now support `return_order` and `customer_invoice` families in addition to existing estimate/sales-order families.
+- Settings document templates now include duplicate and preview workflow support.
+- Integrations section is now operational for metadata hooks, including provider/status metadata and secret-reference-only credential pointers.
+- Security section is now operational for organization security policy metadata controls (MFA flag, session timeout, password policy reference, allowed IP ranges).
+- Settings and integrations mutations are permission-gated by `settings.manage` and `integrations.manage` with deny-by-default behavior.
+
+### Scope Notes
+
+- metadata hooks only for integrations (no live provider authentication or sync transport)
+- security policy metadata only (no live identity/session enforcement engine)
+- no SSO, invitation lifecycle, or billing-provider implementation introduced
+
 ## Unreleased (Epic T Sprint T-08 Customer Invoice Transactions)
 
 ### Improved

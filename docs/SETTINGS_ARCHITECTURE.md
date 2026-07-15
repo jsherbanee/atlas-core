@@ -4,6 +4,8 @@ This document defines the reusable Settings workspace foundation and scope bound
 
 Sprint P-05 extends Settings with deterministic document-template management for commercial document generation.
 
+Sprint S-01 extends Settings to complete the alpha baseline for organization controls and integration metadata governance.
+
 ## Purpose
 
 Provide a deterministic, tenant-aware settings surface for organization controls and user preferences while preserving existing runtime and numbering guarantees.
@@ -15,8 +17,6 @@ Active sections:
 - Personal Preferences
 
 Visible but future-scoped sections:
-- Integrations
-- Security
 - Billing
 - Advanced
 
@@ -34,6 +34,14 @@ P-05 extension:
 - tenant-scoped document templates with version lineage and scoped assignment (transaction, project, customer, tenant default)
 - explicit default-template assignment for tenant-level templates
 - precedence-aware template resolution and runtime export/replace synchronization
+
+S-01 extension:
+- organization profile management (identity, contact, locale, branding reference, tax ID secret reference)
+- taxes and surcharges deterministic rule engine with decimal-safe preview
+- integrations metadata hooks with secret-reference-only credential pointers
+- security policy metadata controls for MFA/session/policy references
+- terms document family expansion to Return Orders and Customer Invoices
+- document template duplication and preview controls
 
 ## Navigation Contract
 
@@ -53,14 +61,23 @@ Secondary sections:
 
 Organization tertiary actions:
 - `overview`
+- `organization_profile`
 - `commercial_numbering`
+- `taxes_surcharges`
 - `terms_and_conditions`
+- `document_templates`
 - `roles_permissions`
 - `audit`
 
 Personal tertiary actions:
 - `profile`
 - `display`
+
+Integrations tertiary actions:
+- `connections`
+
+Security tertiary actions:
+- `policy`
 
 ## Tenant and User Scope Model
 
@@ -70,6 +87,7 @@ Settings state is modeled in two explicit scope layers:
   - scoped by tenant and organization
   - authoritative for tenant-governed controls
   - includes commercial document numbering policies
+  - includes organization profile, tax/surcharge rules, integration connection metadata, and security policy metadata
 
 - Personal preferences
   - scoped by tenant, organization, and user
@@ -133,6 +151,9 @@ Persisted areas:
 - settings workspace navigation state
 - organization numbering policies
 - organization terms and conditions blocks
+- organization tax and surcharge rules
+- organization integration connection metadata (secret references only)
+- organization security policy metadata
 - personal preference values
 - settings audit events
 
@@ -141,6 +162,10 @@ Persisted areas:
 `SettingsService` is the authority for:
 - organization numbering policy list/update/replace/export
 - organization terms and conditions block create/edit/version/assign-default/archive/restore/resolve/export
+- organization profile read/update
+- tax and surcharge rule create/list/update/preview
+- integration connection list/upsert with secret-reference validation
+- security policy read/update
 - numbering previews
 - personal preference defaults and updates
 - settings audit event recording
@@ -174,6 +199,8 @@ T-04 validation includes:
 Tenant-scoped Terms and Conditions content blocks are now supported for:
 - `estimate`
 - `sales_order`
+- `return_order`
+- `customer_invoice`
 
 Block fields:
 - title

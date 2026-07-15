@@ -105,6 +105,17 @@ Project-scoped change-order hardening now includes:
 
 No new blocker-class tenant-isolation or cross-scope regressions were identified in validated T-09 change-order flows.
 
+## S-01 Follow-Up Note
+
+Settings workspace completion now includes:
+- organization profile metadata controls
+- tax and surcharge deterministic rule preview controls
+- integrations metadata hooks with secret-reference-only enforcement
+- security policy metadata controls
+- expanded terms families for Return Orders and Customer Invoices
+
+No blocker-class tenant-isolation regressions were identified in targeted S-01 validation for settings service and settings navigation contracts.
+
 ## Security and Tenancy Findings
 - No active cross-tenant mutation regression remains in audited transactions paths with default service configuration.
 - Transactions service construction now fails fast when active tenant/org scope is omitted.

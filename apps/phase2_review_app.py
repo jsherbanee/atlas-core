@@ -6776,14 +6776,32 @@ def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": None,
             },
             {
+                "tertiary_key": "organization_profile",
+                "label": "Organization Profile",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
                 "tertiary_key": "commercial_numbering",
                 "label": "Commercial Numbering",
                 "action_type": "settings_view",
                 "required_selection": None,
             },
             {
+                "tertiary_key": "taxes_surcharges",
+                "label": "Taxes and Surcharges",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
                 "tertiary_key": "terms_and_conditions",
                 "label": "Terms and Conditions",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "document_templates",
+                "label": "Document Templates",
                 "action_type": "settings_view",
                 "required_selection": None,
             },
@@ -6816,17 +6834,17 @@ def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
         ],
         "integrations": [
             {
-                "tertiary_key": "future",
-                "label": "Future",
-                "action_type": "collection_view",
+                "tertiary_key": "connections",
+                "label": "Connections",
+                "action_type": "settings_view",
                 "required_selection": None,
             }
         ],
         "security": [
             {
-                "tertiary_key": "future",
-                "label": "Future",
-                "action_type": "collection_view",
+                "tertiary_key": "policy",
+                "label": "Policy",
+                "action_type": "settings_view",
                 "required_selection": None,
             }
         ],
@@ -16012,6 +16030,33 @@ def _render_application_administration_page(
             project_id=None,
         )
     )
+    settings_manage_access = permissions_service.evaluate(
+        AccessRequest(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            principal_id=user_id,
+            permission_key="settings.manage",
+            project_id=None,
+        )
+    )
+    integrations_view_access = permissions_service.evaluate(
+        AccessRequest(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            principal_id=user_id,
+            permission_key="integrations.view",
+            project_id=None,
+        )
+    )
+    integrations_manage_access = permissions_service.evaluate(
+        AccessRequest(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            principal_id=user_id,
+            permission_key="integrations.manage",
+            project_id=None,
+        )
+    )
     if not settings_access.allowed:
         st.warning(settings_access.reason)
         return
@@ -16045,6 +16090,104 @@ def _render_application_administration_page(
                 width="stretch",
                 hide_index=True,
             )
+
+        elif tertiary == "organization_profile":
+            profile = settings_service.organization_profile(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+            )
+            with st.form("atlas_settings_organization_profile_form"):
+                identity_cols = st.columns(2)
+                legal_name = identity_cols[0].text_input(
+                    "Legal Name",
+                    value=profile.legal_name,
+                )
+                display_name = identity_cols[1].text_input(
+                    "Display Name",
+                    value=profile.display_name,
+                )
+                contact_cols = st.columns(3)
+                website = contact_cols[0].text_input(
+                    "Website",
+                    value=_safe_text(profile.website, ""),
+                    placeholder="https://example.com",
+                )
+                email = contact_cols[1].text_input(
+                    "Email",
+                    value=_safe_text(profile.email, ""),
+                )
+                phone = contact_cols[2].text_input(
+                    "Phone",
+                    value=_safe_text(profile.phone, ""),
+                )
+                ops_cols = st.columns(3)
+                default_currency = ops_cols[0].text_input(
+                    "Default Currency",
+                    value=profile.default_currency,
+                )
+                default_timezone = ops_cols[1].text_input(
+                    "Default Timezone",
+                    value=profile.default_timezone,
+                )
+                country = ops_cols[2].text_input(
+                    "Country",
+                    value=_safe_text(profile.country, ""),
+                )
+                address_cols = st.columns(2)
+                physical_address = address_cols[0].text_area(
+                    "Physical Address",
+                    value=_safe_text(profile.physical_address, ""),
+                    height=120,
+                )
+                mailing_address = address_cols[1].text_area(
+                    "Mailing Address",
+                    value=_safe_text(profile.mailing_address, ""),
+                    height=120,
+                )
+                security_cols = st.columns(2)
+                logo_reference = security_cols[0].text_input(
+                    "Logo Reference",
+                    value=_safe_text(profile.logo_reference, ""),
+                    placeholder="asset://branding/logo-primary",
+                )
+                tax_id_reference = security_cols[1].text_input(
+                    "Tax ID Secret Reference",
+                    value=_safe_text(profile.tax_identification_reference, ""),
+                    placeholder="secret://vault/organization/tax-id",
+                )
+                save_profile = st.form_submit_button(
+                    "Save Organization Profile",
+                    width="stretch",
+                    disabled=not settings_manage_access.allowed,
+                )
+            if not settings_manage_access.allowed:
+                st.caption(settings_manage_access.reason)
+            if save_profile:
+                try:
+                    settings_service.update_organization_profile(
+                        tenant_id=tenant_id,
+                        organization_id=organization_id,
+                        actor="atlas-ui",
+                        updates={
+                            "legal_name": legal_name,
+                            "display_name": display_name,
+                            "website": website or None,
+                            "email": email or None,
+                            "phone": phone or None,
+                            "default_currency": default_currency,
+                            "default_timezone": default_timezone,
+                            "country": country or None,
+                            "physical_address": physical_address or None,
+                            "mailing_address": mailing_address or None,
+                            "logo_reference": logo_reference or None,
+                            "tax_identification_reference": tax_id_reference or None,
+                        },
+                    )
+                    _save_settings_workspace_state(st, settings_service)
+                    st.success("Organization profile saved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to save organization profile: {exc}")
 
         elif tertiary == "commercial_numbering":
             document_type_labels = [item.value for item in CommercialDocumentType]
@@ -16208,12 +16351,184 @@ def _render_application_administration_page(
                 except Exception as exc:
                     st.error(f"Unable to save policy: {exc}")
 
+        elif tertiary == "taxes_surcharges":
+            include_archived_rules = st.checkbox(
+                "Include Archived Rules",
+                value=False,
+                key="atlas_settings_tax_include_archived",
+            )
+            rules = settings_service.list_tax_surcharge_rules(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                include_archived=include_archived_rules,
+            )
+            if rules:
+                st.dataframe(
+                    [
+                        {
+                            "Rule ID": item.rule_id,
+                            "Title": item.title,
+                            "Type": item.applicability_type,
+                            "Calculation": item.calculation_type,
+                            "Value": item.value,
+                            "Line Scope": item.line_applicability,
+                            "Priority": item.priority,
+                            "Compound": item.compound,
+                            "Archived": item.archived,
+                            "Updated": item.updated_at,
+                        }
+                        for item in rules
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+            else:
+                st.info("No tax or surcharge rules configured.")
+
+            with st.form("atlas_settings_tax_rule_create_form"):
+                rule_cols = st.columns(4)
+                rule_title = rule_cols[0].text_input("Rule Title")
+                rule_type = rule_cols[1].selectbox(
+                    "Applicability",
+                    options=["state", "regional", "county", "municipal", "surcharge"],
+                )
+                rule_calc = rule_cols[2].selectbox(
+                    "Calculation",
+                    options=["percentage", "fixed"],
+                )
+                rule_value = rule_cols[3].text_input("Value", value="0")
+                rule_scope_cols = st.columns(4)
+                rule_line_applicability = rule_scope_cols[0].selectbox(
+                    "Line Applicability",
+                    options=["all", "taxable", "non_taxable"],
+                )
+                rule_priority = int(
+                    rule_scope_cols[1].number_input(
+                        "Priority",
+                        min_value=0,
+                        value=100,
+                        step=1,
+                    )
+                )
+                rule_compound = rule_scope_cols[2].checkbox("Compound", value=False)
+                rule_archived = rule_scope_cols[3].checkbox(
+                    "Archived",
+                    value=False,
+                    help="Create inactive rule state for staged rollout.",
+                )
+                rule_document_types = st.multiselect(
+                    "Document Types",
+                    options=[item.value for item in CommercialDocumentType],
+                    default=[CommercialDocumentType.ESTIMATE.value],
+                )
+                rule_exemptions = st.text_input(
+                    "Exemption Codes (comma-separated)",
+                    value="",
+                )
+                create_rule = st.form_submit_button(
+                    "Create Tax/Surcharge Rule",
+                    width="stretch",
+                    disabled=not settings_manage_access.allowed,
+                )
+            if not settings_manage_access.allowed:
+                st.caption(settings_manage_access.reason)
+            if create_rule:
+                try:
+                    created_rule = settings_service.create_tax_surcharge_rule(
+                        tenant_id=tenant_id,
+                        organization_id=organization_id,
+                        actor="atlas-ui",
+                        title=rule_title,
+                        applicability_type=rule_type,
+                        calculation_type=rule_calc,
+                        value=Decimal(rule_value),
+                        effective_date=None,
+                        expiration_date=None,
+                        exemptions=[
+                            item.strip()
+                            for item in rule_exemptions.split(",")
+                            if item.strip()
+                        ],
+                        document_types=rule_document_types,
+                        line_applicability=rule_line_applicability,
+                        priority=rule_priority,
+                        compound=bool(rule_compound),
+                    )
+                    if rule_archived:
+                        settings_service.update_tax_surcharge_rule(
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            rule_id=created_rule.rule_id,
+                            actor="atlas-ui",
+                            updates={"archived": True},
+                        )
+                    _save_settings_workspace_state(st, settings_service)
+                    st.success("Tax or surcharge rule created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create rule: {exc}")
+
+            st.markdown("#### Preview")
+            preview_cols = st.columns(4)
+            preview_document_type = preview_cols[0].selectbox(
+                "Document Type",
+                options=[item.value for item in CommercialDocumentType],
+                key="atlas_settings_tax_preview_document_type",
+            )
+            preview_subtotal = preview_cols[1].text_input(
+                "Subtotal",
+                value="100.00",
+                key="atlas_settings_tax_preview_subtotal",
+            )
+            preview_taxable = preview_cols[2].checkbox(
+                "Line Is Taxable",
+                value=True,
+                key="atlas_settings_tax_preview_taxable",
+            )
+            preview_exemptions = preview_cols[3].text_input(
+                "Exemption Codes",
+                value="",
+                key="atlas_settings_tax_preview_exemptions",
+                placeholder="EXEMPT-1,EXEMPT-2",
+            )
+            try:
+                preview_result = settings_service.preview_tax_surcharge_calculation(
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                    document_type=preview_document_type,
+                    subtotal=Decimal(preview_subtotal),
+                    line_is_taxable=bool(preview_taxable),
+                    exemption_codes=[
+                        item.strip()
+                        for item in preview_exemptions.split(",")
+                        if item.strip()
+                    ],
+                )
+                st.dataframe(
+                    [
+                        {
+                            "Subtotal": preview_result.get("subtotal"),
+                            "Tax/Surcharge": preview_result.get("tax_surcharge_total"),
+                            "Grand Total": preview_result.get("grand_total"),
+                            "Applied Rules": len(
+                                list(preview_result.get("applied_rules") or [])
+                            ),
+                        }
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+            except Exception as exc:
+                st.caption(f"Preview unavailable: {exc}")
+
         elif tertiary == "terms_and_conditions":
             family = st.selectbox(
                 "Document Family",
                 options=[
                     CommercialDocumentType.ESTIMATE.value,
                     CommercialDocumentType.SALES_ORDER.value,
+                    CommercialDocumentType.RETURN_ORDER.value,
+                    CommercialDocumentType.CUSTOMER_INVOICE.value,
                 ],
                 key="atlas_settings_terms_family",
             )
@@ -16600,6 +16915,122 @@ def _render_application_administration_page(
                         key="atlas_settings_terms_preview_content",
                     )
 
+        elif tertiary == "document_templates":
+            template_family = st.selectbox(
+                "Document Family",
+                options=[item.value for item in CommercialDocumentType],
+                key="atlas_settings_template_family",
+            )
+            include_archived_templates = st.checkbox(
+                "Include Archived Templates",
+                value=False,
+                key="atlas_settings_templates_include_archived",
+            )
+            templates = settings_service.list_document_templates(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                document_family=template_family,
+                include_archived=include_archived_templates,
+            )
+            if templates:
+                st.dataframe(
+                    [
+                        {
+                            "Template ID": item.template_id,
+                            "Title": item.title,
+                            "Version": item.version,
+                            "Status": item.status,
+                            "Default": item.is_default,
+                            "Archived": item.archived,
+                            "Updated": item.updated_at,
+                        }
+                        for item in templates
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+            else:
+                st.info("No templates configured for this family.")
+
+            with st.form("atlas_settings_template_create_form"):
+                create_cols = st.columns(3)
+                create_title = create_cols[0].text_input("Template Title")
+                create_status = create_cols[1].selectbox(
+                    "Status",
+                    options=["draft", "active"],
+                )
+                create_default = create_cols[2].checkbox("Set Default", value=False)
+                create_content = st.text_area("Template Content", height=180)
+                create_template = st.form_submit_button(
+                    "Create Template",
+                    width="stretch",
+                    disabled=not settings_manage_access.allowed,
+                )
+            if create_template:
+                try:
+                    settings_service.create_document_template(
+                        tenant_id=tenant_id,
+                        organization_id=organization_id,
+                        actor="atlas-ui",
+                        title=create_title,
+                        document_family=template_family,
+                        status=create_status,
+                        content=create_content,
+                        section_config={},
+                        is_default=bool(create_default),
+                    )
+                    _save_settings_workspace_state(st, settings_service)
+                    st.success("Template created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create template: {exc}")
+
+            if templates:
+                template_label = st.selectbox(
+                    "Template",
+                    options=[
+                        f"{item.template_id} · v{item.version} · {item.title}"
+                        for item in templates
+                    ],
+                    key="atlas_settings_template_selected",
+                )
+                selected_template = templates[
+                    [
+                        f"{item.template_id} · v{item.version} · {item.title}"
+                        for item in templates
+                    ].index(template_label)
+                ]
+                action_cols = st.columns(2)
+                if action_cols[0].button(
+                    "Duplicate Template",
+                    key="atlas_settings_template_duplicate",
+                    width="stretch",
+                    disabled=not settings_manage_access.allowed,
+                ):
+                    try:
+                        settings_service.duplicate_document_template(
+                            tenant_id=tenant_id,
+                            organization_id=organization_id,
+                            template_id=selected_template.template_id,
+                            actor="atlas-ui",
+                        )
+                        _save_settings_workspace_state(st, settings_service)
+                        st.success("Template duplicated.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Unable to duplicate template: {exc}")
+                preview_payload = settings_service.document_template_preview(
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                    template_id=selected_template.template_id,
+                )
+                st.text_area(
+                    "Template Preview",
+                    value=_safe_text(preview_payload.get("content_preview"), ""),
+                    height=220,
+                    key="atlas_settings_template_preview_content",
+                )
+
         elif tertiary == "roles_permissions":
             roles_view = permissions_service.evaluate(
                 AccessRequest(
@@ -16885,6 +17316,164 @@ def _render_application_administration_page(
 
         else:
             st.info("Select a valid settings subsection.")
+
+    elif secondary == "integrations":
+        if not integrations_view_access.allowed:
+            st.info(integrations_view_access.reason)
+        else:
+            connections = settings_service.list_integration_connections(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+            )
+            if connections:
+                st.dataframe(
+                    [
+                        {
+                            "Provider": item.provider,
+                            "Enabled": item.enabled,
+                            "Status": item.status,
+                            "Metadata Keys": ", ".join(
+                                sorted(item.connection_metadata.keys())
+                            ),
+                            "Secret Keys": ", ".join(
+                                sorted(item.secret_references.keys())
+                            ),
+                            "Updated": item.updated_at,
+                        }
+                        for item in connections
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+            else:
+                st.info("No integration connections configured.")
+
+            with st.form("atlas_settings_integrations_connection_form"):
+                connection_cols = st.columns(4)
+                provider = connection_cols[0].selectbox(
+                    "Provider",
+                    options=[
+                        "quickbooks_online",
+                        "xero",
+                        "microsoft_365",
+                        "google_workspace",
+                        "generic_api",
+                        "generic_webhook",
+                    ],
+                    key="atlas_settings_integrations_provider",
+                )
+                enabled = connection_cols[1].checkbox("Enabled", value=False)
+                status = connection_cols[2].selectbox(
+                    "Status",
+                    options=["disconnected", "configured", "degraded", "error"],
+                )
+                metadata_json = connection_cols[3].text_input(
+                    "Metadata JSON",
+                    value="{}",
+                )
+                secret_refs_json = st.text_input(
+                    "Secret References JSON",
+                    value="{}",
+                    help='Example: {"client_secret": "secret://vault/qbo/client-secret"}',
+                )
+                save_connection = st.form_submit_button(
+                    "Save Integration Connection",
+                    width="stretch",
+                    disabled=not integrations_manage_access.allowed,
+                )
+            if not integrations_manage_access.allowed:
+                st.caption(integrations_manage_access.reason)
+            if save_connection:
+                try:
+                    metadata_payload = json.loads(metadata_json)
+                    secret_refs_payload = json.loads(secret_refs_json)
+                    if not isinstance(metadata_payload, dict):
+                        raise ValueError("Metadata JSON must be an object.")
+                    if not isinstance(secret_refs_payload, dict):
+                        raise ValueError("Secret References JSON must be an object.")
+                    settings_service.upsert_integration_connection(
+                        tenant_id=tenant_id,
+                        organization_id=organization_id,
+                        actor="atlas-ui",
+                        provider=provider,
+                        enabled=bool(enabled),
+                        status=status,
+                        connection_metadata=metadata_payload,
+                        secret_references={
+                            str(key): str(value)
+                            for key, value in secret_refs_payload.items()
+                        },
+                    )
+                    _save_settings_workspace_state(st, settings_service)
+                    st.success("Integration metadata saved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to save integration metadata: {exc}")
+
+    elif secondary == "security":
+        if tertiary == "policy":
+            policy = settings_service.security_policy(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+            )
+            with st.form("atlas_settings_security_policy_form"):
+                policy_cols = st.columns(3)
+                require_mfa = policy_cols[0].checkbox(
+                    "Require MFA",
+                    value=bool(policy.require_mfa),
+                )
+                session_timeout_minutes = int(
+                    policy_cols[1].number_input(
+                        "Session Timeout (minutes)",
+                        min_value=15,
+                        value=int(policy.session_timeout_minutes),
+                        step=15,
+                    )
+                )
+                password_policy_reference = policy_cols[2].text_input(
+                    "Password Policy Reference",
+                    value=_safe_text(policy.password_policy_reference, ""),
+                )
+                allowed_ip_ranges_csv = st.text_input(
+                    "Allowed IP Ranges (comma-separated)",
+                    value=", ".join(list(policy.allowed_ip_ranges or [])),
+                )
+                save_policy = st.form_submit_button(
+                    "Save Security Policy",
+                    width="stretch",
+                    disabled=not settings_manage_access.allowed,
+                )
+            if not settings_manage_access.allowed:
+                st.caption(settings_manage_access.reason)
+            if save_policy:
+                try:
+                    settings_service.update_security_policy(
+                        tenant_id=tenant_id,
+                        organization_id=organization_id,
+                        actor="atlas-ui",
+                        updates={
+                            "require_mfa": bool(require_mfa),
+                            "session_timeout_minutes": session_timeout_minutes,
+                            "password_policy_reference": (
+                                password_policy_reference or None
+                            ),
+                            "allowed_ip_ranges": [
+                                item.strip()
+                                for item in allowed_ip_ranges_csv.split(",")
+                                if item.strip()
+                            ],
+                        },
+                    )
+                    _save_settings_workspace_state(st, settings_service)
+                    st.success("Security policy saved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to save security policy: {exc}")
+            st.caption(
+                "Policy is metadata-only in alpha. SSO, live auth providers, and runtime enforcement remain out of scope."
+            )
+        else:
+            st.info("Select a valid security subsection.")
 
     elif secondary == "personal_preferences":
         prefs = settings_service.personal_preferences(

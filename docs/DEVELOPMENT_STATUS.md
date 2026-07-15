@@ -72,6 +72,7 @@ Sprint P-05 implements the Document Generation and Template Engine with determin
 Sprint P-06 completes the Alpha Foundation Integrity Audit, including repository-wide hardening validation and targeted corrections for tenant-scoped transactions access, explicit template scope enforcement, and attachment-version file-extension validation with regression coverage.
 Sprint P-07 resolves Alpha blocker remediation by enforcing default active tenant/organization scope requirements in transactions service construction, blocking cross-tenant draft creation under enforced scope, and adding regression coverage while preserving explicit test-only unscoped compatibility.
 Sprint T-09 implements project-scoped change-order tracking convention on Sales Orders (additive) and Return Orders (deductive), including shared change-order metadata (owner reference/internal notes included), project-level `CO #n` sequence allocation/preview guarantees, base-bid assignment, and project commercial summary rollups (pending/approved/invoiced/outstanding values) without creating a standalone Change Order document object.
+Sprint S-01 completes Settings Workspace alpha scope with organization profile controls, tax/surcharge deterministic rule preview, integrations metadata hooks (secret-reference enforcement), security policy metadata controls, expanded terms families for return orders/customer invoices, and document template duplicate/preview workflows.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 
 X-01 through X-13 are closed.
@@ -94,7 +95,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1366 tests)
+- pytest: full suite passing (1376 tests)
+
+Latest validated full-suite baseline in active sprint sequence: 1376 passing tests.
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces

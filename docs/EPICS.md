@@ -47,6 +47,7 @@ Status: Active
 - P-06 Alpha Foundation Integrity Audit
 - P-07 Alpha Blocker Remediation
 - T-09 Change Order Tracking Convention
+- S-01 Settings Workspace Completion
 
 ### A-07 Scope
 
@@ -77,6 +78,20 @@ Explicitly out of scope:
 - standalone Change Order document type workflow
 - live QuickBooks synchronization transport
 - inventory and procurement workflow activation
+
+### S-01 Scope
+
+- complete Settings alpha baseline across organization controls and personal-preference boundaries
+- implement organization profile, tax/surcharge policy modeling and deterministic preview, and integration metadata hooks
+- enforce secret-reference-only credential pointer storage for integration settings
+- expand terms settings support to Return Order and Customer Invoice document families
+- implement security policy metadata controls and broader settings UI contract coverage
+
+Explicitly out of scope:
+
+- live integration authentication/transport execution
+- external tax engine integration
+- identity lifecycle, SSO, and invitation workflows
 
 ### A-08 Scope
 

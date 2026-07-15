@@ -41,8 +41,11 @@ def test_settings_workspace_contract_has_expected_sections() -> None:
     ]
     assert org_tertiary == [
         "overview",
+        "organization_profile",
         "commercial_numbering",
+        "taxes_surcharges",
         "terms_and_conditions",
+        "document_templates",
         "roles_permissions",
         "audit",
     ]

@@ -142,6 +142,15 @@ P-01 adds a minimal Settings > Organization > Roles and Permissions surface for:
 
 The Settings audit surface now includes permission change events.
 
+## S-01 Extension
+
+Sprint S-01 applies the existing P-01 authorization model to broader Settings operations:
+
+- organization-level Settings mutations require `settings.manage`
+- integrations metadata mutations require `integrations.manage`
+- organization/integration read surfaces continue to evaluate `settings.view` and `integrations.view`
+- deny-by-default behavior remains authoritative for all newly added settings operations
+
 ## Future Direction
 
 P-01 intentionally leaves room for future custom-role workflows without introducing a full policy editor in this sprint.

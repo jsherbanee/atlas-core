@@ -141,6 +141,11 @@ T-04 implementation note:
 - initial personal-preference support is available for landing workspace, density, table size, date format, timezone, and reduced-motion preferences
 - personal preferences are user-scoped and do not override tenant-controlled numbering, security, billing, retention, or integration policy controls
 
+S-01 implementation note:
+- organization-managed settings now include profile metadata, security policy metadata, and integration connection metadata hooks.
+- settings and integration mutations are gated by role permissions (`settings.manage` and `integrations.manage`); read paths remain independently gateable (`settings.view`, `integrations.view`).
+- placeholder membership IDs remain supported in local development for role assignment continuity while full invitation/provisioning workflows remain future scope.
+
 ## Future Direction
 Atlas should eventually support enterprise-ready administration with invitations, memberships, teams, billing roles, and SSO.
 

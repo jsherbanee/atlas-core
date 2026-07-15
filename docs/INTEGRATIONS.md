@@ -118,6 +118,16 @@ Most integrations described here are architectural direction rather than current
 
 Current functionality should not be overstated.
 
+S-01 implementation update (metadata hooks only):
+- Settings now supports tenant-scoped integration connection metadata records for `quickbooks_online`, `xero`, `microsoft_365`, `google_workspace`, `generic_api`, and `generic_webhook`.
+- Secret material is not stored directly in settings state; secret fields must be provided as secret references using `secret://` URIs.
+- Integration audit events record provider/status and metadata/secret key names only; secret-reference values are not emitted into audit detail payloads.
+
+Current boundary remains:
+- no live provider authentication handshake
+- no token exchange/refresh implementation
+- no webhook registration or transport execution
+
 ## Future Direction
 Atlas should eventually act as an operational hub that synchronizes with accounting, billing, productivity, storage, manufacturer, and field systems without becoming a duplicate of those systems.
 

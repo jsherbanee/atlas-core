@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 import hashlib
 import json
 from typing import Any
@@ -93,14 +94,38 @@ _RESTRICTED_PERSONAL_OVERRIDE_KEYS = {
 _ALLOWED_TERMS_DOCUMENT_FAMILIES = {
     CommercialDocumentType.ESTIMATE.value,
     CommercialDocumentType.SALES_ORDER.value,
+    CommercialDocumentType.RETURN_ORDER.value,
+    CommercialDocumentType.CUSTOMER_INVOICE.value,
 }
 
 
 _ALLOWED_TEMPLATE_DOCUMENT_FAMILIES = {
-    CommercialDocumentType.ESTIMATE.value,
-    CommercialDocumentType.SALES_ORDER.value,
-    CommercialDocumentType.RETURN_ORDER.value,
-    CommercialDocumentType.CREDIT_MEMO.value,
+    document_type.value for document_type in CommercialDocumentType
+}
+
+
+_ALLOWED_INTEGRATION_PROVIDERS = {
+    "quickbooks_online",
+    "xero",
+    "microsoft_365",
+    "google_workspace",
+    "generic_api",
+    "generic_webhook",
+}
+
+
+_ALLOWED_APPLICABILITY_TYPES = {
+    "state",
+    "regional",
+    "county",
+    "municipal",
+    "surcharge",
+}
+
+
+_ALLOWED_RULE_CALCULATION_TYPES = {
+    "percentage",
+    "fixed",
 }
 
 
@@ -127,6 +152,265 @@ class PersonalPreferences:
             "date_display_format": self.date_display_format,
             "timezone": self.timezone,
             "reduced_motion": self.reduced_motion,
+        }
+
+
+@dataclass(frozen=True)
+class OrganizationProfile:
+    legal_name: str = ""
+    display_name: str = ""
+    logo_reference: str | None = None
+    website: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    physical_address: str | None = None
+    mailing_address: str | None = None
+    default_currency: str = "USD"
+    default_timezone: str = "UTC"
+    country: str | None = None
+    tax_identification_reference: str | None = None
+
+    @staticmethod
+    def from_dict(payload: dict[str, Any]) -> "OrganizationProfile":
+        legal_name = _normalize_text(payload.get("legal_name"))
+        display_name = _normalize_text(payload.get("display_name"))
+        email = _normalize_optional_text(payload.get("email"))
+        if email and "@" not in email:
+            raise ValueError("organization profile email must contain @")
+        website = _normalize_optional_text(payload.get("website"))
+        if website and not (
+            website.startswith("http://") or website.startswith("https://")
+        ):
+            raise ValueError(
+                "organization profile website must start with http:// or https://"
+            )
+        currency = _normalize_text(payload.get("default_currency") or "USD").upper()
+        if len(currency) != 3:
+            raise ValueError("default_currency must be a 3-letter code")
+        timezone = _normalize_text(payload.get("default_timezone") or "UTC")
+        return OrganizationProfile(
+            legal_name=legal_name,
+            display_name=display_name,
+            logo_reference=_normalize_optional_text(payload.get("logo_reference")),
+            website=website,
+            phone=_normalize_optional_text(payload.get("phone")),
+            email=email,
+            physical_address=_normalize_optional_text(payload.get("physical_address")),
+            mailing_address=_normalize_optional_text(payload.get("mailing_address")),
+            default_currency=currency,
+            default_timezone=timezone,
+            country=_normalize_optional_text(payload.get("country")),
+            tax_identification_reference=_normalize_optional_text(
+                payload.get("tax_identification_reference")
+            ),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "legal_name": self.legal_name,
+            "display_name": self.display_name,
+            "logo_reference": self.logo_reference,
+            "website": self.website,
+            "phone": self.phone,
+            "email": self.email,
+            "physical_address": self.physical_address,
+            "mailing_address": self.mailing_address,
+            "default_currency": self.default_currency,
+            "default_timezone": self.default_timezone,
+            "country": self.country,
+            "tax_identification_reference": self.tax_identification_reference,
+        }
+
+
+@dataclass(frozen=True)
+class TaxSurchargeRule:
+    rule_id: str
+    title: str
+    applicability_type: str
+    calculation_type: str
+    value: str
+    effective_date: str | None
+    expiration_date: str | None
+    exemptions: list[str]
+    document_types: list[str]
+    line_applicability: str
+    priority: int
+    compound: bool
+    archived: bool
+    created_at: str
+    created_by: str
+    updated_at: str
+    updated_by: str
+
+    @staticmethod
+    def from_dict(payload: dict[str, Any]) -> "TaxSurchargeRule":
+        rule_id = _normalize_text(payload.get("rule_id"))
+        if not rule_id:
+            raise ValueError("rule_id is required")
+        title = _normalize_text(payload.get("title"))
+        if not title:
+            raise ValueError("title is required")
+        applicability_type = _normalize_text(payload.get("applicability_type")).lower()
+        if applicability_type not in _ALLOWED_APPLICABILITY_TYPES:
+            raise ValueError("unsupported applicability_type")
+        calculation_type = _normalize_text(payload.get("calculation_type")).lower()
+        if calculation_type not in _ALLOWED_RULE_CALCULATION_TYPES:
+            raise ValueError("unsupported calculation_type")
+        value = str(payload.get("value") or "0")
+        if Decimal(value) < Decimal("0"):
+            raise ValueError("value cannot be negative")
+        effective_date = _normalize_optional_text(payload.get("effective_date"))
+        expiration_date = _normalize_optional_text(payload.get("expiration_date"))
+        _parse_iso_or_none(effective_date)
+        _parse_iso_or_none(expiration_date)
+        priority = int(payload.get("priority") or 100)
+        if priority < 0:
+            raise ValueError("priority cannot be negative")
+        line_applicability = _normalize_text(
+            payload.get("line_applicability") or "all"
+        ).lower()
+        if line_applicability not in {"all", "taxable", "non_taxable"}:
+            raise ValueError("unsupported line_applicability")
+        document_types = [
+            _normalize_text(item).lower()
+            for item in list(payload.get("document_types") or [])
+            if _normalize_text(item)
+        ]
+        if not document_types:
+            document_types = [item.value for item in CommercialDocumentType]
+        for document_type in document_types:
+            if document_type not in _ALLOWED_TEMPLATE_DOCUMENT_FAMILIES:
+                raise ValueError("unsupported document type in tax/surcharge rule")
+        created_at = _normalize_text(payload.get("created_at")) or _now_iso()
+        created_by = _normalize_text(payload.get("created_by")) or "system"
+        updated_at = _normalize_text(payload.get("updated_at")) or created_at
+        updated_by = _normalize_text(payload.get("updated_by")) or created_by
+        exemptions = [
+            _normalize_text(item)
+            for item in list(payload.get("exemptions") or [])
+            if _normalize_text(item)
+        ]
+        return TaxSurchargeRule(
+            rule_id=rule_id,
+            title=title,
+            applicability_type=applicability_type,
+            calculation_type=calculation_type,
+            value=str(Decimal(value)),
+            effective_date=effective_date,
+            expiration_date=expiration_date,
+            exemptions=exemptions,
+            document_types=document_types,
+            line_applicability=line_applicability,
+            priority=priority,
+            compound=bool(payload.get("compound", False)),
+            archived=bool(payload.get("archived", False)),
+            created_at=created_at,
+            created_by=created_by,
+            updated_at=updated_at,
+            updated_by=updated_by,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "rule_id": self.rule_id,
+            "title": self.title,
+            "applicability_type": self.applicability_type,
+            "calculation_type": self.calculation_type,
+            "value": self.value,
+            "effective_date": self.effective_date,
+            "expiration_date": self.expiration_date,
+            "exemptions": list(self.exemptions),
+            "document_types": list(self.document_types),
+            "line_applicability": self.line_applicability,
+            "priority": self.priority,
+            "compound": self.compound,
+            "archived": self.archived,
+            "created_at": self.created_at,
+            "created_by": self.created_by,
+            "updated_at": self.updated_at,
+            "updated_by": self.updated_by,
+        }
+
+
+@dataclass(frozen=True)
+class IntegrationConnection:
+    provider: str
+    enabled: bool
+    status: str
+    connection_metadata: dict[str, Any]
+    secret_references: dict[str, str]
+    updated_at: str
+    updated_by: str
+
+    @staticmethod
+    def from_dict(payload: dict[str, Any]) -> "IntegrationConnection":
+        provider = _normalize_text(payload.get("provider")).lower()
+        if provider not in _ALLOWED_INTEGRATION_PROVIDERS:
+            raise ValueError("unsupported integration provider")
+        secret_references_payload = dict(payload.get("secret_references") or {})
+        secret_references: dict[str, str] = {}
+        for key, value in secret_references_payload.items():
+            normalized_key = _normalize_text(key)
+            normalized_value = _normalize_text(value)
+            if not normalized_key or not normalized_value:
+                continue
+            if not normalized_value.startswith("secret://"):
+                raise ValueError("secret references must use secret:// scheme")
+            secret_references[normalized_key] = normalized_value
+        return IntegrationConnection(
+            provider=provider,
+            enabled=bool(payload.get("enabled", False)),
+            status=_normalize_text(payload.get("status") or "disconnected").lower(),
+            connection_metadata=dict(payload.get("connection_metadata") or {}),
+            secret_references=secret_references,
+            updated_at=_normalize_text(payload.get("updated_at")) or _now_iso(),
+            updated_by=_normalize_text(payload.get("updated_by")) or "system",
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "provider": self.provider,
+            "enabled": self.enabled,
+            "status": self.status,
+            "connection_metadata": dict(self.connection_metadata),
+            "secret_references": dict(self.secret_references),
+            "updated_at": self.updated_at,
+            "updated_by": self.updated_by,
+        }
+
+
+@dataclass(frozen=True)
+class SecurityPolicy:
+    require_mfa: bool = False
+    session_timeout_minutes: int = 480
+    password_policy_reference: str | None = None
+    allowed_ip_ranges: list[str] | None = None
+
+    @staticmethod
+    def from_dict(payload: dict[str, Any]) -> "SecurityPolicy":
+        session_timeout_minutes = int(payload.get("session_timeout_minutes") or 480)
+        if session_timeout_minutes < 15:
+            raise ValueError("session_timeout_minutes must be at least 15")
+        allowed_ip_ranges = [
+            _normalize_text(item)
+            for item in list(payload.get("allowed_ip_ranges") or [])
+            if _normalize_text(item)
+        ]
+        return SecurityPolicy(
+            require_mfa=bool(payload.get("require_mfa", False)),
+            session_timeout_minutes=session_timeout_minutes,
+            password_policy_reference=_normalize_optional_text(
+                payload.get("password_policy_reference")
+            ),
+            allowed_ip_ranges=allowed_ip_ranges,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "require_mfa": self.require_mfa,
+            "session_timeout_minutes": self.session_timeout_minutes,
+            "password_policy_reference": self.password_policy_reference,
+            "allowed_ip_ranges": list(self.allowed_ip_ranges or []),
         }
 
 
@@ -161,7 +445,7 @@ class TermsAndConditionsBlock:
             raise ValueError("title is required")
         document_family = _normalize_text(payload.get("document_family")).lower()
         if document_family not in _ALLOWED_TERMS_DOCUMENT_FAMILIES:
-            raise ValueError("document_family must be estimate or sales_order")
+            raise ValueError("unsupported terms document_family")
         status = _normalize_text(payload.get("status", "draft")).lower()
         if status not in _ALLOWED_TERMS_STATUS:
             raise ValueError("status must be draft or active")
@@ -257,6 +541,8 @@ class DocumentTemplateBlock:
     content: str
     version: int
     section_config: dict[str, bool]
+    visible_columns: list[str]
+    branding_logo_reference: str | None
     is_default: bool
     customer_id: str | None
     project_id: str | None
@@ -292,6 +578,11 @@ class DocumentTemplateBlock:
         section_config = {
             key: bool(value) for key, value in section_config_payload.items()
         }
+        visible_columns = [
+            _normalize_text(item)
+            for item in list(payload.get("visible_columns") or [])
+            if _normalize_text(item)
+        ]
 
         created_at = _normalize_text(payload.get("created_at")) or _now_iso()
         created_by = _normalize_text(payload.get("created_by")) or "system"
@@ -306,6 +597,10 @@ class DocumentTemplateBlock:
             content=content,
             version=version,
             section_config=section_config,
+            visible_columns=visible_columns,
+            branding_logo_reference=_normalize_optional_text(
+                payload.get("branding_logo_reference")
+            ),
             is_default=bool(payload.get("is_default", False)),
             customer_id=_normalize_optional_text(payload.get("customer_id")),
             project_id=_normalize_optional_text(payload.get("project_id")),
@@ -329,6 +624,8 @@ class DocumentTemplateBlock:
             "content": self.content,
             "version": self.version,
             "section_config": dict(self.section_config),
+            "visible_columns": list(self.visible_columns),
+            "branding_logo_reference": self.branding_logo_reference,
             "is_default": self.is_default,
             "customer_id": self.customer_id,
             "project_id": self.project_id,
@@ -390,6 +687,25 @@ class SettingsService:
             "audit_events": [],
             "immutable_audit_events": [],
         }
+
+    def _scope_payload(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+    ) -> dict[str, Any]:
+        key = _tenant_scope_key(tenant_id, organization_id)
+        return dict(self.state["organization_settings"].get(key) or {})
+
+    def _store_scope_payload(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        payload: dict[str, Any],
+    ) -> None:
+        key = _tenant_scope_key(tenant_id, organization_id)
+        self.state["organization_settings"][key] = dict(payload)
 
     def to_dict(self) -> dict[str, Any]:
         return deepcopy(self.state)
@@ -481,6 +797,378 @@ class SettingsService:
             next_sequence=1,
             allocated_numbers=[],
         )
+
+    def organization_profile(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+    ) -> OrganizationProfile:
+        scoped = self._scope_payload(
+            tenant_id=tenant_id, organization_id=organization_id
+        )
+        payload = dict(scoped.get("organization_profile") or {})
+        return OrganizationProfile.from_dict(payload)
+
+    def update_organization_profile(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        actor: str,
+        updates: dict[str, Any],
+    ) -> OrganizationProfile:
+        prior = self.organization_profile(
+            tenant_id=tenant_id, organization_id=organization_id
+        )
+        merged = prior.to_dict()
+        merged.update(dict(updates or {}))
+        current = OrganizationProfile.from_dict(merged)
+        scoped = self._scope_payload(
+            tenant_id=tenant_id, organization_id=organization_id
+        )
+        scoped["organization_profile"] = current.to_dict()
+        self._store_scope_payload(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            payload=scoped,
+        )
+        self._append_audit(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            action="organization.profile.updated",
+            details={"prior": prior.to_dict(), "current": current.to_dict()},
+        )
+        return current
+
+    def list_tax_surcharge_rules(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        include_archived: bool = False,
+    ) -> list[TaxSurchargeRule]:
+        scoped = self._scope_payload(
+            tenant_id=tenant_id, organization_id=organization_id
+        )
+        rows: list[TaxSurchargeRule] = []
+        for item in list(scoped.get("tax_surcharge_rules") or []):
+            if not isinstance(item, dict):
+                continue
+            try:
+                row = TaxSurchargeRule.from_dict(item)
+            except ValueError:
+                continue
+            if not include_archived and row.archived:
+                continue
+            rows.append(row)
+        rows.sort(key=lambda item: (item.priority, item.title, item.rule_id))
+        return rows
+
+    def _store_tax_surcharge_rules(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        rows: list[TaxSurchargeRule],
+    ) -> None:
+        scoped = self._scope_payload(
+            tenant_id=tenant_id, organization_id=organization_id
+        )
+        scoped["tax_surcharge_rules"] = [item.to_dict() for item in rows]
+        self._store_scope_payload(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            payload=scoped,
+        )
+
+    def create_tax_surcharge_rule(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        actor: str,
+        title: str,
+        applicability_type: str,
+        calculation_type: str,
+        value: Decimal,
+        effective_date: str | None,
+        expiration_date: str | None,
+        exemptions: list[str] | None,
+        document_types: list[str] | None,
+        line_applicability: str,
+        priority: int,
+        compound: bool,
+    ) -> TaxSurchargeRule:
+        now = _now_iso()
+        row = TaxSurchargeRule.from_dict(
+            {
+                "rule_id": f"tax-rule-{uuid4().hex[:12]}",
+                "title": title,
+                "applicability_type": applicability_type,
+                "calculation_type": calculation_type,
+                "value": str(value),
+                "effective_date": effective_date,
+                "expiration_date": expiration_date,
+                "exemptions": list(exemptions or []),
+                "document_types": list(document_types or []),
+                "line_applicability": line_applicability,
+                "priority": priority,
+                "compound": bool(compound),
+                "archived": False,
+                "created_at": now,
+                "created_by": actor,
+                "updated_at": now,
+                "updated_by": actor,
+            }
+        )
+        rows = self.list_tax_surcharge_rules(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            include_archived=True,
+        )
+        rows.append(row)
+        self._store_tax_surcharge_rules(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            rows=rows,
+        )
+        self._append_audit(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            action="organization.tax_surcharge.created",
+            details={"rule_id": row.rule_id, "title": row.title},
+        )
+        return row
+
+    def update_tax_surcharge_rule(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        rule_id: str,
+        actor: str,
+        updates: dict[str, Any],
+    ) -> TaxSurchargeRule:
+        rows = self.list_tax_surcharge_rules(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            include_archived=True,
+        )
+        updated_rows: list[TaxSurchargeRule] = []
+        result: TaxSurchargeRule | None = None
+        for item in rows:
+            if item.rule_id != _normalize_text(rule_id):
+                updated_rows.append(item)
+                continue
+            merged = item.to_dict()
+            merged.update(dict(updates or {}))
+            merged["updated_at"] = _now_iso()
+            merged["updated_by"] = actor
+            result = TaxSurchargeRule.from_dict(merged)
+            updated_rows.append(result)
+        if result is None:
+            raise ValueError("tax/surcharge rule was not found")
+        self._store_tax_surcharge_rules(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            rows=updated_rows,
+        )
+        self._append_audit(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            action="organization.tax_surcharge.updated",
+            details={"rule_id": result.rule_id},
+        )
+        return result
+
+    def preview_tax_surcharge_calculation(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        document_type: str,
+        subtotal: Decimal,
+        line_is_taxable: bool = True,
+        as_of: str | None = None,
+        exemption_codes: list[str] | None = None,
+    ) -> dict[str, Any]:
+        document = _normalize_text(document_type).lower()
+        amount = Decimal(str(subtotal))
+        timestamp = _normalize_text(as_of) or _now_iso()
+        exemptions = {
+            _normalize_text(item)
+            for item in list(exemption_codes or [])
+            if _normalize_text(item)
+        }
+        applied: list[dict[str, Any]] = []
+        total = Decimal("0")
+        base_for_compound = amount
+        rows = [
+            item
+            for item in self.list_tax_surcharge_rules(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                include_archived=False,
+            )
+            if document in set(item.document_types)
+            and _is_effective(
+                effective_date=item.effective_date,
+                expiration_date=item.expiration_date,
+                as_of=timestamp,
+            )
+        ]
+        rows.sort(key=lambda item: (item.priority, item.rule_id))
+        for item in rows:
+            if exemptions.intersection(set(item.exemptions)):
+                continue
+            if item.line_applicability == "taxable" and not line_is_taxable:
+                continue
+            if item.line_applicability == "non_taxable" and line_is_taxable:
+                continue
+            value = Decimal(item.value)
+            if item.calculation_type == "percentage":
+                calculated = (base_for_compound * value) / Decimal("100")
+            else:
+                calculated = value
+            calculated = calculated.quantize(Decimal("0.01"))
+            total += calculated
+            if item.compound:
+                base_for_compound += calculated
+            applied.append(
+                {
+                    "rule_id": item.rule_id,
+                    "title": item.title,
+                    "calculated_amount": str(calculated),
+                    "compound": item.compound,
+                }
+            )
+        grand_total = (amount + total).quantize(Decimal("0.01"))
+        return {
+            "subtotal": str(amount.quantize(Decimal("0.01"))),
+            "tax_surcharge_total": str(total.quantize(Decimal("0.01"))),
+            "grand_total": str(grand_total),
+            "applied_rules": applied,
+        }
+
+    def list_integration_connections(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+    ) -> list[IntegrationConnection]:
+        scoped = self._scope_payload(
+            tenant_id=tenant_id, organization_id=organization_id
+        )
+        rows: list[IntegrationConnection] = []
+        for item in list(scoped.get("integration_connections") or []):
+            if not isinstance(item, dict):
+                continue
+            try:
+                rows.append(IntegrationConnection.from_dict(item))
+            except ValueError:
+                continue
+        rows.sort(key=lambda item: item.provider)
+        return rows
+
+    def upsert_integration_connection(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        actor: str,
+        provider: str,
+        enabled: bool,
+        status: str,
+        connection_metadata: dict[str, Any] | None,
+        secret_references: dict[str, str] | None,
+    ) -> IntegrationConnection:
+        row = IntegrationConnection.from_dict(
+            {
+                "provider": provider,
+                "enabled": bool(enabled),
+                "status": status,
+                "connection_metadata": dict(connection_metadata or {}),
+                "secret_references": dict(secret_references or {}),
+                "updated_at": _now_iso(),
+                "updated_by": actor,
+            }
+        )
+        existing = self.list_integration_connections(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        merged = [item for item in existing if item.provider != row.provider]
+        merged.append(row)
+        scoped = self._scope_payload(
+            tenant_id=tenant_id, organization_id=organization_id
+        )
+        scoped["integration_connections"] = [item.to_dict() for item in merged]
+        self._store_scope_payload(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            payload=scoped,
+        )
+        self._append_audit(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            action="organization.integration.updated",
+            details={
+                "provider": row.provider,
+                "enabled": row.enabled,
+                "status": row.status,
+                "connection_metadata_keys": sorted(row.connection_metadata.keys()),
+                "secret_reference_keys": sorted(row.secret_references.keys()),
+            },
+        )
+        return row
+
+    def security_policy(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+    ) -> SecurityPolicy:
+        scoped = self._scope_payload(
+            tenant_id=tenant_id, organization_id=organization_id
+        )
+        return SecurityPolicy.from_dict(dict(scoped.get("security_policy") or {}))
+
+    def update_security_policy(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        actor: str,
+        updates: dict[str, Any],
+    ) -> SecurityPolicy:
+        prior = self.security_policy(
+            tenant_id=tenant_id, organization_id=organization_id
+        )
+        merged = prior.to_dict()
+        merged.update(dict(updates or {}))
+        current = SecurityPolicy.from_dict(merged)
+        scoped = self._scope_payload(
+            tenant_id=tenant_id, organization_id=organization_id
+        )
+        scoped["security_policy"] = current.to_dict()
+        self._store_scope_payload(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            payload=scoped,
+        )
+        self._append_audit(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            action="organization.security_policy.updated",
+            details={"current": current.to_dict()},
+        )
+        return current
 
     def list_numbering_policies(
         self,
@@ -757,7 +1445,7 @@ class SettingsService:
         if family is not None:
             family = family.lower()
             if family not in _ALLOWED_TERMS_DOCUMENT_FAMILIES:
-                raise ValueError("document_family must be estimate or sales_order")
+                raise ValueError("unsupported terms document_family")
         rows = []
         for block in self._list_terms_blocks_for_scope(
             tenant_id=tenant_id,
@@ -793,7 +1481,7 @@ class SettingsService:
         now = _now_iso()
         family = _normalize_text(document_family).lower()
         if family not in _ALLOWED_TERMS_DOCUMENT_FAMILIES:
-            raise ValueError("document_family must be estimate or sales_order")
+            raise ValueError("unsupported terms document_family")
 
         block = TermsAndConditionsBlock.from_dict(
             {
@@ -1211,7 +1899,7 @@ class SettingsService:
     ) -> TermsAndConditionsBlock | None:
         family = _normalize_text(document_family).lower()
         if family not in _ALLOWED_TERMS_DOCUMENT_FAMILIES:
-            raise ValueError("document_family must be estimate or sales_order")
+            raise ValueError("unsupported terms document_family")
         timestamp = _normalize_text(as_of) or _now_iso()
         customer = _normalize_optional_text(customer_id)
         project = _normalize_optional_text(project_id)
@@ -1461,6 +2149,8 @@ class SettingsService:
                 "content": content,
                 "version": 1,
                 "section_config": dict(section_config or {}),
+                "visible_columns": [],
+                "branding_logo_reference": None,
                 "is_default": bool(is_default),
                 "customer_id": customer_id,
                 "project_id": project_id,
@@ -1545,6 +2235,8 @@ class SettingsService:
                 "content": _normalize_text(content) or current.content,
                 "version": current.version + 1,
                 "section_config": dict(section_config or current.section_config),
+                "visible_columns": list(current.visible_columns),
+                "branding_logo_reference": current.branding_logo_reference,
                 "is_default": current.is_default,
                 "customer_id": current.customer_id,
                 "project_id": current.project_id,
@@ -1660,6 +2352,59 @@ class SettingsService:
             organization_id=organization_id,
             template_id=target.template_id,
         )
+
+    def duplicate_document_template(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        template_id: str,
+        actor: str,
+        title: str | None = None,
+    ) -> DocumentTemplateBlock:
+        source = self.document_template(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            template_id=template_id,
+        )
+        return self.create_document_template(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            title=_normalize_text(title) or f"{source.title} Copy",
+            document_family=source.document_family,
+            status=source.status,
+            content=source.content,
+            section_config=source.section_config,
+            is_default=False,
+            customer_id=source.customer_id,
+            project_id=source.project_id,
+            transaction_id=source.transaction_id,
+        )
+
+    def document_template_preview(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        template_id: str,
+    ) -> dict[str, Any]:
+        template = self.document_template(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            template_id=template_id,
+        )
+        return {
+            "template_id": template.template_id,
+            "title": template.title,
+            "document_family": template.document_family,
+            "version": template.version,
+            "status": template.status,
+            "section_config": dict(template.section_config),
+            "visible_columns": list(template.visible_columns),
+            "branding_logo_reference": template.branding_logo_reference,
+            "content_preview": template.content[:5000],
+        }
 
     def resolve_document_template(
         self,

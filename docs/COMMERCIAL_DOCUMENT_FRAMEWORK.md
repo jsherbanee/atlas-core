@@ -153,6 +153,22 @@ Out of scope in T-09:
 - automatic invoicing or live QuickBooks sync
 - inventory workflows
 
+## S-01 Settings Completion Status
+
+Sprint S-01 completes the alpha settings baseline that commercial documents consume.
+
+Implemented in S-01:
+- terms-family support expanded for settings resolution/snapshot to include `return_order` and `customer_invoice`
+- deterministic tax and surcharge rule modeling plus decimal-safe preview for commercial totals planning
+- organization profile and security-policy metadata controls used by document governance surfaces
+- integrations metadata hooks with secret-reference enforcement for future external-system bindings
+- document template duplication and preview controls in settings
+
+Out of scope in S-01:
+- live integration transport/authentication behavior
+- external tax-engine orchestration
+- accounting-ledger ownership changes
+
 Related documents:
 - [TRANSACTIONS_ARCHITECTURE.md](TRANSACTIONS_ARCHITECTURE.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)
