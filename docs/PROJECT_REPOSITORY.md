@@ -125,6 +125,25 @@ Attachment storage (tenant scoped, shared framework):
         - activity.jsonl
         - blobs/
 
+  M-01 tenant sandbox storage roots (platform administration):
+
+  - AtlasProjects/
+    - .atlas_tenants/
+      - <tenant_id>/
+        - <organization_id>/
+          - projects/
+          - knowledge/
+          - catalog/
+          - transactions/
+          - settings/
+          - templates/
+          - attachments/
+          - audit/
+          - jobs/
+          - search_indexes/
+          - working_set/
+          - user_preferences/
+
 ## Canonical Manifest
 Each project includes project_manifest.json with deterministic storage summary fields:
 

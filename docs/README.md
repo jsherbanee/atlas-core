@@ -8,6 +8,8 @@ Commercial Knowledge update: Epic C Sprint C-03 now includes expanded Commercial
 
 Alpha data validation update: Epic C Sprint C-04 adds deterministic seed catalog loading/reset and scripted catalog-to-transaction validation coverage. See [SEED_DATA.md](SEED_DATA.md).
 
+Alpha infrastructure update: Sprint M-01 adds platform-admin tenant sandbox provisioning and isolation controls for deterministic multi-tenant alpha environments. See [TENANT_MANAGER.md](TENANT_MANAGER.md).
+
 Current workspace-continuity stream: Epic W Workspace Intelligence.
 Scope: deterministic context persistence, cross-workspace continuity, search handoff, Working Set continuity, and repository-backed return context for already-implemented capabilities only.
 

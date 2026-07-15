@@ -50,6 +50,7 @@ Status: Active
 - S-01 Settings Workspace Completion
 - U-01 Commercial Document Usability and Presentation Polish
 - U-02 End-to-End Application UX and Workflow Polish
+- M-01 Tenant Manager and Sandbox Provisioning
 
 ### A-07 Scope
 
@@ -123,6 +124,19 @@ Explicitly out of scope:
 - new product feature development
 - new transaction families or workflow-domain expansion
 - QuickBooks transport execution, payment processing, inventory/procurement activation
+
+### M-01 Scope
+
+- implement tenant manager contracts and deterministic sandbox provisioning services
+- enforce platform-admin-only sandbox lifecycle controls and audit coverage
+- provision tenant-isolated local repository paths and per-tenant data containers
+- validate reset/export/delete guardrails and cross-tenant rejection behavior with regression tests
+
+Explicitly out of scope:
+
+- AWS infrastructure provisioning
+- SSO/Cognito identity lifecycle
+- billing or self-service signup workflows
 
 ### A-08 Scope
 

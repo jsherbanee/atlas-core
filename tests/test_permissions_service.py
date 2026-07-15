@@ -253,6 +253,44 @@ def test_settings_access_for_read_only_allows_view_denies_manage() -> None:
     assert can_manage.allowed is False
 
 
+def test_platform_tenant_management_permission_is_restricted() -> None:
+    service = PermissionsService()
+    service.assign_role(
+        tenant_id="tenant-a",
+        organization_id="org-a",
+        principal_id="reader-1",
+        role_key="read_only",
+        actor="test",
+    )
+    service.assign_role(
+        tenant_id="tenant-a",
+        organization_id="org-a",
+        principal_id="admin-1",
+        role_key="tenant_administrator",
+        actor="test",
+    )
+
+    denied = service.evaluate(
+        AccessRequest(
+            tenant_id="tenant-a",
+            organization_id="org-a",
+            principal_id="reader-1",
+            permission_key="platform.tenants.manage",
+        )
+    )
+    allowed = service.evaluate(
+        AccessRequest(
+            tenant_id="tenant-a",
+            organization_id="org-a",
+            principal_id="admin-1",
+            permission_key="platform.tenants.manage",
+        )
+    )
+
+    assert denied.allowed is False
+    assert allowed.allowed is True
+
+
 def test_serialization_is_deterministic_and_sorted() -> None:
     service = PermissionsService()
     service.assign_role(

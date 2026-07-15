@@ -82,6 +82,17 @@ from atlas_core.contracts.document_generation_contracts import (
     TemplateSource,
     TemplateStatus,
 )
+from atlas_core.contracts.tenant_manager_contracts import (
+    SandboxProvisioningRequest,
+    SandboxProvisioningResult,
+    Tenant,
+    TenantAuditEvent,
+    TenantConfiguration,
+    TenantDataBoundary,
+    TenantEnvironment,
+    TenantMembership,
+    TenantStatus,
+)
 
 __all__ = [
     "PlanReviewRequest",
@@ -150,4 +161,13 @@ __all__ = [
     "TemplateAssignment",
     "TemplateSource",
     "TemplateStatus",
+    "SandboxProvisioningRequest",
+    "SandboxProvisioningResult",
+    "Tenant",
+    "TenantAuditEvent",
+    "TenantConfiguration",
+    "TenantDataBoundary",
+    "TenantEnvironment",
+    "TenantMembership",
+    "TenantStatus",
 ]

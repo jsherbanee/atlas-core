@@ -171,6 +171,7 @@ Production readiness should require:
 - implement unified attachment framework (P-04) with tenant-scoped contracts, repository/local adapters, and Object Workspace documents integration
 - implement deterministic document-generation and template engine foundation (P-05) with precedence-aware template resolution and revision snapshot reuse guarantees
 - remediate alpha blocker-class tenancy and authorization boundary gaps (P-07) without introducing new feature scope
+- implement tenant manager and sandbox provisioning foundation (M-01) with platform-admin lifecycle controls and tenant-isolated local sandbox paths
 - consolidate search and object-graph foundations
 - formalize rule-engine and diagnostics contracts
 - deliver deterministic roles and permissions foundation with centralized action gating and audit-ready permission events

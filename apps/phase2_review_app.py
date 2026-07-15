@@ -73,6 +73,7 @@ from atlas_core.services.sales_design_review_service import SalesDesignReviewSer
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 from atlas_core.services.permissions_service import PermissionsService
 from atlas_core.services.settings_service import SettingsService
+from atlas_core.services.tenant_manager_service import TenantManagerService
 from atlas_core.services.commercial_catalog_seed_service import (
     CommercialCatalogSeedService,
 )
@@ -88,6 +89,7 @@ from atlas_core.services.universal_object_registry import (
     build_default_universal_object_registry,
 )
 from atlas_core.contracts.permissions_contracts import AccessRequest, PermissionEffect
+from atlas_core.contracts.tenant_manager_contracts import SandboxProvisioningRequest
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
@@ -1359,7 +1361,11 @@ def _navigation_section_group(primary: str, mode: str, secondary_key: str) -> st
             return "Settlement"
         return "Overview"
     if primary == "Settings":
-        if secondary_key in {"organization_settings", "personal_preferences"}:
+        if secondary_key in {
+            "organization_settings",
+            "personal_preferences",
+            "platform_management",
+        }:
             return "Active"
         return "Future"
     if primary != "Projects":
@@ -3514,6 +3520,10 @@ def _default_permissions_workspace_state() -> dict[str, Any]:
     return PermissionsService.empty_state()
 
 
+def _default_tenant_manager_workspace_state() -> dict[str, Any]:
+    return TenantManagerService.empty_state()
+
+
 def _settings_workspace_state(st: Any) -> dict[str, Any]:
     state = st.session_state.get("atlas_settings_workspace")
     if isinstance(state, dict):
@@ -3546,6 +3556,29 @@ def _permissions_workspace_service(st: Any) -> PermissionsService:
 
 def _save_permissions_workspace_state(st: Any, service: PermissionsService) -> None:
     st.session_state["atlas_permissions_workspace"] = service.to_dict()
+
+
+def _tenant_manager_workspace_state(st: Any) -> dict[str, Any]:
+    state = st.session_state.get("atlas_tenant_manager_workspace")
+    if isinstance(state, dict):
+        return dict(state)
+    default_state = _default_tenant_manager_workspace_state()
+    st.session_state["atlas_tenant_manager_workspace"] = default_state
+    return default_state
+
+
+def _tenant_manager_workspace_service(st: Any) -> TenantManagerService:
+    return TenantManagerService(
+        state=_tenant_manager_workspace_state(st),
+        permissions_service=_permissions_workspace_service(st),
+    )
+
+
+def _save_tenant_manager_workspace_state(
+    st: Any, service: TenantManagerService
+) -> None:
+    st.session_state["atlas_tenant_manager_workspace"] = service.to_dict()
+    _save_permissions_workspace_state(st, service.permissions_service)
 
 
 def _transactions_workspace_state(st: Any) -> dict[str, Any]:
@@ -4152,6 +4185,9 @@ def _init_session_state(st: Any) -> None:
     )
     st.session_state.setdefault(
         "atlas_permissions_workspace", _default_permissions_workspace_state()
+    )
+    st.session_state.setdefault(
+        "atlas_tenant_manager_workspace", _default_tenant_manager_workspace_state()
     )
     st.session_state.setdefault("atlas_settings_user_id", "local-user")
     st.session_state.setdefault("atlas_transaction_estimate_engine_states", {})
@@ -6993,6 +7029,14 @@ def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": None,
             }
         ],
+        "platform_management": [
+            {
+                "tertiary_key": "tenant_manager",
+                "label": "Tenant Manager",
+                "action_type": "settings_view",
+                "required_selection": None,
+            }
+        ],
     }
 
 
@@ -7143,6 +7187,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             ("security", "Security"),
             ("billing", "Billing"),
             ("advanced", "Advanced"),
+            ("platform_management", "Platform Management"),
         ]
         settings_sections: list[dict[str, Any]] = []
         for secondary_key, label in sections:
@@ -16256,6 +16301,15 @@ def _render_application_administration_page(
             project_id=None,
         )
     )
+    platform_manage_access = permissions_service.evaluate(
+        AccessRequest(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            principal_id=user_id,
+            permission_key="platform.tenants.manage",
+            project_id=None,
+        )
+    )
     if not settings_access.allowed:
         st.warning(settings_access.reason)
         return
@@ -17762,6 +17816,272 @@ def _render_application_administration_page(
             )
         else:
             st.info("Select a valid security subsection.")
+
+    elif secondary == "platform_management":
+        if not platform_manage_access.allowed:
+            st.warning(
+                platform_manage_access.reason
+                or "Platform tenant management requires platform-administrator permission."
+            )
+            return
+
+        tenant_manager = _tenant_manager_workspace_service(st)
+        if tertiary != "tenant_manager":
+            st.info("Select Tenant Manager to continue.")
+            return
+
+        tenants = tenant_manager.list_tenants(
+            actor_id=user_id,
+            requester_tenant_id=tenant_id,
+            requester_organization_id=organization_id,
+            include_archived=True,
+        )
+
+        if tenants:
+            st.dataframe(
+                [
+                    {
+                        "Tenant ID": item.get("tenant_id"),
+                        "Sandbox Label": dict(item.get("configuration") or {}).get(
+                            "sandbox_label"
+                        ),
+                        "Status": item.get("status"),
+                        "Owner": item.get("owner_user_id"),
+                        "Expires": dict(item.get("configuration") or {}).get(
+                            "expiration_date"
+                        ),
+                        "Last Activity": item.get("last_activity_at"),
+                    }
+                    for item in tenants
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+        else:
+            st.info("No sandbox tenants are provisioned yet.")
+
+        with st.form("atlas_tenant_manager_create_form"):
+            create_cols = st.columns(3)
+            sandbox_label = create_cols[0].text_input("Sandbox Label")
+            owner_user_id = create_cols[1].text_input(
+                "Sandbox Owner User ID", value="sandbox-owner"
+            )
+            requested_tenant_id = create_cols[2].text_input(
+                "Stable Tenant ID (optional)", value=""
+            )
+            profile_cols = st.columns(3)
+            seed_profile = profile_cols[0].selectbox(
+                "Seed-data Profile",
+                options=["none", "alpha-basic", "alpha-commercial"],
+            )
+            enable_seed_data = profile_cols[1].checkbox("Enable Seed Data", value=True)
+            expiration_date = profile_cols[2].text_input(
+                "Expiration Date (ISO)", value=""
+            )
+            test_user_notes = st.text_area("Test-user Notes", height=90)
+            create_submitted = st.form_submit_button("Create Sandbox", width="stretch")
+
+        if create_submitted:
+            try:
+                tenant_manager.create_sandbox(
+                    request=SandboxProvisioningRequest(
+                        tenant_id=requested_tenant_id or None,
+                        sandbox_label=sandbox_label,
+                        owner_user_id=owner_user_id,
+                        expiration_date=expiration_date or None,
+                        enable_seed_data=bool(enable_seed_data),
+                        seed_data_profile=seed_profile,
+                        test_user_notes=test_user_notes or None,
+                    ),
+                    actor_id=user_id,
+                    requester_tenant_id=tenant_id,
+                    requester_organization_id=organization_id,
+                )
+                _save_tenant_manager_workspace_state(st, tenant_manager)
+                st.success("Sandbox provisioned.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to create sandbox: {exc}")
+
+        selectable_tenants = [
+            item for item in tenants if item.get("tenant_id") != "local"
+        ]
+        if selectable_tenants:
+            selected_tenant_id = st.selectbox(
+                "Select Sandbox Tenant",
+                options=[
+                    _safe_text(item.get("tenant_id"), "") for item in selectable_tenants
+                ],
+                key="atlas_tenant_manager_selected_tenant",
+            )
+            selected_payload = next(
+                (
+                    item
+                    for item in selectable_tenants
+                    if _safe_text(item.get("tenant_id"), "") == selected_tenant_id
+                ),
+                {},
+            )
+
+            action_cols = st.columns(5)
+            if action_cols[0].button("Open Sandbox", width="stretch"):
+                try:
+                    opened = tenant_manager.open_sandbox(
+                        tenant_id=selected_tenant_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                    )
+                    transactions_state = _transactions_workspace_state(st)
+                    transactions_state["tenant_id"] = _safe_text(
+                        opened.get("tenant_id"), "local"
+                    )
+                    transactions_state["organization_id"] = _safe_text(
+                        opened.get("organization_id"), "atlas"
+                    )
+                    st.session_state["atlas_transactions_workspace"] = (
+                        transactions_state
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Sandbox context opened for transactions workspace.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to open sandbox: {exc}")
+
+            if action_cols[1].button("Suspend", width="stretch"):
+                try:
+                    tenant_manager.suspend_sandbox(
+                        tenant_id=selected_tenant_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Sandbox suspended.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to suspend sandbox: {exc}")
+
+            if action_cols[2].button("Restore", width="stretch"):
+                try:
+                    tenant_manager.restore_sandbox(
+                        tenant_id=selected_tenant_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Sandbox restored.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to restore sandbox: {exc}")
+
+            if action_cols[3].button("Archive", width="stretch"):
+                try:
+                    tenant_manager.archive_sandbox(
+                        tenant_id=selected_tenant_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Sandbox archived.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to archive sandbox: {exc}")
+
+            export_cache_key = f"atlas_tenant_export_payload::{selected_tenant_id}"
+            if st.button("Export Sandbox Data", width="stretch"):
+                try:
+                    st.session_state[export_cache_key] = (
+                        tenant_manager.export_tenant_data(
+                            tenant_id=selected_tenant_id,
+                            actor_id=user_id,
+                            requester_tenant_id=tenant_id,
+                            requester_organization_id=organization_id,
+                        )
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Sandbox export generated.")
+                except Exception as exc:
+                    st.error(f"Unable to export sandbox data: {exc}")
+            export_payload = st.session_state.get(export_cache_key)
+            if isinstance(export_payload, dict):
+                st.download_button(
+                    "Download Latest Export",
+                    data=json.dumps(export_payload, indent=2, sort_keys=True),
+                    file_name=f"tenant-export-{selected_tenant_id}.json",
+                    mime="application/json",
+                    width="stretch",
+                )
+
+            reset_confirmation = st.text_input(
+                "Reset Confirmation",
+                value="",
+                placeholder=f"RESET {selected_tenant_id}",
+                key="atlas_tenant_manager_reset_confirmation",
+            )
+            delete_confirmation = st.text_input(
+                "Delete Confirmation",
+                value="",
+                placeholder=f"DELETE {selected_tenant_id}",
+                key="atlas_tenant_manager_delete_confirmation",
+            )
+            confirmation_cols = st.columns(2)
+            if confirmation_cols[0].button("Reset Sandbox Data", width="stretch"):
+                try:
+                    tenant_manager.reset_sandbox_data(
+                        tenant_id=selected_tenant_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                        confirmation=reset_confirmation,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Sandbox data reset completed.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to reset sandbox: {exc}")
+            if confirmation_cols[1].button("Delete Sandbox", width="stretch"):
+                try:
+                    tenant_manager.delete_sandbox_guarded(
+                        tenant_id=selected_tenant_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                        confirmation=delete_confirmation,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Sandbox deleted.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to delete sandbox: {exc}")
+
+            st.markdown("#### Sandbox Health")
+            st.json(tenant_manager.tenant_health(tenant_id=selected_tenant_id))
+            st.markdown("#### Storage Usage")
+            st.json(tenant_manager.storage_usage_summary(tenant_id=selected_tenant_id))
+            st.markdown("#### Recent Tenant Audit Events")
+            st.dataframe(
+                tenant_manager.recent_tenant_audit_events(
+                    tenant_id=selected_tenant_id,
+                    limit=50,
+                ),
+                width="stretch",
+                hide_index=True,
+            )
+            st.caption(
+                _safe_text(
+                    dict(selected_payload.get("configuration") or {}).get(
+                        "test_user_notes"
+                    ),
+                    "",
+                )
+            )
+        else:
+            st.caption(
+                "Provision a sandbox tenant to unlock platform-management actions."
+            )
 
     elif secondary == "personal_preferences":
         prefs = settings_service.personal_preferences(

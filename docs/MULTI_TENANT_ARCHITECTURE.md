@@ -218,4 +218,20 @@ Sprint P-01 delivers a deterministic authorization foundation aligned to this ar
 - cross-tenant assignment leakage is prevented by evaluation scope matching
 - permission change events are recorded for auditability
 
+## M-01 Implementation Note
+
+Sprint M-01 introduces alpha tenant-manager sandbox foundations with deterministic local provisioning.
+
+Implemented in M-01:
+- platform-admin restricted tenant sandbox lifecycle actions (create/open/suspend/restore/reset/export/archive/delete)
+- tenant-scoped local repository path provisioning under isolated sandbox roots
+- explicit cross-tenant reference and attachment-scope rejection helpers
+- tenant-scoped search, jobs, working-set, and user-preference isolation containers
+- guarded destructive workflows with explicit confirmation and export-before-delete requirements
+
+Still deferred:
+- hosted infrastructure provisioning
+- identity lifecycle and SSO integration
+- billing and subscription lifecycle integration
+
 P-01 is a foundation sprint and does not deliver full tenant administration lifecycle flows.

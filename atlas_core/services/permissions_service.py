@@ -145,6 +145,12 @@ PERMISSION_CATALOG: tuple[Permission, ...] = (
         "Archive and restore",
         "Archive and restore records where allowed.",
     ),
+    Permission(
+        "platform.tenants.manage",
+        "Platform administration",
+        "Manage tenant sandboxes",
+        "Create, suspend, restore, export, archive, and delete tenant sandboxes.",
+    ),
 )
 
 

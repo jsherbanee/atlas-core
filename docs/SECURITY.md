@@ -99,3 +99,18 @@ Security controls include:
 Current P-04 constraints:
 - local deterministic persistence only
 - no external malware scanner integration in this sprint
+
+## M-01 Tenant Manager Security Notes
+
+Sprint M-01 introduces deterministic tenant sandbox administration controls.
+
+Security controls include:
+- platform-admin permission gating (`platform.tenants.manage`) for tenant sandbox lifecycle actions
+- guarded reset/delete actions requiring explicit confirmation phrases
+- export-before-delete enforcement for tenant destruction workflows
+- tenant-scoped audit events for create/open/reset/suspend/restore/export/archive/delete actions
+- explicit cross-tenant reference and attachment scope rejection helpers
+
+Current M-01 constraints:
+- local deterministic sandbox provisioning only
+- no hosted infrastructure secrets or identity-provider lifecycle integration in this sprint

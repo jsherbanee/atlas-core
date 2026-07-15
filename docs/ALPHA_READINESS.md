@@ -157,6 +157,16 @@ U-02 end-to-end workflow validation now includes:
 
 No blocker-class tenant-isolation, issued-immutability, or cross-scope regressions were identified in U-02 validation.
 
+## M-01 Follow-Up Note
+
+M-01 alpha infrastructure validation now includes:
+- deterministic platform-admin tenant sandbox provisioning with isolated local repository roots
+- explicit sandbox lifecycle controls (open, suspend, restore, reset, export, archive, guarded delete)
+- tenant-scoped search/job/settings/preference/working-set isolation coverage
+- export-scope verification and reset isolation verification across multiple tenant sandboxes
+
+No blocker-class cross-tenant leakage regressions were identified in M-01 validation.
+
 ## Security and Tenancy Findings
 - No active cross-tenant mutation regression remains in audited transactions paths with default service configuration.
 - Transactions service construction now fails fast when active tenant/org scope is omitted.

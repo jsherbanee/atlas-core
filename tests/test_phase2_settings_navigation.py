@@ -30,6 +30,7 @@ def test_settings_workspace_contract_has_expected_sections() -> None:
         "security",
         "billing",
         "advanced",
+        "platform_management",
     ]
 
     org_section = next(

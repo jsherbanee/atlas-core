@@ -174,3 +174,17 @@ Current boundary remains:
 - no production user provisioning workflow
 
 Placeholder member IDs are supported in local development settings to enable deterministic permission hardening while full membership administration remains future scope.
+
+## M-01 Implementation Note
+
+Sprint M-01 introduces platform-admin tenant sandbox management for alpha infrastructure validation.
+
+Implemented in M-01:
+- deterministic sandbox-owner membership creation at tenant provisioning time
+- platform-admin-only tenant sandbox lifecycle controls with explicit permission requirement (`platform.tenants.manage`)
+- tenant-scoped audit traces for sandbox create/reset/suspend/restore/export/archive/delete actions
+
+Still deferred:
+- invitation lifecycle and acceptance flows
+- production identity provider and SSO implementation
+- billing-seat automation

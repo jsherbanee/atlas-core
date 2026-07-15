@@ -19,6 +19,22 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Atlas Alpha Infrastructure Sprint M-01 Tenant Manager and Sandbox Provisioning)
+
+### Improved
+
+- Atlas now includes deterministic tenant-manager contracts and service foundations for alpha sandbox lifecycle administration.
+- Platform administrators can provision isolated local tenant sandboxes with stable tenant IDs, owner assignment, seed profile controls, expiration metadata, and environment path provisioning.
+- Tenant Manager now supports restricted sandbox actions for open, suspend, restore, reset, export, archive, and guarded delete workflows.
+- Tenant isolation coverage now includes tenant-scoped search indexes, background jobs, settings/preferences, working-set state, and export payload scoping.
+- Guarded destructive controls now require explicit confirmation phrases, and delete paths require export-before-delete evidence.
+
+### Scope Notes
+
+- no AWS infrastructure provisioning
+- no Cognito/SSO implementation
+- no billing or self-service tenant signup
+
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
 ## Unreleased (Atlas Epic C Sprint C-04 Seed Catalog Import and Alpha Data Validation)
