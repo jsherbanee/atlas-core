@@ -1,10 +1,10 @@
-# Alpha Operations (A-02)
+# Alpha Operations (A-03)
 
 ## Purpose
-Define controlled alpha deployment and test-operations behavior for repeatable tenant-isolated validation.
+Define controlled alpha deployment, tester onboarding, and test-operations behavior for repeatable tenant-isolated validation.
 
 ## Scope
-A-02 operationalizes controlled alpha testing without introducing new product workflows.
+A-03 extends controlled alpha operations for external tester onboarding without introducing new product workflows.
 
 Implemented:
 - controlled alpha environment marker and release-channel guard in the application shell
@@ -16,6 +16,11 @@ Implemented:
 - platform-management error review workflow with status transitions and diagnostics export
 - settings access for known limitations and operator checklist guidance
 - defect-template download and environment-diagnostics capture
+- tester profile assignment and lifecycle-state tracking
+- onboarding acknowledgement recording (terms and known limitations)
+- deterministic scenario assignment and completion tracking per tester
+- sandbox reset/export request intake tied to tester profiles
+- platform-admin operations dashboard for cross-tenant rollout visibility
 
 Out of scope:
 - commercial workflow expansion
@@ -34,12 +39,19 @@ Out of scope:
 - Tenant lifecycle actions remain gated by `platform.tenants.manage` in platform scope (`tenant_id=local`, `organization_id=atlas`).
 - Sandbox reset and delete remain confirmation-guarded.
 - Export-before-delete remains enforced.
+- Tester assignment, onboarding acknowledgements, scenario updates, and tester status changes remain platform-admin-only in platform scope.
 
 ### Tenant Scope Boundaries
 - Feedback records are tenant-scoped and reject cross-tenant diagnostics access.
 - Alpha health-check output is tenant-specific and does not include internal storage paths or secret references.
 - Application error logs are tenant-scoped by default; cross-tenant review is platform-admin-only in platform scope.
 - Suspended tenants cannot access operational error-log surfaces.
+
+### A-03 Tester Rollout Controls
+- Tester states are explicit and auditable: `invited`, `onboarding`, `active`, `paused`, `completed`, `deactivated`.
+- Deactivated and paused tester access checks are explicitly denied.
+- Scenario tracking is deterministic with constrained statuses: `pending`, `in_progress`, `completed`.
+- Sandbox reset/export requests are tracked per tester and surfaced in operations reporting.
 
 ### Error Logging Controls
 - Unhandled exceptions are logged before user-facing error messaging.
@@ -88,6 +100,7 @@ Supported statuses:
 ## Operator Runbook Links
 - [ALPHA_TEST_PLAN.md](ALPHA_TEST_PLAN.md)
 - [ALPHA_SANDBOX_GUIDE.md](ALPHA_SANDBOX_GUIDE.md)
+- [ALPHA_TESTER_ONBOARDING.md](ALPHA_TESTER_ONBOARDING.md)
 - [ALPHA_RELEASE_CHECKLIST.md](ALPHA_RELEASE_CHECKLIST.md)
 - [ALPHA_KNOWN_LIMITATIONS.md](ALPHA_KNOWN_LIMITATIONS.md)
 - [ERROR_LOGGING.md](ERROR_LOGGING.md)

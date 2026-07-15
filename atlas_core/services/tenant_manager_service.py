@@ -130,6 +130,93 @@ def _sanitize_stack_trace(value: Any) -> str:
     return "\n".join(lines[-40:])
 
 
+_ALPHA_TESTER_STATES = {
+    "invited",
+    "onboarding",
+    "active",
+    "paused",
+    "completed",
+    "deactivated",
+}
+
+_ALPHA_SCENARIO_STATUS = {"pending", "in_progress", "completed"}
+
+_ALPHA_SCENARIO_TEMPLATES: list[dict[str, str]] = [
+    {
+        "scenario_key": "organization_settings",
+        "title": "Organization Settings",
+        "instructions": "Review organization profile settings and validate metadata persistence.",
+        "expected_outcome": "Settings updates save deterministically with tenant scope.",
+    },
+    {
+        "scenario_key": "customer_project_creation",
+        "title": "Customer and Project Creation",
+        "instructions": "Create a customer and a project, then verify project visibility in tenant scope.",
+        "expected_outcome": "Customer and project are created and visible only in assigned tenant.",
+    },
+    {
+        "scenario_key": "catalog_browsing",
+        "title": "Catalog Browsing",
+        "instructions": "Browse commercial catalog content and inspect representative item detail views.",
+        "expected_outcome": "Catalog rows render consistently with tenant-scoped records.",
+    },
+    {
+        "scenario_key": "estimate_creation_pdf",
+        "title": "Estimate Creation and PDF",
+        "instructions": "Create an estimate and run deterministic PDF export.",
+        "expected_outcome": "Estimate draft and PDF export complete without cross-tenant leakage.",
+    },
+    {
+        "scenario_key": "sales_order_creation",
+        "title": "Sales Order Creation",
+        "instructions": "Create a sales order from valid source data and verify lifecycle state.",
+        "expected_outcome": "Sales order is created with expected numbering and status behavior.",
+    },
+    {
+        "scenario_key": "change_order_tracking",
+        "title": "Change Order Tracking",
+        "instructions": "Exercise additive/deductive change-order tracking on existing project transactions.",
+        "expected_outcome": "Change-order metadata and rollups remain deterministic.",
+    },
+    {
+        "scenario_key": "customer_invoice",
+        "title": "Customer Invoice",
+        "instructions": "Create a customer invoice and verify draft-state metadata and export path.",
+        "expected_outcome": "Invoice draft workflow completes with deterministic metadata.",
+    },
+    {
+        "scenario_key": "return_order_credit_memo",
+        "title": "Return Order and Credit Memo",
+        "instructions": "Create a return order and linked credit memo for representative tenant data.",
+        "expected_outcome": "Return and credit workflows complete with valid linked references.",
+    },
+    {
+        "scenario_key": "search_object_workspace",
+        "title": "Search and Object Workspace",
+        "instructions": "Validate search and object-workspace navigation continuity in assigned tenant.",
+        "expected_outcome": "Search results and object views remain tenant-scoped and stable.",
+    },
+    {
+        "scenario_key": "attachments",
+        "title": "Attachments",
+        "instructions": "Upload and review attachment metadata while respecting extension constraints.",
+        "expected_outcome": "Attachment handling remains deterministic and tenant-scoped.",
+    },
+    {
+        "scenario_key": "permissions",
+        "title": "Permissions",
+        "instructions": "Validate allowed and denied operations under assigned tenant user context.",
+        "expected_outcome": "Permission boundaries enforce tenant-scoped least privilege behavior.",
+    },
+    {
+        "scenario_key": "error_reporting",
+        "title": "Error Reporting",
+        "instructions": "Submit feedback linked to Error ID and verify sanitized error visibility.",
+        "expected_outcome": "Feedback and error linkage is retained with redacted diagnostics.",
+    },
+]
+
+
 class TenantManagerService:
     """Deterministic tenant sandbox lifecycle and data-boundary controls."""
 
@@ -1100,6 +1187,657 @@ class TenantManagerService:
             "errors": details,
         }
 
+    def list_alpha_scenario_templates(self) -> list[dict[str, str]]:
+        return [deepcopy(item) for item in _ALPHA_SCENARIO_TEMPLATES]
+
+    def assign_alpha_tester(
+        self,
+        *,
+        tenant_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        tester_id: str,
+        display_name: str,
+        email: str,
+        sandbox_expiration: str | None = None,
+    ) -> dict[str, Any]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        self._assert_operational_access(tenant_id)
+        normalized_tester_id = _safe_text(tester_id, "")
+        if not normalized_tester_id:
+            raise ValueError("tester_id is required")
+        data = self._tenant_data(tenant_id)
+        testers = data.setdefault("alpha_testers", {})
+        existing = dict(testers.get(normalized_tester_id) or {})
+        base_state = _safe_text(existing.get("state"), "invited").lower()
+        if base_state not in _ALPHA_TESTER_STATES:
+            base_state = "invited"
+        tenant = self._tenant_required(tenant_id)
+        default_expiration = _safe_text(tenant.configuration.expiration_date, "")
+        record = {
+            "tester_id": normalized_tester_id,
+            "tenant_id": tenant_id,
+            "organization_id": self._organization_id_for_tenant(tenant_id),
+            "display_name": _safe_text(display_name, normalized_tester_id),
+            "email": _sanitize_free_text(email, max_length=180),
+            "state": base_state,
+            "sandbox_expiration": _safe_text(
+                sandbox_expiration,
+                default_expiration,
+            )
+            or None,
+            "assigned_at": _safe_text(existing.get("assigned_at"), now_iso()),
+            "assigned_by": _safe_text(existing.get("assigned_by"), actor_id),
+            "terms_acknowledged": bool(existing.get("terms_acknowledged", False)),
+            "terms_acknowledged_at": _safe_text(
+                existing.get("terms_acknowledged_at"), ""
+            )
+            or None,
+            "known_limitations_acknowledged": bool(
+                existing.get("known_limitations_acknowledged", False)
+            ),
+            "known_limitations_acknowledged_at": _safe_text(
+                existing.get("known_limitations_acknowledged_at"), ""
+            )
+            or None,
+            "last_activity_at": _safe_text(existing.get("last_activity_at"), now_iso()),
+            "last_activity_summary": _safe_text(
+                existing.get("last_activity_summary"), "tester_assigned"
+            ),
+            "deactivated_at": _safe_text(existing.get("deactivated_at"), "") or None,
+            "deactivated_by": _safe_text(existing.get("deactivated_by"), "") or None,
+        }
+        testers[normalized_tester_id] = record
+        data.setdefault("alpha_tester_scenarios", {})
+        data["alpha_tester_scenarios"].setdefault(normalized_tester_id, [])
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_tester.assigned",
+            details={"tester_id": normalized_tester_id},
+        )
+        return self.get_alpha_tester(
+            tenant_id=tenant_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            actor_id=actor_id,
+            tester_id=normalized_tester_id,
+        )
+
+    def get_alpha_tester(
+        self,
+        *,
+        tenant_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        actor_id: str,
+        tester_id: str,
+    ) -> dict[str, Any]:
+        self._assert_tester_admin_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        data = self._tenant_data(tenant_id)
+        testers = dict(data.get("alpha_testers") or {})
+        normalized_tester_id = _safe_text(tester_id, "")
+        payload = dict(testers.get(normalized_tester_id) or {})
+        if not payload:
+            raise ValueError("alpha tester does not exist")
+        payload.update(
+            self._alpha_tester_summary(
+                tenant_id=tenant_id, tester_id=normalized_tester_id
+            )
+        )
+        return payload
+
+    def list_alpha_testers(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        tenant_id: str | None = None,
+        states: list[str] | None = None,
+        limit: int = 500,
+    ) -> list[dict[str, Any]]:
+        is_platform_admin = self._is_platform_admin_scope_actor(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        requested_tenant = _safe_text(tenant_id, "")
+        if not is_platform_admin:
+            self._assert_tenant_scope_request(
+                tenant_id=requested_tenant or requester_tenant_id,
+                requester_tenant_id=requester_tenant_id,
+                requester_organization_id=requester_organization_id,
+            )
+            self._assert_operational_access(requested_tenant or requester_tenant_id)
+        tenant_ids = (
+            [requested_tenant]
+            if requested_tenant
+            else sorted(dict(self.state.get("tenants") or {}).keys())
+        )
+        if not is_platform_admin and not requested_tenant:
+            tenant_ids = [_safe_text(requester_tenant_id, "")]
+        requested_states = {
+            _safe_text(item, "").lower() for item in list(states or []) if item
+        }
+        rows: list[dict[str, Any]] = []
+        for current_tenant_id in tenant_ids:
+            if not current_tenant_id:
+                continue
+            testers = dict(
+                self._tenant_data(current_tenant_id).get("alpha_testers") or {}
+            )
+            for tester_id, payload in testers.items():
+                tester = dict(payload)
+                state = _safe_text(tester.get("state"), "invited").lower()
+                if requested_states and state not in requested_states:
+                    continue
+                tester.update(
+                    self._alpha_tester_summary(
+                        tenant_id=current_tenant_id,
+                        tester_id=_safe_text(tester_id, ""),
+                    )
+                )
+                rows.append(tester)
+        rows.sort(
+            key=lambda item: (
+                _safe_text(item.get("last_activity_at"), ""),
+                _safe_text(item.get("tester_id"), ""),
+            )
+        )
+        return rows[-max(1, int(limit)) :]
+
+    def acknowledge_alpha_onboarding(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        terms_acknowledged: bool,
+        known_limitations_acknowledged: bool,
+    ) -> dict[str, Any]:
+        self._assert_tester_admin_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        tester = self._alpha_tester_record_mutable(
+            tenant_id=tenant_id, tester_id=tester_id
+        )
+        tester["terms_acknowledged"] = bool(terms_acknowledged)
+        tester["known_limitations_acknowledged"] = bool(known_limitations_acknowledged)
+        if terms_acknowledged:
+            tester["terms_acknowledged_at"] = now_iso()
+        if known_limitations_acknowledged:
+            tester["known_limitations_acknowledged_at"] = now_iso()
+        if tester["state"] == "invited":
+            tester["state"] = "onboarding"
+        tester["last_activity_at"] = now_iso()
+        tester["last_activity_summary"] = "acknowledgements_recorded"
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_tester.acknowledged",
+            details={
+                "tester_id": _safe_text(tester_id, ""),
+                "terms": bool(terms_acknowledged),
+                "limitations": bool(known_limitations_acknowledged),
+            },
+        )
+        return deepcopy(tester)
+
+    def assign_alpha_scenarios(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        scenario_keys: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        self._assert_tester_admin_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        _ = self._alpha_tester_record_mutable(tenant_id=tenant_id, tester_id=tester_id)
+        allowed = {
+            _safe_text(item.get("scenario_key"), ""): dict(item)
+            for item in _ALPHA_SCENARIO_TEMPLATES
+        }
+        requested = [
+            _safe_text(item, "") for item in list(scenario_keys or list(allowed.keys()))
+        ]
+        cleaned = [item for item in requested if item in allowed]
+        if not cleaned:
+            raise ValueError("at least one valid scenario is required")
+        data = self._tenant_data(tenant_id)
+        scenario_map = data.setdefault("alpha_tester_scenarios", {})
+        existing_rows = list(scenario_map.get(_safe_text(tester_id, "")) or [])
+        existing_by_key = {
+            _safe_text(dict(item).get("scenario_key"), ""): dict(item)
+            for item in existing_rows
+            if isinstance(item, dict)
+        }
+        assigned_rows: list[dict[str, Any]] = []
+        for key in cleaned:
+            template = dict(allowed[key])
+            row = dict(existing_by_key.get(key) or {})
+            if not row:
+                row = {
+                    "scenario_id": f"scenario:{hashlib.sha1(f'{tenant_id}:{tester_id}:{key}'.encode('utf-8')).hexdigest()[:16]}",
+                    "scenario_key": key,
+                    "title": template["title"],
+                    "instructions": template["instructions"],
+                    "expected_outcome": template["expected_outcome"],
+                    "status": "pending",
+                    "tester_notes": None,
+                    "related_feedback": [],
+                    "related_error_id": None,
+                    "started_at": None,
+                    "completed_at": None,
+                }
+            assigned_rows.append(row)
+        scenario_map[_safe_text(tester_id, "")] = assigned_rows
+        tester = self._alpha_tester_record_mutable(
+            tenant_id=tenant_id, tester_id=tester_id
+        )
+        if _safe_text(tester.get("state"), "") in {"invited", "onboarding"}:
+            tester["state"] = "onboarding"
+        tester["last_activity_at"] = now_iso()
+        tester["last_activity_summary"] = "scenarios_assigned"
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_tester.scenarios_assigned",
+            details={
+                "tester_id": _safe_text(tester_id, ""),
+                "scenario_count": len(assigned_rows),
+            },
+        )
+        return [deepcopy(item) for item in assigned_rows]
+
+    def update_alpha_scenario_status(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+        scenario_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        status: str,
+        tester_notes: str | None = None,
+        related_feedback: list[str] | None = None,
+        related_error_id: str | None = None,
+    ) -> dict[str, Any]:
+        self._assert_tester_admin_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        normalized_status = _safe_text(status, "pending").lower()
+        if normalized_status not in _ALPHA_SCENARIO_STATUS:
+            raise ValueError("scenario status is invalid")
+        scenario = self._alpha_tester_scenario_mutable(
+            tenant_id=tenant_id,
+            tester_id=tester_id,
+            scenario_id=scenario_id,
+        )
+        scenario["status"] = normalized_status
+        if normalized_status == "in_progress" and not _safe_text(
+            scenario.get("started_at"), ""
+        ):
+            scenario["started_at"] = now_iso()
+        if normalized_status == "completed":
+            if not _safe_text(scenario.get("started_at"), ""):
+                scenario["started_at"] = now_iso()
+            scenario["completed_at"] = now_iso()
+        if tester_notes is not None:
+            scenario["tester_notes"] = _sanitize_free_text(tester_notes) or None
+        if related_feedback is not None:
+            scenario["related_feedback"] = [
+                _safe_text(item, "")
+                for item in list(related_feedback)
+                if _safe_text(item, "")
+            ]
+        if related_error_id is not None:
+            scenario["related_error_id"] = _safe_text(related_error_id, "") or None
+        tester = self._alpha_tester_record_mutable(
+            tenant_id=tenant_id, tester_id=tester_id
+        )
+        if tester.get("state") in {"invited", "onboarding"} and normalized_status in {
+            "in_progress",
+            "completed",
+        }:
+            tester["state"] = "active"
+        tester["last_activity_at"] = now_iso()
+        tester["last_activity_summary"] = f"scenario_{normalized_status}"
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_tester.scenario_updated",
+            details={
+                "tester_id": _safe_text(tester_id, ""),
+                "scenario_id": _safe_text(scenario_id, ""),
+                "status": normalized_status,
+            },
+        )
+        return deepcopy(scenario)
+
+    def list_alpha_tester_scenarios(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+    ) -> list[dict[str, Any]]:
+        self._assert_tester_admin_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        _ = self._alpha_tester_record_mutable(tenant_id=tenant_id, tester_id=tester_id)
+        rows = list(
+            dict(self._tenant_data(tenant_id).get("alpha_tester_scenarios") or {}).get(
+                _safe_text(tester_id, "")
+            )
+            or []
+        )
+        return [deepcopy(dict(item)) for item in rows if isinstance(item, dict)]
+
+    def update_alpha_tester_status(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        status: str,
+    ) -> dict[str, Any]:
+        self._assert_tester_admin_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        normalized_status = _safe_text(status, "").lower()
+        if normalized_status not in _ALPHA_TESTER_STATES:
+            raise ValueError("tester status is invalid")
+        tester = self._alpha_tester_record_mutable(
+            tenant_id=tenant_id, tester_id=tester_id
+        )
+        tester["state"] = normalized_status
+        tester["last_activity_at"] = now_iso()
+        tester["last_activity_summary"] = f"status_{normalized_status}"
+        if normalized_status == "deactivated":
+            tester["deactivated_at"] = now_iso()
+            tester["deactivated_by"] = _safe_text(actor_id, "system")
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_tester.status_updated",
+            details={
+                "tester_id": _safe_text(tester_id, ""),
+                "status": normalized_status,
+            },
+        )
+        return deepcopy(tester)
+
+    def deactivate_alpha_tester(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+    ) -> dict[str, Any]:
+        return self.update_alpha_tester_status(
+            tenant_id=tenant_id,
+            tester_id=tester_id,
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            status="deactivated",
+        )
+
+    def assert_alpha_tester_access(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+    ) -> dict[str, Any]:
+        self._assert_operational_access(tenant_id)
+        tester = self._alpha_tester_record_mutable(
+            tenant_id=tenant_id, tester_id=tester_id
+        )
+        state = _safe_text(tester.get("state"), "invited").lower()
+        if state == "deactivated":
+            raise PermissionError("tester access is deactivated")
+        if state == "paused":
+            raise PermissionError("tester access is paused")
+        return deepcopy(tester)
+
+    def request_sandbox_reset(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        self._assert_tester_admin_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        _ = self._alpha_tester_record_mutable(tenant_id=tenant_id, tester_id=tester_id)
+        data = self._tenant_data(tenant_id)
+        data.setdefault("alpha_reset_requests", [])
+        payload = {
+            "request_id": f"reset-request:{hashlib.sha1(f'{tenant_id}:{tester_id}:{now_iso()}'.encode('utf-8')).hexdigest()[:16]}",
+            "tenant_id": tenant_id,
+            "tester_id": _safe_text(tester_id, ""),
+            "requested_by": _safe_text(actor_id, "system"),
+            "requested_at": now_iso(),
+            "reason": _sanitize_free_text(reason) or "requested",
+            "status": "requested",
+        }
+        data["alpha_reset_requests"].append(payload)
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_tester.reset_requested",
+            details={
+                "tester_id": _safe_text(tester_id, ""),
+                "request_id": payload["request_id"],
+            },
+        )
+        return deepcopy(payload)
+
+    def request_tenant_export(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        self._assert_tester_admin_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        _ = self._alpha_tester_record_mutable(tenant_id=tenant_id, tester_id=tester_id)
+        data = self._tenant_data(tenant_id)
+        data.setdefault("alpha_export_requests", [])
+        payload = {
+            "request_id": f"export-request:{hashlib.sha1(f'{tenant_id}:{tester_id}:{now_iso()}'.encode('utf-8')).hexdigest()[:16]}",
+            "tenant_id": tenant_id,
+            "tester_id": _safe_text(tester_id, ""),
+            "requested_by": _safe_text(actor_id, "system"),
+            "requested_at": now_iso(),
+            "reason": _sanitize_free_text(reason) or "requested",
+            "status": "requested",
+        }
+        data["alpha_export_requests"].append(payload)
+        self._touch_activity(tenant_id)
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.alpha_tester.export_requested",
+            details={
+                "tester_id": _safe_text(tester_id, ""),
+                "request_id": payload["request_id"],
+            },
+        )
+        return deepcopy(payload)
+
+    def alpha_operations_dashboard(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        include_archived: bool = False,
+    ) -> dict[str, Any]:
+        self._assert_platform_admin(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        rows: list[dict[str, Any]] = []
+        now = datetime.now(UTC)
+        expiring_sandboxes = 0
+        for tenant_payload in dict(self.state.get("tenants") or {}).values():
+            tenant = Tenant.from_dict(dict(tenant_payload))
+            if tenant.tenant_id == "local":
+                continue
+            if not include_archived and tenant.status == TenantStatus.ARCHIVED:
+                continue
+            data = self._tenant_data(tenant.tenant_id)
+            testers = list(dict(data.get("alpha_testers") or {}).values())
+            scenarios_by_tester = dict(data.get("alpha_tester_scenarios") or {})
+            all_scenarios = [
+                dict(row)
+                for rows_for_tester in scenarios_by_tester.values()
+                for row in list(rows_for_tester or [])
+                if isinstance(row, dict)
+            ]
+            scenario_completed = len(
+                [
+                    row
+                    for row in all_scenarios
+                    if _safe_text(row.get("status"), "") == "completed"
+                ]
+            )
+            scenario_total = len(all_scenarios)
+            feedback_rows = list(data.get("alpha_feedback") or [])
+            open_defects = len(
+                [
+                    item
+                    for item in feedback_rows
+                    if _safe_text(dict(item).get("status"), "")
+                    not in {"resolved", "closed"}
+                ]
+            )
+            unresolved_errors = len(
+                [
+                    item
+                    for item in list(data.get("application_errors") or [])
+                    if _safe_text(dict(item).get("status"), "")
+                    in {
+                        ErrorResolutionStatus.NEW.value,
+                        ErrorResolutionStatus.ACKNOWLEDGED.value,
+                        ErrorResolutionStatus.INVESTIGATING.value,
+                        ErrorResolutionStatus.REOPENED.value,
+                    }
+                ]
+            )
+            sandbox_expiration = _safe_text(tenant.configuration.expiration_date, "")
+            if sandbox_expiration:
+                try:
+                    expires = datetime.fromisoformat(sandbox_expiration)
+                    if expires >= now and (expires - now).days <= 14:
+                        expiring_sandboxes += 1
+                except ValueError:
+                    pass
+            rows.append(
+                {
+                    "tenant_id": tenant.tenant_id,
+                    "sandbox_status": tenant.status.value,
+                    "active_testers": len(
+                        [
+                            item
+                            for item in testers
+                            if _safe_text(dict(item).get("state"), "")
+                            in {"active", "onboarding"}
+                        ]
+                    ),
+                    "scenario_completion": (
+                        f"{scenario_completed}/{scenario_total}"
+                        if scenario_total
+                        else "0/0"
+                    ),
+                    "feedback_count": len(feedback_rows),
+                    "open_defects": open_defects,
+                    "unresolved_errors": unresolved_errors,
+                    "last_activity": _safe_text(tenant.last_activity_at, ""),
+                    "sandbox_expiration": sandbox_expiration,
+                    "reset_requests": len(list(data.get("alpha_reset_requests") or [])),
+                    "export_requests": len(
+                        list(data.get("alpha_export_requests") or [])
+                    ),
+                }
+            )
+        rows.sort(
+            key=lambda item: (
+                _safe_text(item.get("last_activity"), ""),
+                _safe_text(item.get("tenant_id"), ""),
+            )
+        )
+        return {
+            "generated_at": now_iso(),
+            "active_testers": sum(
+                int(item.get("active_testers") or 0) for item in rows
+            ),
+            "expiring_sandboxes": int(expiring_sandboxes),
+            "rows": rows,
+        }
+
     def submit_alpha_feedback(
         self,
         *,
@@ -1536,6 +2274,125 @@ class TenantManagerService:
         )
         self._assert_operational_access(tenant_id)
 
+    def _assert_tester_admin_access(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        tenant_id: str,
+    ) -> None:
+        if self._is_platform_admin_scope_actor(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        ):
+            self._assert_operational_access(tenant_id)
+            return
+        self._assert_tenant_scope_request(
+            tenant_id=tenant_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+        )
+        self._assert_operational_access(tenant_id)
+
+    def _alpha_tester_record_mutable(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+    ) -> dict[str, Any]:
+        data = self._tenant_data(tenant_id)
+        testers = data.setdefault("alpha_testers", {})
+        normalized_tester_id = _safe_text(tester_id, "")
+        payload = testers.get(normalized_tester_id)
+        if not isinstance(payload, dict):
+            raise ValueError("alpha tester does not exist")
+        return payload
+
+    def _alpha_tester_scenario_mutable(
+        self,
+        *,
+        tenant_id: str,
+        tester_id: str,
+        scenario_id: str,
+    ) -> dict[str, Any]:
+        data = self._tenant_data(tenant_id)
+        scenario_map = data.setdefault("alpha_tester_scenarios", {})
+        rows = list(scenario_map.get(_safe_text(tester_id, "")) or [])
+        for item in rows:
+            if _safe_text(dict(item).get("scenario_id"), "") == _safe_text(
+                scenario_id, ""
+            ):
+                if isinstance(item, dict):
+                    return item
+        raise ValueError("alpha scenario does not exist")
+
+    def _alpha_tester_summary(
+        self, *, tenant_id: str, tester_id: str
+    ) -> dict[str, Any]:
+        data = self._tenant_data(tenant_id)
+        feedback_rows = [
+            dict(item)
+            for item in list(data.get("alpha_feedback") or [])
+            if isinstance(item, dict)
+            and _safe_text(item.get("user_id"), "") == _safe_text(tester_id, "")
+        ]
+        open_feedback = len(
+            [
+                item
+                for item in feedback_rows
+                if _safe_text(item.get("status"), "") not in {"resolved", "closed"}
+            ]
+        )
+        linked_error_ids = {
+            _safe_text(item.get("related_error_id"), "")
+            for item in feedback_rows
+            if _safe_text(item.get("related_error_id"), "")
+        }
+        unresolved_errors = len(
+            [
+                item
+                for item in list(data.get("application_errors") or [])
+                if isinstance(item, dict)
+                and _safe_text(item.get("error_id"), "") in linked_error_ids
+                and _safe_text(item.get("status"), "")
+                in {
+                    ErrorResolutionStatus.NEW.value,
+                    ErrorResolutionStatus.ACKNOWLEDGED.value,
+                    ErrorResolutionStatus.INVESTIGATING.value,
+                    ErrorResolutionStatus.REOPENED.value,
+                }
+            ]
+        )
+        scenario_rows = list(
+            dict(data.get("alpha_tester_scenarios") or {}).get(
+                _safe_text(tester_id, "")
+            )
+            or []
+        )
+        completed = len(
+            [
+                item
+                for item in scenario_rows
+                if _safe_text(dict(item).get("status"), "") == "completed"
+            ]
+        )
+        return {
+            "feedback_summary": {
+                "total_feedback": len(feedback_rows),
+                "open_feedback": int(open_feedback),
+            },
+            "open_defect_summary": {
+                "open_defects": int(open_feedback),
+                "unresolved_errors": int(unresolved_errors),
+            },
+            "scenario_summary": {
+                "total": len(scenario_rows),
+                "completed": int(completed),
+            },
+        }
+
     def _allocate_tenant_id(self, sandbox_label: str) -> str:
         token = _slug(sandbox_label)
         digest = hashlib.sha1(f"{token}:{now_iso()}".encode("utf-8")).hexdigest()[:8]
@@ -1606,6 +2463,10 @@ class TenantManagerService:
             "search_indexes": {},
             "working_set": {},
             "user_preferences": {},
+            "alpha_testers": {},
+            "alpha_tester_scenarios": {},
+            "alpha_reset_requests": [],
+            "alpha_export_requests": [],
             "alpha_feedback": [],
             "application_errors": [],
             "export_history": {},

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -818,3 +819,288 @@ def test_application_error_status_workflow_and_feedback_linking(tmp_path: Path) 
     )
     assert diagnostics["tenant_id"] == "tenant-a"
     assert diagnostics["errors"][0]["error_id"].startswith("ERR-")
+
+
+def test_alpha_tester_onboarding_scenario_completion_and_deactivation(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=True,
+            expiration_date=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+
+    tester = service.assign_alpha_tester(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        tester_id="tester-1",
+        display_name="Tester One",
+        email="tester-1@example.com",
+    )
+    assert tester["state"] == "invited"
+    assert tester["sandbox_expiration"]
+
+    acknowledged = service.acknowledge_alpha_onboarding(
+        tenant_id="tenant-a",
+        tester_id="tester-1",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        terms_acknowledged=True,
+        known_limitations_acknowledged=True,
+    )
+    assert acknowledged["state"] == "onboarding"
+    assert acknowledged["terms_acknowledged"] is True
+    assert acknowledged["known_limitations_acknowledged"] is True
+
+    assigned = service.assign_alpha_scenarios(
+        tenant_id="tenant-a",
+        tester_id="tester-1",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        scenario_keys=["organization_settings", "estimate_creation_pdf"],
+    )
+    assert len(assigned) == 2
+
+    scenario_id = assigned[0]["scenario_id"]
+    updated_scenario = service.update_alpha_scenario_status(
+        tenant_id="tenant-a",
+        tester_id="tester-1",
+        scenario_id=scenario_id,
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        status="completed",
+        tester_notes="Completed baseline walkthrough",
+        related_feedback=["feedback:abc123"],
+        related_error_id="ERR-12345",
+    )
+    assert updated_scenario["status"] == "completed"
+    assert updated_scenario["related_error_id"] == "ERR-12345"
+    assert updated_scenario["related_feedback"] == ["feedback:abc123"]
+
+    listed = service.list_alpha_tester_scenarios(
+        tenant_id="tenant-a",
+        tester_id="tester-1",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    assert any(
+        row["scenario_id"] == scenario_id and row["status"] == "completed"
+        for row in listed
+    )
+
+    tester_after_progress = service.get_alpha_tester(
+        tenant_id="tenant-a",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        actor_id="platform-admin",
+        tester_id="tester-1",
+    )
+    assert tester_after_progress["state"] == "active"
+
+    access = service.assert_alpha_tester_access(
+        tenant_id="tenant-a", tester_id="tester-1"
+    )
+    assert access["tester_id"] == "tester-1"
+
+    deactivated = service.deactivate_alpha_tester(
+        tenant_id="tenant-a",
+        tester_id="tester-1",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    assert deactivated["state"] == "deactivated"
+
+    with pytest.raises(PermissionError, match="deactivated"):
+        service.assert_alpha_tester_access(tenant_id="tenant-a", tester_id="tester-1")
+
+    actions = {
+        event["action"]
+        for event in service.recent_tenant_audit_events(tenant_id="tenant-a")
+    }
+    assert "tenant.alpha_tester.assigned" in actions
+    assert "tenant.alpha_tester.acknowledged" in actions
+    assert "tenant.alpha_tester.scenarios_assigned" in actions
+    assert "tenant.alpha_tester.scenario_updated" in actions
+    assert "tenant.alpha_tester.status_updated" in actions
+
+
+def test_alpha_tester_cross_tenant_rejection_and_platform_scope_requirements(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=False,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-b",
+            sandbox_label="Tenant B",
+            owner_user_id="owner-b",
+            seed_data_profile="profile-b",
+            enable_seed_data=False,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.permissions_service.assign_role(
+        tenant_id="tenant-a",
+        organization_id="org-tenant-a",
+        principal_id="owner-a",
+        role_key="tenant_administrator",
+        actor="tests",
+    )
+
+    with pytest.raises(PermissionError):
+        service.assign_alpha_tester(
+            tenant_id="tenant-a",
+            actor_id="owner-a",
+            requester_tenant_id="tenant-a",
+            requester_organization_id="org-tenant-a",
+            tester_id="tester-unauthorized",
+            display_name="Unauthorized",
+            email="unauthorized@example.com",
+        )
+
+    service.assign_alpha_tester(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        tester_id="tester-a",
+        display_name="Tester A",
+        email="tester-a@example.com",
+    )
+
+    with pytest.raises(PermissionError, match="cross-tenant"):
+        service.get_alpha_tester(
+            tenant_id="tenant-a",
+            requester_tenant_id="tenant-b",
+            requester_organization_id="org-tenant-b",
+            actor_id="owner-b",
+            tester_id="tester-a",
+        )
+
+
+def test_alpha_operations_dashboard_and_requests_are_tracked(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=True,
+            expiration_date=(datetime.now(UTC) + timedelta(days=10)).isoformat(),
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-b",
+            sandbox_label="Tenant B",
+            owner_user_id="owner-b",
+            seed_data_profile="profile-b",
+            enable_seed_data=True,
+            expiration_date=(datetime.now(UTC) + timedelta(days=45)).isoformat(),
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+
+    service.assign_alpha_tester(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        tester_id="tester-a1",
+        display_name="Tester A1",
+        email="tester-a1@example.com",
+    )
+    service.assign_alpha_scenarios(
+        tenant_id="tenant-a",
+        tester_id="tester-a1",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        scenario_keys=["organization_settings"],
+    )
+    scenarios = service.list_alpha_tester_scenarios(
+        tenant_id="tenant-a",
+        tester_id="tester-a1",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.update_alpha_scenario_status(
+        tenant_id="tenant-a",
+        tester_id="tester-a1",
+        scenario_id=scenarios[0]["scenario_id"],
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        status="completed",
+    )
+    service.request_sandbox_reset(
+        tenant_id="tenant-a",
+        tester_id="tester-a1",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        reason="reset for second pass",
+    )
+    service.request_tenant_export(
+        tenant_id="tenant-a",
+        tester_id="tester-a1",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        reason="export validation package",
+    )
+
+    dashboard = service.alpha_operations_dashboard(
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    assert dashboard["active_testers"] >= 1
+    assert dashboard["expiring_sandboxes"] >= 1
+    row_a = next(item for item in dashboard["rows"] if item["tenant_id"] == "tenant-a")
+    assert row_a["scenario_completion"] == "1/1"
+    assert row_a["reset_requests"] == 1
+    assert row_a["export_requests"] == 1
+
+    with pytest.raises(PermissionError):
+        service.alpha_operations_dashboard(
+            actor_id="owner-a",
+            requester_tenant_id="tenant-a",
+            requester_organization_id="org-tenant-a",
+        )

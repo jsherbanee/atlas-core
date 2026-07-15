@@ -1,7 +1,7 @@
-# Alpha Test Plan (A-02)
+# Alpha Test Plan (A-03)
 
 ## Purpose
-Define the controlled alpha deployment and test-operations validation plan and record evidence for Sprint A-02.
+Define the controlled alpha onboarding and rollout validation plan and record evidence for Sprint A-03.
 
 ## Scope Boundaries
 In scope:
@@ -17,6 +17,9 @@ In scope:
 - centralized application error logging capture, grouping, and status workflow
 - user-safe Error ID behavior and diagnostics export controls
 - navigation/state regression coverage for validated alpha surfaces
+- alpha tester assignment, acknowledgement, and lifecycle transitions
+- deterministic scenario assignment, progression, and completion tracking
+- tester deactivation access denial and platform-admin-only dashboard enforcement
 
 Out of scope:
 - AWS infrastructure provisioning
@@ -36,6 +39,8 @@ Out of scope:
 | Application error logging | Fingerprint grouping, redaction, occurrence history, and user-facing IDs | `tests/test_tenant_manager_service.py` | passing |
 | Error log access control | Tenant isolation, suspended-tenant rejection, and platform cross-tenant scope | `tests/test_tenant_manager_service.py` | passing |
 | Error status workflow | Acknowledged/investigating/resolved/reopened transitions with audit coverage | `tests/test_tenant_manager_service.py` | passing |
+| Alpha tester onboarding | Tester assignment, onboarding acknowledgement, scenario completion, and access checks | `tests/test_tenant_manager_service.py` | passing |
+| Alpha operations dashboard | Platform-admin-only rollout summary and request counters | `tests/test_tenant_manager_service.py` | passing |
 | Immutable audit | Append-only chain and deterministic filtering/export | `tests/test_immutable_audit_service.py` | passing |
 | Attachment security | Tenant-scoped access and extension-policy enforcement | `tests/test_attachment_service.py` | passing |
 | Job reliability | Deterministic lifecycle and idempotent retry/cancel semantics | `tests/test_project_workspace_service.py` | passing |
@@ -46,32 +51,28 @@ Out of scope:
 | Universal object tenant safety | Relationship/activity tenant-boundary enforcement | `tests/test_universal_object_contract.py` | passing |
 
 ## Executed Commands
-Focused A-02 suites:
+Focused A-03 suites:
 - `.venv/bin/pytest -q tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py`
-- Result: `19 passed`
+- Result: `22 passed`
 
-Explicit A-02 operational validation:
-- `.venv/bin/pytest -q tests/test_tenant_manager_service.py -k "two_sandbox_alpha_operations_are_isolated or alpha_feedback_is_tenant_scoped_and_structured or alpha_health_check_requires_platform_admin_and_redacts"`
-- Result: `3 passed`
+Current Sprint A-03 validation commands executed in-session:
+- `black atlas_core/services/tenant_manager_service.py apps/phase2_review_app.py tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py`
+- `ruff check atlas_core/services/tenant_manager_service.py apps/phase2_review_app.py tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py`
+- `mypy atlas_core/services/tenant_manager_service.py apps/phase2_review_app.py`
+- `pytest tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py -q`
+- Result: `22 passed`
 
-Explicit error-logging validation:
-- `.venv/bin/pytest -q tests/test_tenant_manager_service.py -k "application_error_fingerprinting_redaction_and_occurrences or application_error_tenant_scope_and_suspended_rejection or application_error_status_workflow_and_feedback_linking"`
-- Result: `3 passed`
-
-Full quality gates:
-- `.venv/bin/black --check .`
-- `.venv/bin/ruff check .`
-- `.venv/bin/mypy .`
-- `.venv/bin/pytest -q`
-- Result: `1415 passed`
-
-## A-02 Operations Verification
+## A-03 Operations Verification
 - Controlled-alpha environment marker is visible in shell header/status and blocks accidental production designation.
 - Platform Management now includes alpha health-check, tenant-scoped feedback/defect capture, known-limitations access, and operator checklist guidance.
 - Seed loading, reset, and export remain available as explicit sandbox lifecycle operations.
 - Tenant feedback and diagnostics remain tenant-scoped with cross-tenant rejection and sensitive-key/path redaction.
+- Platform Management now includes tester-onboarding and operations-dashboard tertiary actions.
+- Tester profiles can be assigned, acknowledged, and moved through deterministic lifecycle states.
+- Scenario assignments can be completed and linked to related feedback/Error IDs.
+- Deactivated testers are blocked by access assertions.
 
 ## Validation Outcome
 - Alpha blocker findings identified in A-02: 0
 - Remaining confirmed alpha blockers: 0
-- Recommendation: controlled alpha deployment operations are ready for repeatable sandbox-based testing under local deterministic constraints.
+- Recommendation: controlled alpha tester onboarding and rollout operations are ready for sandbox-based external alpha execution under local deterministic constraints.

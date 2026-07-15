@@ -41,6 +41,13 @@ Operator runbook for provisioning and validating isolated tenant sandboxes in th
 13. Validate Error Log view shows tenant-scoped records with Error IDs and grouped occurrence counts.
 14. Verify stack traces/messages are sanitized and no raw paths/secrets are exposed.
 15. Link one feedback record to a valid Error ID and verify persistence.
+16. In Platform Management -> Tester Onboarding, assign one tester profile to sandbox A and one to sandbox B.
+17. Record terms and known-limitations acknowledgement for both testers.
+18. Assign baseline scenario templates to both testers.
+19. Complete at least one scenario in sandbox A with completion notes and related feedback/Error linkage.
+20. Submit one sandbox-reset request and one tenant-export request for sandbox A tester.
+21. Deactivate sandbox A tester and verify access assertion is denied for that tester only.
+22. Verify sandbox B tester remains unaffected and can still pass access assertion.
 
 ## Lifecycle Guardrails
 - Suspended sandboxes should not accept operational helper access until restored.
@@ -48,6 +55,8 @@ Operator runbook for provisioning and validating isolated tenant sandboxes in th
 - Platform tenant-management actions must be run from platform scope only.
 - Alpha health checks must be administrator-only and should never expose internal paths or secret references.
 - Error logs must be tenant-scoped for tenant admins and cross-tenant metadata must remain platform-admin-only.
+- Tester lifecycle operations (assignment, acknowledgement, scenario updates, status changes) must run in platform scope by platform admins only.
+- Deactivated or paused tester states should block active tester access assertions.
 
 ## Evidence Mapping
 Primary automated evidence for this runbook:
@@ -55,6 +64,7 @@ Primary automated evidence for this runbook:
 - `tests/test_permissions_service.py`
 - `tests/test_universal_object_contract.py`
 - `tests/test_phase2_settings_navigation.py`
+- `docs/ALPHA_TESTER_ONBOARDING.md`
 
 ## Troubleshooting
 - PermissionError for tenant manager actions:

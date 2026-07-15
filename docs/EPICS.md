@@ -53,6 +53,7 @@ Status: Active
 - M-01 Tenant Manager and Sandbox Provisioning
 - A-01 Final Alpha Readiness Audit and Release Candidate
 - A-02 Controlled Alpha Deployment and Test Operations
+- A-03 Alpha Tester Onboarding and Controlled Rollout
 
 ### A-07 Scope
 
@@ -170,6 +171,22 @@ Explicitly out of scope:
 - live QuickBooks transport execution
 - external ticketing integration
 - hosted production deployment claims
+
+### A-03 Scope
+
+- implement controlled external tester onboarding for isolated sandbox tenants
+- implement platform-admin tester profile assignment and lifecycle-state transitions
+- implement onboarding acknowledgement capture for terms and known limitations
+- implement deterministic scenario assignment and completion tracking per tester
+- implement tester-linked sandbox reset/export request intake and operations dashboard summaries
+- add regression coverage for tester onboarding, cross-tenant rejection, deactivation access denial, and dashboard permission enforcement
+
+Explicitly out of scope:
+
+- product feature expansion beyond approved alpha scope
+- SSO, invitation automation, billing, or public signup flows
+- live QuickBooks transport execution
+- new commercial workflow-domain expansion
 
 ### A-08 Scope
 

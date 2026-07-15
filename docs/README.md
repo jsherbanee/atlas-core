@@ -14,6 +14,8 @@ Alpha release-candidate update: Sprint A-01 completes the final alpha readiness 
 
 Alpha operations update: Sprint A-02 operationalizes controlled alpha deployment workflows with visible environment/version labeling, administrator health-check surfaces, tenant-scoped feedback capture, and operator runbook guidance. See [ALPHA_OPERATIONS.md](ALPHA_OPERATIONS.md).
 
+Alpha onboarding rollout update: Sprint A-03 adds controlled external tester onboarding operations with tester-profile lifecycle controls, acknowledgement capture, deterministic scenario tracking, tester-scoped reset/export requests, and platform-admin dashboard reporting. See [ALPHA_TESTER_ONBOARDING.md](ALPHA_TESTER_ONBOARDING.md).
+
 Current workspace-continuity stream: Epic W Workspace Intelligence.
 Scope: deterministic context persistence, cross-workspace continuity, search handoff, Working Set continuity, and repository-backed return context for already-implemented capabilities only.
 

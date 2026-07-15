@@ -19,6 +19,27 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Atlas Alpha Operations Sprint A-03 Alpha Tester Onboarding and Controlled Rollout)
+
+### Improved
+
+- Platform Management now includes dedicated Tester Onboarding and Operations Dashboard tertiary views for controlled alpha administration.
+- Platform admins can assign alpha tester profiles, capture terms/known-limitations acknowledgements, and track explicit tester lifecycle states.
+- Tester scenario templates can be assigned and updated through deterministic status transitions (`pending`, `in_progress`, `completed`) with optional feedback/Error linkage metadata.
+- Tester-scoped sandbox reset/export requests are now tracked and surfaced in operations summaries.
+- Deactivated tester access is explicitly denied by service-level access assertions.
+
+### Quality
+
+- targeted validation: `pytest tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py -q` -> `22 passed`
+- touched-file checks: `black`, `ruff`, and `mypy` passing
+
+### Scope Notes
+
+- no new commercial workflow features
+- no SSO/invitation automation or billing/public-signup workflows
+- no live QuickBooks sync execution
+
 ## Unreleased (Atlas Alpha Operations Sprint A-02 pt 2 Controlled Alpha Operations and Error Logging)
 
 ### Improved

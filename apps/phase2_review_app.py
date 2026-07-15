@@ -7227,6 +7227,18 @@ def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": None,
             },
             {
+                "tertiary_key": "alpha_tester_onboarding",
+                "label": "Tester Onboarding",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "alpha_operations_dashboard",
+                "label": "Operations Dashboard",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
                 "tertiary_key": "error_log",
                 "label": "Error Log",
                 "action_type": "settings_view",
@@ -18107,6 +18119,382 @@ def _render_application_administration_page(
                 ),
                 {},
             )
+
+        if tertiary == "alpha_operations_dashboard":
+            try:
+                dashboard = tenant_manager.alpha_operations_dashboard(
+                    actor_id=user_id,
+                    requester_tenant_id=tenant_id,
+                    requester_organization_id=organization_id,
+                )
+                summary_cols = st.columns(3)
+                summary_cols[0].metric(
+                    "Active Testers",
+                    int(dashboard.get("active_testers") or 0),
+                )
+                summary_cols[1].metric(
+                    "Expiring Sandboxes (<=14d)",
+                    int(dashboard.get("expiring_sandboxes") or 0),
+                )
+                summary_cols[2].metric(
+                    "Tenant Rows",
+                    len(list(dashboard.get("rows") or [])),
+                )
+                st.dataframe(
+                    list(dashboard.get("rows") or []),
+                    width="stretch",
+                    hide_index=True,
+                )
+            except Exception as exc:
+                _render_logged_error_message(
+                    st,
+                    summary="Unable to load alpha operations dashboard",
+                    exception=exc,
+                    severity="medium",
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                    user_id=user_id,
+                    workspace="Settings",
+                    route="Platform Management > Operations Dashboard",
+                )
+            return
+
+        if tertiary == "alpha_tester_onboarding":
+            if not selected_tenant_id:
+                st.info("Provision a sandbox tenant to manage alpha testers.")
+                return
+
+            st.markdown("#### Alpha Tester Profile")
+            with st.form("atlas_alpha_tester_assign_form"):
+                assign_cols = st.columns(4)
+                tester_id = assign_cols[0].text_input("Tester ID", value="")
+                tester_name = assign_cols[1].text_input("Display Name", value="")
+                tester_email = assign_cols[2].text_input("Email", value="")
+                tester_expiration = assign_cols[3].text_input(
+                    "Sandbox Expiration (ISO)",
+                    value=_safe_text(
+                        dict(selected_payload.get("configuration") or {}).get(
+                            "expiration_date"
+                        ),
+                        "",
+                    ),
+                )
+                assign_submitted = st.form_submit_button(
+                    "Assign Tester",
+                    width="stretch",
+                )
+            if assign_submitted:
+                try:
+                    tenant_manager.assign_alpha_tester(
+                        tenant_id=selected_tenant_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                        tester_id=tester_id,
+                        display_name=tester_name,
+                        email=tester_email,
+                        sandbox_expiration=tester_expiration or None,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Tester assigned.")
+                    st.rerun()
+                except Exception as exc:
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to assign tester",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id,
+                        organization_id=f"org-{selected_tenant_id}",
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tester Onboarding",
+                    )
+
+            tester_rows = tenant_manager.list_alpha_testers(
+                actor_id=user_id,
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+                tenant_id=selected_tenant_id,
+                limit=200,
+            )
+            if not tester_rows:
+                st.caption("No tester profiles assigned for this sandbox.")
+                return
+            st.dataframe(tester_rows, width="stretch", hide_index=True)
+
+            selected_tester_id = st.selectbox(
+                "Select Tester",
+                options=[_safe_text(item.get("tester_id"), "") for item in tester_rows],
+            )
+            selected_tester = next(
+                (
+                    item
+                    for item in tester_rows
+                    if _safe_text(item.get("tester_id"), "") == selected_tester_id
+                ),
+                {},
+            )
+            st.markdown("#### Onboarding Acknowledgements")
+            ack_cols = st.columns(2)
+            ack_terms = ack_cols[0].checkbox(
+                "Terms Acknowledged",
+                value=bool(selected_tester.get("terms_acknowledged", False)),
+            )
+            ack_limits = ack_cols[1].checkbox(
+                "Known Limitations Acknowledged",
+                value=bool(
+                    selected_tester.get("known_limitations_acknowledged", False)
+                ),
+            )
+            if st.button("Record Acknowledgement", width="stretch"):
+                try:
+                    tenant_manager.acknowledge_alpha_onboarding(
+                        tenant_id=selected_tenant_id,
+                        tester_id=selected_tester_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                        terms_acknowledged=ack_terms,
+                        known_limitations_acknowledged=ack_limits,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Acknowledgement recorded.")
+                    st.rerun()
+                except Exception as exc:
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to record acknowledgement",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id,
+                        organization_id=f"org-{selected_tenant_id}",
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tester Onboarding",
+                    )
+
+            st.markdown("#### Test Scenario Assignment")
+            scenario_templates = tenant_manager.list_alpha_scenario_templates()
+            scenario_keys = [
+                _safe_text(item.get("scenario_key"), "") for item in scenario_templates
+            ]
+            selected_keys = st.multiselect(
+                "Scenarios",
+                options=scenario_keys,
+                default=scenario_keys,
+            )
+            if st.button("Assign Selected Scenarios", width="stretch"):
+                try:
+                    tenant_manager.assign_alpha_scenarios(
+                        tenant_id=selected_tenant_id,
+                        tester_id=selected_tester_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                        scenario_keys=selected_keys,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Scenarios assigned.")
+                    st.rerun()
+                except Exception as exc:
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to assign scenarios",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id,
+                        organization_id=f"org-{selected_tenant_id}",
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tester Onboarding",
+                    )
+
+            tester_details = tenant_manager.get_alpha_tester(
+                tenant_id=selected_tenant_id,
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+                actor_id=user_id,
+                tester_id=selected_tester_id,
+            )
+            st.json(tester_details)
+            tester_scenarios = tenant_manager.list_alpha_tester_scenarios(
+                tenant_id=selected_tenant_id,
+                tester_id=selected_tester_id,
+                actor_id=user_id,
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+            )
+            if tester_scenarios:
+                st.dataframe(tester_scenarios, width="stretch", hide_index=True)
+                scenario_id = st.selectbox(
+                    "Scenario",
+                    options=[
+                        _safe_text(dict(item).get("scenario_id"), "")
+                        for item in tester_scenarios
+                    ],
+                )
+                scenario_cols = st.columns(4)
+                scenario_status = scenario_cols[0].selectbox(
+                    "Scenario Status",
+                    options=["pending", "in_progress", "completed"],
+                    index=0,
+                )
+                scenario_error_id = scenario_cols[1].text_input(
+                    "Related Error ID", value=""
+                )
+                scenario_feedback_ids = scenario_cols[2].text_input(
+                    "Related Feedback IDs (comma-separated)", value=""
+                )
+                scenario_notes = scenario_cols[3].text_input("Tester Notes", value="")
+                if st.button("Update Scenario", width="stretch"):
+                    try:
+                        tenant_manager.update_alpha_scenario_status(
+                            tenant_id=selected_tenant_id,
+                            tester_id=selected_tester_id,
+                            scenario_id=scenario_id,
+                            actor_id=user_id,
+                            requester_tenant_id=tenant_id,
+                            requester_organization_id=organization_id,
+                            status=scenario_status,
+                            tester_notes=scenario_notes or None,
+                            related_feedback=[
+                                item.strip()
+                                for item in scenario_feedback_ids.split(",")
+                                if item.strip()
+                            ],
+                            related_error_id=scenario_error_id or None,
+                        )
+                        _save_tenant_manager_workspace_state(st, tenant_manager)
+                        st.success("Scenario updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        _render_logged_error_message(
+                            st,
+                            summary="Unable to update scenario",
+                            exception=exc,
+                            severity="medium",
+                            tenant_id=selected_tenant_id,
+                            organization_id=f"org-{selected_tenant_id}",
+                            user_id=user_id,
+                            workspace="Settings",
+                            route="Platform Management > Tester Onboarding",
+                        )
+
+            status_cols = st.columns(6)
+            for label, state in [
+                ("Set Onboarding", "onboarding"),
+                ("Set Active", "active"),
+                ("Set Paused", "paused"),
+                ("Set Completed", "completed"),
+            ]:
+                if status_cols.pop(0).button(label, width="stretch"):
+                    try:
+                        tenant_manager.update_alpha_tester_status(
+                            tenant_id=selected_tenant_id,
+                            tester_id=selected_tester_id,
+                            actor_id=user_id,
+                            requester_tenant_id=tenant_id,
+                            requester_organization_id=organization_id,
+                            status=state,
+                        )
+                        _save_tenant_manager_workspace_state(st, tenant_manager)
+                        st.success("Tester status updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        _render_logged_error_message(
+                            st,
+                            summary="Unable to update tester status",
+                            exception=exc,
+                            severity="medium",
+                            tenant_id=selected_tenant_id,
+                            organization_id=f"org-{selected_tenant_id}",
+                            user_id=user_id,
+                            workspace="Settings",
+                            route="Platform Management > Tester Onboarding",
+                        )
+
+            request_cols = st.columns(3)
+            reset_reason = request_cols[0].text_input("Reset Request Reason", value="")
+            export_reason = request_cols[1].text_input(
+                "Export Request Reason", value=""
+            )
+            if request_cols[2].button("Deactivate Tester", width="stretch"):
+                try:
+                    tenant_manager.deactivate_alpha_tester(
+                        tenant_id=selected_tenant_id,
+                        tester_id=selected_tester_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Tester deactivated.")
+                    st.rerun()
+                except Exception as exc:
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to deactivate tester",
+                        exception=exc,
+                        severity="high",
+                        tenant_id=selected_tenant_id,
+                        organization_id=f"org-{selected_tenant_id}",
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tester Onboarding",
+                    )
+            request_action_cols = st.columns(2)
+            if request_action_cols[0].button("Request Sandbox Reset", width="stretch"):
+                try:
+                    tenant_manager.request_sandbox_reset(
+                        tenant_id=selected_tenant_id,
+                        tester_id=selected_tester_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                        reason=reset_reason or "operator-requested",
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Reset request recorded.")
+                    st.rerun()
+                except Exception as exc:
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to request sandbox reset",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id,
+                        organization_id=f"org-{selected_tenant_id}",
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tester Onboarding",
+                    )
+            if request_action_cols[1].button("Request Tenant Export", width="stretch"):
+                try:
+                    tenant_manager.request_tenant_export(
+                        tenant_id=selected_tenant_id,
+                        tester_id=selected_tester_id,
+                        actor_id=user_id,
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                        reason=export_reason or "operator-requested",
+                    )
+                    _save_tenant_manager_workspace_state(st, tenant_manager)
+                    st.success("Export request recorded.")
+                    st.rerun()
+                except Exception as exc:
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to request tenant export",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id,
+                        organization_id=f"org-{selected_tenant_id}",
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tester Onboarding",
+                    )
+            return
 
         if tertiary == "error_log":
             st.markdown("#### Application Error Log")

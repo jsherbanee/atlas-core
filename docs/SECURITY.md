@@ -129,3 +129,17 @@ Security controls include:
 Current A-02 constraints:
 - local deterministic persistence only
 - no external monitoring/alert pipeline integration in this sprint
+
+## A-03 Tester Onboarding and Rollout Security Notes
+
+Sprint A-03 introduces controlled external tester onboarding controls for sandbox tenants.
+
+Security controls include:
+- platform-admin scope enforcement (`tenant_id=local`, `organization_id=atlas`) for tester profile assignment, acknowledgement, scenario updates, and status transitions
+- explicit tester lifecycle states with deterministic access denial for `paused` and `deactivated` testers
+- tenant-scoped scenario, reset-request, and export-request records with audit events
+- platform-admin-only cross-tenant rollout dashboard visibility
+
+Current A-03 constraints:
+- local deterministic persistence only
+- no SSO, invitation service automation, or hosted identity-provider integration in this sprint
