@@ -116,6 +116,16 @@ Settings workspace completion now includes:
 
 No blocker-class tenant-isolation regressions were identified in targeted S-01 validation for settings service and settings navigation contracts.
 
+## U-01 Follow-Up Note
+
+Commercial-document usability and presentation polish now includes:
+- standardized tertiary action contracts for Sales Orders, Return Orders, Credit Memos, and Customer Invoices
+- deterministic `export_pdf` pathway parity for Return Orders and Credit Memos alongside existing estimate/sales-order/customer-invoice flows
+- line-presentation sort parity extension (`unit_cost`, `discount`, `tax_rate`) with presentation-only semantics preserved
+- related-document/source lineage visibility improvements in Transactions views
+
+No blocker-class tenant-isolation, issued-immutability, or cross-scope regressions were identified in U-01 validation.
+
 ## Security and Tenancy Findings
 - No active cross-tenant mutation regression remains in audited transactions paths with default service configuration.
 - Transactions service construction now fails fast when active tenant/org scope is omitted.

@@ -108,6 +108,21 @@ Completed hardening sprints (A-05 and X-01) apply usability validation to existi
 
 - no new engineering features
 - no Commercial Intelligence, Sell Pricing, or Proposal Generation implementation
+
+## 8.2 Sprint U-01 Commercial Workflow Usability Polish
+
+Sprint U-01 applies the same behavior-preserving usability posture to commercial transaction workflows:
+
+- keep action language and placement consistent across comparable document families
+- reduce dead-end controls by aligning visible actions with implemented deterministic behavior
+- preserve line-presentation clarity (sort/reorder/group/comment/visible-column controls) without changing authoritative totals or lifecycle rules
+- improve chain comprehension by surfacing source and related-document lineage in context
+
+U-01 remains a polish sprint, not a scope-expansion sprint:
+
+- no new transaction families
+- no payment workflow ownership
+- no inventory/procurement activation
 - no post-D-03 epic starts
 
 Hardening priorities:

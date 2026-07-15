@@ -48,6 +48,7 @@ Status: Active
 - P-07 Alpha Blocker Remediation
 - T-09 Change Order Tracking Convention
 - S-01 Settings Workspace Completion
+- U-01 Commercial Document Usability and Presentation Polish
 
 ### A-07 Scope
 
@@ -92,6 +93,21 @@ Explicitly out of scope:
 - live integration authentication/transport execution
 - external tax engine integration
 - identity lifecycle, SSO, and invitation workflows
+
+### U-01 Scope
+
+- standardize Transactions tertiary action contracts for commercial document families already in alpha scope
+- remove dead or inconsistent export/action paths and align supported workflows to deterministic PDF/export controls
+- improve line-presentation parity and usability for reorder/sort/group/comment/subtotal/visible-column controls
+- strengthen commercial chain visibility through related-document/source-lineage presentation improvements
+- add regression coverage for navigation/action parity and line-presentation sort parity
+
+Explicitly out of scope:
+
+- QuickBooks API transport execution
+- payment processing
+- inventory/procurement workflows
+- new transaction families or roadmap expansion
 
 ### A-08 Scope
 

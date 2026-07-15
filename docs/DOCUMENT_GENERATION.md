@@ -80,6 +80,11 @@ Key behavior:
 - customer-invoice presentation exports use the same deterministic generation path and revision snapshot guarantees
 - sales-order and return-order revisions marked as change orders render explicit change-order labels in PDF output (`CHANGE ORDER`, `CO #n`, project/base-bid references, and change summary context) while preserving existing template-resolution behavior
 
+U-01 usability polish follow-up:
+
+- Transactions workflow contracts now consistently route commercial export actions through `export_pdf` for supported line-based families (Sales Order, Return Order, Credit Memo, Customer Invoice, and Estimate presentations)
+- export-action contract cleanup removes divergent legacy return-order export paths while retaining deterministic artifact/hash guarantees
+
 ## Background Job and Audit Alignment
 
 The generation service is deterministic and job-safe by design.

@@ -89,6 +89,21 @@ Still deferred:
 
 Sprint T-03 operationalizes Estimates as the first full transaction family.
 
+## U-01 Implementation Note
+
+Sprint U-01 delivers usability and presentation polish for already-implemented commercial transaction families.
+
+Implemented in U-01:
+- standardized tertiary action contracts across Sales Orders, Return Orders, Credit Memos, and Customer Invoices to match active supported workflows
+- unified export controls on deterministic `export_pdf` actions for commercial-document families in active scope
+- expanded related-document visibility with explicit source and lineage references alongside relationship lists
+- line-presentation sorting parity extension for additional numeric commercial columns (`unit_cost`, `discount`, `tax_rate`)
+
+Still deferred:
+- QuickBooks transport APIs
+- accounting ledger and payment processing behavior
+- inventory/procurement workflow activation
+
 Implemented in T-03:
 - estimate-specific tertiary workflow actions: Add, Browse, Edit, Lines, Revisions, Issue, Approvals, Related Documents, Activity, Export
 - deterministic reuse of the existing estimate engine for estimate line editing, validation, revision history, and issue readiness

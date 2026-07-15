@@ -6452,6 +6452,36 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                     "required_selection": "entity",
                 },
                 {
+                    "tertiary_key": "duplicate",
+                    "label": "Duplicate",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "create_revision",
+                    "label": "Create Revision",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "revision_history",
+                    "label": "Revision History",
+                    "action_type": "history_activity_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "archive",
+                    "label": "Archive",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "restore",
+                    "label": "Restore",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
                     "tertiary_key": "lines",
                     "label": "Lines",
                     "action_type": "detail_view",
@@ -6482,13 +6512,25 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                     "required_selection": "entity",
                 },
                 {
+                    "tertiary_key": "issue",
+                    "label": "Issue",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "related_documents",
+                    "label": "Related Documents",
+                    "action_type": "relationship_view",
+                    "required_selection": "entity",
+                },
+                {
                     "tertiary_key": "activity",
                     "label": "Activity",
                     "action_type": "history_activity_view",
                     "required_selection": "entity",
                 },
                 {
-                    "tertiary_key": "export",
+                    "tertiary_key": "export_pdf",
                     "label": "Export",
                     "action_type": "export_action",
                     "required_selection": "entity",
@@ -6498,15 +6540,63 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
         if secondary_key == "credit_memos":
             actions[secondary_key] = [
                 {
+                    "tertiary_key": "add",
+                    "label": "Add",
+                    "action_type": "create_action",
+                    "required_selection": None,
+                },
+                {
                     "tertiary_key": "browse",
                     "label": "Browse",
                     "action_type": "collection_view",
                     "required_selection": None,
                 },
                 {
-                    "tertiary_key": "details",
-                    "label": "Details",
+                    "tertiary_key": "edit",
+                    "label": "Edit",
+                    "action_type": "edit_action",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "duplicate",
+                    "label": "Duplicate",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "create_revision",
+                    "label": "Create Revision",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "revision_history",
+                    "label": "Revision History",
+                    "action_type": "history_activity_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "archive",
+                    "label": "Archive",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "restore",
+                    "label": "Restore",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "lines",
+                    "label": "Lines",
                     "action_type": "detail_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "issue",
+                    "label": "Issue",
+                    "action_type": "operational_view",
                     "required_selection": "entity",
                 },
                 {
@@ -6604,6 +6694,12 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                     "required_selection": "entity",
                 },
                 {
+                    "tertiary_key": "issue",
+                    "label": "Issue",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
                     "tertiary_key": "related_documents",
                     "label": "Related Documents",
                     "action_type": "relationship_view",
@@ -6641,6 +6737,12 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                     "tertiary_key": "edit",
                     "label": "Edit",
                     "action_type": "edit_action",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "duplicate",
+                    "label": "Duplicate",
+                    "action_type": "operational_view",
                     "required_selection": "entity",
                 },
                 {
@@ -14103,6 +14205,8 @@ def _render_transactions_workspace_page(
     if tertiary == "duplicate" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.RETURN_ORDER,
+        CommercialDocumentType.CREDIT_MEMO,
         CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         if st.button("Duplicate Document", key=f"{prefix}_duplicate", width="stretch"):
@@ -14123,6 +14227,8 @@ def _render_transactions_workspace_page(
     if tertiary == "create_revision" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.RETURN_ORDER,
+        CommercialDocumentType.CREDIT_MEMO,
         CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         create_revision_reason = st.text_input(
@@ -14156,6 +14262,8 @@ def _render_transactions_workspace_page(
     if tertiary == "revision_history" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.RETURN_ORDER,
+        CommercialDocumentType.CREDIT_MEMO,
         CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         st.dataframe(
@@ -14167,6 +14275,8 @@ def _render_transactions_workspace_page(
     if tertiary == "archive" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.RETURN_ORDER,
+        CommercialDocumentType.CREDIT_MEMO,
         CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         if st.button(
@@ -14180,6 +14290,8 @@ def _render_transactions_workspace_page(
     if tertiary == "restore" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.RETURN_ORDER,
+        CommercialDocumentType.CREDIT_MEMO,
         CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         if st.button(
@@ -14193,6 +14305,8 @@ def _render_transactions_workspace_page(
     if tertiary == "export_pdf" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.RETURN_ORDER,
+        CommercialDocumentType.CREDIT_MEMO,
         CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         if selected_document.document_type == CommercialDocumentType.ESTIMATE:
@@ -14207,6 +14321,9 @@ def _render_transactions_workspace_page(
         elif selected_document.document_type == CommercialDocumentType.CREDIT_MEMO:
             presentation = "credit_memo"
             st.caption("Credit Memo presentation is fixed to credit_memo.")
+        elif selected_document.document_type == CommercialDocumentType.RETURN_ORDER:
+            presentation = "return_order"
+            st.caption("Return Order presentation is fixed to return_order.")
         else:
             presentation = "sales_order"
             st.caption("Sales Order presentation is fixed to sales_order.")
@@ -14984,6 +15101,53 @@ def _render_transactions_workspace_page(
                 except Exception as exc:
                     st.error(f"Unable to issue customer invoice: {exc}")
 
+    if tertiary == "issue" and selected_document.document_type in {
+        CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.RETURN_ORDER,
+        CommercialDocumentType.CREDIT_MEMO,
+    }:
+        preview_number = service.preview_number(selected_document.document_id)
+        st.dataframe(
+            [
+                {
+                    "Lifecycle": _safe_text(
+                        selected_document.lifecycle_state.value, ""
+                    ),
+                    "Approval": _safe_text(selected_document.approval_state.value, ""),
+                    "Current Number": _safe_text(
+                        selected_document.document_number, "draft"
+                    ),
+                    "Next Number": preview_number,
+                    "Revision": selected_document.revision_number,
+                }
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+        issue_reason = st.text_input(
+            "Issue Reason",
+            value="Issue approved document",
+            key=f"{prefix}_generic_issue_reason",
+        )
+        if st.button(
+            "Issue Document",
+            key=f"{prefix}_issue_generic_document",
+            width="stretch",
+        ):
+            if selected_document.approval_state != ApprovalState.APPROVED:
+                st.warning("Document must be approved before issuing.")
+            else:
+                try:
+                    service.issue_document(
+                        document_id=selected_document.document_id,
+                        reason=issue_reason,
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.success("Document issued.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to issue document: {exc}")
+
     if (
         tertiary == "revisions"
         and selected_document.document_type == CommercialDocumentType.CUSTOMER_INVOICE
@@ -15658,14 +15822,65 @@ def _render_transactions_workspace_page(
         )
 
     if tertiary == "related_documents":
+        source_rows: list[dict[str, str]] = []
+        if _safe_text(selected_document.source_document_id, ""):
+            source_rows.append(
+                {
+                    "Relation": "source_document",
+                    "Target Type": "commercial_document",
+                    "Target ID": _safe_text(
+                        selected_document.source_document_id, "n/a"
+                    ),
+                    "Reason": _safe_text(
+                        selected_document.source_relationship_type, ""
+                    ),
+                }
+            )
+        if _safe_text(selected_document.source_sales_order_id, ""):
+            source_rows.append(
+                {
+                    "Relation": "source_sales_order",
+                    "Target Type": "commercial_document",
+                    "Target ID": _safe_text(
+                        selected_document.source_sales_order_id, "n/a"
+                    ),
+                    "Reason": "lineage",
+                }
+            )
+        if _safe_text(selected_document.source_invoice_id, ""):
+            source_rows.append(
+                {
+                    "Relation": "source_invoice",
+                    "Target Type": "commercial_document",
+                    "Target ID": _safe_text(selected_document.source_invoice_id, "n/a"),
+                    "Reason": "lineage",
+                }
+            )
+        metadata = dict(selected_document.document_metadata or {})
+        for related in list(metadata.get("related_documents") or []):
+            related_id = _safe_text(related, "")
+            if related_id:
+                source_rows.append(
+                    {
+                        "Relation": "related_document",
+                        "Target Type": "commercial_document",
+                        "Target ID": related_id,
+                        "Reason": "metadata",
+                    }
+                )
+        if source_rows:
+            st.caption("Source and lineage references")
+            _render_data_table(st, source_rows)
+
         relationships = list(selected_document.relationships or [])
         if not relationships:
-            _render_guided_empty_state(
-                st,
-                why_empty="No related documents are linked to this record.",
-                action_to_populate="Use relationship workflows when line-items and revisions are connected.",
-                next_location="Object Workspace and future transaction relationship tools.",
-            )
+            if not source_rows:
+                _render_guided_empty_state(
+                    st,
+                    why_empty="No related documents are linked to this record.",
+                    action_to_populate="Use relationship workflows when line-items and revisions are connected.",
+                    next_location="Object Workspace and future transaction relationship tools.",
+                )
         else:
             _render_data_table(
                 st,
@@ -15678,49 +15893,6 @@ def _render_transactions_workspace_page(
                     }
                     for item in relationships
                 ],
-            )
-
-    if tertiary == "export":
-        if selected_document.document_type == CommercialDocumentType.RETURN_ORDER:
-            if st.button(
-                "Generate Return Order PDF",
-                key=f"{prefix}_generate_return_order_pdf",
-                width="stretch",
-            ):
-                try:
-                    export_result = service.export_document_pdf(
-                        document_id=selected_document.document_id,
-                        presentation="return_order",
-                        actor="atlas-ui",
-                    )
-                    st.session_state[f"{prefix}_return_order_export_payload"] = (
-                        export_result
-                    )
-                    _save_transactions_workspace_state(st, service)
-                except Exception as exc:
-                    st.error(f"Unable to generate return order PDF: {exc}")
-            return_order_export = dict(
-                st.session_state.get(f"{prefix}_return_order_export_payload") or {}
-            )
-            if return_order_export:
-                st.download_button(
-                    "Download Return Order PDF",
-                    data=return_order_export.get("payload", b""),
-                    file_name=_safe_text(
-                        return_order_export.get("file_name"), "return-order.pdf"
-                    ),
-                    mime="application/pdf",
-                    key=f"{prefix}_download_return_order_pdf",
-                    width="stretch",
-                )
-        else:
-            st.download_button(
-                "Download Document JSON",
-                data=json.dumps(selected_document.to_dict(), indent=2, sort_keys=True),
-                file_name=f"{selected_document.document_id}.json",
-                mime="application/json",
-                key=f"{prefix}_export_json",
-                width="stretch",
             )
 
 

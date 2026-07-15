@@ -88,6 +88,22 @@ Preserved guarantees in T-04:
 
 ## P-05 Implementation Status
 
+## U-01 Implementation Status
+
+Sprint U-01 completes commercial document usability and presentation polish on top of existing T-series and P-series implementation.
+
+Implemented in U-01:
+- standardized tertiary workflow contracts for Sales Orders, Return Orders, Credit Memos, and Customer Invoices so supported actions align with implemented behavior
+- deterministic PDF export action parity across line-based commercial families (including Return Orders and Credit Memos through the shared `export_pdf` pattern)
+- source and related-document lineage visibility improvements in Transactions related-document views
+- line-presentation sort parity extension (`unit_cost`, `discount`, `tax_rate`) while preserving authoritative totals semantics
+
+Preserved boundaries in U-01:
+- no new commercial document families
+- no payment ownership changes
+- no inventory/procurement workflow activation
+- no QuickBooks API transport execution
+
 Sprint P-05 introduces deterministic document generation and template orchestration for commercial document revisions.
 
 Implemented in P-05:

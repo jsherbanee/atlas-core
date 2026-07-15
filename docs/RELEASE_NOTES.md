@@ -21,6 +21,23 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Atlas Alpha Completion Sprint U-01 Commercial Document Usability and Presentation Polish)
+
+### Improved
+
+- Transactions tertiary action contracts are now standardized across Sales Orders, Return Orders, Credit Memos, and Customer Invoices (including parity for duplicate/archive/restore/issue/export workflows where supported).
+- Return Orders and Credit Memos now use the same deterministic `export_pdf` pathway as other commercial document families, removing legacy export-action divergence.
+- Related Documents now surfaces explicit source/lineage references (`source_document`, linked sales-order/invoice IDs, and metadata-related links) even when relationship collections are sparse.
+- Line-presentation sorting now includes `unit_cost`, `discount`, and `tax_rate` columns for preview/apply/restore workflows.
+- Regression coverage now locks standardized transaction navigation action matrices and expanded line-presentation sort parity.
+
+### Scope Notes
+
+- no QuickBooks API transport execution
+- no payment workflows
+- no inventory or procurement activation
+- no new transaction families or roadmap expansion
+
 ## Unreleased (Atlas Alpha Completion Sprint S-01 Settings Workspace Completion)
 
 ### Improved

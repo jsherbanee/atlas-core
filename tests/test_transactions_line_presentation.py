@@ -30,6 +30,9 @@ def _sales_order_with_lines() -> tuple[TransactionsWorkspaceService, str]:
         description="Camera",
         quantity=Decimal("2"),
         unit_price=Decimal("100.00"),
+        unit_cost=Decimal("10.00"),
+        discount=Decimal("0"),
+        tax_rate=Decimal("0"),
         product_or_service_reference="CAM-1",
         line_metadata={"manufacturer": "Acme"},
     )
@@ -38,6 +41,9 @@ def _sales_order_with_lines() -> tuple[TransactionsWorkspaceService, str]:
         description="Programming",
         quantity=Decimal("3"),
         unit_price=Decimal("50.00"),
+        unit_cost=Decimal("20.00"),
+        discount=Decimal("2.00"),
+        tax_rate=Decimal("10.00"),
         product_or_service_reference="SVC-1",
         line_metadata={"line_type": "service", "manufacturer": "Atlas Services"},
     )
@@ -131,6 +137,33 @@ def test_sort_preview_apply_and_restore_manual_order() -> None:
     service.restore_manual_line_order(document_id=document_id)
     restored = service.line_presentation_snapshot(document_id=document_id)
     assert [row["line_id"] for row in restored["rows"][:2]] == original_order
+
+
+def test_sort_preview_supports_extended_numeric_columns() -> None:
+    service, document_id = _sales_order_with_lines()
+
+    unit_cost_preview = service.sort_lines(
+        document_id=document_id,
+        column="unit_cost",
+        direction="desc",
+        apply=False,
+    )
+    discount_preview = service.sort_lines(
+        document_id=document_id,
+        column="discount",
+        direction="desc",
+        apply=False,
+    )
+    tax_rate_preview = service.sort_lines(
+        document_id=document_id,
+        column="tax_rate",
+        direction="desc",
+        apply=False,
+    )
+
+    assert unit_cost_preview[0]["description"] == "Programming"
+    assert discount_preview[0]["description"] == "Programming"
+    assert tax_rate_preview[0]["description"] == "Programming"
 
 
 def test_duplicate_and_revision_preserve_presentation_metadata() -> None:

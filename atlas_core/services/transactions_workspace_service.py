@@ -85,7 +85,10 @@ class TransactionsWorkspaceService:
         "description",
         "item_type",
         "quantity",
+        "unit_cost",
         "unit_price",
+        "discount",
+        "tax_rate",
         "extended_price",
     }
 
