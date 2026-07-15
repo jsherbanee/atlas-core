@@ -9,6 +9,7 @@ from decimal import Decimal
 import hashlib
 from html import escape
 import json
+import os
 from pathlib import Path
 import platform
 import re
@@ -72,6 +73,9 @@ from atlas_core.services.sales_design_review_service import SalesDesignReviewSer
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
 from atlas_core.services.permissions_service import PermissionsService
 from atlas_core.services.settings_service import SettingsService
+from atlas_core.services.commercial_catalog_seed_service import (
+    CommercialCatalogSeedService,
+)
 from atlas_core.services.specification_intelligence import (
     SpecificationIntelligenceEngine,
     SpecificationReferenceType,
@@ -16285,6 +16289,95 @@ def _render_application_administration_page(
                 width="stretch",
                 hide_index=True,
             )
+
+            seed_actions_enabled = _safe_text(
+                os.getenv("ATLAS_ENABLE_SEED_DATA_ACTIONS"), ""
+            ).lower() in {"1", "true", "yes"}
+            if seed_actions_enabled:
+                with st.expander(
+                    "Development Seed Data (C-04)",
+                    expanded=False,
+                ):
+                    st.caption(
+                        "Administrator-only development action for deterministic C-04 sample catalog loading/reset."
+                    )
+                    seed_service = CommercialCatalogSeedService(
+                        _transactions_workspace_service(st).catalog_service
+                    )
+                    seed_summary = seed_service.seed_summary(tenant_id=tenant_id)
+                    st.json(seed_summary)
+                    seed_cols = st.columns(3)
+                    can_mutate_seed = settings_manage_access.allowed
+                    if seed_cols[0].button(
+                        "Load Seed Data",
+                        key="atlas_c04_seed_load",
+                        width="stretch",
+                        disabled=not can_mutate_seed,
+                    ):
+                        try:
+                            loader_workspace = _transactions_workspace_service(st)
+                            loader = CommercialCatalogSeedService(
+                                loader_workspace.catalog_service
+                            )
+                            result = loader.load_seed_data(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                imported_by="atlas-ui",
+                            )
+                            _save_transactions_workspace_state(st, loader_workspace)
+                            st.success("C-04 seed data loaded.")
+                            st.json(result)
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to load C-04 seed data: {exc}")
+                    if seed_cols[1].button(
+                        "Validate Seed Flow",
+                        key="atlas_c04_seed_validate",
+                        width="stretch",
+                        disabled=not can_mutate_seed,
+                    ):
+                        try:
+                            validator_workspace = _transactions_workspace_service(st)
+                            validator = CommercialCatalogSeedService(
+                                validator_workspace.catalog_service
+                            )
+                            validation_result = (
+                                validator.validate_catalog_to_transaction_workflow(
+                                    tenant_id=tenant_id,
+                                    organization_id=organization_id,
+                                    actor="atlas-ui",
+                                )
+                            )
+                            _save_transactions_workspace_state(st, validator_workspace)
+                            st.success("C-04 workflow validation completed.")
+                            st.json(validation_result)
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to validate C-04 seed workflow: {exc}")
+                    if seed_cols[2].button(
+                        "Reset Seed Data",
+                        key="atlas_c04_seed_reset",
+                        width="stretch",
+                        disabled=not can_mutate_seed,
+                    ):
+                        try:
+                            reset_workspace = _transactions_workspace_service(st)
+                            resetter = CommercialCatalogSeedService(
+                                reset_workspace.catalog_service
+                            )
+                            reset_result = resetter.reset_seed_data(tenant_id=tenant_id)
+                            _save_transactions_workspace_state(st, reset_workspace)
+                            st.success("C-04 seed data reset complete.")
+                            st.json(reset_result)
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to reset C-04 seed data: {exc}")
+                    if not can_mutate_seed:
+                        st.caption(settings_manage_access.reason)
+            else:
+                st.caption(
+                    "Development seed actions are hidden. Set ATLAS_ENABLE_SEED_DATA_ACTIONS=true to enable administrator-only controls."
+                )
 
         elif tertiary == "organization_profile":
             profile = settings_service.organization_profile(

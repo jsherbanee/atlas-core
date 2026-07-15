@@ -121,6 +121,17 @@ Sprint C-03 extends commercial import behavior with deterministic PDF catalog pr
 - partial-success finalization with rejected-row export payload
 - immutable catalog price-list version snapshots with provenance
 
+## C-04 Seed Import Validation Alignment
+
+Sprint C-04 introduces a deterministic seed import package that validates the shared ingestion pipeline behavior across representative commercial catalog inputs.
+
+C-04 validation focus:
+- repeatable load and duplicate suppression
+- deterministic seed provenance on imported records
+- seed-only reset preserving non-seed records
+- CSV/XLSX catalog import parity
+- PDF inspection and import lifecycle validation coverage (diagnostics, partial success, rejected-row export, immutable versions)
+
 ## P-04 Attachment Framework Alignment
 
 Sprint P-04 introduces a shared attachment domain and orchestration layer that aligns with import-pipeline requirements for provenance, duplicate detection, and versioned source handling.

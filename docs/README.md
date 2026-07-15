@@ -6,6 +6,8 @@ Current implementation focus remains Phase 2 Bid Intelligence and the associated
 
 Commercial Knowledge update: Epic C Sprint C-03 now includes expanded Commercial Catalog coverage for Product/Service/Fee/Assembly item types, deterministic PDF catalog price-list import preview/finalization behavior, and assembly lifecycle/versioning references. See [COMMERCIAL_CATALOG.md](COMMERCIAL_CATALOG.md).
 
+Alpha data validation update: Epic C Sprint C-04 adds deterministic seed catalog loading/reset and scripted catalog-to-transaction validation coverage. See [SEED_DATA.md](SEED_DATA.md).
+
 Current workspace-continuity stream: Epic W Workspace Intelligence.
 Scope: deterministic context persistence, cross-workspace continuity, search handoff, Working Set continuity, and repository-backed return context for already-implemented capabilities only.
 

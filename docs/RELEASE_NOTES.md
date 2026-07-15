@@ -21,6 +21,24 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Atlas Epic C Sprint C-04 Seed Catalog Import and Alpha Data Validation)
+
+### Improved
+
+- Atlas now supports deterministic tenant-scoped C-04 seed catalog loading for alpha validation with explicit provenance markers.
+- Seed package coverage includes representative manufacturers, vendors, products, services, fees, assemblies, assembly components, tax nexus records, and price-sheet imports.
+- Development/admin seed controls now support repeatable load, duplicate suppression, and seed-only reset preserving non-seed records.
+- Seed validation now includes representative CSV/XLSX/PDF import paths and deterministic import diagnostics behavior.
+- Scripted validation now covers catalog-backed Estimate -> Sales Order -> Customer Invoice and Return Order -> Credit Memo workflows, including representative PDF generation checks.
+
+### Scope Notes
+
+- non-production sample data only
+- no inventory implementation
+- no live tax service integration
+- no QuickBooks sync execution
+- no new transaction families
+
 ## Unreleased (Atlas Epic C Sprint C-03 Commercial Catalog, PDF Price Lists, and Assemblies)
 
 ### Improved

@@ -378,6 +378,7 @@ Status: Active
 - C-01 Commercial Product Foundation
 - C-02 Commercial Knowledge Completion
 - C-03 Commercial Catalog Foundation
+- C-04 Seed Catalog Import and Alpha Data Validation
 
 ### C-01 Scope Boundaries
 
@@ -445,6 +446,22 @@ Deferred beyond C-03:
 - Product Resolution workflows now move to later C-series scope.
 - Procurement execution workflows, inventory activation, payment workflows, and external accounting transport.
 - Commercial intelligence automation and ERP synchronization.
+
+### C-04 Scope Boundaries
+
+Implemented in C-04:
+- Deterministic tenant-scoped seed package for commercial catalog alpha validation data.
+- Representative seeded manufacturers, vendors, products, services, fees, assemblies, component maps, tax nexus rates, and price-sheet data.
+- Repeatable seed load and duplicate suppression behavior.
+- Seed-only reset preserving non-seed tenant records.
+- Explicit seed provenance markers on seeded records.
+- Representative import validation coverage for CSV/XLSX/PDF catalog sources.
+- Scripted validation for Estimate -> Sales Order -> Customer Invoice and Return Order -> Credit Memo flows.
+
+Deferred beyond C-04:
+- Any production data ingestion workflows.
+- Inventory, procurement execution, live tax-service integration, and QuickBooks transport execution.
+- New commercial document family introduction.
 
 ## Epic D: Deterministic Estimating
 

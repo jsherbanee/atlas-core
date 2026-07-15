@@ -60,3 +60,22 @@ Catalog lines can be inserted into:
 Assembly insertion modes:
 - `expand`: component lines only
 - `grouped`: priced parent + visible component lines with snapshot metadata
+
+## C-04 Seed Catalog Import and Alpha Validation
+
+Sprint C-04 adds a deterministic seed package and validation utility for alpha readiness.
+
+Coverage:
+- tenant-scoped non-production sample catalog data
+- representative imports for CSV, XLSX, and PDF price list validation paths
+- seeded manufacturers, vendors, products, services, fees, assemblies, component maps, tax rules, and price sheets
+- deterministic load, duplicate suppression, seed-only reset, and provenance tracking
+
+Workflow validation:
+- estimate creation with product/service/fee/assembly lines
+- estimate-to-sales-order conversion
+- sales-order-linked customer invoice creation
+- return-order processing and generated credit-memo traceability
+- representative PDF generation for customer-facing commercial documents
+
+See [SEED_DATA.md](SEED_DATA.md) for package identity, controls, and operational usage.

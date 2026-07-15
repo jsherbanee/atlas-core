@@ -128,6 +128,17 @@ Commercial catalog readiness now includes:
 
 No new blocker-class tenant-isolation regressions were identified in targeted C-03 service-level validation.
 
+## C-04 Follow-Up Note
+
+C-04 alpha data validation now includes:
+- deterministic tenant-scoped seed catalog package with explicit provenance markers
+- representative non-production commercial data for manufacturers, vendors, products, services, fees, assemblies, tax nexus, and price-sheet coverage
+- repeatable load, duplicate suppression, and seed-only reset behavior
+- scripted validation for estimate-to-sales-order-to-invoice and return-order-to-credit-memo workflows
+- representative PDF artifact generation validation on customer-facing commercial document paths
+
+No blocker-class regressions were identified in targeted C-04 seed-load/reset/workflow validation coverage.
+
 Commercial-document usability and presentation polish now includes:
 - standardized tertiary action contracts for Sales Orders, Return Orders, Credit Memos, and Customer Invoices
 - deterministic `export_pdf` pathway parity for Return Orders and Credit Memos alongside existing estimate/sales-order/customer-invoice flows

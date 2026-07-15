@@ -2072,11 +2072,17 @@ class CommercialKnowledgeService:
             raise ValueError("manufacturer imports require code and name")
         key = code.upper()
         is_insert = key not in self.state["manufacturers"]
+        provenance_payload = row.get("provenance")
         self.state["manufacturers"][key] = {
             "manufacturer_code": key,
             "manufacturer_name": name,
             "website": self._safe(row.get("website"), "") or None,
             "status": self._safe(row.get("status"), "active") or "active",
+            "source": self._safe(row.get("source"), "catalog_import")
+            or "catalog_import",
+            "provenance": (
+                dict(provenance_payload) if isinstance(provenance_payload, dict) else {}
+            ),
             "updated_at": self._now_iso(),
         }
         return is_insert
@@ -2088,11 +2094,17 @@ class CommercialKnowledgeService:
             raise ValueError("vendor imports require code and name")
         key = code.upper()
         is_insert = key not in self.state["vendors"]
+        provenance_payload = row.get("provenance")
         self.state["vendors"][key] = {
             "vendor_code": key,
             "vendor_name": name,
             "vendor_type": self._safe(row.get("vendor_type"), "other") or "other",
             "status": self._safe(row.get("status"), "active") or "active",
+            "source": self._safe(row.get("source"), "catalog_import")
+            or "catalog_import",
+            "provenance": (
+                dict(provenance_payload) if isinstance(provenance_payload, dict) else {}
+            ),
             "updated_at": self._now_iso(),
         }
         return is_insert

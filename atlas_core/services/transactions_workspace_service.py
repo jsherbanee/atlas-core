@@ -1120,6 +1120,10 @@ class TransactionsWorkspaceService:
     def catalog_state_payload(self) -> dict[str, Any]:
         return self._commercial_catalog_service.to_dict()
 
+    @property
+    def catalog_service(self) -> CommercialKnowledgeService:
+        return self._commercial_catalog_service
+
     def add_return_order_line(
         self,
         *,
