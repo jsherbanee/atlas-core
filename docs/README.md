@@ -4,6 +4,8 @@ Atlas documentation defines the product vision, architecture, lifecycle roadmap,
 
 Current implementation focus remains Phase 2 Bid Intelligence and the associated workspace-continuity/documentation workstream. Epic X is complete through X-13, Epic W has delivered W-01 Workspace Intelligence continuity, W-02 universal object contracts, and W-03 controlled Universal Object Workspace migration, and Epic E has not started.
 
+Commercial Knowledge update: Epic C Sprint C-03 now includes expanded Commercial Catalog coverage for Product/Service/Fee/Assembly item types, deterministic PDF catalog price-list import preview/finalization behavior, and assembly lifecycle/versioning references. See [COMMERCIAL_CATALOG.md](COMMERCIAL_CATALOG.md).
+
 Current workspace-continuity stream: Epic W Workspace Intelligence.
 Scope: deterministic context persistence, cross-workspace continuity, search handoff, Working Set continuity, and repository-backed return context for already-implemented capabilities only.
 

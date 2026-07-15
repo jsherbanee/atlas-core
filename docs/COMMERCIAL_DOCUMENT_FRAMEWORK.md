@@ -118,6 +118,15 @@ Deferred in P-05:
 - external delivery transport execution
 - e-signature and approval workflow expansion
 
+## C-03 Commercial Catalog Integration Note
+
+Sprint C-03 commercial catalog integration now supports deterministic catalog-backed line insertion for Product, Service, Fee, and Assembly references on supported customer-facing commercial document families. Assembly insertion supports both expanded component insertion and grouped parent-plus-components presentation with line-level catalog snapshots.
+
+C-03 preserves existing boundaries:
+- no procurement/inventory execution activation
+- no accounting ledger ownership change
+- no issued-document mutation
+
 ## T-08 Implementation Status
 
 Sprint T-08 operationalizes Customer Invoice transactions on top of the shared commercial-document framework.

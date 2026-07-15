@@ -5,6 +5,7 @@ Commercial Knowledge is Atlas's immutable commercial reference layer for determi
 
 C-03 extension note:
 - Commercial Knowledge now includes a catalog foundation for deterministic item reuse across transactions and settings-driven pricing/tax defaults.
+- C-03 expanded scope now includes assembly lifecycle/versioning/nested expansion and deterministic PDF catalog price-list import preview/finalization with diagnostics and immutable version snapshots.
 
 This layer is intentionally:
 
@@ -34,12 +35,12 @@ Each object has stable identifiers.
 ## Object Model
 
 ### Catalog Item (C-03)
-Catalog Item is the reusable transaction-facing commercial identity for products, services, and fees.
+Catalog Item is the reusable transaction-facing commercial identity for products, services, fees, and assemblies.
 
 Key fields:
 
 - catalog_item_id
-- item_type (`product`, `service`, `fee`)
+- item_type (`product`, `service`, `fee`, `assembly`)
 - code
 - name
 - manufacturer
@@ -48,9 +49,14 @@ Key fields:
 - cost
 - msrp
 - map_price
+- default_sales_price
 - manual_unit_price
 - taxable
 - default_tax_nexus
+- notes
+- tags
+- source
+- provenance
 - archived
 
 Catalog items are deterministic references and do not mutate previously issued commercial-document snapshots.
@@ -81,6 +87,8 @@ Commercial Knowledge stores tenant pricing defaults for deterministic quote beha
 - default_markup_percent
 - default_margin_percent
 - default_multiplier
+- default_tax_nexus
+- currency
 - rounding_policy
 
 ### Vendor Offering
@@ -321,6 +329,9 @@ Catalog foundation import coverage now includes:
 - products (CSV/XLSX)
 - services (CSV/XLSX)
 - fees (CSV/XLSX)
+- assemblies (CSV/XLSX)
+- assembly components (CSV/XLSX)
+- catalog price lists (PDF inspect/preview/finalize with immutable version history)
 - `atlas_core/services/master_library/commercial_product_service.py`
 - `apps/phase2_review_app.py`
 - `tests/test_commercial_knowledge_service.py`

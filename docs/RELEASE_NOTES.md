@@ -21,16 +21,17 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
-## Unreleased (Atlas Epic C Sprint C-03 Commercial Catalog Foundation)
+## Unreleased (Atlas Epic C Sprint C-03 Commercial Catalog, PDF Price Lists, and Assemblies)
 
 ### Improved
 
-- Commercial Knowledge now includes a unified catalog item foundation supporting `product`, `service`, and `fee` item types with deterministic archive/restore behavior.
+- Commercial Knowledge now includes a unified catalog item foundation supporting `product`, `service`, `fee`, and `assembly` item types with deterministic archive/restore behavior.
 - Commercial catalog pricing now supports policy-based quote behavior (MSRP, MAP, Cost+%, Margin%, Multiplier, Manual), including explicit manual line override precedence.
 - Nexus-based tax foundation now supports deterministic rule selection with effective date windows, priority ordering, compound behavior, item-type applicability, and exemption flags.
 - Settings now supports tenant-scoped organization commercial defaults for pricing policy, markup/margin, default tax nexus, currency, and rounding behavior.
-- Transactions now supports catalog-backed line insertion for Estimates, Sales Orders, Return Orders, and Customer Invoices while preserving manual line workflows.
-- Commercial catalog imports now support CSV/XLSX ingestion for manufacturers, vendors, products, services, and fees with deterministic import summaries.
+- Transactions now supports catalog-backed line insertion for Estimates, Sales Orders, Return Orders, Credit Memos, and Customer Invoices, including assembly `expand` and `grouped` insertion modes.
+- Commercial catalog imports now support CSV/XLSX ingestion for manufacturers, vendors, products, services, fees, assemblies, and assembly components with deterministic import summaries.
+- Commercial catalog price-list imports now support deterministic PDF inspection, explicit table mapping preview, diagnostics, partial-success finalization, and immutable version snapshots.
 
 ### Quality
 

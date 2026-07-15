@@ -431,13 +431,15 @@ Deferred beyond C-02:
 ### C-03 Scope Boundaries
 
 Implemented in C-03:
-- Unified commercial catalog item model with deterministic type support for `product`, `service`, and `fee` items.
+- Unified commercial catalog item model with deterministic type support for `product`, `service`, `fee`, and `assembly` items.
 - Catalog lifecycle controls for archive/restore without destructive mutation of historical references.
 - Pricing policy foundation for MSRP, MAP, Cost+%, Margin%, Multiplier, and Manual semantics with explicit manual line override precedence.
 - Nexus-based tax rule engine foundation with effective-date windows, deterministic priority ordering, compound-tax behavior, taxable item-type constraints, and exemption-flag filtering.
 - Tenant-scoped organization commercial defaults for pricing policy, markup/margin, tax nexus, currency, and rounding policy.
-- Catalog import workflows for manufacturers, vendors, products, services, and fees from CSV/XLSX sources.
-- Transaction integration for adding catalog-backed lines to Estimates, Sales Orders, Return Orders, and Customer Invoices while preserving manual line behavior.
+- Deterministic PDF catalog price-list lifecycle with inspect/preview/finalize stages, diagnostics, explicit mapping controls, duplicate hash warning, immutable version snapshots, and partial-success rejection reporting.
+- Catalog import workflows for manufacturers, vendors, products, services, fees, assemblies, and assembly components from CSV/XLSX sources.
+- Assembly versioning with nested expansion, circular-reference rejection, deterministic component ordering, and rollup totals.
+- Transaction integration for adding catalog-backed lines to Estimates, Sales Orders, Return Orders, Credit Memos, and Customer Invoices while preserving manual line behavior.
 
 Deferred beyond C-03:
 - Product Resolution workflows now move to later C-series scope.

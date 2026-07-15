@@ -33,6 +33,7 @@ Atlas Workspace Sprint T-09 adds change-order tracking controls to Sales Order a
 Atlas Workspace Sprint S-01 completes Settings alpha scope with Organization Profile, Taxes and Surcharges, expanded Terms families (Return Order and Customer Invoice), Document Templates management (create/list/duplicate/preview), Integrations metadata hooks, and Security policy metadata controls with permission-gated mutation paths.
 Atlas Workspace Sprint U-01 completes Transactions commercial-document usability polish by normalizing tertiary actions across active commercial families, unifying export controls onto deterministic `export_pdf` paths, extending line-sort parity for presentation controls, and surfacing explicit source/lineage context in Related Documents.
 Atlas Workspace Sprint U-02 completes end-to-end UX and workflow polish across all primary workspaces with clearer page-purpose identity, tighter action language consistency, reduced prototype/developer terminology, improved settings roadmap-section guidance, and consistent responsive behavior validation at 820/980/1180/1366 widths.
+Atlas Workspace Sprint C-03 extends Transactions catalog-backed line insertion for Product/Service/Fee/Assembly item types, including assembly `expand` and `grouped` insertion options and credit memo compatibility, while preserving deterministic no-mutation behavior for issued revisions.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.

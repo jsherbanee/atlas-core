@@ -35,6 +35,14 @@ Excluded from scope:
 - Vendor catalog synchronization
 - Cloud synchronization
 
+## C-03 Boundary Clarification
+
+Sprint C-03 introduces a separate Commercial Catalog surface for transactional pricing/tax/import and assembly sales composition behavior. Master Library remains the canonical engineering reference model and does not absorb transactional commercial ownership.
+
+Cross-reference:
+- [COMMERCIAL_CATALOG.md](COMMERCIAL_CATALOG.md)
+- [COMMERCIAL_KNOWLEDGE.md](COMMERCIAL_KNOWLEDGE.md)
+
 ## Architecture
 
 ### Domain

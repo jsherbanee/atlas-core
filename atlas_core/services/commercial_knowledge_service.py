@@ -7,11 +7,16 @@ from datetime import UTC, date, datetime
 import hashlib
 import io
 import json
+from pathlib import Path
+import tempfile
 from typing import Any
 import zipfile
 import xml.etree.ElementTree as ET
+from pypdf import PdfReader
 
 from atlas_core.domain.commercial_knowledge import (
+    AssemblyComponent,
+    AssemblyVersion,
     CatalogItem,
     CatalogItemType,
     CommercialProductLifecycleStatus,
@@ -23,6 +28,7 @@ from atlas_core.domain.commercial_knowledge import (
     TaxNexusRule,
     VendorOffering,
 )
+from atlas_core.services.document_intake_service import DocumentIntakeService
 
 
 class CommercialKnowledgeService:
@@ -59,8 +65,14 @@ class CommercialKnowledgeService:
                 "default_margin_percent": 0.0,
                 "default_multiplier": 1.0,
                 "rounding_policy": "currency_2dp",
+                "default_tax_nexus": "",
+                "currency": "USD",
             },
             "catalog_import_history": [],
+            "assembly_versions": {},
+            "assembly_version_lineage": {},
+            "price_list_import_previews": {},
+            "catalog_price_list_versions": {},
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -472,15 +484,26 @@ class CommercialKnowledgeService:
         code: str,
         name: str,
         description: str = "",
+        long_description: str = "",
         manufacturer: str | None = None,
         vendor: str | None = None,
         uom: str = "ea",
+        category: str = "",
+        family: str = "",
+        status: str = "active",
+        tax_category: str = "standard",
+        cost_references: list[dict[str, Any]] | None = None,
         cost: float | None = None,
         msrp: float | None = None,
         map_price: float | None = None,
+        default_sales_price: float | None = None,
         manual_unit_price: float | None = None,
         taxable: bool = True,
         default_tax_nexus: str | None = None,
+        notes: str = "",
+        tags: list[str] | None = None,
+        source: str = "manual",
+        provenance: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
         archived: bool = False,
     ) -> dict[str, Any]:
@@ -497,15 +520,26 @@ class CommercialKnowledgeService:
             code=code,
             name=name,
             description=description,
+            long_description=long_description,
             manufacturer=manufacturer,
             vendor=vendor,
             uom=uom,
+            category=category,
+            family=family,
+            status=status,
+            tax_category=tax_category,
+            cost_references=list(cost_references or []),
             cost=cost,
             msrp=msrp,
             map_price=map_price,
+            default_sales_price=default_sales_price,
             manual_unit_price=manual_unit_price,
             taxable=taxable,
             default_tax_nexus=default_tax_nexus,
+            notes=notes,
+            tags=list(tags or []),
+            source=source,
+            provenance=dict(provenance or {}),
             metadata=dict(metadata or {}),
             archived=archived,
             created_at=created_at,
@@ -540,6 +574,8 @@ class CommercialKnowledgeService:
         default_margin_percent: float,
         default_multiplier: float,
         rounding_policy: str,
+        default_tax_nexus: str = "",
+        currency: str = "USD",
     ) -> dict[str, Any]:
         policy = PricingPolicyType(self._safe(default_policy, "")).value
         defaults = {
@@ -548,6 +584,8 @@ class CommercialKnowledgeService:
             "default_margin_percent": max(0.0, round(float(default_margin_percent), 4)),
             "default_multiplier": max(0.0, round(float(default_multiplier), 6)),
             "rounding_policy": self._safe(rounding_policy, "currency_2dp"),
+            "default_tax_nexus": self._safe(default_tax_nexus, ""),
+            "currency": self._safe(currency, "USD").upper() or "USD",
         }
         self.state["pricing_defaults"] = defaults
         return dict(defaults)
@@ -724,6 +762,7 @@ class CommercialKnowledgeService:
         base_cost = self._float_or_none(item.get("cost"))
         msrp = self._float_or_none(item.get("msrp"))
         map_price = self._float_or_none(item.get("map_price"))
+        default_sales_price = self._float_or_none(item.get("default_sales_price"))
         manual_default = self._float_or_none(item.get("manual_unit_price"))
 
         resolved_markup = (
@@ -762,7 +801,11 @@ class CommercialKnowledgeService:
         else:
             unit_price = manual_default
             if unit_price is None:
-                unit_price = msrp if msrp is not None else base_cost or 0.0
+                unit_price = (
+                    default_sales_price
+                    if default_sales_price is not None
+                    else (msrp if msrp is not None else base_cost or 0.0)
+                )
 
         if unit_price is None:
             unit_price = 0.0
@@ -770,7 +813,10 @@ class CommercialKnowledgeService:
         line_subtotal = round(qty * unit_price, 4)
         resolved_nexus = self._safe(
             tax_nexus,
-            self._safe(item.get("default_tax_nexus"), ""),
+            self._safe(
+                item.get("default_tax_nexus"),
+                self._safe(defaults.get("default_tax_nexus"), ""),
+            ),
         )
         tax_quote = self.tax_quote_for_line(
             nexus=resolved_nexus,
@@ -796,6 +842,551 @@ class CommercialKnowledgeService:
             "manufacturer": self._safe(item.get("manufacturer"), "") or None,
             "vendor": self._safe(item.get("vendor"), "") or None,
         }
+
+    def create_or_update_assembly_version(
+        self,
+        *,
+        assembly_item_id: str,
+        components: list[dict[str, Any]],
+        expanded_description: str = "",
+        status: str = "active",
+        clone_from_version_id: str | None = None,
+    ) -> dict[str, Any]:
+        assembly = self.catalog_item(assembly_item_id)
+        if assembly is None:
+            raise ValueError("assembly catalog item was not found")
+        if self._safe(assembly.get("item_type"), "") != CatalogItemType.ASSEMBLY.value:
+            raise ValueError("catalog item is not an assembly")
+
+        normalized_components: list[dict[str, Any]] = []
+        if clone_from_version_id:
+            previous = self.assembly_version(clone_from_version_id)
+            if previous is None:
+                raise ValueError("clone source assembly version was not found")
+            normalized_components.extend(
+                [dict(item) for item in list(previous.get("components") or [])]
+            )
+        for row in list(components or []):
+            component_item_id = self._safe(row.get("component_item_id"), "")
+            if not component_item_id:
+                raise ValueError("assembly components require component_item_id")
+            component_item = self.catalog_item(component_item_id)
+            if component_item is None:
+                raise ValueError(
+                    f"assembly component catalog item was not found: {component_item_id}"
+                )
+            component = AssemblyComponent(
+                component_id=self._safe(row.get("component_id"), "")
+                or self._assembly_component_id(
+                    assembly_item_id=assembly_item_id,
+                    component_item_id=component_item_id,
+                    sequence=int(
+                        row.get("sequence", len(normalized_components) + 1) or 1
+                    ),
+                ),
+                component_item_id=component_item_id,
+                quantity=float(row.get("quantity", 0.0) or 0.0),
+                required=bool(row.get("required", True)),
+                sequence=int(row.get("sequence", len(normalized_components) + 1) or 1),
+                notes=self._safe(row.get("notes"), ""),
+            ).to_dict()
+            normalized_components.append(component)
+
+        normalized_components.sort(
+            key=lambda item: (
+                int(item.get("sequence", 1) or 1),
+                self._safe(item.get("component_id"), ""),
+            )
+        )
+        self._assert_no_assembly_cycle(
+            root_assembly_item_id=assembly_item_id,
+            components=normalized_components,
+        )
+
+        version_number = self._next_assembly_version_number(assembly_item_id)
+        version_id = self._assembly_version_id(assembly_item_id, version_number)
+        rollup = self._assembly_rollup(
+            assembly_item_id=assembly_item_id,
+            components=normalized_components,
+        )
+        payload = AssemblyVersion(
+            assembly_version_id=version_id,
+            assembly_item_id=assembly_item_id,
+            version_number=version_number,
+            status=self._safe(status, "active"),
+            expanded_description=self._safe(expanded_description),
+            component_count=len(normalized_components),
+            total_cost=rollup["total_cost"],
+            total_sales_price=rollup["total_sales_price"],
+            components=normalized_components,
+            created_at=self._now_iso(),
+            updated_at=self._now_iso(),
+            archived=False,
+        ).to_dict()
+        self.state.setdefault("assembly_versions", {})[version_id] = payload
+        lineage = self.state.setdefault("assembly_version_lineage", {})
+        lineage.setdefault(assembly_item_id, [])
+        lineage[assembly_item_id].append(version_id)
+        return dict(payload)
+
+    def assembly_version(self, assembly_version_id: str) -> dict[str, Any] | None:
+        key = self._safe(assembly_version_id, "")
+        if not key:
+            return None
+        row = self.state.get("assembly_versions", {}).get(key)
+        if not isinstance(row, dict):
+            return None
+        return dict(row)
+
+    def list_assembly_versions(
+        self,
+        *,
+        assembly_item_id: str,
+        include_archived: bool = False,
+    ) -> list[dict[str, Any]]:
+        key = self._safe(assembly_item_id, "")
+        version_ids = list(
+            self.state.get("assembly_version_lineage", {}).get(key) or []
+        )
+        rows: list[dict[str, Any]] = []
+        for version_id in version_ids:
+            payload = self.assembly_version(version_id)
+            if payload is None:
+                continue
+            if not include_archived and bool(payload.get("archived", False)):
+                continue
+            rows.append(payload)
+        rows.sort(
+            key=lambda item: int(item.get("version_number", 0) or 0), reverse=True
+        )
+        return rows
+
+    def latest_assembly_version(self, assembly_item_id: str) -> dict[str, Any] | None:
+        rows = self.list_assembly_versions(assembly_item_id=assembly_item_id)
+        return dict(rows[0]) if rows else None
+
+    def expand_assembly(
+        self,
+        *,
+        assembly_item_id: str,
+        quantity: float,
+        assembly_version_id: str | None = None,
+        include_optional: bool = True,
+    ) -> dict[str, Any]:
+        qty = max(0.0, round(float(quantity), 6))
+        assembly_item = self.catalog_item(assembly_item_id)
+        if assembly_item is None:
+            raise ValueError("assembly catalog item was not found")
+        if (
+            self._safe(assembly_item.get("item_type"), "")
+            != CatalogItemType.ASSEMBLY.value
+        ):
+            raise ValueError("catalog item is not an assembly")
+
+        version = (
+            self.assembly_version(self._safe(assembly_version_id, ""))
+            if self._safe(assembly_version_id, "")
+            else self.latest_assembly_version(assembly_item_id)
+        )
+        if version is None:
+            raise ValueError("assembly has no active version")
+
+        exploded: list[dict[str, Any]] = []
+        self._expand_assembly_recursive(
+            assembly_item_id=assembly_item_id,
+            assembly_version=version,
+            root_multiplier=qty,
+            include_optional=include_optional,
+            exploded=exploded,
+            traversal_stack=[assembly_item_id],
+            parent_path=self._safe(assembly_item.get("code"), assembly_item_id),
+        )
+        total_cost = round(
+            sum(float(item.get("extended_cost", 0.0) or 0.0) for item in exploded), 4
+        )
+        total_sales_price = round(
+            sum(
+                float(item.get("extended_sales_price", 0.0) or 0.0) for item in exploded
+            ),
+            4,
+        )
+        return {
+            "assembly_item_id": assembly_item_id,
+            "assembly_code": self._safe(assembly_item.get("code"), ""),
+            "assembly_name": self._safe(assembly_item.get("name"), ""),
+            "assembly_version_id": self._safe(version.get("assembly_version_id"), ""),
+            "quantity": qty,
+            "components": exploded,
+            "total_cost": total_cost,
+            "total_sales_price": total_sales_price,
+            "snapshot": {
+                "expanded_at": self._now_iso(),
+                "assembly_version_id": self._safe(
+                    version.get("assembly_version_id"), ""
+                ),
+                "component_count": len(exploded),
+            },
+        }
+
+    def inspect_catalog_pdf_price_list(
+        self,
+        *,
+        source_filename: str,
+        file_bytes: bytes,
+    ) -> dict[str, Any]:
+        if Path(self._safe(source_filename, "")).suffix.lower() != ".pdf":
+            raise ValueError("PDF inspection requires a .pdf source file")
+        file_hash = hashlib.sha1(file_bytes).hexdigest()
+        try:
+            reader = PdfReader(io.BytesIO(file_bytes))
+        except Exception:
+            return {
+                "source_filename": self._safe(source_filename),
+                "source_hash": file_hash,
+                "valid_pdf": False,
+                "page_count": 0,
+                "table_candidates": [],
+                "diagnostics": [
+                    {
+                        "severity": "error",
+                        "code": "malformed_pdf",
+                        "message": "Malformed PDF could not be parsed.",
+                        "row_number": None,
+                    }
+                ],
+            }
+        if getattr(reader, "is_encrypted", False):
+            return {
+                "source_filename": self._safe(source_filename),
+                "source_hash": file_hash,
+                "valid_pdf": True,
+                "page_count": 0,
+                "table_candidates": [],
+                "diagnostics": [
+                    {
+                        "severity": "error",
+                        "code": "encrypted_pdf",
+                        "message": "Encrypted PDF is unsupported for import.",
+                        "row_number": None,
+                    }
+                ],
+            }
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = Path(tmp.name)
+        try:
+            intake = DocumentIntakeService(enable_local_ocr=True)
+            pages, intake_warnings, _status = intake._extract_document_pages(
+                tmp_path,
+                "schedules",
+            )
+        finally:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        diagnostics: list[dict[str, Any]] = []
+        for warning in intake_warnings:
+            diagnostics.append(
+                {
+                    "severity": "warning",
+                    "code": "extraction_warning",
+                    "message": self._safe(warning),
+                    "row_number": None,
+                }
+            )
+
+        table_candidates = self._pdf_table_candidates(pages)
+        if not table_candidates:
+            diagnostics.append(
+                {
+                    "severity": "error",
+                    "code": "no_table_candidate_found",
+                    "message": "No table candidate found in selected PDF.",
+                    "row_number": None,
+                }
+            )
+        if len(table_candidates) > 1:
+            diagnostics.append(
+                {
+                    "severity": "warning",
+                    "code": "multiple_table_candidates_found",
+                    "message": "Multiple table candidates detected; selection required.",
+                    "row_number": None,
+                }
+            )
+        return {
+            "source_filename": self._safe(source_filename),
+            "source_hash": file_hash,
+            "valid_pdf": True,
+            "page_count": len(reader.pages),
+            "table_candidates": table_candidates,
+            "diagnostics": diagnostics,
+        }
+
+    def preview_catalog_pdf_price_list_import(
+        self,
+        *,
+        source_filename: str,
+        file_bytes: bytes,
+        selected_pages: list[int],
+        table_candidate_id: str,
+        header_row_index: int,
+        column_mapping: dict[str, str],
+        imported_by: str,
+    ) -> dict[str, Any]:
+        inspected = self.inspect_catalog_pdf_price_list(
+            source_filename=source_filename,
+            file_bytes=file_bytes,
+        )
+        candidates = list(inspected.get("table_candidates") or [])
+        candidate = next(
+            (
+                item
+                for item in candidates
+                if self._safe(item.get("candidate_id"), "")
+                == self._safe(table_candidate_id, "")
+            ),
+            None,
+        )
+        if candidate is None:
+            raise ValueError("selected table candidate was not found")
+        page_set = {
+            int(value) for value in list(selected_pages or []) if int(value) > 0
+        }
+        if not page_set:
+            raise ValueError("at least one selected page is required")
+        rows = [
+            dict(item)
+            for item in list(candidate.get("rows") or [])
+            if int(item.get("page_number", 0) or 0) in page_set
+        ]
+        if not rows:
+            raise ValueError("no rows found for selected pages and candidate")
+
+        header_index = max(0, min(int(header_row_index), len(rows) - 1))
+        header_cells = [
+            self._safe(cell) for cell in list(rows[header_index].get("cells") or [])
+        ]
+        mapping = {
+            self._safe(target): self._safe(source)
+            for target, source in dict(column_mapping or {}).items()
+            if self._safe(target) and self._safe(source)
+        }
+        required_fields = {"code", "name"}
+        diagnostics = list(inspected.get("diagnostics") or [])
+        missing_required = [
+            field for field in sorted(required_fields) if field not in mapping
+        ]
+        if missing_required:
+            diagnostics.append(
+                {
+                    "severity": "error",
+                    "code": "missing_required_mapping",
+                    "message": f"Missing required mapping fields: {', '.join(missing_required)}",
+                    "row_number": None,
+                }
+            )
+
+        preview_rows: list[dict[str, Any]] = []
+        rejected_rows: list[dict[str, Any]] = []
+        for idx, row in enumerate(rows):
+            if idx == header_index:
+                continue
+            cells = [self._safe(cell) for cell in list(row.get("cells") or [])]
+            cell_map = {
+                header_cells[col_idx]: (cells[col_idx] if col_idx < len(cells) else "")
+                for col_idx in range(len(header_cells))
+                if header_cells[col_idx]
+            }
+            normalized: dict[str, Any] = {
+                target: self._safe(cell_map.get(source), "")
+                for target, source in mapping.items()
+            }
+            normalized["source_page_number"] = int(row.get("page_number", 0) or 0)
+            normalized["source_row_reference"] = self._safe(
+                row.get("row_reference"), ""
+            )
+            row_errors: list[str] = []
+            if not self._safe(normalized.get("code"), ""):
+                row_errors.append("missing code")
+            if not self._safe(normalized.get("name"), ""):
+                row_errors.append("missing name")
+            if (
+                self._safe(normalized.get("cost"), "")
+                and self._float_or_none(normalized.get("cost")) is None
+            ):
+                row_errors.append("invalid cost")
+            if (
+                self._safe(normalized.get("msrp"), "")
+                and self._float_or_none(normalized.get("msrp")) is None
+            ):
+                row_errors.append("invalid msrp")
+
+            if row_errors:
+                rejected_rows.append(
+                    {
+                        "row_number": int(
+                            row.get("sequence_number", idx + 1) or idx + 1
+                        ),
+                        "source_page_number": normalized["source_page_number"],
+                        "errors": row_errors,
+                        "raw_values": dict(cell_map),
+                    }
+                )
+                diagnostics.append(
+                    {
+                        "severity": "warning",
+                        "code": "row_rejected",
+                        "message": f"Row rejected: {', '.join(row_errors)}",
+                        "row_number": int(
+                            row.get("sequence_number", idx + 1) or idx + 1
+                        ),
+                    }
+                )
+            else:
+                preview_rows.append(normalized)
+
+        preview_id = self._catalog_price_list_preview_id(
+            source_filename=self._safe(source_filename),
+            source_hash=self._safe(inspected.get("source_hash"), ""),
+            imported_by=self._safe(imported_by, "atlas"),
+        )
+        duplicate_versions = self.catalog_price_list_versions_by_hash(
+            self._safe(inspected.get("source_hash"), "")
+        )
+        if duplicate_versions:
+            diagnostics.append(
+                {
+                    "severity": "warning",
+                    "code": "duplicate_source_hash",
+                    "message": "Source file hash already exists in catalog import versions.",
+                    "row_number": None,
+                }
+            )
+        rejected_csv = self._rows_to_csv(
+            [
+                {
+                    "row_number": row["row_number"],
+                    "source_page_number": row["source_page_number"],
+                    "errors": "; ".join(list(row.get("errors") or [])),
+                }
+                for row in rejected_rows
+            ]
+        )
+        preview = {
+            "preview_id": preview_id,
+            "source_filename": self._safe(source_filename),
+            "source_hash": self._safe(inspected.get("source_hash"), ""),
+            "imported_by": self._safe(imported_by, "atlas"),
+            "selected_pages": sorted(page_set),
+            "table_candidate_id": self._safe(table_candidate_id),
+            "header_row_index": header_index,
+            "column_mapping": dict(mapping),
+            "accepted_rows": preview_rows,
+            "rejected_rows": rejected_rows,
+            "rejected_rows_csv": rejected_csv,
+            "diagnostics": diagnostics,
+            "created_at": self._now_iso(),
+            "status": "preview",
+        }
+        self.state.setdefault("price_list_import_previews", {})[preview_id] = preview
+        return dict(preview)
+
+    def finalize_catalog_pdf_price_list_import(
+        self,
+        *,
+        preview_id: str,
+        imported_by: str,
+    ) -> dict[str, Any]:
+        preview = dict(
+            self.state.setdefault("price_list_import_previews", {}).get(
+                self._safe(preview_id), {}
+            )
+        )
+        if not preview:
+            raise ValueError("price list preview was not found")
+        if self._safe(preview.get("status"), "") == "finalized":
+            raise ValueError("price list preview already finalized")
+
+        inserted = 0
+        updated = 0
+        rejected = len(list(preview.get("rejected_rows") or []))
+        for row in list(preview.get("accepted_rows") or []):
+            upserted = self._upsert_catalog_item_from_row(
+                item_type=CatalogItemType.PRODUCT.value,
+                row={
+                    **dict(row),
+                    "source": "pdf_price_list_import",
+                },
+            )
+            inserted += 1 if upserted["is_insert"] else 0
+            updated += 0 if upserted["is_insert"] else 1
+
+        version = {
+            "catalog_price_list_version_id": self._catalog_price_list_version_id(
+                source_hash=self._safe(preview.get("source_hash"), ""),
+                created_at=self._now_iso(),
+            ),
+            "source_filename": self._safe(preview.get("source_filename"), ""),
+            "source_hash": self._safe(preview.get("source_hash"), ""),
+            "imported_by": self._safe(imported_by, "atlas"),
+            "created_at": self._now_iso(),
+            "inserted": inserted,
+            "updated": updated,
+            "rejected": rejected,
+            "accepted_row_count": len(list(preview.get("accepted_rows") or [])),
+            "rejected_row_count": rejected,
+            "preview_id": self._safe(preview_id),
+            "immutable": True,
+            "snapshot": {
+                "selected_pages": list(preview.get("selected_pages") or []),
+                "table_candidate_id": self._safe(preview.get("table_candidate_id"), ""),
+                "column_mapping": dict(preview.get("column_mapping") or {}),
+                "accepted_rows": [
+                    dict(item) for item in list(preview.get("accepted_rows") or [])
+                ],
+            },
+        }
+        self.state.setdefault("catalog_price_list_versions", {})[
+            version["catalog_price_list_version_id"]
+        ] = version
+        preview["status"] = "finalized"
+        preview["finalized_at"] = self._now_iso()
+        self.state["price_list_import_previews"][self._safe(preview_id)] = preview
+
+        return {
+            "version": dict(version),
+            "inserted": inserted,
+            "updated": updated,
+            "rejected": rejected,
+            "partial_success": rejected > 0,
+            "rejected_rows_csv": self._safe(preview.get("rejected_rows_csv"), ""),
+            "diagnostics": list(preview.get("diagnostics") or []),
+        }
+
+    def list_catalog_price_list_versions(self) -> list[dict[str, Any]]:
+        rows = [
+            dict(item)
+            for item in self.state.setdefault(
+                "catalog_price_list_versions", {}
+            ).values()
+            if isinstance(item, dict)
+        ]
+        rows.sort(key=lambda item: self._safe(item.get("created_at"), ""), reverse=True)
+        return rows
+
+    def catalog_price_list_versions_by_hash(
+        self, source_hash: str
+    ) -> list[dict[str, Any]]:
+        digest = self._safe(source_hash, "")
+        return [
+            dict(item)
+            for item in self.list_catalog_price_list_versions()
+            if self._safe(item.get("source_hash"), "") == digest
+        ]
 
     def import_catalog_entities(
         self,
@@ -831,6 +1422,8 @@ class CommercialKnowledgeService:
             "products",
             "services",
             "fees",
+            "assemblies",
+            "assembly_components",
         }:
             raise ValueError("unsupported entity_type")
 
@@ -852,11 +1445,16 @@ class CommercialKnowledgeService:
                     is_insert = self._upsert_vendor(normalized_row)
                     inserted += 1 if is_insert else 0
                     updated += 0 if is_insert else 1
+                elif normalized_type == "assembly_components":
+                    is_insert = self._upsert_assembly_component_from_row(normalized_row)
+                    inserted += 1 if is_insert else 0
+                    updated += 0 if is_insert else 1
                 else:
                     item_type = {
                         "products": CatalogItemType.PRODUCT.value,
                         "services": CatalogItemType.SERVICE.value,
                         "fees": CatalogItemType.FEE.value,
+                        "assemblies": CatalogItemType.ASSEMBLY.value,
                     }[normalized_type]
                     upserted = self._upsert_catalog_item_from_row(
                         item_type=item_type,
@@ -1205,6 +1803,256 @@ class CommercialKnowledgeService:
         return f"catalog-item:{digest}"
 
     @staticmethod
+    def _assembly_version_id(assembly_item_id: str, version_number: int) -> str:
+        return f"{assembly_item_id}:assembly-v{version_number}"
+
+    @staticmethod
+    def _assembly_component_id(
+        *,
+        assembly_item_id: str,
+        component_item_id: str,
+        sequence: int,
+    ) -> str:
+        digest = hashlib.sha1(
+            f"{assembly_item_id}|{component_item_id}|{sequence}".encode("utf-8")
+        ).hexdigest()[:12]
+        return f"assembly-component:{digest}"
+
+    def _next_assembly_version_number(self, assembly_item_id: str) -> int:
+        lineage = list(
+            self.state.setdefault("assembly_version_lineage", {}).get(assembly_item_id)
+            or []
+        )
+        return len(lineage) + 1
+
+    def _assert_no_assembly_cycle(
+        self,
+        *,
+        root_assembly_item_id: str,
+        components: list[dict[str, Any]],
+    ) -> None:
+        for component in components:
+            component_item_id = self._safe(component.get("component_item_id"), "")
+            if component_item_id == root_assembly_item_id:
+                raise ValueError("assembly circular reference detected")
+            component_item = self.catalog_item(component_item_id)
+            if component_item is None:
+                continue
+            if (
+                self._safe(component_item.get("item_type"), "")
+                != CatalogItemType.ASSEMBLY.value
+            ):
+                continue
+            nested = self.latest_assembly_version(component_item_id)
+            if nested is None:
+                continue
+            for nested_component in list(nested.get("components") or []):
+                nested_item_id = self._safe(
+                    nested_component.get("component_item_id"), ""
+                )
+                if nested_item_id == root_assembly_item_id:
+                    raise ValueError("assembly circular reference detected")
+
+    def _assembly_rollup(
+        self,
+        *,
+        assembly_item_id: str,
+        components: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        total_cost = 0.0
+        total_sales_price = 0.0
+        for row in components:
+            component_item_id = self._safe(row.get("component_item_id"), "")
+            component_item = self.catalog_item(component_item_id)
+            if component_item is None:
+                continue
+            quantity = max(0.0, float(row.get("quantity", 0.0) or 0.0))
+            if (
+                self._safe(component_item.get("item_type"), "")
+                == CatalogItemType.ASSEMBLY.value
+            ):
+                nested_version = self.latest_assembly_version(component_item_id)
+                if nested_version is None:
+                    continue
+                nested_expansion = self.expand_assembly(
+                    assembly_item_id=component_item_id,
+                    quantity=quantity,
+                    assembly_version_id=self._safe(
+                        nested_version.get("assembly_version_id"), ""
+                    )
+                    or None,
+                )
+                total_cost += float(nested_expansion.get("total_cost", 0.0) or 0.0)
+                total_sales_price += float(
+                    nested_expansion.get("total_sales_price", 0.0) or 0.0
+                )
+                continue
+            item_cost = self._float_or_none(component_item.get("cost")) or 0.0
+            item_sales = (
+                self._float_or_none(component_item.get("default_sales_price"))
+                or self._float_or_none(component_item.get("manual_unit_price"))
+                or self._float_or_none(component_item.get("msrp"))
+                or item_cost
+            )
+            total_cost += quantity * item_cost
+            total_sales_price += quantity * item_sales
+        return {
+            "assembly_item_id": assembly_item_id,
+            "total_cost": round(max(0.0, total_cost), 4),
+            "total_sales_price": round(max(0.0, total_sales_price), 4),
+        }
+
+    def _expand_assembly_recursive(
+        self,
+        *,
+        assembly_item_id: str,
+        assembly_version: dict[str, Any],
+        root_multiplier: float,
+        include_optional: bool,
+        exploded: list[dict[str, Any]],
+        traversal_stack: list[str],
+        parent_path: str,
+    ) -> None:
+        components = [
+            dict(item) for item in list(assembly_version.get("components") or [])
+        ]
+        components.sort(
+            key=lambda item: (
+                int(item.get("sequence", 1) or 1),
+                self._safe(item.get("component_id"), ""),
+            )
+        )
+        for component in components:
+            if not include_optional and not bool(component.get("required", True)):
+                continue
+            component_item_id = self._safe(component.get("component_item_id"), "")
+            component_item = self.catalog_item(component_item_id)
+            if component_item is None:
+                continue
+            quantity = round(
+                float(component.get("quantity", 0.0) or 0.0) * root_multiplier,
+                6,
+            )
+            if (
+                self._safe(component_item.get("item_type"), "")
+                == CatalogItemType.ASSEMBLY.value
+            ):
+                if component_item_id in traversal_stack:
+                    raise ValueError("assembly circular reference detected")
+                nested_version = self.latest_assembly_version(component_item_id)
+                if nested_version is None:
+                    continue
+                self._expand_assembly_recursive(
+                    assembly_item_id=component_item_id,
+                    assembly_version=nested_version,
+                    root_multiplier=quantity,
+                    include_optional=include_optional,
+                    exploded=exploded,
+                    traversal_stack=[*traversal_stack, component_item_id],
+                    parent_path=f"{parent_path}>{self._safe(component_item.get('code'), component_item_id)}",
+                )
+                continue
+
+            item_cost = self._float_or_none(component_item.get("cost")) or 0.0
+            unit_price = (
+                self._float_or_none(component_item.get("default_sales_price"))
+                or self._float_or_none(component_item.get("manual_unit_price"))
+                or self._float_or_none(component_item.get("msrp"))
+                or item_cost
+            )
+            exploded.append(
+                {
+                    "assembly_item_id": assembly_item_id,
+                    "component_item_id": component_item_id,
+                    "component_code": self._safe(component_item.get("code"), ""),
+                    "component_name": self._safe(component_item.get("name"), ""),
+                    "component_item_type": self._safe(
+                        component_item.get("item_type"), ""
+                    ),
+                    "quantity": quantity,
+                    "required": bool(component.get("required", True)),
+                    "sequence": int(component.get("sequence", 1) or 1),
+                    "path": f"{parent_path}>{self._safe(component_item.get('code'), component_item_id)}",
+                    "unit_cost": round(item_cost, 4),
+                    "unit_sales_price": round(unit_price, 4),
+                    "extended_cost": round(quantity * item_cost, 4),
+                    "extended_sales_price": round(quantity * unit_price, 4),
+                }
+            )
+
+    def _pdf_table_candidates(
+        self, pages: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        candidates: list[dict[str, Any]] = []
+        for page in list(pages or []):
+            page_number = int(page.get("page_number", 0) or 0)
+            text = self._safe(page.get("text"), "")
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            rows: list[dict[str, Any]] = []
+            for idx, line in enumerate(lines, start=1):
+                cells = self._split_pdf_line_cells(line)
+                if len(cells) < 3:
+                    continue
+                rows.append(
+                    {
+                        "sequence_number": idx,
+                        "page_number": page_number,
+                        "row_reference": f"p{page_number}:row{idx}",
+                        "cells": cells,
+                    }
+                )
+            if len(rows) < 2:
+                continue
+            signature = "|".join(rows[0]["cells"])[:240]
+            candidate_id = f"pdf-candidate:{hashlib.sha1(signature.encode('utf-8')).hexdigest()[:12]}"
+            candidates.append(
+                {
+                    "candidate_id": candidate_id,
+                    "page_numbers": [page_number],
+                    "header_preview": rows[0]["cells"],
+                    "row_count": len(rows),
+                    "rows": rows,
+                }
+            )
+        return candidates
+
+    @staticmethod
+    def _split_pdf_line_cells(line: str) -> list[str]:
+        parts = [segment.strip() for segment in line.replace("\t", "  ").split("  ")]
+        return [segment for segment in parts if segment]
+
+    @staticmethod
+    def _catalog_price_list_preview_id(
+        *,
+        source_filename: str,
+        source_hash: str,
+        imported_by: str,
+    ) -> str:
+        digest = hashlib.sha1(
+            f"{source_filename}|{source_hash}|{imported_by}".encode("utf-8")
+        ).hexdigest()[:16]
+        return f"catalog-price-preview:{digest}"
+
+    @staticmethod
+    def _catalog_price_list_version_id(*, source_hash: str, created_at: str) -> str:
+        digest = hashlib.sha1(
+            f"{source_hash}|{created_at}".encode("utf-8")
+        ).hexdigest()[:16]
+        return f"catalog-price-version:{digest}"
+
+    @staticmethod
+    def _rows_to_csv(rows: list[dict[str, Any]]) -> str:
+        if not rows:
+            return ""
+        headers = sorted({key for row in rows for key in row.keys()})
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=headers)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: row.get(key) for key in headers})
+        return buffer.getvalue()
+
+    @staticmethod
     def _tax_rule_id(*, nexus: str, title: str, priority: int) -> str:
         digest = hashlib.sha1(
             f"{nexus.strip().lower()}|{title.strip().lower()}|{priority}".encode(
@@ -1267,24 +2115,120 @@ class CommercialKnowledgeService:
             code=code,
             name=name,
             description=self._safe(row.get("description"), ""),
+            long_description=self._safe(row.get("long_description"), ""),
             manufacturer=self._safe(row.get("manufacturer"), "") or None,
             vendor=self._safe(row.get("vendor"), "") or None,
             uom=self._safe(row.get("uom"), "ea"),
+            category=self._safe(row.get("category"), ""),
+            family=self._safe(row.get("family"), ""),
+            status=self._safe(row.get("status"), "active"),
+            tax_category=self._safe(row.get("tax_category"), "standard"),
             cost=self._float_or_none(row.get("cost") or row.get("unit_cost")),
             msrp=self._float_or_none(row.get("msrp") or row.get("list_price")),
             map_price=self._float_or_none(row.get("map") or row.get("map_price")),
+            default_sales_price=self._float_or_none(
+                row.get("default_sales_price") or row.get("unit_price")
+            ),
             manual_unit_price=self._float_or_none(row.get("manual_unit_price")),
             taxable=self._safe(row.get("taxable"), "true").lower()
             not in {"0", "false", "no"},
             default_tax_nexus=self._safe(row.get("default_tax_nexus"), "") or None,
+            notes=self._safe(row.get("notes"), ""),
+            tags=[
+                self._safe(item)
+                for item in self._safe(row.get("tags"), "").split("|")
+                if self._safe(item)
+            ],
+            source=self._safe(row.get("source"), "catalog_import"),
+            provenance={
+                "import_type": "catalog_rows",
+                "source_row_reference": self._safe(row.get("source_row_reference"), ""),
+                "source_page_number": self._safe(row.get("source_page_number"), ""),
+            },
             metadata={
-                "source": "catalog_import",
+                "source": self._safe(row.get("source"), "catalog_import"),
                 "raw_row": dict(row),
             },
             archived=self._safe(row.get("archived"), "false").lower()
             in {"1", "true", "yes"},
         )
         return {"catalog_item_id": item_id, "is_insert": is_insert}
+
+    def _upsert_assembly_component_from_row(self, row: dict[str, Any]) -> bool:
+        assembly_code = self._safe(row.get("assembly_code"), "")
+        component_code = self._safe(row.get("component_code"), "")
+        if not assembly_code or not component_code:
+            raise ValueError(
+                "assembly component imports require assembly_code and component_code"
+            )
+        assembly_id = self._catalog_item_id(
+            CatalogItemType.ASSEMBLY.value, assembly_code
+        )
+        component_item_id = (
+            self._catalog_item_id(CatalogItemType.PRODUCT.value, component_code)
+            if self.catalog_item(
+                self._catalog_item_id(CatalogItemType.PRODUCT.value, component_code)
+            )
+            else (
+                self._catalog_item_id(CatalogItemType.SERVICE.value, component_code)
+                if self.catalog_item(
+                    self._catalog_item_id(CatalogItemType.SERVICE.value, component_code)
+                )
+                else (
+                    self._catalog_item_id(CatalogItemType.FEE.value, component_code)
+                    if self.catalog_item(
+                        self._catalog_item_id(CatalogItemType.FEE.value, component_code)
+                    )
+                    else self._catalog_item_id(
+                        CatalogItemType.ASSEMBLY.value, component_code
+                    )
+                )
+            )
+        )
+        if self.catalog_item(assembly_id) is None:
+            raise ValueError("assembly component import assembly was not found")
+        if self.catalog_item(component_item_id) is None:
+            raise ValueError("assembly component import component was not found")
+
+        latest = self.latest_assembly_version(assembly_id)
+        existing_components = (
+            [dict(item) for item in list(latest.get("components") or [])]
+            if latest
+            else []
+        )
+        sequence = int(
+            row.get("sequence", len(existing_components) + 1)
+            or len(existing_components) + 1
+        )
+        required = self._safe(row.get("required"), "true").lower() not in {
+            "0",
+            "false",
+            "no",
+        }
+        component_payload = {
+            "component_item_id": component_item_id,
+            "quantity": float(row.get("quantity", 1.0) or 1.0),
+            "required": required,
+            "sequence": sequence,
+            "notes": self._safe(row.get("notes"), ""),
+        }
+        is_insert = True
+        for existing in existing_components:
+            if (
+                self._safe(existing.get("component_item_id"), "") == component_item_id
+                and int(existing.get("sequence", 0) or 0) == sequence
+            ):
+                is_insert = False
+                existing.update(component_payload)
+                break
+        if is_insert:
+            existing_components.append(component_payload)
+        self.create_or_update_assembly_version(
+            assembly_item_id=assembly_id,
+            components=existing_components,
+            expanded_description=self._safe(row.get("expanded_description"), ""),
+        )
+        return is_insert
 
     def _parse_tabular_rows(
         self,

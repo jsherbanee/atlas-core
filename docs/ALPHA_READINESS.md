@@ -118,6 +118,16 @@ No blocker-class tenant-isolation regressions were identified in targeted S-01 v
 
 ## U-01 Follow-Up Note
 
+## C-03 Follow-Up Note
+
+Commercial catalog readiness now includes:
+- tenant-scoped Product/Service/Fee/Assembly catalog model with archive/restore lifecycle
+- deterministic assembly versioning, nested expansion, circular-reference rejection, and rollup behavior
+- deterministic PDF catalog import inspection/preview/finalization with diagnostics and partial-success handling
+- transaction catalog insertion support including assembly expansion/grouped insertion paths and credit memo support
+
+No new blocker-class tenant-isolation regressions were identified in targeted C-03 service-level validation.
+
 Commercial-document usability and presentation polish now includes:
 - standardized tertiary action contracts for Sales Orders, Return Orders, Credit Memos, and Customer Invoices
 - deterministic `export_pdf` pathway parity for Return Orders and Credit Memos alongside existing estimate/sales-order/customer-invoice flows

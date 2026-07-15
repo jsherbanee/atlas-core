@@ -3,10 +3,15 @@ from __future__ import annotations
 import csv
 import io
 from decimal import Decimal
+from pathlib import Path
 import zipfile
+import hashlib
+
+import pytest
 
 from atlas_core.domain.commercial_document import CommercialDocumentType
 from atlas_core.services.commercial_knowledge_service import CommercialKnowledgeService
+from atlas_core.services.document_intake_service import DocumentIntakeService
 from atlas_core.services.settings_service import SettingsService
 from atlas_core.services.transactions_workspace_service import (
     TransactionsWorkspaceService,
@@ -373,3 +378,285 @@ def test_transactions_return_order_catalog_line_contains_return_metadata() -> No
     assert metadata["approved_return_quantity"] == "1"
     assert document.document_metadata is not None
     assert Decimal(document.document_metadata["approved_credit_amount"]) > Decimal("0")
+
+
+def test_assembly_versioning_rollups_and_expansion_with_nested_components() -> None:
+    service = CommercialKnowledgeService()
+    amp = service.upsert_catalog_item(
+        catalog_item_id=None,
+        item_type="product",
+        code="AMP-A",
+        name="Amplifier",
+        cost=500.0,
+        default_sales_price=800.0,
+    )
+    labor = service.upsert_catalog_item(
+        catalog_item_id=None,
+        item_type="service",
+        code="LAB-A",
+        name="Labor",
+        cost=100.0,
+        default_sales_price=200.0,
+    )
+    sub_assembly = service.upsert_catalog_item(
+        catalog_item_id=None,
+        item_type="assembly",
+        code="SUB-1",
+        name="Sub Assembly",
+    )
+    main_assembly = service.upsert_catalog_item(
+        catalog_item_id=None,
+        item_type="assembly",
+        code="MAIN-1",
+        name="Main Assembly",
+    )
+
+    service.create_or_update_assembly_version(
+        assembly_item_id=sub_assembly["catalog_item_id"],
+        components=[
+            {
+                "component_item_id": amp["catalog_item_id"],
+                "quantity": 1,
+                "required": True,
+                "sequence": 1,
+            }
+        ],
+    )
+    version = service.create_or_update_assembly_version(
+        assembly_item_id=main_assembly["catalog_item_id"],
+        components=[
+            {
+                "component_item_id": sub_assembly["catalog_item_id"],
+                "quantity": 2,
+                "required": True,
+                "sequence": 1,
+            },
+            {
+                "component_item_id": labor["catalog_item_id"],
+                "quantity": 1,
+                "required": True,
+                "sequence": 2,
+            },
+        ],
+    )
+
+    expanded = service.expand_assembly(
+        assembly_item_id=main_assembly["catalog_item_id"],
+        quantity=1,
+    )
+
+    assert version["version_number"] == 1
+    assert round(version["total_cost"], 2) == 1100.0
+    assert round(version["total_sales_price"], 2) == 1800.0
+    assert len(expanded["components"]) == 2
+    assert round(expanded["total_cost"], 2) == 1100.0
+    assert round(expanded["total_sales_price"], 2) == 1800.0
+
+
+def test_assembly_cycle_prevention_rejects_circular_references() -> None:
+    service = CommercialKnowledgeService()
+    a = service.upsert_catalog_item(
+        catalog_item_id=None,
+        item_type="assembly",
+        code="ASM-A",
+        name="Assembly A",
+    )
+    b = service.upsert_catalog_item(
+        catalog_item_id=None,
+        item_type="assembly",
+        code="ASM-B",
+        name="Assembly B",
+    )
+
+    service.create_or_update_assembly_version(
+        assembly_item_id=b["catalog_item_id"],
+        components=[
+            {
+                "component_item_id": a["catalog_item_id"],
+                "quantity": 1,
+                "required": True,
+                "sequence": 1,
+            }
+        ],
+    )
+    with pytest.raises(ValueError, match="circular"):
+        service.create_or_update_assembly_version(
+            assembly_item_id=a["catalog_item_id"],
+            components=[
+                {
+                    "component_item_id": b["catalog_item_id"],
+                    "quantity": 1,
+                    "required": True,
+                    "sequence": 1,
+                }
+            ],
+        )
+
+
+def test_import_supports_assemblies_and_components_rows() -> None:
+    service = CommercialKnowledgeService()
+    service.import_catalog_entities_from_rows(
+        entity_type="products",
+        rows=[{"code": "SPK-1", "name": "Speaker", "cost": "100"}],
+        imported_by="tester",
+        source_filename="products.csv",
+    )
+    service.import_catalog_entities_from_rows(
+        entity_type="assemblies",
+        rows=[{"code": "KIT-1", "name": "Kit 1"}],
+        imported_by="tester",
+        source_filename="assemblies.csv",
+    )
+    component_summary = service.import_catalog_entities_from_rows(
+        entity_type="assembly_components",
+        rows=[
+            {
+                "assembly_code": "KIT-1",
+                "component_code": "SPK-1",
+                "quantity": 2,
+                "required": "true",
+                "sequence": 1,
+            }
+        ],
+        imported_by="tester",
+        source_filename="assembly_components.csv",
+    )
+
+    assembly_id = service._catalog_item_id("assembly", "KIT-1")
+    latest = service.latest_assembly_version(assembly_id)
+    assert component_summary["inserted"] == 1
+    assert latest is not None
+    assert latest["component_count"] == 1
+
+
+def test_pdf_price_list_preview_and_finalize_partial_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = CommercialKnowledgeService()
+    fixture_path = Path(__file__).parent / "fixtures" / "simple.pdf"
+    pdf_bytes = fixture_path.read_bytes()
+
+    def _fake_extract(
+        self: DocumentIntakeService,
+        file_path: Path,
+        group_name: str,
+    ) -> tuple[list[dict[str, object]], list[str], dict[str, object]]:
+        _ = (self, file_path, group_name)
+        return (
+            [
+                {
+                    "page_number": 1,
+                    "text": (
+                        "Code  Name  Cost  MSRP\n"
+                        "AMP-100  Amplifier  500  900\n"
+                        "BAD-1  Broken  bad-value  100\n"
+                    ),
+                    "has_text": True,
+                    "ocr_derived": False,
+                    "text_source": "embedded",
+                    "source_file": "simple.pdf",
+                }
+            ],
+            [],
+            {"status": "extracted"},
+        )
+
+    monkeypatch.setattr(DocumentIntakeService, "_extract_document_pages", _fake_extract)
+    inspected = service.inspect_catalog_pdf_price_list(
+        source_filename="simple.pdf",
+        file_bytes=pdf_bytes,
+    )
+    candidate = list(inspected.get("table_candidates") or [])[0]
+
+    preview = service.preview_catalog_pdf_price_list_import(
+        source_filename="simple.pdf",
+        file_bytes=pdf_bytes,
+        selected_pages=[1],
+        table_candidate_id=str(candidate.get("candidate_id")),
+        header_row_index=0,
+        column_mapping={
+            "code": "Code",
+            "name": "Name",
+            "cost": "Cost",
+            "msrp": "MSRP",
+        },
+        imported_by="tester",
+    )
+    finalized = service.finalize_catalog_pdf_price_list_import(
+        preview_id=preview["preview_id"],
+        imported_by="tester",
+    )
+
+    assert len(preview["accepted_rows"]) == 1
+    assert len(preview["rejected_rows"]) == 1
+    assert finalized["partial_success"] is True
+    assert finalized["inserted"] == 1
+    assert "row_number" in finalized["rejected_rows_csv"]
+    versions = service.list_catalog_price_list_versions()
+    assert versions
+    assert versions[0]["source_hash"] == hashlib.sha1(pdf_bytes).hexdigest()
+
+
+def test_transactions_add_assembly_lines_grouped_and_credit_memo_support() -> None:
+    catalog = CommercialKnowledgeService()
+    component = catalog.upsert_catalog_item(
+        catalog_item_id=None,
+        item_type="product",
+        code="CMP-1",
+        name="Component",
+        cost=10.0,
+        default_sales_price=20.0,
+    )
+    assembly = catalog.upsert_catalog_item(
+        catalog_item_id=None,
+        item_type="assembly",
+        code="ASM-1",
+        name="Assembly",
+        default_sales_price=100.0,
+    )
+    catalog.create_or_update_assembly_version(
+        assembly_item_id=assembly["catalog_item_id"],
+        components=[
+            {
+                "component_item_id": component["catalog_item_id"],
+                "quantity": 2,
+                "required": True,
+                "sequence": 1,
+            }
+        ],
+    )
+
+    workspace = TransactionsWorkspaceService(
+        enforce_active_scope=False,
+        commercial_catalog_service=catalog,
+    )
+    estimate = workspace.create_draft(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.ESTIMATE,
+        customer_id="customer-1",
+    )
+    workspace.add_catalog_line(
+        document_id=estimate.document_id,
+        catalog_item_id=assembly["catalog_item_id"],
+        quantity=Decimal("1"),
+        assembly_mode="grouped",
+    )
+    assert len(estimate.lines) == 2
+    assert estimate.lines[0].line_metadata is not None
+    assert estimate.lines[0].line_metadata["line_type"] == "assembly"
+    assert estimate.lines[1].line_metadata is not None
+    assert estimate.lines[1].line_metadata["assembly_component"] is True
+
+    credit_memo = workspace.create_draft(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.CREDIT_MEMO,
+        customer_id="customer-1",
+    )
+    workspace.add_catalog_line(
+        document_id=credit_memo.document_id,
+        catalog_item_id=component["catalog_item_id"],
+        quantity=Decimal("1"),
+    )
+    assert len(credit_memo.lines) == 1

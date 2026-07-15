@@ -110,6 +110,17 @@ Reprocessing should be deterministic and should not overwrite historical facts w
 ## Future Direction
 The desired architecture is a unified ingestion framework with content-type specific adapters for documents, price sheets, correspondence, and service artifacts.
 
+## C-03 Commercial Catalog PDF Import Alignment
+
+Sprint C-03 extends commercial import behavior with deterministic PDF catalog price-list workflow steps:
+- source hash capture and duplicate-hash detection
+- malformed/encrypted PDF diagnostics
+- extraction diagnostics and table-candidate selection
+- explicit page/header/mapping controls (no silent guessing)
+- preview with accepted/rejected rows and row-level diagnostics
+- partial-success finalization with rejected-row export payload
+- immutable catalog price-list version snapshots with provenance
+
 ## P-04 Attachment Framework Alignment
 
 Sprint P-04 introduces a shared attachment domain and orchestration layer that aligns with import-pipeline requirements for provenance, duplicate detection, and versioned source handling.

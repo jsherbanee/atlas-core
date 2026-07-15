@@ -33,6 +33,7 @@ class CatalogItemType(str, Enum):
     PRODUCT = "product"
     SERVICE = "service"
     FEE = "fee"
+    ASSEMBLY = "assembly"
 
 
 class PricingPolicyType(str, Enum):
@@ -265,15 +266,26 @@ class CatalogItem:
     code: str
     name: str
     description: str = ""
+    long_description: str = ""
     manufacturer: str | None = None
     vendor: str | None = None
     uom: str = "ea"
+    category: str = ""
+    family: str = ""
+    status: str = "active"
+    tax_category: str = "standard"
+    cost_references: list[dict[str, Any]] = field(default_factory=list)
     cost: float | None = None
     msrp: float | None = None
     map_price: float | None = None
+    default_sales_price: float | None = None
     manual_unit_price: float | None = None
     taxable: bool = True
     default_tax_nexus: str | None = None
+    notes: str = ""
+    tags: list[str] = field(default_factory=list)
+    source: str = "manual"
+    provenance: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
     archived: bool = False
     created_at: str = field(default_factory=_now_iso)
@@ -286,17 +298,34 @@ class CatalogItem:
         self.code = _required("code", self.code)
         self.name = _required("name", self.name)
         self.description = _safe(self.description)
+        self.long_description = _safe(self.long_description)
         self.manufacturer = _safe(self.manufacturer) or None
         self.vendor = _safe(self.vendor) or None
         self.uom = _safe(self.uom, "ea")
+        self.category = _safe(self.category)
+        self.family = _safe(self.family)
+        self.status = _safe(self.status, "active")
+        self.tax_category = _safe(self.tax_category, "standard")
+        self.cost_references = [
+            dict(item)
+            for item in list(self.cost_references or [])
+            if isinstance(item, dict)
+        ]
         self.cost = _non_negative_float_or_none("cost", self.cost)
         self.msrp = _non_negative_float_or_none("msrp", self.msrp)
         self.map_price = _non_negative_float_or_none("map_price", self.map_price)
+        self.default_sales_price = _non_negative_float_or_none(
+            "default_sales_price", self.default_sales_price
+        )
         self.manual_unit_price = _non_negative_float_or_none(
             "manual_unit_price", self.manual_unit_price
         )
         self.taxable = bool(self.taxable)
         self.default_tax_nexus = _safe(self.default_tax_nexus) or None
+        self.notes = _safe(self.notes)
+        self.tags = [_safe(item) for item in list(self.tags or []) if _safe(item)]
+        self.source = _safe(self.source, "manual")
+        self.provenance = dict(self.provenance or {})
         self.metadata = dict(self.metadata or {})
         self.archived = bool(self.archived)
         self.created_at = _required("created_at", self.created_at)
@@ -309,19 +338,118 @@ class CatalogItem:
             "code": self.code,
             "name": self.name,
             "description": self.description,
+            "long_description": self.long_description,
             "manufacturer": self.manufacturer,
             "vendor": self.vendor,
             "uom": self.uom,
+            "category": self.category,
+            "family": self.family,
+            "status": self.status,
+            "tax_category": self.tax_category,
+            "cost_references": list(self.cost_references),
             "cost": self.cost,
             "msrp": self.msrp,
             "map_price": self.map_price,
+            "default_sales_price": self.default_sales_price,
             "manual_unit_price": self.manual_unit_price,
             "taxable": self.taxable,
             "default_tax_nexus": self.default_tax_nexus,
+            "notes": self.notes,
+            "tags": list(self.tags),
+            "source": self.source,
+            "provenance": dict(self.provenance),
             "metadata": dict(self.metadata),
             "archived": self.archived,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+        }
+
+
+@dataclass
+class AssemblyComponent:
+    component_id: str
+    component_item_id: str
+    quantity: float
+    required: bool = True
+    sequence: int = 1
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        self.component_id = _required("component_id", self.component_id)
+        self.component_item_id = _required("component_item_id", self.component_item_id)
+        self.quantity = _non_negative_float("quantity", self.quantity)
+        self.required = bool(self.required)
+        self.sequence = _non_negative_int("sequence", self.sequence)
+        if self.sequence == 0:
+            raise ValueError("sequence must be greater than zero")
+        self.notes = _safe(self.notes)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "component_id": self.component_id,
+            "component_item_id": self.component_item_id,
+            "quantity": self.quantity,
+            "required": self.required,
+            "sequence": self.sequence,
+            "notes": self.notes,
+        }
+
+
+@dataclass
+class AssemblyVersion:
+    assembly_version_id: str
+    assembly_item_id: str
+    version_number: int
+    status: str = "active"
+    expanded_description: str = ""
+    component_count: int = 0
+    total_cost: float = 0.0
+    total_sales_price: float = 0.0
+    components: list[dict[str, Any]] = field(default_factory=list)
+    created_at: str = field(default_factory=_now_iso)
+    updated_at: str = field(default_factory=_now_iso)
+    archived: bool = False
+
+    def __post_init__(self) -> None:
+        self.assembly_version_id = _required(
+            "assembly_version_id", self.assembly_version_id
+        )
+        self.assembly_item_id = _required("assembly_item_id", self.assembly_item_id)
+        self.version_number = _non_negative_int("version_number", self.version_number)
+        if self.version_number == 0:
+            raise ValueError("version_number must be greater than zero")
+        self.status = _safe(self.status, "active")
+        self.expanded_description = _safe(self.expanded_description)
+        self.component_count = _non_negative_int(
+            "component_count", self.component_count
+        )
+        self.total_cost = _non_negative_float("total_cost", self.total_cost)
+        self.total_sales_price = _non_negative_float(
+            "total_sales_price", self.total_sales_price
+        )
+        normalized_components: list[dict[str, Any]] = []
+        for component in list(self.components or []):
+            if isinstance(component, dict):
+                normalized_components.append(AssemblyComponent(**component).to_dict())
+        self.components = normalized_components
+        self.created_at = _required("created_at", self.created_at)
+        self.updated_at = _required("updated_at", self.updated_at)
+        self.archived = bool(self.archived)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "assembly_version_id": self.assembly_version_id,
+            "assembly_item_id": self.assembly_item_id,
+            "version_number": self.version_number,
+            "status": self.status,
+            "expanded_description": self.expanded_description,
+            "component_count": self.component_count,
+            "total_cost": self.total_cost,
+            "total_sales_price": self.total_sales_price,
+            "components": [dict(item) for item in self.components],
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "archived": self.archived,
         }
 
 

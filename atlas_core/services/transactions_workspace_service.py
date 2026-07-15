@@ -545,6 +545,7 @@ class TransactionsWorkspaceService:
         tax_nexus: str | None = None,
         exemption_flags: list[str] | None = None,
         description_override: str | None = None,
+        assembly_mode: str = "expand",
     ) -> CommercialDocument:
         document = self._required_document(document_id)
         if document.document_type not in {
@@ -552,13 +553,112 @@ class TransactionsWorkspaceService:
             CommercialDocumentType.SALES_ORDER,
             CommercialDocumentType.RETURN_ORDER,
             CommercialDocumentType.CUSTOMER_INVOICE,
+            CommercialDocumentType.CREDIT_MEMO,
         }:
             raise ValueError(
-                "catalog lines are supported for estimates, sales orders, return orders, and customer invoices"
+                "catalog lines are supported for estimates, sales orders, return orders, credit memos, and customer invoices"
             )
         item = self._commercial_catalog_service.catalog_item(catalog_item_id)
         if item is None:
             raise ValueError("catalog item was not found")
+
+        if _safe_text(item.get("item_type"), "") == "assembly":
+            expansion = self._commercial_catalog_service.expand_assembly(
+                assembly_item_id=catalog_item_id,
+                quantity=float(quantity),
+            )
+            mode = _safe_text(assembly_mode, "expand").lower() or "expand"
+            if mode not in {"expand", "grouped"}:
+                raise ValueError("assembly_mode must be 'expand' or 'grouped'")
+
+            if mode == "grouped":
+                quote = self._commercial_catalog_service.quote_catalog_item(
+                    catalog_item_id=catalog_item_id,
+                    quantity=float(quantity),
+                    policy=pricing_policy,
+                    markup_percent=markup_percent,
+                    margin_percent=margin_percent,
+                    multiplier=multiplier,
+                    manual_unit_price=(
+                        float(manual_unit_price)
+                        if manual_unit_price is not None
+                        else None
+                    ),
+                    tax_nexus=tax_nexus,
+                    exemption_flags=exemption_flags,
+                )
+                self._commercial_service.add_line(
+                    document,
+                    description=_safe_text(description_override, "")
+                    or _safe_text(item.get("name"), "")
+                    or _safe_text(item.get("code"), "Assembly"),
+                    quantity=quantity,
+                    unit_price=Decimal(str(quote["unit_price"])),
+                    unit_cost=Decimal(str(item.get("cost") or "0")),
+                    unit_of_measure=_safe_text(item.get("uom"), "ea"),
+                    product_or_service_reference=_safe_text(item.get("code"), "")
+                    or quote["catalog_item_id"],
+                    line_metadata={
+                        "line_type": "assembly",
+                        "catalog": {
+                            "catalog_item_id": quote["catalog_item_id"],
+                            "catalog_code": quote["code"],
+                            "catalog_item_type": quote["item_type"],
+                            "pricing_policy": quote["policy"],
+                            "manual_override_applied": quote["manual_override_applied"],
+                            "tax_nexus": quote["tax"]["nexus"],
+                        },
+                        "assembly": {
+                            "mode": "grouped",
+                            "snapshot": dict(expansion.get("snapshot") or {}),
+                            "components": [
+                                dict(component)
+                                for component in list(expansion.get("components") or [])
+                            ],
+                        },
+                    },
+                )
+
+            for component in list(expansion.get("components") or []):
+                component_qty = Decimal(str(component.get("quantity") or "0"))
+                unit_price_value = (
+                    Decimal("0")
+                    if mode == "grouped"
+                    else Decimal(str(component.get("unit_sales_price") or "0"))
+                )
+                self._commercial_service.add_line(
+                    document,
+                    description=(
+                        f"{_safe_text(item.get('code'), 'ASM')} :: "
+                        f"{_safe_text(component.get('component_name'), '')}"
+                    ),
+                    quantity=component_qty,
+                    unit_price=unit_price_value,
+                    unit_cost=Decimal(str(component.get("unit_cost") or "0")),
+                    unit_of_measure="ea",
+                    product_or_service_reference=_safe_text(
+                        component.get("component_code"),
+                        _safe_text(component.get("component_item_id"), ""),
+                    ),
+                    line_metadata={
+                        "line_type": self._catalog_component_line_type(component),
+                        "assembly_component": True,
+                        "assembly": {
+                            "mode": mode,
+                            "assembly_item_id": catalog_item_id,
+                            "assembly_code": _safe_text(item.get("code"), ""),
+                            "assembly_version_id": _safe_text(
+                                expansion.get("assembly_version_id"), ""
+                            ),
+                            "required": bool(component.get("required", True)),
+                            "path": _safe_text(component.get("path"), ""),
+                            "snapshot": dict(expansion.get("snapshot") or {}),
+                        },
+                    },
+                )
+            if document.document_type == CommercialDocumentType.RETURN_ORDER:
+                self._recalculate_return_order_financials(document)
+            return document
 
         quote = self._commercial_catalog_service.quote_catalog_item(
             catalog_item_id=catalog_item_id,
@@ -2784,6 +2884,19 @@ class TransactionsWorkspaceService:
         item_type = _safe_text(item.get("item_type"), "product").lower()
         if item_type == "service":
             return "service"
+        if item_type == "fee":
+            return "fee"
+        if item_type == "assembly":
+            return "assembly"
+        return "product"
+
+    @staticmethod
+    def _catalog_component_line_type(component: dict[str, Any]) -> str:
+        item_type = _safe_text(component.get("component_item_type"), "product").lower()
+        if item_type == "service":
+            return "service"
+        if item_type == "fee":
+            return "fee"
         return "product"
 
     def _assert_presentation_supported(self, document: CommercialDocument) -> None:
