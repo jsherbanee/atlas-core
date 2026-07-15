@@ -180,6 +180,162 @@ def test_overview_metrics_and_sync_status() -> None:
     assert metrics.sync_failures == 1
 
 
+def test_create_customer_invoice_from_sales_order_with_billing() -> None:
+    service = _service()
+    sales_order = service.create_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        document_type=CommercialDocumentType.SALES_ORDER,
+        project_id="project-a",
+        project_code="P-A",
+        customer_id="customer-a",
+    )
+
+    invoice = service.create_customer_invoice_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id=None,
+        source_type="sales_order",
+        source_document_id=sales_order.document_id,
+        billing_strategy="milestone",
+        requested_amount=Decimal("450.00"),
+        available_to_bill=Decimal("1000.00"),
+        billing_context={"milestone": "rough_in_complete"},
+    )
+
+    assert invoice.document_type == CommercialDocumentType.CUSTOMER_INVOICE
+    assert invoice.customer_id == "customer-a"
+    assert invoice.project_id == "project-a"
+    assert invoice.source_document_id == sales_order.document_id
+    assert (invoice.document_metadata or {}).get("source_type") == "sales_order"
+    assert (invoice.document_metadata or {}).get("billing_strategy") == "milestone"
+    assert (invoice.document_metadata or {}).get("requested_amount") == "450.00"
+    assert invoice.totals.subtotal == Decimal("450.00")
+
+
+def test_customer_invoice_overbilling_requires_override() -> None:
+    service = _service()
+    invoice = service.create_customer_invoice_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        source_type="standalone",
+        billing_strategy="partial",
+    )
+
+    with pytest.raises(ValueError, match="requested_amount exceeds available_to_bill"):
+        service.set_customer_invoice_billing(
+            document_id=invoice.document_id,
+            billing_strategy="partial",
+            requested_amount=Decimal("1200.00"),
+            available_to_bill=Decimal("800.00"),
+        )
+
+    updated = service.set_customer_invoice_billing(
+        document_id=invoice.document_id,
+        billing_strategy="partial",
+        requested_amount=Decimal("1200.00"),
+        available_to_bill=Decimal("800.00"),
+        allow_overbilling=True,
+        override_reason="Final reconciliation",
+        override_actor="qa",
+    )
+    assert (updated.document_metadata or {}).get("overbilling_override_applied") is True
+    assert any(
+        diagnostic.code == "customer_invoice_overbilling_override"
+        for diagnostic in updated.diagnostics
+    )
+
+
+def test_customer_invoice_issue_payment_and_sync_metadata() -> None:
+    service = _service()
+    invoice = service.create_customer_invoice_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        source_type="project",
+        project_id="project-a",
+        project_code="P-A",
+        billing_strategy="progress",
+        requested_amount=Decimal("500.00"),
+        available_to_bill=Decimal("1000.00"),
+    )
+    service.set_approval_state(
+        document_id=invoice.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+
+    issued = service.issue_document(document_id=invoice.document_id, reason="issue")
+    assert issued.lifecycle_state == CommercialDocumentLifecycleState.ISSUED
+    assert issued.sync_metadata.status == SyncStatus.READY
+    assert (issued.document_metadata or {}).get("payment_status") == "unpaid"
+
+    partially_paid = service.set_customer_invoice_payment_state(
+        document_id=invoice.document_id,
+        payment_state="partially_paid",
+        reason="Partial payment posted",
+    )
+    assert (
+        partially_paid.lifecycle_state
+        == CommercialDocumentLifecycleState.PARTIALLY_PAID
+    )
+
+    paid = service.set_customer_invoice_payment_state(
+        document_id=invoice.document_id,
+        payment_state="paid",
+        reason="Final payment posted",
+    )
+    assert paid.lifecycle_state == CommercialDocumentLifecycleState.PAID
+
+    synced = service.record_customer_invoice_sync_event(
+        document_id=invoice.document_id,
+        sync_status=SyncStatus.SYNCED,
+        external_id="qb-inv-123",
+        external_revision="v7",
+        reconciliation_state="reconciled",
+        payment_status="paid",
+    )
+    assert synced.sync_metadata.external_object_type == "invoice"
+    assert synced.sync_metadata.external_id == "qb-inv-123"
+    assert synced.sync_metadata.status == SyncStatus.SYNCED
+    assert (synced.document_metadata or {}).get("quickbooks_payment_status") == "paid"
+
+
+def test_customer_invoice_pdf_and_duplication_supported() -> None:
+    service = _service()
+    invoice = service.create_customer_invoice_draft(
+        tenant_id="tenant-1",
+        organization_id="org-1",
+        customer_id="customer-a",
+        source_type="standalone",
+        billing_strategy="full",
+        requested_amount=Decimal("200.00"),
+        available_to_bill=Decimal("200.00"),
+    )
+    service.set_approval_state(
+        document_id=invoice.document_id,
+        approval_state=ApprovalState.APPROVED,
+    )
+    service.issue_document(document_id=invoice.document_id, reason="issue")
+
+    export_1 = service.export_document_pdf(
+        document_id=invoice.document_id,
+        presentation="customer_invoice",
+        actor="qa",
+    )
+    export_2 = service.export_document_pdf(
+        document_id=invoice.document_id,
+        presentation="customer_invoice",
+        actor="qa",
+    )
+    assert export_1["payload"] == export_2["payload"]
+    assert export_1["content_hash"] == export_2["content_hash"]
+
+    duplicate = service.duplicate_document(document_id=invoice.document_id, actor="qa")
+    assert duplicate.document_type == CommercialDocumentType.CUSTOMER_INVOICE
+    assert duplicate.source_document_id == invoice.document_id
+
+
 def test_estimate_standalone_requires_customer() -> None:
     service = _service()
 

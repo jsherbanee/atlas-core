@@ -56,6 +56,22 @@ class TransactionsWorkspaceService:
         CommercialDocumentType.SALES_ORDER,
         CommercialDocumentType.RETURN_ORDER,
         CommercialDocumentType.CREDIT_MEMO,
+        CommercialDocumentType.CUSTOMER_INVOICE,
+    }
+    _CUSTOMER_INVOICE_SOURCE_TYPES = {
+        "standalone",
+        "sales_order",
+        "project",
+        "project_milestone",
+        "change_order",
+    }
+    _CUSTOMER_INVOICE_BILLING_STRATEGIES = {
+        "full",
+        "partial",
+        "milestone",
+        "progress",
+        "line",
+        "final",
     }
     _DEFAULT_VISIBLE_COLUMNS = [
         "description",
@@ -314,6 +330,7 @@ class TransactionsWorkspaceService:
         if document.document_type in {
             CommercialDocumentType.ESTIMATE,
             CommercialDocumentType.SALES_ORDER,
+            CommercialDocumentType.CUSTOMER_INVOICE,
         }:
             terms_payload = self._terms_reference_and_snapshot(
                 document_type=document.document_type,
@@ -765,6 +782,300 @@ class TransactionsWorkspaceService:
             CommercialDocumentLifecycleState.ISSUED,
             reason=reason,
         )
+        if document.document_type == CommercialDocumentType.CUSTOMER_INVOICE:
+            document.sync_metadata.status = SyncStatus.READY
+            document.sync_metadata.external_object_type = "invoice"
+            self._commercial_service.set_document_metadata(
+                document,
+                metadata={
+                    "payment_status": _safe_text(
+                        (document.document_metadata or {}).get("payment_status"),
+                        "unpaid",
+                    ),
+                    "payment_status_updated_at": _utc_now(),
+                    "issued_at": _utc_now(),
+                },
+                force=True,
+            )
+        return document
+
+    def create_customer_invoice_draft(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        customer_id: str | None,
+        project_id: str | None = None,
+        project_code: str | None = None,
+        source_type: str = "standalone",
+        source_document_id: str | None = None,
+        source_reference: str | None = None,
+        billing_strategy: str = "full",
+        requested_amount: Decimal | None = None,
+        available_to_bill: Decimal | None = None,
+        allow_overbilling: bool = False,
+        override_reason: str | None = None,
+        override_actor: str | None = None,
+        billing_context: dict[str, Any] | None = None,
+    ) -> CommercialDocument:
+        normalized_source_type = _safe_text(source_type, "standalone").lower()
+        if normalized_source_type not in self._CUSTOMER_INVOICE_SOURCE_TYPES:
+            raise ValueError("unsupported customer invoice source_type")
+
+        normalized_billing_strategy = _safe_text(billing_strategy, "full").lower()
+        if normalized_billing_strategy not in self._CUSTOMER_INVOICE_BILLING_STRATEGIES:
+            raise ValueError("unsupported customer invoice billing_strategy")
+
+        source_document: CommercialDocument | None = None
+        if normalized_source_type in {"sales_order", "change_order"}:
+            if not _safe_text(source_document_id, ""):
+                raise ValueError(
+                    "source_document_id is required for source-linked invoices"
+                )
+            source_document = self._required_document(
+                _safe_text(source_document_id, "")
+            )
+            expected_type = (
+                CommercialDocumentType.SALES_ORDER
+                if normalized_source_type == "sales_order"
+                else CommercialDocumentType.CHANGE_ORDER
+            )
+            if source_document.document_type != expected_type:
+                raise ValueError("source document type does not match source_type")
+
+        derived_customer_id = (
+            _safe_text(
+                customer_id,
+                _safe_text(source_document.customer_id, "") if source_document else "",
+            )
+            or None
+        )
+        derived_project_id = (
+            _safe_text(
+                project_id,
+                _safe_text(source_document.project_id, "") if source_document else "",
+            )
+            or None
+        )
+        derived_project_code = (
+            _safe_text(
+                project_code,
+                _safe_text(source_document.project_code, "") if source_document else "",
+            )
+            or None
+        )
+
+        if not derived_customer_id:
+            raise ValueError("customer invoices require customer_id")
+
+        invoice = self.create_draft(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            document_type=CommercialDocumentType.CUSTOMER_INVOICE,
+            project_id=derived_project_id,
+            project_code=derived_project_code,
+            customer_id=derived_customer_id,
+        )
+
+        if source_document is not None:
+            invoice.source_document_id = source_document.document_id
+            invoice.source_relationship_type = "derived_from_source"
+            self._commercial_service.add_relationship(
+                invoice,
+                relationship_type=f"source_{normalized_source_type}",
+                related_document_id=source_document.document_id,
+            )
+
+        self._commercial_service.set_document_metadata(
+            invoice,
+            metadata={
+                "source_type": normalized_source_type,
+                "source_document_id": _safe_text(source_document_id, "") or None,
+                "source_reference": _safe_text(source_reference, "") or None,
+                "billing_strategy": normalized_billing_strategy,
+                "billing_context": dict(billing_context or {}),
+                "payment_status": "unpaid",
+                "payment_status_updated_at": _utc_now(),
+            },
+        )
+
+        if requested_amount is not None and available_to_bill is not None:
+            self.set_customer_invoice_billing(
+                document_id=invoice.document_id,
+                billing_strategy=normalized_billing_strategy,
+                requested_amount=requested_amount,
+                available_to_bill=available_to_bill,
+                allow_overbilling=allow_overbilling,
+                override_reason=override_reason,
+                override_actor=override_actor,
+                billing_context=billing_context,
+            )
+        return invoice
+
+    def set_customer_invoice_billing(
+        self,
+        *,
+        document_id: str,
+        billing_strategy: str,
+        requested_amount: Decimal,
+        available_to_bill: Decimal,
+        allow_overbilling: bool = False,
+        override_reason: str | None = None,
+        override_actor: str | None = None,
+        billing_context: dict[str, Any] | None = None,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.document_type != CommercialDocumentType.CUSTOMER_INVOICE:
+            raise ValueError("document must be a customer invoice")
+        if not document.is_mutable:
+            raise ValueError("only mutable drafts/review documents can be edited")
+
+        normalized_strategy = _safe_text(billing_strategy, "").lower()
+        if normalized_strategy not in self._CUSTOMER_INVOICE_BILLING_STRATEGIES:
+            raise ValueError("unsupported customer invoice billing_strategy")
+
+        requested = Decimal(str(requested_amount))
+        available = Decimal(str(available_to_bill))
+        if requested <= Decimal("0"):
+            raise ValueError("requested_amount must be greater than zero")
+        if available <= Decimal("0"):
+            raise ValueError("available_to_bill must be greater than zero")
+
+        override_applied = False
+        if requested > available:
+            if not allow_overbilling:
+                raise ValueError("requested_amount exceeds available_to_bill")
+            if not _safe_text(override_reason, "") or not _safe_text(
+                override_actor, ""
+            ):
+                raise ValueError(
+                    "override_reason and override_actor are required when overbilling"
+                )
+            override_applied = True
+            self._commercial_service.add_diagnostic(
+                document,
+                CommercialDocumentDiagnostic(
+                    code="customer_invoice_overbilling_override",
+                    message="Requested amount exceeds available-to-bill via explicit override",
+                    details={
+                        "requested_amount": str(requested),
+                        "available_to_bill": str(available),
+                        "override_reason": _safe_text(override_reason, ""),
+                        "override_actor": _safe_text(override_actor, ""),
+                    },
+                ),
+            )
+
+        self._commercial_service.set_totals(
+            document,
+            subtotal=requested,
+            discount_total=Decimal("0"),
+            tax_total=document.totals.tax_total,
+            grand_total=requested + document.totals.tax_total,
+        )
+        self._commercial_service.set_document_metadata(
+            document,
+            metadata={
+                "billing_strategy": normalized_strategy,
+                "billable_available": str(available),
+                "requested_amount": str(requested),
+                "approved_amount": str(requested),
+                "allow_overbilling": bool(allow_overbilling),
+                "overbilling_override_applied": override_applied,
+                "overbilling_override_reason": _safe_text(override_reason, "") or None,
+                "overbilling_override_actor": _safe_text(override_actor, "") or None,
+                "billing_context": dict(billing_context or {}),
+            },
+        )
+        return document
+
+    def set_customer_invoice_payment_state(
+        self,
+        *,
+        document_id: str,
+        payment_state: str,
+        reason: str,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.document_type != CommercialDocumentType.CUSTOMER_INVOICE:
+            raise ValueError("document must be a customer invoice")
+        target_by_payment_state = {
+            "partially_paid": CommercialDocumentLifecycleState.PARTIALLY_PAID,
+            "paid": CommercialDocumentLifecycleState.PAID,
+            "overdue": CommercialDocumentLifecycleState.OVERDUE,
+            "voided": CommercialDocumentLifecycleState.VOIDED,
+            "closed": CommercialDocumentLifecycleState.CLOSED,
+        }
+        normalized_payment_state = _safe_text(payment_state, "").lower()
+        target_state = target_by_payment_state.get(normalized_payment_state)
+        if target_state is None:
+            raise ValueError("unsupported customer invoice payment_state")
+        self._commercial_service.transition_lifecycle(
+            document,
+            target_state,
+            reason=reason,
+        )
+        self._commercial_service.set_document_metadata(
+            document,
+            metadata={
+                "payment_status": normalized_payment_state,
+                "payment_status_updated_at": _utc_now(),
+            },
+            force=True,
+        )
+        return document
+
+    def record_customer_invoice_sync_event(
+        self,
+        *,
+        document_id: str,
+        sync_status: SyncStatus,
+        external_id: str | None = None,
+        external_revision: str | None = None,
+        failure_code: str | None = None,
+        failure_message: str | None = None,
+        reconciliation_state: str | None = None,
+        payment_status: str | None = None,
+        payment_status_timestamp: str | None = None,
+    ) -> CommercialDocument:
+        document = self._required_document(document_id)
+        if document.document_type != CommercialDocumentType.CUSTOMER_INVOICE:
+            raise ValueError("document must be a customer invoice")
+        if not isinstance(sync_status, SyncStatus):
+            sync_status = SyncStatus(sync_status)
+
+        metadata = document.sync_metadata
+        metadata.external_object_type = "invoice"
+        metadata.status = sync_status
+        metadata.external_id = _safe_text(external_id, "") or metadata.external_id
+        metadata.external_revision = (
+            _safe_text(external_revision, "") or metadata.external_revision
+        )
+        metadata.last_attempt_at = _utc_now()
+        metadata.failure_code = _safe_text(failure_code, "") or None
+        metadata.failure_message = _safe_text(failure_message, "") or None
+        metadata.reconciliation_state = (
+            _safe_text(reconciliation_state, "") or metadata.reconciliation_state
+        )
+        if sync_status == SyncStatus.SYNCED:
+            metadata.last_success_at = _utc_now()
+            metadata.failure_code = None
+            metadata.failure_message = None
+        if sync_status == SyncStatus.FAILED:
+            metadata.retry_count = int(metadata.retry_count or 0) + 1
+
+        if _safe_text(payment_status, ""):
+            self._commercial_service.set_document_metadata(
+                document,
+                metadata={
+                    "quickbooks_payment_status": _safe_text(payment_status, ""),
+                    "quickbooks_payment_status_timestamp": _safe_text(
+                        payment_status_timestamp,
+                        _utc_now(),
+                    ),
+                },
+                force=True,
+            )
         return document
 
     def create_draft_revision(
@@ -806,9 +1117,10 @@ class TransactionsWorkspaceService:
             CommercialDocumentType.SALES_ORDER,
             CommercialDocumentType.RETURN_ORDER,
             CommercialDocumentType.CREDIT_MEMO,
+            CommercialDocumentType.CUSTOMER_INVOICE,
         }:
             raise ValueError(
-                "only estimates, sales orders, return orders, and credit memos are supported"
+                "only estimates, sales orders, return orders, credit memos, and customer invoices are supported"
             )
 
         duplicate = self.create_draft(
@@ -1218,6 +1530,7 @@ class TransactionsWorkspaceService:
             "internal_estimate",
             "customer_estimate",
             "sales_order",
+            "customer_invoice",
             "return_order",
             "credit_memo",
         }:
@@ -1319,6 +1632,7 @@ class TransactionsWorkspaceService:
             "internal_estimate",
             "customer_estimate",
             "sales_order",
+            "customer_invoice",
             "return_order",
             "credit_memo",
         }:

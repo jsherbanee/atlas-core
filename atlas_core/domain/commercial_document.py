@@ -92,6 +92,10 @@ class CommercialDocumentLifecycleState(str, Enum):
     INSPECTED = "inspected"
     PROCESSED = "processed"
     ISSUED = "issued"
+    PARTIALLY_PAID = "partially_paid"
+    PAID = "paid"
+    OVERDUE = "overdue"
+    VOIDED = "voided"
     SYNCED = "synced"
     APPLIED = "applied"
     PARTIALLY_FULFILLED = "partially_fulfilled"
@@ -180,13 +184,43 @@ COMMERCIAL_DOCUMENT_LIFECYCLE_TRANSITIONS: dict[
     },
     CommercialDocumentLifecycleState.ISSUED: {
         CommercialDocumentLifecycleState.SYNCED,
+        CommercialDocumentLifecycleState.PARTIALLY_PAID,
+        CommercialDocumentLifecycleState.PAID,
+        CommercialDocumentLifecycleState.OVERDUE,
+        CommercialDocumentLifecycleState.VOIDED,
         CommercialDocumentLifecycleState.APPLIED,
         CommercialDocumentLifecycleState.PARTIALLY_FULFILLED,
         CommercialDocumentLifecycleState.FULFILLED,
         CommercialDocumentLifecycleState.CLOSED,
         CommercialDocumentLifecycleState.ARCHIVED,
     },
+    CommercialDocumentLifecycleState.PARTIALLY_PAID: {
+        CommercialDocumentLifecycleState.PAID,
+        CommercialDocumentLifecycleState.OVERDUE,
+        CommercialDocumentLifecycleState.VOIDED,
+        CommercialDocumentLifecycleState.CLOSED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.PAID: {
+        CommercialDocumentLifecycleState.CLOSED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.OVERDUE: {
+        CommercialDocumentLifecycleState.PARTIALLY_PAID,
+        CommercialDocumentLifecycleState.PAID,
+        CommercialDocumentLifecycleState.VOIDED,
+        CommercialDocumentLifecycleState.CLOSED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
+    CommercialDocumentLifecycleState.VOIDED: {
+        CommercialDocumentLifecycleState.CLOSED,
+        CommercialDocumentLifecycleState.ARCHIVED,
+    },
     CommercialDocumentLifecycleState.SYNCED: {
+        CommercialDocumentLifecycleState.PARTIALLY_PAID,
+        CommercialDocumentLifecycleState.PAID,
+        CommercialDocumentLifecycleState.OVERDUE,
+        CommercialDocumentLifecycleState.VOIDED,
         CommercialDocumentLifecycleState.APPLIED,
         CommercialDocumentLifecycleState.CLOSED,
         CommercialDocumentLifecycleState.ARCHIVED,

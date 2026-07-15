@@ -6617,6 +6617,76 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 },
             ]
             continue
+        if secondary_key == "customer_invoices":
+            actions[secondary_key] = [
+                {
+                    "tertiary_key": "add",
+                    "label": "Add",
+                    "action_type": "create_action",
+                    "required_selection": None,
+                },
+                {
+                    "tertiary_key": "browse",
+                    "label": "Browse",
+                    "action_type": "collection_view",
+                    "required_selection": None,
+                },
+                {
+                    "tertiary_key": "edit",
+                    "label": "Edit",
+                    "action_type": "edit_action",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "lines",
+                    "label": "Lines",
+                    "action_type": "detail_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "billing",
+                    "label": "Billing",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "revisions",
+                    "label": "Revisions",
+                    "action_type": "history_activity_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "approvals",
+                    "label": "Approvals",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "issue",
+                    "label": "Issue",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "sync_status",
+                    "label": "Sync Status",
+                    "action_type": "operational_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "activity",
+                    "label": "Activity",
+                    "action_type": "history_activity_view",
+                    "required_selection": "entity",
+                },
+                {
+                    "tertiary_key": "export_pdf",
+                    "label": "Export PDF",
+                    "action_type": "export_action",
+                    "required_selection": "entity",
+                },
+            ]
+            continue
         actions[secondary_key] = [
             {
                 "tertiary_key": "add",
@@ -13296,6 +13366,116 @@ def _render_transactions_workspace_page(
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to create return order: {exc}")
+        elif document_type == CommercialDocumentType.CUSTOMER_INVOICE:
+            create_cols = st.columns(4)
+            project_id = create_cols[0].text_input(
+                "Project ID", key=f"{prefix}_project_id"
+            )
+            project_code = create_cols[1].text_input(
+                "Project Code", key=f"{prefix}_project_code"
+            )
+            customer_id = create_cols[2].text_input(
+                "Customer ID", key=f"{prefix}_customer_id"
+            )
+            source_type = create_cols[3].selectbox(
+                "Source Type",
+                options=[
+                    "standalone",
+                    "sales_order",
+                    "project",
+                    "project_milestone",
+                    "change_order",
+                ],
+                key=f"{prefix}_invoice_source_type",
+            )
+
+            source_cols = st.columns(4)
+            source_document_id = source_cols[0].text_input(
+                "Source Document ID",
+                key=f"{prefix}_invoice_source_document_id",
+            )
+            source_reference = source_cols[1].text_input(
+                "Source Reference",
+                key=f"{prefix}_invoice_source_reference",
+            )
+            billing_strategy = source_cols[2].selectbox(
+                "Billing Strategy",
+                options=["full", "partial", "milestone", "progress", "line", "final"],
+                key=f"{prefix}_invoice_billing_strategy",
+            )
+            allow_override = source_cols[3].checkbox(
+                "Allow Override",
+                key=f"{prefix}_invoice_allow_override",
+                value=False,
+            )
+
+            amount_cols = st.columns(4)
+            requested_amount = Decimal(
+                str(
+                    amount_cols[0].number_input(
+                        "Requested Amount",
+                        min_value=0.0,
+                        value=0.0,
+                        step=1.0,
+                        key=f"{prefix}_invoice_requested_amount",
+                    )
+                )
+            )
+            available_to_bill = Decimal(
+                str(
+                    amount_cols[1].number_input(
+                        "Available to Bill",
+                        min_value=0.0,
+                        value=0.0,
+                        step=1.0,
+                        key=f"{prefix}_invoice_available_to_bill",
+                    )
+                )
+            )
+            override_reason = amount_cols[2].text_input(
+                "Override Reason",
+                key=f"{prefix}_invoice_override_reason",
+            )
+            source_milestone = amount_cols[3].text_input(
+                "Milestone/Line Ref",
+                key=f"{prefix}_invoice_milestone_ref",
+            )
+
+            if st.button(
+                "Create Customer Invoice", key=f"{prefix}_create", width="stretch"
+            ):
+                try:
+                    create_kwargs: dict[str, Any] = {
+                        "tenant_id": "local",
+                        "organization_id": "atlas",
+                        "customer_id": customer_id or None,
+                        "project_id": project_id or None,
+                        "project_code": project_code or None,
+                        "source_type": source_type,
+                        "source_document_id": source_document_id or None,
+                        "source_reference": source_reference or None,
+                        "billing_strategy": billing_strategy,
+                        "allow_overbilling": bool(allow_override),
+                        "override_reason": override_reason or None,
+                        "override_actor": "atlas-ui" if allow_override else None,
+                        "billing_context": {
+                            "milestone_or_line_reference": source_milestone or None,
+                        },
+                    }
+                    if requested_amount > Decimal("0") and available_to_bill > Decimal(
+                        "0"
+                    ):
+                        create_kwargs["requested_amount"] = requested_amount
+                        create_kwargs["available_to_bill"] = available_to_bill
+                    created = service.create_customer_invoice_draft(**create_kwargs)
+                    st.session_state["atlas_transactions_selected_document_id"] = (
+                        created.document_id
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.success("Customer invoice draft created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to create customer invoice: {exc}")
         else:
             create_cols = st.columns(4)
             project_id = create_cols[0].text_input(
@@ -13492,6 +13672,7 @@ def _render_transactions_workspace_page(
     if tertiary == "duplicate" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         if st.button("Duplicate Document", key=f"{prefix}_duplicate", width="stretch"):
             try:
@@ -13511,6 +13692,7 @@ def _render_transactions_workspace_page(
     if tertiary == "create_revision" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         create_revision_reason = st.text_input(
             "Revision Reason",
@@ -13543,6 +13725,7 @@ def _render_transactions_workspace_page(
     if tertiary == "revision_history" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         st.dataframe(
             service.revision_history(document_id=selected_document.document_id),
@@ -13553,6 +13736,7 @@ def _render_transactions_workspace_page(
     if tertiary == "archive" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         if st.button(
             "Archive Document", key=f"{prefix}_archive_action", width="stretch"
@@ -13565,6 +13749,7 @@ def _render_transactions_workspace_page(
     if tertiary == "restore" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         if st.button(
             "Restore Document", key=f"{prefix}_restore_action", width="stretch"
@@ -13577,6 +13762,7 @@ def _render_transactions_workspace_page(
     if tertiary == "export_pdf" and selected_document.document_type in {
         CommercialDocumentType.ESTIMATE,
         CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.CUSTOMER_INVOICE,
     }:
         if selected_document.document_type == CommercialDocumentType.ESTIMATE:
             presentation = st.selectbox(
@@ -13584,6 +13770,9 @@ def _render_transactions_workspace_page(
                 options=["internal_estimate", "customer_estimate"],
                 key=f"{prefix}_pdf_presentation",
             )
+        elif selected_document.document_type == CommercialDocumentType.CUSTOMER_INVOICE:
+            presentation = "customer_invoice"
+            st.caption("Customer Invoice presentation is fixed to customer_invoice.")
         elif selected_document.document_type == CommercialDocumentType.CREDIT_MEMO:
             presentation = "credit_memo"
             st.caption("Credit Memo presentation is fixed to credit_memo.")
@@ -14191,6 +14380,182 @@ def _render_transactions_workspace_page(
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to create draft revision: {exc}")
+
+    if (
+        tertiary == "issue"
+        and selected_document.document_type == CommercialDocumentType.CUSTOMER_INVOICE
+    ):
+        issue_reason = st.text_input(
+            "Issue Reason",
+            value="Issue customer invoice",
+            key=f"{prefix}_invoice_issue_reason",
+        )
+        if st.button(
+            "Issue Customer Invoice",
+            key=f"{prefix}_issue_customer_invoice",
+            width="stretch",
+        ):
+            if selected_document.approval_state != ApprovalState.APPROVED:
+                st.warning("Customer invoice must be approved before issuing.")
+            else:
+                try:
+                    service.issue_document(
+                        document_id=selected_document.document_id,
+                        reason=issue_reason,
+                    )
+                    _save_transactions_workspace_state(st, service)
+                    st.success("Customer invoice issued.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to issue customer invoice: {exc}")
+
+    if (
+        tertiary == "revisions"
+        and selected_document.document_type == CommercialDocumentType.CUSTOMER_INVOICE
+    ):
+        st.dataframe(
+            service.revision_history(document_id=selected_document.document_id),
+            width="stretch",
+            hide_index=True,
+        )
+        revision_reason = st.text_input(
+            "Revision Reason",
+            value="Customer invoice draft revision",
+            key=f"{prefix}_invoice_revision_reason",
+        )
+        revision_label = st.text_input(
+            "Revision Label",
+            value=f"R{selected_document.revision_number + 1}",
+            key=f"{prefix}_invoice_revision_label",
+        )
+        if st.button(
+            "Create Invoice Revision",
+            key=f"{prefix}_invoice_create_revision",
+            width="stretch",
+        ):
+            try:
+                service.create_draft_revision(
+                    document_id=selected_document.document_id,
+                    reason=revision_reason,
+                    actor="atlas-ui",
+                    revision_label=revision_label,
+                )
+                _save_transactions_workspace_state(st, service)
+                st.success("Customer invoice revision created.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to create invoice revision: {exc}")
+
+    if (
+        tertiary == "billing"
+        and selected_document.document_type == CommercialDocumentType.CUSTOMER_INVOICE
+    ):
+        billing_cols = st.columns(4)
+        billing_strategy = billing_cols[0].selectbox(
+            "Billing Strategy",
+            options=["full", "partial", "milestone", "progress", "line", "final"],
+            key=f"{prefix}_billing_strategy",
+        )
+        requested_amount = Decimal(
+            str(
+                billing_cols[1].number_input(
+                    "Requested Amount",
+                    min_value=0.0,
+                    value=float(
+                        Decimal(
+                            _safe_text(
+                                (selected_document.document_metadata or {}).get(
+                                    "requested_amount"
+                                ),
+                                "0",
+                            )
+                        )
+                    ),
+                    step=1.0,
+                    key=f"{prefix}_billing_requested_amount",
+                )
+            )
+        )
+        available_to_bill = Decimal(
+            str(
+                billing_cols[2].number_input(
+                    "Available to Bill",
+                    min_value=0.0,
+                    value=float(
+                        Decimal(
+                            _safe_text(
+                                (selected_document.document_metadata or {}).get(
+                                    "billable_available"
+                                ),
+                                "0",
+                            )
+                        )
+                    ),
+                    step=1.0,
+                    key=f"{prefix}_billing_available_to_bill",
+                )
+            )
+        )
+        allow_overbilling = billing_cols[3].checkbox(
+            "Allow Overbilling",
+            key=f"{prefix}_billing_allow_overbilling",
+            value=False,
+        )
+        override_cols = st.columns(2)
+        override_reason = override_cols[0].text_input(
+            "Override Reason",
+            key=f"{prefix}_billing_override_reason",
+        )
+        milestone_reference = override_cols[1].text_input(
+            "Milestone/Line Reference",
+            key=f"{prefix}_billing_milestone_reference",
+        )
+        if st.button("Apply Billing", key=f"{prefix}_billing_apply", width="stretch"):
+            try:
+                service.set_customer_invoice_billing(
+                    document_id=selected_document.document_id,
+                    billing_strategy=billing_strategy,
+                    requested_amount=requested_amount,
+                    available_to_bill=available_to_bill,
+                    allow_overbilling=allow_overbilling,
+                    override_reason=override_reason or None,
+                    override_actor="atlas-ui" if allow_overbilling else None,
+                    billing_context={
+                        "milestone_or_line_reference": milestone_reference or None,
+                    },
+                )
+                _save_transactions_workspace_state(st, service)
+                st.success("Customer invoice billing updated.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to update billing: {exc}")
+
+    if (
+        tertiary == "lines"
+        and selected_document.document_type == CommercialDocumentType.CUSTOMER_INVOICE
+    ):
+        _render_transaction_line_presentation_controls(
+            st,
+            service=service,
+            document=selected_document,
+            prefix=prefix,
+        )
+        st.dataframe(
+            [
+                {
+                    "Line": line.sequence,
+                    "Description": line.description,
+                    "Qty": str(line.quantity),
+                    "Unit Price": str(line.unit_price),
+                    "Extended": str(line.extended_amount),
+                    "Source Document": _safe_text(line.source_document_id, ""),
+                    "Source Line": _safe_text(line.source_line_id, ""),
+                }
+                for line in list(selected_document.lines or [])
+            ],
+            width="stretch",
+            hide_index=True,
+        )
 
     if (
         tertiary == "accept"
