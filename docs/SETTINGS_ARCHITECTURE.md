@@ -2,6 +2,8 @@
 
 This document defines the reusable Settings workspace foundation and scope boundaries introduced in Sprint T-04 and extended in Sprint P-01.
 
+Sprint P-05 extends Settings with deterministic document-template management for commercial document generation.
+
 ## Purpose
 
 Provide a deterministic, tenant-aware settings surface for organization controls and user preferences while preserving existing runtime and numbering guarantees.
@@ -27,6 +29,11 @@ P-01 extension:
 - deterministic roles and permissions administration foundation is now active under Organization Settings
 - tenant-scoped role assignment and effective-access evaluation are now supported
 - project-scoped access overrides are now supported
+
+P-05 extension:
+- tenant-scoped document templates with version lineage and scoped assignment (transaction, project, customer, tenant default)
+- explicit default-template assignment for tenant-level templates
+- precedence-aware template resolution and runtime export/replace synchronization
 
 ## Navigation Contract
 

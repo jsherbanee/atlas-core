@@ -5,6 +5,11 @@ This document defines the reporting architecture for Atlas.
 
 It distinguishes operational reporting from financial summaries and keeps AI-generated narrative draft-only.
 
+## P-05 Implementation Note
+
+Sprint P-05 introduces the first deterministic document-template engine implementation for commercial-document generation.
+Template precedence, revision template snapshots, and output hash capture now provide a concrete reusable baseline for broader reporting-template evolution.
+
 ## Related Documents
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [ROADMAP.md](ROADMAP.md)

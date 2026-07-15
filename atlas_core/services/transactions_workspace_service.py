@@ -17,6 +17,10 @@ from atlas_core.domain.commercial_document import (
     CommercialDocumentType,
     SyncStatus,
 )
+from atlas_core.contracts.document_generation_contracts import (
+    OutputFormat,
+    RenderRequest,
+)
 from atlas_core.services.commercial_document_service import (
     CommercialDocumentService,
     CommercialNumberingService,
@@ -25,6 +29,7 @@ from atlas_core.services.commercial_document_pdf_export_service import (
     CommercialDocumentPdfExportService,
     PdfSectionConfig,
 )
+from atlas_core.services.document_generation_service import DocumentGenerationService
 
 
 def _utc_now() -> str:
@@ -74,6 +79,7 @@ class TransactionsWorkspaceService:
         serialized_documents: list[dict[str, Any]] | None = None,
         serialized_numbering_policies: list[dict[str, Any]] | None = None,
         serialized_terms_blocks: list[dict[str, Any]] | None = None,
+        serialized_document_templates: list[dict[str, Any]] | None = None,
         commercial_service: CommercialDocumentService | None = None,
     ) -> None:
         self._commercial_service = commercial_service or CommercialDocumentService(
@@ -92,6 +98,9 @@ class TransactionsWorkspaceService:
             if isinstance(item, dict)
         ]
         self._pdf_export_service = CommercialDocumentPdfExportService()
+        self._document_generation_service = DocumentGenerationService(
+            serialized_templates=serialized_document_templates
+        )
 
     def _document_family(self, document_type: CommercialDocumentType) -> str:
         return document_type.value
@@ -1160,6 +1169,148 @@ class TransactionsWorkspaceService:
         actor: str,
         revision_number: int | None = None,
         section_config: PdfSectionConfig | None = None,
+        branding: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if section_config is not None:
+            return self._export_document_pdf_legacy(
+                document_id=document_id,
+                presentation=presentation,
+                actor=actor,
+                revision_number=revision_number,
+                section_config=section_config,
+                branding=branding,
+            )
+
+        generated = self.generate_document_artifact(
+            document_id=document_id,
+            presentation=presentation,
+            actor=actor,
+            revision_number=revision_number,
+            output_format="pdf",
+            branding=branding,
+        )
+        return {
+            "file_name": generated["file_name"],
+            "mime_type": generated["mime_type"],
+            "payload": generated["payload"],
+            "revision_number": generated["revision_number"],
+            "content_hash": generated["content_hash"],
+        }
+
+    def generate_document_artifact(
+        self,
+        *,
+        document_id: str,
+        presentation: str,
+        actor: str,
+        revision_number: int | None = None,
+        output_format: str = "pdf",
+        explicit_template_id: str | None = None,
+        branding: dict[str, Any] | None = None,
+        permission_allowed: bool = True,
+    ) -> dict[str, Any]:
+        if not permission_allowed:
+            raise ValueError("document generation permission was denied")
+
+        document = self._required_document(document_id)
+        normalized_presentation = presentation.strip().lower()
+        if normalized_presentation not in {
+            "internal_estimate",
+            "customer_estimate",
+            "sales_order",
+            "return_order",
+            "credit_memo",
+        }:
+            raise ValueError("unsupported presentation")
+
+        target_revision_number = revision_number or document.revision_number
+        revision = next(
+            (
+                item
+                for item in list(document.revisions or [])
+                if item.revision_number == target_revision_number
+            ),
+            None,
+        )
+        if revision is None:
+            raise ValueError("revision was not found")
+
+        format_value = output_format.strip().lower()
+        if format_value not in {"pdf", "html"}:
+            raise ValueError("unsupported output_format")
+
+        result = self._document_generation_service.render_document(
+            request=RenderRequest(
+                tenant_id=document.tenant_id,
+                organization_id=document.organization_id,
+                actor_id=actor,
+                document_id=document.document_id,
+                revision_number=revision.revision_number,
+                document_family=document.document_type.value,
+                output_format=OutputFormat(format_value),
+                presentation=normalized_presentation,
+                explicit_template_id=explicit_template_id,
+            ),
+            document=document,
+            revision=revision,
+            branding=branding,
+        )
+
+        if document.is_mutable and not revision.immutable:
+            self._commercial_service.assign_template_version(
+                document,
+                assignment=result.assignment.to_dict(),
+                snapshot=result.template_version_snapshot,
+            )
+
+        export_event = {
+            "event": "document_generated",
+            "actor": actor,
+            "timestamp": _utc_now(),
+            "presentation": normalized_presentation,
+            "output_format": result.artifact.output_format.value,
+            "revision_number": revision.revision_number,
+            "revision_id": revision.revision_id,
+            "file_name": result.artifact.file_name,
+            "content_hash": result.artifact.content_hash,
+            "status": document.lifecycle_state.value,
+            "is_archived_revision": revision.is_archived,
+            "template_assignment": result.assignment.to_dict(),
+            "template_version_snapshot": deepcopy(result.template_version_snapshot),
+        }
+        document.export_activity.append(export_event)
+        document.attachments.append(
+            {
+                "attachment_id": result.artifact.artifact_id,
+                "file_name": result.artifact.file_name,
+                "mime_type": result.artifact.mime_type,
+                "content_hash": result.artifact.content_hash,
+                "revision_number": revision.revision_number,
+                "presentation": normalized_presentation,
+                "output_format": result.artifact.output_format.value,
+                "generated_at": export_event["timestamp"],
+                "generated_by": actor,
+                "template_assignment": result.assignment.to_dict(),
+            }
+        )
+        return {
+            "file_name": result.artifact.file_name,
+            "mime_type": result.artifact.mime_type,
+            "payload": result.artifact.payload,
+            "revision_number": revision.revision_number,
+            "content_hash": result.artifact.content_hash,
+            "assignment": result.assignment.to_dict(),
+            "template_version_snapshot": deepcopy(result.template_version_snapshot),
+        }
+
+    def _export_document_pdf_legacy(
+        self,
+        *,
+        document_id: str,
+        presentation: str,
+        actor: str,
+        revision_number: int | None = None,
+        section_config: PdfSectionConfig,
         branding: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         document = self._required_document(document_id)

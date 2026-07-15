@@ -167,6 +167,7 @@ Production readiness should require:
 - harden current repository-backed workspace behavior
 - implement deterministic local background job framework (P-03) with storage-agnostic contracts and immutable audit linkage
 - implement unified attachment framework (P-04) with tenant-scoped contracts, repository/local adapters, and Object Workspace documents integration
+- implement deterministic document-generation and template engine foundation (P-05) with precedence-aware template resolution and revision snapshot reuse guarantees
 - consolidate search and object-graph foundations
 - formalize rule-engine and diagnostics contracts
 - deliver deterministic roles and permissions foundation with centralized action gating and audit-ready permission events

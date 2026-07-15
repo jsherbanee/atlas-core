@@ -68,6 +68,20 @@ from atlas_core.contracts.attachment_contracts import (
     AttachmentStatus,
     AttachmentVersion,
 )
+from atlas_core.contracts.document_generation_contracts import (
+    DocumentTemplate,
+    DocumentTemplateVersion,
+    OutputArtifact,
+    OutputFormat,
+    RenderContext,
+    RenderDiagnostic,
+    RenderRequest,
+    RenderResult,
+    RenderSection,
+    TemplateAssignment,
+    TemplateSource,
+    TemplateStatus,
+)
 
 __all__ = [
     "PlanReviewRequest",
@@ -124,4 +138,16 @@ __all__ = [
     "AttachmentScanStatus",
     "AttachmentStatus",
     "AttachmentVersion",
+    "DocumentTemplate",
+    "DocumentTemplateVersion",
+    "OutputArtifact",
+    "OutputFormat",
+    "RenderContext",
+    "RenderDiagnostic",
+    "RenderRequest",
+    "RenderResult",
+    "RenderSection",
+    "TemplateAssignment",
+    "TemplateSource",
+    "TemplateStatus",
 ]

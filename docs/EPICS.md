@@ -42,6 +42,7 @@ Status: Active
 - P-02 Immutable Audit Foundation
 - P-03 Deterministic Background Job Framework
 - P-04 Unified Attachment Framework
+- P-05 Document Generation and Template Engine
 
 ### A-07 Scope
 
@@ -115,6 +116,20 @@ Explicitly out of scope:
 - cloud object-store adapters
 - malware scanning engines
 - external worker execution for attachment hooks
+
+### P-05 Scope
+
+- implement deterministic document-generation contracts and rendering orchestration
+- implement template precedence resolution and fallback behavior
+- implement revision-level template snapshot capture for immutable issued rendering
+- implement settings-backed template version/default management and runtime export/replace sync
+- integrate transactions export with generated artifact metadata and template provenance
+
+Explicitly out of scope:
+
+- cloud worker implementation changes
+- external delivery transport execution
+- e-signature workflow implementation
 
 ## Epic G: Product Governance And Delivery Discipline
 

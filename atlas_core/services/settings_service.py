@@ -96,6 +96,17 @@ _ALLOWED_TERMS_DOCUMENT_FAMILIES = {
 }
 
 
+_ALLOWED_TEMPLATE_DOCUMENT_FAMILIES = {
+    CommercialDocumentType.ESTIMATE.value,
+    CommercialDocumentType.SALES_ORDER.value,
+    CommercialDocumentType.RETURN_ORDER.value,
+    CommercialDocumentType.CREDIT_MEMO.value,
+}
+
+
+_ALLOWED_TEMPLATE_STATUS = {"draft", "active"}
+
+
 _ALLOWED_TERMS_STATUS = {"draft", "active"}
 
 
@@ -214,6 +225,120 @@ class TermsAndConditionsBlock:
             "updated_at": self.updated_at,
             "updated_by": self.updated_by,
             "previous_block_id": self.previous_block_id,
+        }
+
+    @property
+    def scope_rank(self) -> int:
+        if self.transaction_id:
+            return 4
+        if self.project_id:
+            return 3
+        if self.customer_id:
+            return 2
+        return 1
+
+    @property
+    def is_tenant_default_candidate(self) -> bool:
+        return (
+            self.customer_id is None
+            and self.project_id is None
+            and self.transaction_id is None
+            and not self.archived
+            and self.status == "active"
+        )
+
+
+@dataclass(frozen=True)
+class DocumentTemplateBlock:
+    template_id: str
+    title: str
+    document_family: str
+    status: str
+    content: str
+    version: int
+    section_config: dict[str, bool]
+    is_default: bool
+    customer_id: str | None
+    project_id: str | None
+    transaction_id: str | None
+    archived: bool
+    created_at: str
+    created_by: str
+    updated_at: str
+    updated_by: str
+    previous_template_id: str | None = None
+
+    @staticmethod
+    def from_dict(payload: dict[str, Any]) -> "DocumentTemplateBlock":
+        template_id = _normalize_text(payload.get("template_id"))
+        if not template_id:
+            raise ValueError("template_id is required")
+        title = _normalize_text(payload.get("title"))
+        if not title:
+            raise ValueError("title is required")
+        document_family = _normalize_text(payload.get("document_family")).lower()
+        if document_family not in _ALLOWED_TEMPLATE_DOCUMENT_FAMILIES:
+            raise ValueError("unsupported template document_family")
+        status = _normalize_text(payload.get("status", "draft")).lower()
+        if status not in _ALLOWED_TEMPLATE_STATUS:
+            raise ValueError("status must be draft or active")
+        content = _normalize_text(payload.get("content"))
+        if not content:
+            raise ValueError("content is required")
+        version = int(payload.get("version", 1))
+        if version <= 0:
+            raise ValueError("version must be greater than 0")
+        section_config_payload = dict(payload.get("section_config") or {})
+        section_config = {
+            key: bool(value) for key, value in section_config_payload.items()
+        }
+
+        created_at = _normalize_text(payload.get("created_at")) or _now_iso()
+        created_by = _normalize_text(payload.get("created_by")) or "system"
+        updated_at = _normalize_text(payload.get("updated_at")) or created_at
+        updated_by = _normalize_text(payload.get("updated_by")) or created_by
+
+        return DocumentTemplateBlock(
+            template_id=template_id,
+            title=title,
+            document_family=document_family,
+            status=status,
+            content=content,
+            version=version,
+            section_config=section_config,
+            is_default=bool(payload.get("is_default", False)),
+            customer_id=_normalize_optional_text(payload.get("customer_id")),
+            project_id=_normalize_optional_text(payload.get("project_id")),
+            transaction_id=_normalize_optional_text(payload.get("transaction_id")),
+            archived=bool(payload.get("archived", False)),
+            created_at=created_at,
+            created_by=created_by,
+            updated_at=updated_at,
+            updated_by=updated_by,
+            previous_template_id=_normalize_optional_text(
+                payload.get("previous_template_id")
+            ),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "template_id": self.template_id,
+            "title": self.title,
+            "document_family": self.document_family,
+            "status": self.status,
+            "content": self.content,
+            "version": self.version,
+            "section_config": dict(self.section_config),
+            "is_default": self.is_default,
+            "customer_id": self.customer_id,
+            "project_id": self.project_id,
+            "transaction_id": self.transaction_id,
+            "archived": self.archived,
+            "created_at": self.created_at,
+            "created_by": self.created_by,
+            "updated_at": self.updated_at,
+            "updated_by": self.updated_by,
+            "previous_template_id": self.previous_template_id,
         }
 
     @property
@@ -1234,6 +1359,407 @@ class SettingsService:
             actor=actor,
             action="organization.terms.runtime_sync",
             details={"reason": reason, "count": len(blocks)},
+        )
+
+    def _list_document_templates_for_scope(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+    ) -> list[DocumentTemplateBlock]:
+        key = _tenant_scope_key(tenant_id, organization_id)
+        scoped = dict(self.state["organization_settings"].get(key) or {})
+        payload = list(scoped.get("document_templates") or [])
+        rows: list[DocumentTemplateBlock] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            try:
+                rows.append(DocumentTemplateBlock.from_dict(item))
+            except ValueError:
+                continue
+        return rows
+
+    def _store_document_templates_for_scope(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        templates: list[DocumentTemplateBlock],
+    ) -> None:
+        key = _tenant_scope_key(tenant_id, organization_id)
+        scoped = dict(self.state["organization_settings"].get(key) or {})
+        scoped["document_templates"] = [item.to_dict() for item in templates]
+        self.state["organization_settings"][key] = scoped
+
+    def _validate_template_default_uniqueness(
+        self,
+        templates: list[DocumentTemplateBlock],
+    ) -> None:
+        defaults: dict[str, str] = {}
+        for template in templates:
+            if not template.is_default or not template.is_tenant_default_candidate:
+                continue
+            prior = defaults.get(template.document_family)
+            if prior and prior != template.template_id:
+                raise ValueError(
+                    "only one active default template is allowed per document family"
+                )
+            defaults[template.document_family] = template.template_id
+
+    def list_document_templates(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        document_family: str | None = None,
+        include_archived: bool = False,
+    ) -> list[DocumentTemplateBlock]:
+        family = _normalize_optional_text(document_family)
+        if family is not None:
+            family = family.lower()
+            if family not in _ALLOWED_TEMPLATE_DOCUMENT_FAMILIES:
+                raise ValueError("unsupported template document_family")
+        rows: list[DocumentTemplateBlock] = []
+        for template in self._list_document_templates_for_scope(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        ):
+            if family and template.document_family != family:
+                continue
+            if not include_archived and template.archived:
+                continue
+            rows.append(template)
+        rows.sort(
+            key=lambda item: (item.document_family, item.updated_at, item.version)
+        )
+        return rows
+
+    def create_document_template(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        actor: str,
+        title: str,
+        document_family: str,
+        status: str,
+        content: str,
+        section_config: dict[str, bool] | None,
+        is_default: bool,
+        customer_id: str | None = None,
+        project_id: str | None = None,
+        transaction_id: str | None = None,
+    ) -> DocumentTemplateBlock:
+        now = _now_iso()
+        template = DocumentTemplateBlock.from_dict(
+            {
+                "template_id": f"template-{uuid4().hex[:16]}",
+                "title": title,
+                "document_family": document_family,
+                "status": status,
+                "content": content,
+                "version": 1,
+                "section_config": dict(section_config or {}),
+                "is_default": bool(is_default),
+                "customer_id": customer_id,
+                "project_id": project_id,
+                "transaction_id": transaction_id,
+                "archived": False,
+                "created_at": now,
+                "created_by": actor,
+                "updated_at": now,
+                "updated_by": actor,
+            }
+        )
+        if template.is_default and not template.is_tenant_default_candidate:
+            raise ValueError("default flag is only allowed on tenant-level templates")
+        templates = self._list_document_templates_for_scope(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        if template.is_default:
+            demoted: list[DocumentTemplateBlock] = []
+            for item in templates:
+                if (
+                    item.document_family == template.document_family
+                    and item.is_tenant_default_candidate
+                    and item.is_default
+                ):
+                    demoted.append(
+                        DocumentTemplateBlock.from_dict(
+                            {
+                                **item.to_dict(),
+                                "is_default": False,
+                                "updated_at": now,
+                                "updated_by": actor,
+                            }
+                        )
+                    )
+                else:
+                    demoted.append(item)
+            templates = demoted
+        templates.append(template)
+        self._validate_template_default_uniqueness(templates)
+        self._store_document_templates_for_scope(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            templates=templates,
+        )
+        self._append_audit(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            action="organization.document_template.created",
+            details={
+                "template_id": template.template_id,
+                "document_family": template.document_family,
+            },
+        )
+        return template
+
+    def create_document_template_version(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        template_id: str,
+        actor: str,
+        title: str | None = None,
+        content: str | None = None,
+        status: str | None = None,
+        section_config: dict[str, bool] | None = None,
+    ) -> DocumentTemplateBlock:
+        current = self.document_template(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            template_id=template_id,
+        )
+        now = _now_iso()
+        created = DocumentTemplateBlock.from_dict(
+            {
+                "template_id": f"template-{uuid4().hex[:16]}",
+                "title": _normalize_text(title) or current.title,
+                "document_family": current.document_family,
+                "status": _normalize_text(status) or current.status,
+                "content": _normalize_text(content) or current.content,
+                "version": current.version + 1,
+                "section_config": dict(section_config or current.section_config),
+                "is_default": current.is_default,
+                "customer_id": current.customer_id,
+                "project_id": current.project_id,
+                "transaction_id": current.transaction_id,
+                "archived": False,
+                "created_at": now,
+                "created_by": actor,
+                "updated_at": now,
+                "updated_by": actor,
+                "previous_template_id": current.template_id,
+            }
+        )
+        templates = self._list_document_templates_for_scope(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        templates = [
+            (
+                DocumentTemplateBlock.from_dict(
+                    {
+                        **item.to_dict(),
+                        "is_default": False,
+                        "updated_at": now,
+                        "updated_by": actor,
+                    }
+                )
+                if item.template_id == current.template_id and current.is_default
+                else item
+            )
+            for item in templates
+        ]
+        templates.append(created)
+        self._validate_template_default_uniqueness(templates)
+        self._store_document_templates_for_scope(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            templates=templates,
+        )
+        self._append_audit(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            action="organization.document_template.version_created",
+            details={
+                "template_id": created.template_id,
+                "previous_template_id": current.template_id,
+                "version": created.version,
+            },
+        )
+        return created
+
+    def document_template(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        template_id: str,
+    ) -> DocumentTemplateBlock:
+        normalized = _normalize_text(template_id)
+        for item in self._list_document_templates_for_scope(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        ):
+            if item.template_id == normalized:
+                return item
+        raise ValueError("document template was not found")
+
+    def assign_default_document_template(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        template_id: str,
+        actor: str,
+    ) -> DocumentTemplateBlock:
+        target = self.document_template(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            template_id=template_id,
+        )
+        if not target.is_tenant_default_candidate:
+            raise ValueError(
+                "default assignment requires an active tenant-level template"
+            )
+        now = _now_iso()
+        templates = self._list_document_templates_for_scope(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        updated: list[DocumentTemplateBlock] = []
+        for item in templates:
+            if item.document_family != target.document_family:
+                updated.append(item)
+                continue
+            updated.append(
+                DocumentTemplateBlock.from_dict(
+                    {
+                        **item.to_dict(),
+                        "is_default": item.template_id == target.template_id,
+                        "updated_at": now,
+                        "updated_by": actor,
+                    }
+                )
+            )
+        self._validate_template_default_uniqueness(updated)
+        self._store_document_templates_for_scope(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            templates=updated,
+        )
+        return self.document_template(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            template_id=target.template_id,
+        )
+
+    def resolve_document_template(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        document_family: str,
+        customer_id: str | None = None,
+        project_id: str | None = None,
+        transaction_id: str | None = None,
+        explicit_template_id: str | None = None,
+    ) -> DocumentTemplateBlock | None:
+        if _normalize_optional_text(explicit_template_id):
+            selected = self.document_template(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                template_id=_normalize_text(explicit_template_id),
+            )
+            if selected.archived or selected.status != "active":
+                raise ValueError("explicit template is not active")
+            return selected
+
+        family = _normalize_text(document_family).lower()
+        customer = _normalize_optional_text(customer_id)
+        project = _normalize_optional_text(project_id)
+        transaction = _normalize_optional_text(transaction_id)
+        candidates: list[DocumentTemplateBlock] = []
+        for template in self.list_document_templates(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            document_family=family,
+            include_archived=False,
+        ):
+            if template.status != "active":
+                continue
+            if template.transaction_id and template.transaction_id != transaction:
+                continue
+            if template.project_id and template.project_id != project:
+                continue
+            if template.customer_id and template.customer_id != customer:
+                continue
+            if (
+                template.customer_id is None
+                and template.project_id is None
+                and template.transaction_id is None
+                and not template.is_default
+            ):
+                continue
+            candidates.append(template)
+        if not candidates:
+            return None
+        candidates.sort(
+            key=lambda item: (item.scope_rank, item.version, item.updated_at),
+            reverse=True,
+        )
+        return candidates[0]
+
+    def export_document_templates(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+    ) -> list[dict[str, Any]]:
+        return [
+            item.to_dict()
+            for item in self.list_document_templates(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                include_archived=True,
+            )
+        ]
+
+    def replace_document_templates(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        templates_payload: list[dict[str, Any]],
+        actor: str,
+        reason: str,
+    ) -> None:
+        templates: list[DocumentTemplateBlock] = []
+        for payload in list(templates_payload or []):
+            if not isinstance(payload, dict):
+                continue
+            templates.append(DocumentTemplateBlock.from_dict(payload))
+        if not templates:
+            return
+        self._validate_template_default_uniqueness(templates)
+        self._store_document_templates_for_scope(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            templates=templates,
+        )
+        self._append_audit(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            action="organization.document_template.runtime_sync",
+            details={"reason": reason, "count": len(templates)},
         )
 
     def personal_preferences(

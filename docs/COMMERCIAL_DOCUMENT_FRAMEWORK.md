@@ -86,6 +86,22 @@ Preserved guarantees in T-04:
 - no document number reuse
 - previously allocated numbers are preserved when policy settings are edited
 
+## P-05 Implementation Status
+
+Sprint P-05 introduces deterministic document generation and template orchestration for commercial document revisions.
+
+Implemented in P-05:
+- shared document-generation contracts for template/version assignment, render context, diagnostics, sections, output artifacts, and render results
+- deterministic template resolution with explicit precedence (transaction, project, customer, tenant default, fallback)
+- revision-level template snapshot and terms snapshot capture for immutable issued rendering behavior
+- settings template model support for template create/version/default/resolve and tenant-scoped export/replace synchronization
+- transactions export integration that records template provenance and generated artifact metadata
+
+Deferred in P-05:
+- cloud worker implementation changes for generation jobs
+- external delivery transport execution
+- e-signature and approval workflow expansion
+
 Related documents:
 - [TRANSACTIONS_ARCHITECTURE.md](TRANSACTIONS_ARCHITECTURE.md)
 - [DOMAIN_MODEL.md](DOMAIN_MODEL.md)

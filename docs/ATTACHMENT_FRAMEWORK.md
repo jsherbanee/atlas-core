@@ -3,6 +3,11 @@
 ## Purpose
 This document defines the Sprint P-04 unified attachment framework for tenant-scoped file attachments across Atlas object families.
 
+## P-05 Integration Note
+
+Sprint P-05 document generation records deterministic output artifact metadata in commercial document attachment payloads.
+This aligns generated export artifacts with the unified attachment model and preserves template/version provenance alongside output hashes for traceable retrieval workflows.
+
 ## Related Documents
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)

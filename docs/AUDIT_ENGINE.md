@@ -3,6 +3,11 @@
 ## Purpose
 This document defines Atlas immutable audit behavior and the current engine implementation boundaries.
 
+## P-05 Integration Note
+
+Sprint P-05 document generation flows are audit-ready through existing immutable audit patterns.
+Template assignment, template version snapshot, output hash, and revision identity are emitted in generation activity metadata so audit callbacks can persist deterministic provenance without introducing a second audit model.
+
 ## Related Documents
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [SECURITY.md](SECURITY.md)

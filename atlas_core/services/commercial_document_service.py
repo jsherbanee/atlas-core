@@ -185,6 +185,10 @@ class CommercialDocumentService:
             is_current=True,
             immutable=False,
             notes="Initial draft",
+            terms_and_conditions_reference=None,
+            terms_and_conditions_snapshot=None,
+            template_assignment=None,
+            template_version_snapshot=None,
             lines=[],
             totals=CommercialDocumentTotals(),
             created_at=now,
@@ -512,6 +516,14 @@ class CommercialDocumentService:
             is_current=True,
             immutable=False,
             notes=reason,
+            terms_and_conditions_reference=deepcopy(
+                document.terms_and_conditions_reference
+            ),
+            terms_and_conditions_snapshot=deepcopy(
+                document.terms_and_conditions_snapshot
+            ),
+            template_assignment=deepcopy(document.template_assignment),
+            template_version_snapshot=deepcopy(document.template_version_snapshot),
             lines=deepcopy(document.lines),
             totals=deepcopy(document.totals),
             created_at=now,
@@ -546,6 +558,14 @@ class CommercialDocumentService:
                 immutable=True,
                 issued_at=now,
                 notes=reason,
+                terms_and_conditions_reference=deepcopy(
+                    document.terms_and_conditions_reference
+                ),
+                terms_and_conditions_snapshot=deepcopy(
+                    document.terms_and_conditions_snapshot
+                ),
+                template_assignment=deepcopy(document.template_assignment),
+                template_version_snapshot=deepcopy(document.template_version_snapshot),
                 lines=deepcopy(document.lines),
                 totals=deepcopy(document.totals),
                 created_at=now,
@@ -560,6 +580,16 @@ class CommercialDocumentService:
         current_revision.immutable = True
         current_revision.revision_reason = reason
         current_revision.notes = reason
+        current_revision.terms_and_conditions_reference = deepcopy(
+            document.terms_and_conditions_reference
+        )
+        current_revision.terms_and_conditions_snapshot = deepcopy(
+            document.terms_and_conditions_snapshot
+        )
+        current_revision.template_assignment = deepcopy(document.template_assignment)
+        current_revision.template_version_snapshot = deepcopy(
+            document.template_version_snapshot
+        )
         current_revision.lines = deepcopy(document.lines)
         current_revision.totals = deepcopy(document.totals)
         current_revision.revision_date = now
@@ -584,6 +614,21 @@ class CommercialDocumentService:
             self._assert_mutable(document)
         document.terms_and_conditions_reference = dict(reference)
         document.terms_and_conditions_snapshot = dict(snapshot)
+        self._sync_current_revision_snapshot(document)
+        document.updated_at = _utc_now()
+
+    def assign_template_version(
+        self,
+        document: CommercialDocument,
+        *,
+        assignment: dict[str, Any],
+        snapshot: dict[str, Any],
+        force: bool = False,
+    ) -> None:
+        if not force:
+            self._assert_mutable(document)
+        document.template_assignment = dict(assignment)
+        document.template_version_snapshot = dict(snapshot)
         self._sync_current_revision_snapshot(document)
         document.updated_at = _utc_now()
 
@@ -629,5 +674,15 @@ class CommercialDocumentService:
             return
         current_revision.lifecycle_state = document.lifecycle_state
         current_revision.approval_state = document.approval_state
+        current_revision.terms_and_conditions_reference = deepcopy(
+            document.terms_and_conditions_reference
+        )
+        current_revision.terms_and_conditions_snapshot = deepcopy(
+            document.terms_and_conditions_snapshot
+        )
+        current_revision.template_assignment = deepcopy(document.template_assignment)
+        current_revision.template_version_snapshot = deepcopy(
+            document.template_version_snapshot
+        )
         current_revision.lines = deepcopy(document.lines)
         current_revision.totals = deepcopy(document.totals)

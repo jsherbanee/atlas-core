@@ -508,6 +508,10 @@ class CommercialDocumentRevision:
     issued_at: str | None = None
     immutable: bool = False
     notes: str | None = None
+    terms_and_conditions_reference: dict[str, Any] | None = None
+    terms_and_conditions_snapshot: dict[str, Any] | None = None
+    template_assignment: dict[str, Any] | None = None
+    template_version_snapshot: dict[str, Any] | None = None
     lines: list[CommercialDocumentLineItem] = field(default_factory=list)
     totals: CommercialDocumentTotals = field(default_factory=CommercialDocumentTotals)
     created_at: str = field(default_factory=_utc_now)
@@ -536,6 +540,14 @@ class CommercialDocumentRevision:
             self.revision_reason = self.notes
         if self.notes is None and self.revision_reason is not None:
             self.notes = self.revision_reason
+        self.terms_and_conditions_reference = _optional_dict(
+            self.terms_and_conditions_reference
+        )
+        self.terms_and_conditions_snapshot = _optional_dict(
+            self.terms_and_conditions_snapshot
+        )
+        self.template_assignment = _optional_dict(self.template_assignment)
+        self.template_version_snapshot = _optional_dict(self.template_version_snapshot)
         self.revision_date = _required_text("revision_date", self.revision_date)
         self.lines = [
             (
@@ -567,6 +579,10 @@ class CommercialDocumentRevision:
             "issued_at": self.issued_at,
             "immutable": self.immutable,
             "notes": self.notes,
+            "terms_and_conditions_reference": self.terms_and_conditions_reference,
+            "terms_and_conditions_snapshot": self.terms_and_conditions_snapshot,
+            "template_assignment": self.template_assignment,
+            "template_version_snapshot": self.template_version_snapshot,
             "lines": [line.to_dict() for line in self.lines],
             "totals": self.totals.to_dict(),
             "created_at": self.created_at,
@@ -765,6 +781,8 @@ class CommercialDocument:
     source_invoice_id: str | None = None
     terms_and_conditions_reference: dict[str, Any] | None = None
     terms_and_conditions_snapshot: dict[str, Any] | None = None
+    template_assignment: dict[str, Any] | None = None
+    template_version_snapshot: dict[str, Any] | None = None
     numbering_policy_snapshot: dict[str, Any] | None = None
     attachments: list[dict[str, Any]] = field(default_factory=list)
     document_metadata: dict[str, Any] | None = None
@@ -814,6 +832,8 @@ class CommercialDocument:
         self.terms_and_conditions_snapshot = _optional_dict(
             self.terms_and_conditions_snapshot
         )
+        self.template_assignment = _optional_dict(self.template_assignment)
+        self.template_version_snapshot = _optional_dict(self.template_version_snapshot)
         self.numbering_policy_snapshot = _optional_dict(self.numbering_policy_snapshot)
         self.attachments = _list_of_dicts(self.attachments)
         self.document_metadata = _optional_dict(self.document_metadata)
@@ -909,6 +929,8 @@ class CommercialDocument:
             "source_invoice_id": self.source_invoice_id,
             "terms_and_conditions_reference": self.terms_and_conditions_reference,
             "terms_and_conditions_snapshot": self.terms_and_conditions_snapshot,
+            "template_assignment": self.template_assignment,
+            "template_version_snapshot": self.template_version_snapshot,
             "numbering_policy_snapshot": self.numbering_policy_snapshot,
             "attachments": [dict(item) for item in self.attachments],
             "document_metadata": self.document_metadata,
@@ -947,6 +969,10 @@ class CommercialDocument:
             normalized["terms_and_conditions_reference"] = None
         if "terms_and_conditions_snapshot" not in normalized:
             normalized["terms_and_conditions_snapshot"] = None
+        if "template_assignment" not in normalized:
+            normalized["template_assignment"] = None
+        if "template_version_snapshot" not in normalized:
+            normalized["template_version_snapshot"] = None
         if "source_document_id" not in normalized:
             normalized["source_document_id"] = None
         if "source_relationship_type" not in normalized:

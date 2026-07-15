@@ -32,6 +32,7 @@ from atlas_core.services.background_job_service import (
 )
 from atlas_core.services.immutable_audit_service import ImmutableAuditService
 from atlas_core.services.attachment_service import AttachmentService
+from atlas_core.services.document_generation_service import DocumentGenerationService
 from atlas_core.services.csv_export_service import CsvExportService
 from atlas_core.services.document_classifier_service import (
     DocumentClassifierService,
@@ -267,6 +268,7 @@ __all__ = [
     "LocalDeterministicExecutor",
     "ImmutableAuditService",
     "AttachmentService",
+    "DocumentGenerationService",
     "BaselineService",
     "BidCompleteness",
     "BidCompletenessService",

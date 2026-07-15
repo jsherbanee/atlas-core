@@ -504,3 +504,121 @@ def test_terms_backward_compatible_reads_without_terms_state() -> None:
         document_family="estimate",
     )
     assert rows == []
+
+
+def test_document_template_precedence_transaction_project_customer_default() -> None:
+    service = _service()
+    default_template = service.create_document_template(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Default",
+        document_family="estimate",
+        status="active",
+        content="default",
+        section_config={},
+        is_default=True,
+    )
+    customer_template = service.create_document_template(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Customer",
+        document_family="estimate",
+        status="active",
+        content="customer",
+        section_config={},
+        is_default=False,
+        customer_id="customer-1",
+    )
+    project_template = service.create_document_template(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Project",
+        document_family="estimate",
+        status="active",
+        content="project",
+        section_config={},
+        is_default=False,
+        project_id="project-1",
+    )
+    transaction_template = service.create_document_template(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Transaction",
+        document_family="estimate",
+        status="active",
+        content="transaction",
+        section_config={},
+        is_default=False,
+        transaction_id="doc-1",
+    )
+
+    resolved = service.resolve_document_template(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_family="estimate",
+        customer_id="customer-1",
+        project_id="project-1",
+        transaction_id="doc-1",
+    )
+
+    assert resolved is not None
+    assert resolved.template_id == transaction_template.template_id
+    assert transaction_template.template_id != project_template.template_id
+    assert project_template.template_id != customer_template.template_id
+    assert customer_template.template_id != default_template.template_id
+
+
+def test_document_template_export_replace_and_tenant_scope() -> None:
+    service = _service()
+    created = service.create_document_template(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        actor="tester",
+        title="Sales Order Default",
+        document_family="sales_order",
+        status="active",
+        content="v1",
+        section_config={"include_terms": True},
+        is_default=True,
+    )
+    version2 = service.create_document_template_version(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        template_id=created.template_id,
+        actor="tester",
+        content="v2",
+    )
+    payload = service.export_document_templates(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+    )
+
+    restored = _service()
+    restored.replace_document_templates(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        templates_payload=payload,
+        actor="tester",
+        reason="sync",
+    )
+
+    resolved = restored.resolve_document_template(
+        tenant_id="tenant-a",
+        organization_id="org-1",
+        document_family="sales_order",
+    )
+    assert resolved is not None
+    assert resolved.template_id == version2.template_id
+    assert resolved.version == 2
+    assert (
+        restored.resolve_document_template(
+            tenant_id="tenant-b",
+            organization_id="org-1",
+            document_family="sales_order",
+        )
+        is None
+    )

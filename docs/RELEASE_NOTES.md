@@ -21,6 +21,22 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Sprint P-05 Document Generation and Template Engine)
+
+### Improved
+
+- Atlas now includes deterministic document-generation contracts and service orchestration for template resolution and reproducible rendering outputs.
+- Settings now includes tenant-scoped document template records with versioning, default assignment, precedence-aware resolution, and export/replace synchronization support.
+- Commercial document revisions now capture template assignment and template version snapshot metadata alongside terms snapshots.
+- Transactions export now routes through the generation engine, recording generated artifact metadata and template provenance in export activity and attachments.
+- Issued revision rendering now reuses immutable revision snapshots, preventing silent reassignment to newly edited templates.
+
+### Scope Notes
+
+- no cloud worker implementation changes
+- no external delivery transport execution
+- no e-signature workflow implementation
+
 ## Unreleased (Sprint P-04 Unified Attachment Framework)
 
 ### Improved

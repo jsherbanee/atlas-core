@@ -3545,6 +3545,10 @@ def _transactions_workspace_service(st: Any) -> TransactionsWorkspaceService:
             tenant_id=tenant_id,
             organization_id=organization_id,
         ),
+        serialized_document_templates=settings_service.export_document_templates(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        ),
     )
 
 

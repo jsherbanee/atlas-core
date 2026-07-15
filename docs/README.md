@@ -108,6 +108,11 @@ Future releases should follow this structure.
 - Audience: Product, architecture, integrations, commercial-operations, and platform contributors.
 - When to reference: When planning any commercial document family or shared transaction-document behavior.
 
+### [DOCUMENT_GENERATION.md](DOCUMENT_GENERATION.md)
+- Purpose: Defines deterministic template resolution, template-version snapshot behavior, and document rendering/output artifact guarantees.
+- Audience: Product, architecture, transactions, settings, and platform contributors.
+- When to reference: When implementing template management, render reproducibility, or generated artifact workflows.
+
 ### [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md)
 - Purpose: Defines engineering execution sequencing, technical milestones, and production-readiness gates.
 - Audience: Engineering, platform, architecture, and release stakeholders.

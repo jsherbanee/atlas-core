@@ -3,6 +3,11 @@
 ## Purpose
 This document defines the Sprint P-03 deterministic background job framework used by Atlas for local, tenant-scoped, auditable job execution.
 
+## P-05 Integration Note
+
+Sprint P-05 document generation is designed to execute safely under the existing deterministic background-job contract.
+Generation payloads and template snapshots are deterministic, so job retries and replays preserve output reproducibility for a fixed revision and template snapshot.
+
 ## Related Documents
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)
