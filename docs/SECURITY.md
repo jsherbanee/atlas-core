@@ -70,3 +70,17 @@ Universal Object actions now evaluate permission hooks centrally and resolve to:
 - hidden
 
 P-01 does not implement authentication, invitations, SSO, or production identity-provider provisioning.
+
+## P-03 Deterministic Background Job Security Notes
+
+Sprint P-03 introduces tenant-scoped job orchestration with deterministic local execution.
+
+Security boundary expectations:
+- job read/run/retry/cancel actions must enforce tenant and organization scope checks
+- cross-tenant or cross-organization job access must fail by design
+- job lifecycle actions should emit immutable audit events with scoped targets
+- diagnostic payloads should remain redaction-safe and avoid sensitive credential material
+
+Current P-03 constraints preserve local deterministic execution only:
+- no external queue infrastructure
+- no external worker deployment

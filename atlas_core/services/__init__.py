@@ -25,6 +25,12 @@ from atlas_core.services.permissions_service import (
     SYSTEM_ROLES,
     PermissionsService,
 )
+from atlas_core.services.background_job_service import (
+    BackgroundJobService,
+    JobExecutionContext,
+    LocalDeterministicExecutor,
+)
+from atlas_core.services.immutable_audit_service import ImmutableAuditService
 from atlas_core.services.csv_export_service import CsvExportService
 from atlas_core.services.document_classifier_service import (
     DocumentClassifierService,
@@ -255,6 +261,10 @@ __all__ = [
     "PERMISSION_CATALOG",
     "SYSTEM_ROLES",
     "PermissionsService",
+    "BackgroundJobService",
+    "JobExecutionContext",
+    "LocalDeterministicExecutor",
+    "ImmutableAuditService",
     "BaselineService",
     "BidCompleteness",
     "BidCompletenessService",

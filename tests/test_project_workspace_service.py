@@ -2,6 +2,12 @@ from pathlib import Path
 import json
 import re
 
+from atlas_core.contracts.background_job_contracts import (
+    JobCategory,
+    JobDefinition,
+    JobRequest,
+    JobRetryPolicy,
+)
 from atlas_core.domain import Project, ProjectLifecycleEvent, ProjectStatus
 from atlas_core.domain import OrganizationRole
 from atlas_core.services.project_workspace_service import (
@@ -595,3 +601,178 @@ def test_workspace_service_rejects_atlas_bid_id_mutation_after_create(
 
     with pytest.raises(ValueError, match="Atlas Bid ID is immutable"):
         service.save_record(loaded)
+
+
+def test_workspace_service_runs_document_import_as_background_job(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="job-import-1",
+        name="Import Job",
+        client="Client",
+    )
+    record.metadata["tenant_id"] = "tenant-a"
+    record.metadata["organization_id"] = "org-a"
+    service.save_record(record)
+
+    result = service.run_document_import_job(
+        workspace_id=record.workspace_id,
+        uploaded_files=[("bid-package.pdf", _blank_pdf_bytes())],
+        actor_id="user-1",
+    )
+    jobs = service.list_background_jobs(record.workspace_id)
+
+    assert result["status"] == "succeeded"
+    assert jobs
+    assert jobs[-1]["status"] == "succeeded"
+    assert jobs[-1]["request"]["category"] == JobCategory.DOCUMENT_IMPORT.value
+    assert service.load_record(record.workspace_id).workspace_id == record.workspace_id
+
+
+def test_workspace_service_runs_export_as_background_job(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="job-export-1",
+        name="Export Job",
+        client="Client",
+    )
+    record.metadata["tenant_id"] = "tenant-a"
+    record.metadata["organization_id"] = "org-a"
+    service.save_record(record)
+
+    out_path = str(tmp_path / "outputs" / f"{record.workspace_id}.atlaspkg")
+    result = service.run_export_generation_job(
+        workspace_id=record.workspace_id,
+        out_path=out_path,
+        actor_id="user-1",
+    )
+
+    payload = dict(result.get("result") or {}).get("payload") or {}
+    assert result["status"] == "succeeded"
+    assert str(payload.get("bundle_path") or "").endswith(".atlaspkg")
+    assert Path(str(payload.get("bundle_path"))).exists()
+
+
+def test_workspace_service_cancels_queued_background_job(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="job-cancel-1",
+        name="Cancel Job",
+        client="Client",
+    )
+    record.metadata["tenant_id"] = "tenant-a"
+    record.metadata["organization_id"] = "org-a"
+    service.save_record(record)
+
+    request = JobRequest(
+        tenant_id="tenant-a",
+        organization_id="org-a",
+        actor_id="user-1",
+        category=JobCategory.COMMERCIAL_IMPORT,
+        definition=JobDefinition(
+            category=JobCategory.COMMERCIAL_IMPORT,
+            handler_key="tests.commercial_import",
+            cancellable=True,
+        ),
+        input_payload={"workspace_id": record.workspace_id},
+        related_object_type="project",
+        related_object_id=record.workspace_id,
+        idempotency_key="cancel-job-1",
+        retry_policy=JobRetryPolicy(max_attempts=1),
+    )
+    created = service.manager.background_job_service.submit_job(
+        project_id=record.workspace_id,
+        request=request,
+    )
+
+    cancelled = service.cancel_background_job(
+        record.workspace_id,
+        job_id=str(created.get("job_id")),
+        actor_id="user-1",
+        reason="Cancelled in test",
+    )
+
+    assert cancelled["status"] == "cancelled"
+    assert dict(cancelled.get("cancellation") or {}).get("requested") is True
+
+
+def test_workspace_service_retries_failed_job_via_wrapper(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="job-retry-1",
+        name="Retry Job",
+        client="Client",
+    )
+    record.metadata["tenant_id"] = "tenant-a"
+    record.metadata["organization_id"] = "org-a"
+    service.save_record(record)
+
+    def _failing_handler(_context: object) -> dict[str, object]:
+        raise RuntimeError("simulated failure")
+
+    service.manager.background_job_service.register_handler(
+        category=JobCategory.SEARCH_INDEXING,
+        handler=_failing_handler,
+    )
+
+    request = JobRequest(
+        tenant_id="tenant-a",
+        organization_id="org-a",
+        actor_id="user-1",
+        category=JobCategory.SEARCH_INDEXING,
+        definition=JobDefinition(
+            category=JobCategory.SEARCH_INDEXING,
+            handler_key="tests.search_indexing",
+            cancellable=False,
+        ),
+        input_payload={"workspace_id": record.workspace_id},
+        related_object_type="project",
+        related_object_id=record.workspace_id,
+        idempotency_key="retry-job-1",
+        retry_policy=JobRetryPolicy(max_attempts=2),
+    )
+    created = service.manager.background_job_service.submit_job(
+        project_id=record.workspace_id,
+        request=request,
+    )
+    failed = service.manager.background_job_service.run_job(
+        project_id=record.workspace_id,
+        job_id=str(created.get("job_id")),
+        tenant_id="tenant-a",
+        organization_id="org-a",
+    )
+    retried = service.retry_background_job(
+        record.workspace_id,
+        job_id=str(created.get("job_id")),
+    )
+
+    assert failed["status"] == "retry_scheduled"
+    assert retried["status"] == "failed"
+    assert retried["retry_available"] is False
+
+
+def test_workspace_service_job_scope_enforced_on_listing(tmp_path: Path) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="job-scope-1",
+        name="Scope Job",
+        client="Client",
+    )
+    record.metadata["tenant_id"] = "tenant-a"
+    record.metadata["organization_id"] = "org-a"
+    service.save_record(record)
+
+    service.run_export_generation_job(
+        workspace_id=record.workspace_id,
+        out_path=str(tmp_path / "outputs" / "scope-test.atlaspkg"),
+        actor_id="user-1",
+    )
+
+    visible = service.list_background_jobs(record.workspace_id)
+    hidden = service.list_background_jobs(
+        record.workspace_id,
+        tenant_id="tenant-b",
+        organization_id="org-a",
+    )
+
+    assert visible
+    assert hidden == []

@@ -15,6 +15,7 @@ from atlas_core import __version__
 from atlas_core.repository.contracts import (
     DocumentRepository,
     HistoryRepository,
+    JobRepository,
     JsonDict,
     KnowledgeRepository,
     ProjectRepository,
@@ -32,6 +33,7 @@ _METADATA_FILE = "metadata.json"
 _WORKSPACE_FILE = "workspace.json"
 _MANIFEST_FILE = "project_manifest.json"
 _HISTORY_FILE = "history/events.jsonl"
+_JOBS_FILE = "jobs/jobs.jsonl"
 _BID_SEQUENCE_FILE = ".atlas_bid_id_sequence.json"
 _SCHEMA_VERSION = "1.0"
 _STORAGE_VERSION = "1.0"
@@ -41,6 +43,7 @@ _REQUIRED_TOP_LEVEL_DIRS = [
     "review",
     "exports",
     "history",
+    "jobs",
     "cache",
 ]
 _REQUIRED_TOP_LEVEL_FILES = [
@@ -504,6 +507,7 @@ class LocalProjectRepository(ProjectRepository):
 
         (project_dir / "exports").mkdir(parents=True, exist_ok=True)
         (project_dir / "history").mkdir(parents=True, exist_ok=True)
+        (project_dir / "jobs").mkdir(parents=True, exist_ok=True)
         (project_dir / "cache").mkdir(parents=True, exist_ok=True)
 
     def _read_json(self, path: Path) -> JsonDict:
@@ -661,6 +665,7 @@ class LocalProjectRepository(ProjectRepository):
         checksums["review"] = _sha1_tree(project_dir / "review")
         checksums["documents"] = _sha1_tree(project_dir / "documents")
         checksums["history"] = _sha1_tree(project_dir / "history")
+        checksums["jobs"] = _sha1_tree(project_dir / "jobs")
         return checksums
 
     @staticmethod
@@ -868,6 +873,80 @@ class LocalHistoryRepository(HistoryRepository):
                     rows.append(parsed)
 
         rows.sort(key=lambda item: str(item.get("timestamp") or ""), reverse=True)
+        return rows[:limit]
+
+
+class LocalJobRepository(JobRepository):
+    """Local JSONL-backed storage for background jobs."""
+
+    def __init__(self, project_repository: ProjectRepository) -> None:
+        self.project_repository = project_repository
+
+    def save_job(self, project_id: str, job_payload: JsonDict) -> None:
+        rows = self.list_jobs(project_id, limit=10000)
+        job_id = str(job_payload.get("job_id") or "").strip()
+        if not job_id:
+            raise ValueError("job_id is required")
+
+        retained = [
+            dict(item)
+            for item in rows
+            if str(item.get("job_id") or "").strip() != job_id
+        ]
+        retained.append(dict(job_payload))
+        retained.sort(
+            key=lambda item: (
+                str(item.get("created_at") or ""),
+                str(item.get("job_id") or ""),
+            )
+        )
+
+        _, _, _, location = self.project_repository.load(project_id)
+        project_dir = Path(location)
+        jobs_file = project_dir / _JOBS_FILE
+        jobs_file.parent.mkdir(parents=True, exist_ok=True)
+        with jobs_file.open("w", encoding="utf-8") as file:
+            for item in retained:
+                file.write(json.dumps(item, sort_keys=True) + "\n")
+
+        self.project_repository.refresh_manifest(project_id)
+
+    def load_job(self, project_id: str, job_id: str) -> JsonDict | None:
+        target_id = str(job_id or "").strip()
+        if not target_id:
+            return None
+        for item in self.list_jobs(project_id, limit=10000):
+            if str(item.get("job_id") or "").strip() == target_id:
+                return dict(item)
+        return None
+
+    def list_jobs(self, project_id: str, limit: int = 200) -> list[JsonDict]:
+        _, _, _, location = self.project_repository.load(project_id)
+        project_dir = Path(location)
+        jobs_file = project_dir / _JOBS_FILE
+        if not jobs_file.exists():
+            return []
+
+        rows: list[JsonDict] = []
+        with jobs_file.open(encoding="utf-8") as file:
+            for line in file:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    parsed = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict):
+                    rows.append(parsed)
+
+        rows.sort(
+            key=lambda item: (
+                str(item.get("created_at") or ""),
+                str(item.get("job_id") or ""),
+            ),
+            reverse=True,
+        )
         return rows[:limit]
 
 

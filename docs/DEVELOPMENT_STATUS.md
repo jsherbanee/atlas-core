@@ -64,6 +64,8 @@ Sprint T-05 amendment now also implements estimate and sales-order duplication, 
 Sprint T-06 implements Return Orders and Credit Memos, including customer-side return workflow, deterministic credit calculation, linked Credit Memo generation, and QuickBooks-boundary-safe sync metadata.
 Sprint T-07 implements line presentation controls for commercial documents, including grouping, comment/spacer rows, explicit display ordering, presentation-aware sorting, and PDF layout preservation without changing authoritative totals.
 Sprint P-01 implements the Roles and Permissions Foundation, including deterministic tenant-scoped role and permission contracts/services, deny-by-default evaluation with explicit deny precedence, universal-object action permission-hook gating, and a minimal Settings surface for role assignment and effective-access diagnostics.
+Sprint P-02 introduces immutable audit contracts and service integration with compatibility-safe history persistence and scoped audit export behavior.
+Sprint P-03 implements the Deterministic Background Job Framework with storage-agnostic contracts, local repository persistence, deterministic local execution, representative import/export workflow integration, Processing UI visibility, and permission-gated retry/cancel controls.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 
 X-01 through X-13 are closed.
@@ -86,7 +88,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1326 tests)
+- pytest: full suite passing (1332 tests baseline at P-03 start)
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces

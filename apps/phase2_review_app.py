@@ -114,6 +114,7 @@ WORKFLOW_PAGES = [
     "Documents",
     "Price List Library",
     "Import History",
+    "Processing",
     "BOM Review",
     "Scope & Risk",
     "Engineering Review",
@@ -133,6 +134,7 @@ NAV_DROPDOWN_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("Documents", "Documents"),
             ("Price List Library", "Price List Library"),
             ("Import History", "Import History"),
+            ("Processing", "Processing"),
             ("BOM Review", "BOM Review"),
             ("Scope & Risk", "Scope & Risk"),
             ("Engineering Review", "Engineering Review"),
@@ -501,6 +503,7 @@ PROJECTS_LIBRARY_PAGES = {
 PROJECTS_ACTIVE_PAGES = {
     "Overview",
     "Documents",
+    "Processing",
     "BOM Review",
     "Scope & Risk",
     "Engineering Review",
@@ -6983,6 +6986,14 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             ],
         ),
         (
+            "processing",
+            "Processing",
+            "Processing",
+            [
+                ("jobs", "Jobs", "history_activity_view", None, "Processing"),
+            ],
+        ),
+        (
             "bom_review",
             "BOM Review",
             "BOM Review",
@@ -7218,6 +7229,7 @@ def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
     page_map = {
         "Overview": "overview",
         "Documents": "documents",
+        "Processing": "processing",
         "BOM Review": "bom_review",
         "Scope & Risk": "scope_risk",
         "Engineering Review": "engineering_review",
@@ -27113,9 +27125,17 @@ def _render_upload_panel(
             else set()
         )
         with st.spinner("Uploading files and running project analysis..."):
-            updated_record = workspace_service.import_uploaded_documents(
+            job_result = workspace_service.run_document_import_job(
                 workspace_id=record.workspace_id,
                 uploaded_files=accepted_payload,
+                actor_id=_safe_text(
+                    st.session_state.get("atlas_settings_user_id"),
+                    "atlas-ui",
+                ),
+            )
+            job_payload = dict(job_result.get("result") or {}).get("payload") or {}
+            updated_record = workspace_service.load_record(
+                _safe_text(job_payload.get("workspace_id"), record.workspace_id)
             )
             st.session_state["atlas_active_workspace_id"] = updated_record.workspace_id
             st.session_state["atlas_active_page"] = "Documents"
@@ -27133,7 +27153,9 @@ def _render_upload_panel(
                 f"{len(remaining)} file(s) remain pending due to validation diagnostics."
             )
         else:
-            st.success("File upload completed. Project analysis artifacts refreshed.")
+            st.success(
+                "File upload completed via Processing job. Project analysis artifacts refreshed."
+            )
         st.rerun()
 
 
@@ -29815,6 +29837,149 @@ def _render_timeline_page(
     st.dataframe(events, width="stretch", hide_index=True)
 
 
+def _render_processing_page(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+) -> None:
+    _render_page_header(
+        st,
+        "Processing",
+        "Deterministic background jobs for import and export operations.",
+    )
+    transactions_state = _transactions_workspace_state(st)
+    tenant_id = _safe_text(transactions_state.get("tenant_id"), "local")
+    organization_id = _safe_text(transactions_state.get("organization_id"), "atlas")
+    user_id = _safe_text(st.session_state.get("atlas_settings_user_id"), "local-user")
+    permissions_service = _permissions_workspace_service(st)
+
+    view_access = permissions_service.evaluate(
+        AccessRequest(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            principal_id=user_id,
+            permission_key="jobs.view",
+            project_id=record.workspace_id,
+        )
+    )
+    manage_access = permissions_service.evaluate(
+        AccessRequest(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            principal_id=user_id,
+            permission_key="jobs.manage",
+            project_id=record.workspace_id,
+        )
+    )
+    if not view_access.allowed:
+        st.warning(view_access.reason)
+        return
+
+    jobs = workspace_service.list_background_jobs(
+        record.workspace_id,
+        tenant_id=tenant_id,
+        organization_id=organization_id,
+        limit=200,
+    )
+    if not jobs:
+        _render_guided_empty_state(
+            st,
+            why_empty="No processing jobs have been created for this project.",
+            action_to_populate="Run document import or project export operations.",
+            next_location="Use Documents or Repository actions to create jobs.",
+        )
+        return
+
+    rows = []
+    for item in jobs:
+        result_payload = dict(item.get("result") or {})
+        diagnostics = list(item.get("diagnostics") or [])
+        rows.append(
+            {
+                "Job": _safe_text(item.get("job_id"), ""),
+                "Category": _safe_text(
+                    dict(item.get("request") or {}).get("category"), "unknown"
+                ),
+                "Status": _safe_text(item.get("status"), "unknown"),
+                "Progress": f"{int(dict(item.get('progress') or {}).get('percent', 0))}%",
+                "Created": _safe_text(item.get("created_at"), ""),
+                "Started": _safe_text(item.get("started_at"), ""),
+                "Completed": _safe_text(item.get("completed_at"), ""),
+                "Result Summary": _safe_text(result_payload.get("summary"), ""),
+                "Failure Reason": _safe_text(
+                    diagnostics[-1].get("message") if diagnostics else "", ""
+                ),
+                "Retry Available": bool(item.get("retry_available", False)),
+                "Related Object": " ".join(
+                    part
+                    for part in [
+                        _safe_text(
+                            dict(item.get("request") or {}).get("related_object_type"),
+                            "",
+                        ),
+                        _safe_text(
+                            dict(item.get("request") or {}).get("related_object_id"),
+                            "",
+                        ),
+                    ]
+                    if part
+                ),
+            }
+        )
+    st.dataframe(rows, width="stretch", hide_index=True)
+
+    selected_job = st.selectbox(
+        "Select Job",
+        options=[_safe_text(item.get("job_id"), "") for item in jobs],
+        key=f"atlas_processing_selected_job_{record.workspace_id}",
+    )
+    selected_payload = next(
+        item for item in jobs if _safe_text(item.get("job_id"), "") == selected_job
+    )
+
+    if not manage_access.allowed:
+        st.caption(manage_access.reason)
+        return
+
+    action_cols = st.columns(2)
+    can_retry = bool(selected_payload.get("retry_available", False))
+    can_cancel = _safe_text(selected_payload.get("status"), "") in {
+        "queued",
+        "retry_scheduled",
+    }
+    if action_cols[0].button(
+        "Retry Job",
+        key=f"atlas_processing_retry_{selected_job}",
+        width="stretch",
+        disabled=not can_retry,
+    ):
+        workspace_service.retry_background_job(
+            record.workspace_id,
+            job_id=selected_job,
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        st.success("Job retry requested.")
+        st.rerun()
+
+    if action_cols[1].button(
+        "Cancel Job",
+        key=f"atlas_processing_cancel_{selected_job}",
+        width="stretch",
+        disabled=not can_cancel,
+    ):
+        workspace_service.cancel_background_job(
+            record.workspace_id,
+            job_id=selected_job,
+            actor_id=user_id,
+            reason="Cancelled from Processing workspace",
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        st.success("Job cancelled.")
+        st.rerun()
+
+
 def _select_first_node(graph: dict[str, Any], node_type: str) -> dict[str, Any] | None:
     for node in graph.get("nodes", []):
         if _safe_text(node.get("type"), "") == node_type:
@@ -30771,10 +30936,16 @@ def _render_settings_page(
             key="atlas_project_export_path",
         )
         if st.button("Export Project Bundle", key="atlas_export_bundle_btn"):
-            written = workspace_service.export_project_bundle(
-                record.workspace_id,
-                bundle_output,
+            job_result = workspace_service.run_export_generation_job(
+                workspace_id=record.workspace_id,
+                out_path=bundle_output,
+                actor_id=_safe_text(
+                    st.session_state.get("atlas_settings_user_id"),
+                    "atlas-ui",
+                ),
             )
+            payload = dict(job_result.get("result") or {}).get("payload") or {}
+            written = _safe_text(payload.get("bundle_path"), bundle_output)
             st.success(f"Exported bundle to {written}")
 
         import_path = st.text_input(
@@ -31330,6 +31501,8 @@ def _render_main_content(
         _render_project_summary_page(st, record, context)
     elif page == "Documents":
         _render_project_files_page(st, workspace_service, record, context)
+    elif page == "Processing":
+        _render_processing_page(st, workspace_service, record)
     elif page == "Price List Library":
         _render_price_list_library_page(st, record, context)
     elif page == "Import History":

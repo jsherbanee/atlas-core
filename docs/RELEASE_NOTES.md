@@ -19,6 +19,24 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Sprint P-03 Deterministic Background Job Framework)
+
+### Improved
+
+- Atlas now includes deterministic background-job contracts and orchestration for tenant-scoped local execution.
+- Project repository now persists job records through dedicated repository contracts and local job adapters.
+- Project Workspace now exposes job submit/list/retry/cancel wrappers for representative workflow operations.
+- Document upload and project bundle export now execute through deterministic background jobs.
+- Project Workspace now includes a Processing page for job visibility and status tracking.
+- Processing actions are permission-gated via `jobs.view` and `jobs.manage` permissions.
+- Background job lifecycle transitions now emit immutable audit-linked events.
+
+### Scope Notes
+
+- no AWS queue implementation
+- no external worker deployment
+- no cloud scheduler orchestration
+
 ## Unreleased (Sprint P-01 Roles and Permissions Foundation)
 
 ### Improved

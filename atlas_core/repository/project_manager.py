@@ -8,11 +8,14 @@ from atlas_core.repository.contracts import ProjectRepository
 from atlas_core.repository.local import (
     LocalDocumentRepository,
     LocalHistoryRepository,
+    LocalJobRepository,
     LocalKnowledgeRepository,
     LocalProjectRepository,
     LocalReviewRepository,
     LocalWorkspaceRepository,
 )
+from atlas_core.services.background_job_service import BackgroundJobService
+from atlas_core.services.immutable_audit_service import ImmutableAuditService
 
 
 class AtlasProjectManager:
@@ -29,9 +32,83 @@ class AtlasProjectManager:
         self.review_repository = LocalReviewRepository(self.project_repository)
         self.knowledge_repository = LocalKnowledgeRepository(self.project_repository)
         self.history_repository = LocalHistoryRepository(self.project_repository)
+        self.job_repository = LocalJobRepository(self.project_repository)
+        self.audit_service = ImmutableAuditService(self.history_repository)
+        self.background_job_service = BackgroundJobService(
+            repository=self.job_repository,
+            audit_callback=self.record_audit_event,
+        )
 
     def log(self, project_id: str, event_type: str, payload: dict[str, Any]) -> None:
         self.history_repository.append_event(project_id, event_type, payload)
+
+    def record_audit_event(
+        self,
+        *,
+        project_id: str,
+        action: str,
+        actor_id: str,
+        actor_type: str = "user",
+        actor_display_name: str | None = None,
+        tenant_id: str,
+        organization_id: str,
+        target_type: str,
+        target_id: str,
+        source: str = "atlas",
+        correlation_id: str | None = None,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
+        permission_reference: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        event = self.audit_service.append_event(
+            project_id=project_id,
+            action=action,
+            actor_id=actor_id,
+            actor_type=actor_type,
+            actor_display_name=actor_display_name,
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            target_type=target_type,
+            target_id=target_id,
+            source=source,
+            correlation_id=correlation_id,
+            before=before,
+            after=after,
+            context=context,
+            permission_reference=permission_reference,
+        )
+        return event.to_dict()
+
+    def list_audit_events(
+        self,
+        *,
+        project_id: str,
+        tenant_id: str,
+        organization_id: str,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        return self.audit_service.list_events(
+            project_id=project_id,
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            limit=limit,
+        )
+
+    def export_audit_events(
+        self,
+        *,
+        project_id: str,
+        tenant_id: str,
+        organization_id: str,
+        limit: int = 5000,
+    ) -> dict[str, Any]:
+        return self.audit_service.export_events(
+            project_id=project_id,
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            limit=limit,
+        )
 
     def list_projects(self, include_archived: bool = False) -> list[dict[str, Any]]:
         rows = self.project_repository.list_projects(include_archived=include_archived)

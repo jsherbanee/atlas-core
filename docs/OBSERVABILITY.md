@@ -71,6 +71,8 @@ Distributed tracing should support:
 - import batch IDs
 - tenant-safe context propagation
 
+Current P-03 baseline includes deterministic local correlation through project ID, job ID, and immutable audit event IDs persisted with each job record.
+
 ## Health Checks
 Health checks should support:
 - application readiness
@@ -89,6 +91,12 @@ Dashboards should summarize:
 - job backlog
 - AI retrieval anomalies
 - cost hotspots
+
+P-03 baseline dashboard candidates:
+- job count by status (`queued`, `running`, `succeeded`, `failed`, `retry_scheduled`, `cancelled`)
+- retry-scheduled count
+- failed-job diagnostic code distribution
+- average execution duration for representative import/export jobs
 
 Alerting should support incident response without generating unnecessary noise.
 

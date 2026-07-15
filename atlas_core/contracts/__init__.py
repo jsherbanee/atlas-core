@@ -35,6 +35,28 @@ from atlas_core.contracts.permissions_contracts import (
     RoleAssignment,
     TenantPolicy,
 )
+from atlas_core.contracts.audit_contracts import (
+    AuditActor,
+    AuditExportRecord,
+    AuditPermissionReference,
+    AuditRetentionClass,
+    AuditTarget,
+    ImmutableAuditEvent,
+)
+from atlas_core.contracts.background_job_contracts import (
+    JobAttempt,
+    JobAuditReference,
+    JobCancellation,
+    JobCategory,
+    JobDefinition,
+    JobDiagnostic,
+    JobProgress,
+    JobRecord,
+    JobRequest,
+    JobResult,
+    JobRetryPolicy,
+    JobStatus,
+)
 
 __all__ = [
     "PlanReviewRequest",
@@ -64,4 +86,22 @@ __all__ = [
     "Role",
     "RoleAssignment",
     "TenantPolicy",
+    "AuditActor",
+    "AuditExportRecord",
+    "AuditPermissionReference",
+    "AuditRetentionClass",
+    "AuditTarget",
+    "ImmutableAuditEvent",
+    "JobAttempt",
+    "JobAuditReference",
+    "JobCancellation",
+    "JobCategory",
+    "JobDefinition",
+    "JobDiagnostic",
+    "JobProgress",
+    "JobRecord",
+    "JobRequest",
+    "JobResult",
+    "JobRetryPolicy",
+    "JobStatus",
 ]

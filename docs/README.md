@@ -216,6 +216,16 @@ Future releases should follow this structure.
 - Audience: Platform, repository, ingestion, and AI contributors.
 - When to reference: When changing upload, extraction, or finalization flows.
 
+### [BACKGROUND_JOBS.md](BACKGROUND_JOBS.md)
+- Purpose: Defines deterministic background job contracts, local execution model, and job lifecycle integration boundaries.
+- Audience: Platform, repository, workspace, and observability contributors.
+- When to reference: When changing async-capable workflow orchestration or job execution semantics.
+
+### [AUDIT_ENGINE.md](AUDIT_ENGINE.md)
+- Purpose: Defines immutable audit contracts, persistence model, redaction behavior, and compatibility normalization.
+- Audience: Security, platform, observability, and workflow contributors.
+- When to reference: When changing audit event shape, retention class usage, or lifecycle audit integrations.
+
 ### [REPORTING.md](REPORTING.md)
 - Purpose: Defines operational and executive reporting architecture.
 - Audience: Product, engineering, reporting, and platform contributors.

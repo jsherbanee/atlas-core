@@ -45,6 +45,7 @@ Contracts:
 - ReviewRepository
 - KnowledgeRepository
 - HistoryRepository
+- JobRepository
 
 Project identity contract notes (X-02):
 - `allocate_bid_id(year=None)` reserves the next available deterministic Atlas Bid ID.
@@ -62,6 +63,7 @@ Current adapter implementation:
 - LocalReviewRepository
 - LocalKnowledgeRepository
 - LocalHistoryRepository
+- LocalJobRepository
 
 The local adapters are the development-time stand-in for future cloud-hosted tenant-scoped storage adapters.
 
@@ -106,6 +108,8 @@ Directory structure:
     - exports/
     - history/
       - events.jsonl
+    - jobs/
+      - jobs.jsonl
     - cache/
 
 ## Canonical Manifest
@@ -170,6 +174,9 @@ review/*.json:
 
 history/events.jsonl:
 - Project timeline events (project_created, documents_imported, workspace_opened, review_executed, etc.)
+
+jobs/jobs.jsonl:
+- Deterministic background job records, attempts, progress, diagnostics, and audit references.
 
 project_manifest.json:
 - Canonical deterministic repository summary for health checks, bundle validation, and future adapter migration.

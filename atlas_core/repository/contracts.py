@@ -195,3 +195,19 @@ class HistoryRepository(ABC):
     @abstractmethod
     def list_events(self, project_id: str, limit: int = 100) -> list[JsonDict]:
         raise NotImplementedError
+
+
+class JobRepository(ABC):
+    """Persistence contract for background jobs and immutable attempt history."""
+
+    @abstractmethod
+    def save_job(self, project_id: str, job_payload: JsonDict) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_job(self, project_id: str, job_id: str) -> JsonDict | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_jobs(self, project_id: str, limit: int = 200) -> list[JsonDict]:
+        raise NotImplementedError

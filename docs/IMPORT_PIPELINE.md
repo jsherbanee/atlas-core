@@ -110,6 +110,18 @@ Reprocessing should be deterministic and should not overwrite historical facts w
 ## Future Direction
 The desired architecture is a unified ingestion framework with content-type specific adapters for documents, price sheets, correspondence, and service artifacts.
 
+## Current P-03 Execution Note
+Sprint P-03 introduces deterministic background-job orchestration for representative import/export workflows.
+
+Current implementation posture:
+- local in-process job execution
+- repository-backed job state
+- deterministic retry/cancel/list semantics
+
+Explicitly out of scope in the current pipeline implementation:
+- external queue infrastructure
+- external worker deployment
+
 ## Unresolved Decisions
 - exact extraction stack remains flexible
 - final OCR strategy remains open

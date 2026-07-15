@@ -39,6 +39,8 @@ Status: Active
 - T-06 Return Orders and Credit Memos
 - T-07 Commercial Document Line Layout and Presentation
 - P-01 Roles and Permissions Foundation
+- P-02 Immutable Audit Foundation
+- P-03 Deterministic Background Job Framework
 
 ### A-07 Scope
 
@@ -84,6 +86,20 @@ Explicitly out of scope:
 - SSO or external identity-provider implementation
 - billing-permission model
 - QuickBooks integration scope expansion
+
+### P-03 Scope
+
+- implement deterministic background job contracts and orchestration service
+- add repository contract and local adapter for job persistence
+- integrate representative workflows (document import and export generation)
+- provide permission-gated Processing surface for job visibility and control
+- enforce tenant-scoped list/retry/cancel behavior
+
+Explicitly out of scope:
+
+- AWS queue implementation
+- external worker deployment
+- cloud scheduler orchestration
 
 ## Epic G: Product Governance And Delivery Discipline
 

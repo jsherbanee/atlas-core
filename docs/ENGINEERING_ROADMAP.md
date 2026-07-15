@@ -165,6 +165,7 @@ Production readiness should require:
 ## Technical Milestones
 - preserve Phase 2 stability and quality gates
 - harden current repository-backed workspace behavior
+- implement deterministic local background job framework (P-03) with storage-agnostic contracts and immutable audit linkage
 - consolidate search and object-graph foundations
 - formalize rule-engine and diagnostics contracts
 - deliver deterministic roles and permissions foundation with centralized action gating and audit-ready permission events

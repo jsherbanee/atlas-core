@@ -18,6 +18,8 @@
 - [AI_FOUNDATIONAL_KNOWLEDGE.md](AI_FOUNDATIONAL_KNOWLEDGE.md)
 - [SECURITY.md](SECURITY.md)
 - [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md)
+- [BACKGROUND_JOBS.md](BACKGROUND_JOBS.md)
+- [AUDIT_ENGINE.md](AUDIT_ENGINE.md)
 
 Future assistant behavior is documented in [AI_ASSISTANT.md](AI_ASSISTANT.md), and staged AWS hosting direction is documented in [AWS_ARCHITECTURE.md](AWS_ARCHITECTURE.md).
 
@@ -128,6 +130,25 @@ Business logic should live once in the Atlas engine and be reused by all callers
 - CLI
 - future API services
 - future UI/web applications
+
+## Sprint P-03 Deterministic Background Job Framework
+
+P-03 introduces deterministic background-job orchestration as an engine-first capability, without introducing external queue infrastructure.
+
+Architecture posture:
+- storage-agnostic job contracts and repository boundaries
+- local in-process deterministic executor for current runtime
+- tenant-scoped lifecycle controls (submit/run/retry/cancel/list)
+- immutable audit integration for lifecycle events
+
+Explicitly out of scope in P-03:
+- AWS queue implementation
+- external worker deployment
+- cloud scheduler coupling
+
+Representative workflow integration in current scope:
+- document import
+- export generation
 
 ## Rule Engine Direction
 Atlas is moving to a registry-driven rule model where:

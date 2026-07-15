@@ -5,9 +5,17 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import hashlib
+import json
 from typing import Any
 from uuid import uuid4
 
+from atlas_core.contracts.audit_contracts import (
+    AuditActor,
+    AuditRetentionClass,
+    AuditTarget,
+    ImmutableAuditEvent,
+)
 from atlas_core.domain.commercial_document import (
     CommercialDocumentType,
     CommercialNumberingPolicy,
@@ -242,6 +250,11 @@ class SettingsService:
                 for item in list(incoming.get("audit_events") or [])
                 if isinstance(item, dict)
             ],
+            "immutable_audit_events": [
+                dict(item)
+                for item in list(incoming.get("immutable_audit_events") or [])
+                if isinstance(item, dict)
+            ],
         }
 
     @staticmethod
@@ -250,6 +263,7 @@ class SettingsService:
             "organization_settings": {},
             "personal_preferences": {},
             "audit_events": [],
+            "immutable_audit_events": [],
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -274,6 +288,50 @@ class SettingsService:
                 "details": deepcopy(details),
             }
         )
+        occurred_at = _now_iso()
+        material = {
+            "tenant_id": tenant_id,
+            "organization_id": organization_id,
+            "actor": actor,
+            "action": action,
+            "timestamp": occurred_at,
+            "details": details,
+        }
+        digest = hashlib.sha1(
+            json.dumps(material, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:20]
+        immutable_event = ImmutableAuditEvent(
+            event_id=f"audit-settings:{digest}",
+            action=action,
+            actor=AuditActor(
+                actor_id=_normalize_text(actor) or "system", actor_type="user"
+            ),
+            target=AuditTarget(
+                target_type="settings",
+                target_id=f"{tenant_id}::{organization_id}",
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                project_id=None,
+            ),
+            occurred_at=occurred_at,
+            retention_class=AuditRetentionClass.COMPLIANCE,
+            source="settings_service",
+            before={},
+            after={},
+            change_summary={
+                "added_fields": sorted(dict(details).keys()),
+                "removed_fields": [],
+                "changed_fields": sorted(dict(details).keys()),
+            },
+            context=deepcopy(dict(details)),
+        )
+        immutable_rows = [
+            dict(item)
+            for item in list(self.state.get("immutable_audit_events") or [])
+            if isinstance(item, dict)
+        ]
+        immutable_rows.append(immutable_event.to_dict())
+        self.state["immutable_audit_events"] = immutable_rows[-2000:]
 
     def _default_numbering_policy(
         self,
@@ -1254,3 +1312,27 @@ class SettingsService:
             if _normalize_text(item.get("tenant_id")) == tenant_id
             and _normalize_text(item.get("organization_id")) == organization_id
         ]
+
+    def immutable_audit_events(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        rows = [
+            dict(item)
+            for item in list(self.state.get("immutable_audit_events") or [])
+            if isinstance(item, dict)
+            and _normalize_text(dict(item.get("target") or {}).get("tenant_id"))
+            == tenant_id
+            and _normalize_text(dict(item.get("target") or {}).get("organization_id"))
+            == organization_id
+        ]
+        rows.sort(
+            key=lambda item: (
+                _normalize_text(item.get("occurred_at")),
+                _normalize_text(item.get("event_id")),
+            )
+        )
+        return rows[-max(1, int(limit)) :]

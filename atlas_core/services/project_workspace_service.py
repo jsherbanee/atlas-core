@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import hashlib
 from pathlib import Path
+import base64
+import json
 from typing import Any
 
 from atlas_core import __version__
@@ -18,7 +21,15 @@ from atlas_core.domain.av_lifecycle import (
     normalize_stage_key,
     project_lifecycle_from_legacy,
 )
+from atlas_core.contracts.background_job_contracts import (
+    JobCategory,
+    JobDefinition,
+    JobRequest,
+    JobRetryPolicy,
+    JobStatus,
+)
 from atlas_core.repository import AtlasProjectManager
+from atlas_core.services.background_job_service import JobExecutionContext
 from atlas_core.services.document_intake_service import (
     DocumentIntakeService,
     UploadInspectionResult,
@@ -178,6 +189,124 @@ class ProjectWorkspaceService:
         self.manager = AtlasProjectManager(str(self.workspace_root))
         self.organization_directory = OrganizationDirectoryService(self.workspace_root)
         self.lifecycle_engine = AVLifecycleEngine.default()
+        self.manager.background_job_service.register_handler(
+            category=JobCategory.DOCUMENT_IMPORT,
+            handler=self._execute_document_import_job,
+        )
+        self.manager.background_job_service.register_handler(
+            category=JobCategory.EXPORT_GENERATION,
+            handler=self._execute_project_export_job,
+        )
+
+    @staticmethod
+    def _tenant_scope_for_record(record: ProjectWorkspaceRecord) -> tuple[str, str]:
+        tenant_id = str(record.metadata.get("tenant_id") or "local").strip() or "local"
+        organization_id = (
+            str(record.metadata.get("organization_id") or "atlas").strip() or "atlas"
+        )
+        return tenant_id, organization_id
+
+    def _record_audit(
+        self,
+        *,
+        record: ProjectWorkspaceRecord,
+        action: str,
+        actor: str,
+        target_type: str,
+        target_id: str,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
+        source: str = "project_workspace_service",
+    ) -> None:
+        tenant_id, organization_id = self._tenant_scope_for_record(record)
+        self.manager.record_audit_event(
+            project_id=record.workspace_id,
+            action=action,
+            actor_id=actor,
+            actor_type="user",
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            target_type=target_type,
+            target_id=target_id,
+            source=source,
+            before=before,
+            after=after,
+            context=context,
+        )
+
+    @staticmethod
+    def _canonical_payload_hash(payload: dict[str, Any]) -> str:
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha1(canonical.encode("utf-8")).hexdigest()[:20]
+
+    @staticmethod
+    def _encode_uploaded_files(uploaded_files: list[tuple[str, bytes]]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for name, data in uploaded_files:
+            rows.append(
+                {
+                    "name": str(name),
+                    "size_bytes": len(data),
+                    "sha1": hashlib.sha1(data).hexdigest(),
+                    "data_b64": base64.b64encode(data).decode("ascii"),
+                }
+            )
+        return rows
+
+    @staticmethod
+    def _decode_uploaded_files(payload_rows: list[dict[str, Any]]) -> list[tuple[str, bytes]]:
+        rows: list[tuple[str, bytes]] = []
+        for item in payload_rows:
+            name = str(item.get("name") or "")
+            encoded = str(item.get("data_b64") or "")
+            if not name or not encoded:
+                continue
+            rows.append((name, base64.b64decode(encoded.encode("ascii"))))
+        return rows
+
+    def _execute_document_import_job(
+        self,
+        context: JobExecutionContext,
+    ) -> dict[str, Any]:
+        payload = dict(context.request.input_payload or {})
+        workspace_id = str(payload.get("workspace_id") or context.project_id)
+        uploaded = self._decode_uploaded_files(list(payload.get("uploaded_files") or []))
+        context.progress(10, "Preparing import", "prepare", 0, max(len(uploaded), 1))
+        updated_record = self.import_uploaded_documents(
+            workspace_id=workspace_id,
+            uploaded_files=uploaded,
+        )
+        context.progress(100, "Import completed", "completed", len(uploaded), len(uploaded))
+        return {
+            "summary": "Document import completed",
+            "payload": {
+                "workspace_id": updated_record.workspace_id,
+                "uploaded_file_count": len(uploaded),
+                "warning_count": len(updated_record.warnings),
+                "import_summary": dict(updated_record.import_summary),
+            },
+        }
+
+    def _execute_project_export_job(
+        self,
+        context: JobExecutionContext,
+    ) -> dict[str, Any]:
+        payload = dict(context.request.input_payload or {})
+        workspace_id = str(payload.get("workspace_id") or context.project_id)
+        out_path = str(payload.get("out_path") or "")
+        if not out_path:
+            raise ValueError("out_path is required for export job")
+        context.progress(10, "Preparing export", "prepare")
+        bundle_path = self.export_project_bundle(workspace_id, out_path)
+        context.progress(100, "Export completed", "completed")
+        return {
+            "summary": "Project bundle export completed",
+            "payload": {
+                "workspace_id": workspace_id,
+                "bundle_path": bundle_path,
+            },
+        }
 
     def list_recent_workspaces(self, limit: int = 10) -> list[ProjectWorkspaceRecord]:
         records = self.list_workspaces(include_archived=False)
@@ -236,6 +365,7 @@ class ProjectWorkspaceService:
         )
 
     def save_record(self, record: ProjectWorkspaceRecord) -> Path:
+        is_new_project = False
         record.touch()
         self._update_lifecycle_snapshot(record)
         project_root = Path(
@@ -275,6 +405,7 @@ class ProjectWorkspaceService:
                 workspace_payload,
             )
         else:
+            is_new_project = True
             self.manager.project_repository.create(
                 record.workspace_id,
                 record.project.to_dict(),
@@ -287,6 +418,19 @@ class ProjectWorkspaceService:
                 {
                     "project_id": record.project.project_id,
                     "project_name": record.project.name,
+                },
+            )
+        if is_new_project:
+            self._record_audit(
+                record=record,
+                action="project.created",
+                actor="atlas-ui",
+                target_type="project",
+                target_id=record.project.project_id,
+                after={
+                    "project_id": record.project.project_id,
+                    "project_name": record.project.name,
+                    "lifecycle_stage": record.metadata.get("lifecycle_stage"),
                 },
             )
 
@@ -485,6 +629,14 @@ class ProjectWorkspaceService:
         bid_date: str | None = None,
     ) -> ProjectWorkspaceRecord:
         record = self.load_record(workspace_id)
+        before = {
+            "owner": record.metadata.get("owner"),
+            "lifecycle_stage": record.metadata.get("lifecycle_stage"),
+            "client_project_number": record.project.client_project_number,
+            "internal_project_number": record.project.internal_project_number,
+            "location": record.project.location,
+            "bid_date": record.project.bid_date,
+        }
 
         if owner is not None:
             record.metadata["owner"] = owner
@@ -554,7 +706,24 @@ class ProjectWorkspaceService:
                 "lifecycle_stage": record.metadata.get("lifecycle_stage"),
             },
         )
-        return self.load_record(workspace_id)
+        refreshed = self.load_record(workspace_id)
+        self._record_audit(
+            record=refreshed,
+            action="project.identity.updated",
+            actor=lifecycle_actor or "atlas-ui",
+            target_type="project",
+            target_id=workspace_id,
+            before=before,
+            after={
+                "owner": refreshed.metadata.get("owner"),
+                "lifecycle_stage": refreshed.metadata.get("lifecycle_stage"),
+                "client_project_number": refreshed.project.client_project_number,
+                "internal_project_number": refreshed.project.internal_project_number,
+                "location": refreshed.project.location,
+                "bid_date": refreshed.project.bid_date,
+            },
+        )
+        return refreshed
 
     def lifecycle_plan_for_record(
         self, record: ProjectWorkspaceRecord
@@ -583,6 +752,7 @@ class ProjectWorkspaceService:
         tenant_id: str | None = None,
     ) -> ProjectWorkspaceRecord:
         record = self.load_record(workspace_id)
+        before_stage = record.metadata.get("lifecycle_stage")
         record = self._transition_record_lifecycle(
             record,
             target_stage_key=target_stage_key,
@@ -591,7 +761,18 @@ class ProjectWorkspaceService:
             tenant_id=tenant_id,
         )
         self.save_record(record)
-        return self.load_record(workspace_id)
+        refreshed = self.load_record(workspace_id)
+        self._record_audit(
+            record=refreshed,
+            action="project.lifecycle.transitioned",
+            actor=actor,
+            target_type="project_lifecycle",
+            target_id=workspace_id,
+            before={"lifecycle_stage": before_stage},
+            after={"lifecycle_stage": refreshed.metadata.get("lifecycle_stage")},
+            context={"reason": reason},
+        )
+        return refreshed
 
     def rename_project(
         self, workspace_id: str, new_name: str
@@ -605,13 +786,24 @@ class ProjectWorkspaceService:
         workspace_id: str,
         archived: bool = True,
     ) -> ProjectWorkspaceRecord:
+        prior = self.load_record(workspace_id)
         self.manager.project_repository.archive(workspace_id, archived=archived)
         self.manager.log(
             workspace_id,
             "project_archived" if archived else "project_unarchived",
             {"archived": archived},
         )
-        return self.load_record(workspace_id)
+        refreshed = self.load_record(workspace_id)
+        self._record_audit(
+            record=refreshed,
+            action="project.archive.updated",
+            actor="atlas-ui",
+            target_type="project",
+            target_id=workspace_id,
+            before={"archived": prior.archived},
+            after={"archived": refreshed.archived},
+        )
+        return refreshed
 
     def delete_project(self, workspace_id: str) -> None:
         self.manager.project_repository.delete(workspace_id)
@@ -657,6 +849,15 @@ class ProjectWorkspaceService:
             workspace_id,
             "workspace_opened",
             {"last_open_page": state.get("last_open_page")},
+        )
+        record = self.load_record(workspace_id)
+        self._record_audit(
+            record=record,
+            action="workspace.state.saved",
+            actor="atlas-ui",
+            target_type="workspace",
+            target_id=workspace_id,
+            after={"last_open_page": state.get("last_open_page")},
         )
 
     def import_uploaded_documents(
@@ -707,6 +908,20 @@ class ProjectWorkspaceService:
                 "warnings": len(record.warnings),
             },
         )
+        self._record_audit(
+            record=record,
+            action="project.documents.imported",
+            actor="atlas-ui",
+            target_type="project_documents",
+            target_id=workspace_id,
+            after={
+                "uploaded_file_count": len(uploaded_files),
+                "warning_count": len(record.warnings),
+            },
+            context={
+                "uploaded_file_names": [name for name, _ in uploaded_files],
+            },
+        )
         return record
 
     def save_review_artifact(
@@ -735,6 +950,162 @@ class ProjectWorkspaceService:
     def list_history(self, workspace_id: str, limit: int = 100) -> list[dict[str, Any]]:
         return self.manager.history_repository.list_events(workspace_id, limit=limit)
 
+    def list_background_jobs(
+        self,
+        workspace_id: str,
+        *,
+        tenant_id: str | None = None,
+        organization_id: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        record = self.load_record(workspace_id)
+        resolved_tenant, resolved_org = self._tenant_scope_for_record(record)
+        return self.manager.background_job_service.list_jobs(
+            project_id=workspace_id,
+            tenant_id=tenant_id or resolved_tenant,
+            organization_id=organization_id or resolved_org,
+            limit=limit,
+        )
+
+    def cancel_background_job(
+        self,
+        workspace_id: str,
+        *,
+        job_id: str,
+        actor_id: str,
+        reason: str,
+        tenant_id: str | None = None,
+        organization_id: str | None = None,
+    ) -> dict[str, Any]:
+        record = self.load_record(workspace_id)
+        resolved_tenant, resolved_org = self._tenant_scope_for_record(record)
+        return self.manager.background_job_service.cancel_job(
+            project_id=workspace_id,
+            job_id=job_id,
+            tenant_id=tenant_id or resolved_tenant,
+            organization_id=organization_id or resolved_org,
+            actor_id=actor_id,
+            reason=reason,
+        )
+
+    def retry_background_job(
+        self,
+        workspace_id: str,
+        *,
+        job_id: str,
+        tenant_id: str | None = None,
+        organization_id: str | None = None,
+    ) -> dict[str, Any]:
+        record = self.load_record(workspace_id)
+        resolved_tenant, resolved_org = self._tenant_scope_for_record(record)
+        return self.manager.background_job_service.retry_job(
+            project_id=workspace_id,
+            job_id=job_id,
+            tenant_id=tenant_id or resolved_tenant,
+            organization_id=organization_id or resolved_org,
+        )
+
+    def run_document_import_job(
+        self,
+        *,
+        workspace_id: str,
+        uploaded_files: list[tuple[str, bytes]],
+        actor_id: str = "atlas-ui",
+        idempotency_key: str | None = None,
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
+        record = self.load_record(workspace_id)
+        tenant_id, organization_id = self._tenant_scope_for_record(record)
+        encoded_uploads = self._encode_uploaded_files(uploaded_files)
+        deterministic_input = {
+            "workspace_id": workspace_id,
+            "uploaded_files": encoded_uploads,
+        }
+        job_request = JobRequest(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor_id=actor_id,
+            category=JobCategory.DOCUMENT_IMPORT,
+            definition=JobDefinition(
+                category=JobCategory.DOCUMENT_IMPORT,
+                handler_key="project_workspace.document_import",
+                cancellable=False,
+            ),
+            input_payload=deterministic_input,
+            related_object_type="project_documents",
+            related_object_id=workspace_id,
+            idempotency_key=idempotency_key
+            or f"document_import:{self._canonical_payload_hash({'files': [{'name': item['name'], 'sha1': item['sha1']} for item in encoded_uploads]})}",
+            correlation_id=correlation_id,
+            retry_policy=JobRetryPolicy(max_attempts=2, retry_delay_seconds=0),
+        )
+        submitted = self.manager.background_job_service.submit_job(
+            project_id=workspace_id,
+            request=job_request,
+        )
+        if JobStatus(str(submitted.get("status") or JobStatus.QUEUED.value)) not in {
+            JobStatus.QUEUED,
+            JobStatus.RETRY_SCHEDULED,
+            JobStatus.RUNNING,
+        }:
+            return submitted
+        return self.manager.background_job_service.run_job(
+            project_id=workspace_id,
+            job_id=str(submitted.get("job_id") or ""),
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+
+    def run_export_generation_job(
+        self,
+        *,
+        workspace_id: str,
+        out_path: str,
+        actor_id: str = "atlas-ui",
+        idempotency_key: str | None = None,
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
+        record = self.load_record(workspace_id)
+        tenant_id, organization_id = self._tenant_scope_for_record(record)
+        deterministic_input = {
+            "workspace_id": workspace_id,
+            "out_path": out_path,
+        }
+        job_request = JobRequest(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor_id=actor_id,
+            category=JobCategory.EXPORT_GENERATION,
+            definition=JobDefinition(
+                category=JobCategory.EXPORT_GENERATION,
+                handler_key="project_workspace.export_generation",
+                cancellable=False,
+            ),
+            input_payload=deterministic_input,
+            related_object_type="project_bundle",
+            related_object_id=workspace_id,
+            idempotency_key=idempotency_key
+            or f"export_generation:{self._canonical_payload_hash(deterministic_input)}",
+            correlation_id=correlation_id,
+            retry_policy=JobRetryPolicy(max_attempts=2, retry_delay_seconds=0),
+        )
+        submitted = self.manager.background_job_service.submit_job(
+            project_id=workspace_id,
+            request=job_request,
+        )
+        if JobStatus(str(submitted.get("status") or JobStatus.QUEUED.value)) not in {
+            JobStatus.QUEUED,
+            JobStatus.RETRY_SCHEDULED,
+            JobStatus.RUNNING,
+        }:
+            return submitted
+        return self.manager.background_job_service.run_job(
+            project_id=workspace_id,
+            job_id=str(submitted.get("job_id") or ""),
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+
     def read_manifest(self, workspace_id: str) -> dict[str, Any]:
         return self.manager.read_manifest(workspace_id)
 
@@ -742,12 +1113,69 @@ class ProjectWorkspaceService:
         return self.manager.refresh_manifest(workspace_id)
 
     def export_project_bundle(self, workspace_id: str, out_path: str) -> str:
-        return self.manager.export_project_bundle(workspace_id, out_path)
+        bundle = self.manager.export_project_bundle(workspace_id, out_path)
+        record = self.load_record(workspace_id)
+        self._record_audit(
+            record=record,
+            action="project.bundle.exported",
+            actor="atlas-ui",
+            target_type="project_bundle",
+            target_id=workspace_id,
+            context={"out_path": out_path, "bundle_path": bundle},
+        )
+        return bundle
 
     def import_project_bundle(self, bundle_path: str) -> ProjectWorkspaceRecord:
         workspace_id = self.manager.import_project_bundle(bundle_path)
         self.log_event(workspace_id, "project_imported", {"bundle_path": bundle_path})
-        return self.load_record(workspace_id)
+        record = self.load_record(workspace_id)
+        self._record_audit(
+            record=record,
+            action="project.bundle.imported",
+            actor="atlas-ui",
+            target_type="project_bundle",
+            target_id=workspace_id,
+            context={"bundle_path": bundle_path},
+        )
+        return record
+
+    def list_audit_history(
+        self,
+        workspace_id: str,
+        *,
+        tenant_id: str | None = None,
+        organization_id: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        record = self.load_record(workspace_id)
+        resolved_tenant_id, resolved_organization_id = self._tenant_scope_for_record(
+            record
+        )
+        return self.manager.list_audit_events(
+            project_id=workspace_id,
+            tenant_id=tenant_id or resolved_tenant_id,
+            organization_id=organization_id or resolved_organization_id,
+            limit=limit,
+        )
+
+    def export_audit_history(
+        self,
+        workspace_id: str,
+        *,
+        tenant_id: str | None = None,
+        organization_id: str | None = None,
+        limit: int = 5000,
+    ) -> dict[str, Any]:
+        record = self.load_record(workspace_id)
+        resolved_tenant_id, resolved_organization_id = self._tenant_scope_for_record(
+            record
+        )
+        return self.manager.export_audit_events(
+            project_id=workspace_id,
+            tenant_id=tenant_id or resolved_tenant_id,
+            organization_id=organization_id or resolved_organization_id,
+            limit=limit,
+        )
 
     def project_health(self, workspace_id: str) -> dict[str, Any]:
         return self.manager.health_check(workspace_id)

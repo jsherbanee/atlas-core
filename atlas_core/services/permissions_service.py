@@ -4,9 +4,18 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
+import hashlib
+import json
 from typing import Any
 from uuid import uuid4
 
+from atlas_core.contracts.audit_contracts import (
+    AuditActor,
+    AuditRetentionClass,
+    AuditTarget,
+    ImmutableAuditEvent,
+    now_iso as audit_now_iso,
+)
 from atlas_core.contracts.permissions_contracts import (
     AccessDecision,
     AccessDiagnostic,
@@ -119,6 +128,18 @@ PERMISSION_CATALOG: tuple[Permission, ...] = (
         "export.execute", "Export", "Execute exports", "Export files and datasets."
     ),
     Permission(
+        "jobs.view",
+        "Background jobs",
+        "View background jobs",
+        "View background job status and diagnostics.",
+    ),
+    Permission(
+        "jobs.manage",
+        "Background jobs",
+        "Manage background jobs",
+        "Retry and cancel background jobs where safe.",
+    ),
+    Permission(
         "archive_restore.execute",
         "Archive and restore",
         "Archive and restore",
@@ -148,6 +169,7 @@ SYSTEM_ROLES: tuple[Role, ...] = (
             "reports.export",
             "commercial_documents.view",
             "export.execute",
+            "jobs.view",
         ],
     ),
     Role(
@@ -166,6 +188,8 @@ SYSTEM_ROLES: tuple[Role, ...] = (
             "reports.view",
             "export.execute",
             "lifecycle_transitions.execute",
+            "jobs.view",
+            "jobs.manage",
         ],
     ),
     Role(
@@ -184,6 +208,8 @@ SYSTEM_ROLES: tuple[Role, ...] = (
             "lifecycle_transitions.execute",
             "reports.view",
             "archive_restore.execute",
+            "jobs.view",
+            "jobs.manage",
         ],
     ),
     Role(
@@ -235,6 +261,7 @@ SYSTEM_ROLES: tuple[Role, ...] = (
             "settings.view",
             "integrations.view",
             "export.execute",
+            "jobs.view",
         ],
     ),
     Role(
@@ -276,6 +303,7 @@ SYSTEM_ROLES: tuple[Role, ...] = (
             "settings.view",
             "reports.view",
             "commercial_documents.view",
+            "jobs.view",
         ],
     ),
 )
@@ -304,11 +332,20 @@ class PermissionsService:
                 for item in list(incoming.get("permission_events") or [])
                 if isinstance(item, dict)
             ],
+            "immutable_audit_events": [
+                dict(item)
+                for item in list(incoming.get("immutable_audit_events") or [])
+                if isinstance(item, dict)
+            ],
         }
 
     @staticmethod
     def empty_state() -> dict[str, Any]:
-        return {"tenant_policies": {}, "permission_events": []}
+        return {
+            "tenant_policies": {},
+            "permission_events": [],
+            "immutable_audit_events": [],
+        }
 
     def to_dict(self) -> dict[str, Any]:
         policies: dict[str, Any] = {}
@@ -330,6 +367,11 @@ class PermissionsService:
         return {
             "tenant_policies": policies,
             "permission_events": events,
+            "immutable_audit_events": [
+                dict(item)
+                for item in list(self.state.get("immutable_audit_events") or [])
+                if isinstance(item, dict)
+            ],
         }
 
     def list_permissions(self) -> list[Permission]:
@@ -384,7 +426,89 @@ class PermissionsService:
         )
         self.state.setdefault("permission_events", [])
         self.state["permission_events"].append(event.to_dict())
+        self._append_immutable_audit(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            actor=actor,
+            event_type=event_type,
+            details=details,
+        )
         return event
+
+    def _append_immutable_audit(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        actor: str,
+        event_type: str,
+        details: dict[str, Any],
+    ) -> None:
+        occurred_at = audit_now_iso()
+        material = {
+            "tenant_id": tenant_id,
+            "organization_id": organization_id,
+            "event_type": event_type,
+            "timestamp": occurred_at,
+            "details": details,
+        }
+        digest = hashlib.sha1(
+            json.dumps(material, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:20]
+        event = ImmutableAuditEvent(
+            event_id=f"audit-permissions:{digest}",
+            action=f"permissions.{event_type}",
+            actor=AuditActor(actor_id=_safe_text(actor, "system"), actor_type="user"),
+            target=AuditTarget(
+                target_type="permissions_policy",
+                target_id=f"{tenant_id}::{organization_id}",
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                project_id=None,
+            ),
+            occurred_at=occurred_at,
+            retention_class=AuditRetentionClass.SECURITY,
+            source="permissions_service",
+            before={},
+            after={},
+            change_summary={
+                "changed_fields": sorted(dict(details).keys()),
+                "added_fields": sorted(dict(details).keys()),
+                "removed_fields": [],
+            },
+            context=deepcopy(dict(details)),
+        )
+        rows = [
+            dict(item)
+            for item in list(self.state.get("immutable_audit_events") or [])
+            if isinstance(item, dict)
+        ]
+        rows.append(event.to_dict())
+        self.state["immutable_audit_events"] = rows[-2000:]
+
+    def immutable_audit_events(
+        self,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        rows = [
+            dict(item)
+            for item in list(self.state.get("immutable_audit_events") or [])
+            if isinstance(item, dict)
+            and _safe_text(dict(item.get("target") or {}).get("tenant_id"), "")
+            == tenant_id
+            and _safe_text(dict(item.get("target") or {}).get("organization_id"), "")
+            == organization_id
+        ]
+        rows.sort(
+            key=lambda item: (
+                _safe_text(item.get("occurred_at"), ""),
+                _safe_text(item.get("event_id"), ""),
+            )
+        )
+        return rows[-max(1, int(limit)) :]
 
     def permission_events(
         self, *, tenant_id: str, organization_id: str
