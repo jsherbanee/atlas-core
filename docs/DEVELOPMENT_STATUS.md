@@ -77,6 +77,7 @@ Sprint U-01 completes commercial document usability and presentation polish acro
 Sprint U-02 completes end-to-end application usability polish across Home, Projects, project lifecycle-facing surfaces, Transactions, Knowledge, Reports, and Settings by standardizing page-purpose identity captions, reducing development/prototype language in user-facing controls, improving roadmap-section guidance messaging, and validating responsive/state stability behavior without adding new features.
 Alpha UI Cleanup refines production-facing shell/navigation surfaces by tightening active vs deferred route clarity, removing tenant-facing implementation remnants, reducing duplicate action exposure, and preserving behavior contracts without adding new business workflows.
 Alpha UI Cleanup (Responsive Navigation and Estimate Creation UX) standardizes primary shell order to Transactions, Projects, Knowledge, Reports, restores tenant-facing footer copyright text, and adds a dedicated Transactions > Estimates > Add workflow with dropdown-driven estimate details and catalog-backed Product/Service/Fee/Assembly line controls.
+Alpha UI Cleanup (Header Consolidation and Copy Reduction) standardizes a one-row shared header (Atlas, Transactions, Projects, Knowledge, Reports, Search, Menu), removes redundant tenant-facing shell metadata and repeated descriptive copy, and preserves continuity-critical object breadcrumbs and deterministic settings navigation.
 Sprint M-01 implements tenant manager and sandbox provisioning foundations for alpha infrastructure, including platform-admin sandbox lifecycle controls, deterministic isolated repository-path provisioning, tenant-scoped search/job/settings/preference containers, and guarded reset/export/delete workflows without introducing hosted infrastructure dependencies.
 Sprint A-02 implements controlled alpha deployment and test operations, including controlled-alpha environment labeling, administrator-only alpha health checks, tenant-scoped feedback/defect workflow capture, known-limitations access, and operator checklist guidance without introducing new product workflows.
 Sprint A-02 pt 2 implements centralized tenant-scoped application error logging and review workflow, including deterministic fingerprint grouping, occurrence history, user-facing Error IDs, status transitions with audit coverage, sanitized diagnostics export, and health-check unresolved-error/severity summaries.
@@ -155,6 +156,13 @@ Latest Alpha UI Cleanup navigation/estimate-add targeted validation baseline: 13
 - validated dedicated Transactions > Estimates > Add surface rendering and draft-estimate creation path
 - validated estimate-add controls include customer/project/project-code selectors and omit Vendor ID
 - validated catalog line-entry filtering controls for Product/Service/Fee/Assembly and assembly insertion mode selection
+
+## Manual UI Validation (Alpha UI Cleanup: Header Consolidation and Copy Reduction)
+- validated one-row shared global header composition at 980, 1180, and 1366 widths with no overflow
+- validated predictable primary-link collapse at 820 width with Search and Menu remaining accessible
+- validated Settings menu navigation path routes to Settings and closes deterministic menu state after navigation
+- validated removal of redundant tenant-facing shell labels and alpha/version string from normal pages
+- validated object-level continuity breadcrumbs remain available when object selection context exists
 
 ## Manual UI Validation (W-03)
 - validated Object Workspace search handoff with visible context banner and deterministic return behavior

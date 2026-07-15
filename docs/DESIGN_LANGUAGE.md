@@ -318,6 +318,29 @@ Design rules for this pass:
 
 - preserve two-column workspace composition and align content start positions consistently
 - reduce excess whitespace and avoid repeated action exposure across navigation and content panes
+
+## 8.10 Header Consolidation and Copy Reduction
+
+This hardening pass keeps behavior-preserving scope and focuses on shell density, clarity, and deterministic navigation behavior.
+
+Global shell rules:
+
+- use a single shared header row for Atlas, primary navigation, global search, and menu control
+- keep Transactions first in primary navigation order
+- keep Atlas as the Home control
+- preserve active-state behavior while avoiding page-specific header implementations
+- collapse navigation predictably on narrow widths instead of wrapping into a second header row
+
+Copy and metadata rules:
+
+- remove tenant-facing shell metadata that only repeats visible navigation state
+- reserve build/version/commit/test diagnostics for authorized Alpha Operations or Platform Management surfaces
+- remove redundant descriptive page copy that restates page titles or obvious purpose
+- retain copy only when it changes user decisions (warnings, errors, legal/financial implications, or actionable empty-state guidance)
+
+Continuity rule:
+
+- preserve meaningful object-level breadcrumbs used for cross-workspace continuity
 - keep Home operational and compact with Continue Working, Recent Projects, Action Center, Notifications, and Favorites
 - keep Knowledge summary language user-facing (data health and next actions), not implementation-status phrasing
 - keep Transactions limited to active families and treat change orders as a Sales Order/Return Order convention

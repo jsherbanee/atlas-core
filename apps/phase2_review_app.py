@@ -1208,31 +1208,12 @@ def _safe_text(value: Any, default: str = "Unknown") -> str:
     return str(value)
 
 
-_PAGE_PURPOSE_SUBTITLES: dict[str, str] = {
-    "Home": "Operational launchpad for active work, project continuity, and next-step actions.",
-    "Projects": "Project library for creating, opening, importing, and managing bid workspaces.",
-    "Knowledge": "Shared commercial and reference entities used across projects.",
-    "Transactions": "Commercial document workflows with deterministic lifecycle and revision controls.",
-    "Object Workspace": "Shared object context for summary, relationships, activity, and documents.",
-    "Reports": "Delivery-ready outputs and readiness summaries across active work.",
-    "Settings": "Tenant and personal configuration with deterministic policy boundaries.",
-    "Open Existing Project": "Browse repository projects and open the selected workspace.",
-    "Create New Project": "Create a bid workspace, then continue onboarding in Documents.",
-    "Overview": "Project health, next actions, and continuity signals.",
-    "Documents": "Upload source files, monitor extraction health, and run project analysis.",
-    "BOM Review": "Review extracted equipment scope, cost posture, and source traceability.",
-    "Scope & Risk": "Track scope gaps, RFIs, and ownership responsibilities.",
-    "Engineering Review": "Consolidate engineering insights, conflicts, and coordination actions.",
-    "Estimate": "Deterministic estimate structure, revisions, confidence, and export.",
-    "Notebook": "Engineering notes, decisions, and timeline context.",
-}
+_PAGE_PURPOSE_SUBTITLES: dict[str, str] = {}
 
 
 def _render_page_header(st: Any, title: str, subtitle: str) -> None:
     st.subheader(title)
     resolved_subtitle = _safe_text(subtitle, "")
-    if not resolved_subtitle:
-        resolved_subtitle = _safe_text(_PAGE_PURPOSE_SUBTITLES.get(title), "")
     if resolved_subtitle:
         st.caption(resolved_subtitle)
 
@@ -1265,6 +1246,9 @@ def _render_workspace_section_header(
     objective: str,
     current_focus: str,
 ) -> None:
+    # Objective/focus metadata is reserved for platform diagnostics surfaces.
+    if not _build_diagnostics_visible(st):
+        return
     st.markdown(
         render_workspace_context_html(
             workspace=workspace,
@@ -5746,6 +5730,7 @@ def _submit_global_search(st: Any) -> None:
 
 
 def _open_page(st: Any, page: str) -> None:
+    st.session_state["atlas_header_menu_open"] = False
     st.session_state["atlas_active_page"] = page
     st.rerun()
 
@@ -8063,17 +8048,11 @@ def _render_top_navigation(
     ]
 
     for column, (label, page) in zip(nav_columns, nav_items):
-        is_active = active_page == page
-        if (
-            label == "Projects"
-            and record is not None
-            and active_page != "Mission Control"
-        ):
-            is_active = True
-        elif label == "Knowledge" and active_page in KNOWLEDGE_PAGES:
-            is_active = True
-        elif label == "Transactions" and active_page == "Transactions":
-            is_active = True
+        is_active = _primary_navigation_is_active(
+            label,
+            active_page=active_page,
+            record=record,
+        )
         if column.button(
             label,
             key=f"atlas_header_nav_{label}",
@@ -8083,8 +8062,65 @@ def _render_top_navigation(
             _open_page(st, page)
 
 
-def _render_header_menu(st: Any, host: Any) -> None:
-    menu = host.popover("☰")
+def _primary_navigation_is_active(
+    label: str,
+    *,
+    active_page: str,
+    record: ProjectWorkspaceRecord | None,
+) -> bool:
+    if active_page == label:
+        return True
+    if label == "Projects" and record is not None and active_page != "Mission Control":
+        return True
+    if label == "Knowledge" and active_page in KNOWLEDGE_PAGES:
+        return True
+    return label == "Transactions" and active_page == "Transactions"
+
+
+def _render_header_menu(
+    st: Any,
+    host: Any,
+    *,
+    active_page: str,
+    record: ProjectWorkspaceRecord | None,
+) -> None:
+    is_open = bool(st.session_state.get("atlas_header_menu_open", False))
+    if host.button(
+        "☰",
+        key="atlas_header_menu_toggle",
+        type="secondary",
+        width="content",
+    ):
+        st.session_state["atlas_header_menu_open"] = not is_open
+        st.rerun()
+
+    if not bool(st.session_state.get("atlas_header_menu_open", False)):
+        return
+
+    menu = host.container(border=True)
+    menu.caption("Navigate")
+    for label, page in [
+        ("Transactions", "Transactions"),
+        ("Projects", "Projects"),
+        ("Knowledge", "Knowledge"),
+        ("Reports", "Reports"),
+    ]:
+        if menu.button(
+            label,
+            key=f"atlas_header_menu_nav_{label}",
+            type=(
+                "primary"
+                if _primary_navigation_is_active(
+                    label,
+                    active_page=active_page,
+                    record=record,
+                )
+                else "secondary"
+            ),
+            width="stretch",
+        ):
+            _open_page(st, page)
+
     if menu.button(
         "Settings",
         key="atlas_header_settings",
@@ -8102,23 +8138,22 @@ def _render_header(
 ) -> None:
     _ = (workspace_service, context)
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
-    alpha_marker = _alpha_environment_marker()
 
-    top_cols = st.columns([1.6, 5.2, 0.5])
-    if top_cols[0].button(
+    header_cols = st.columns([1.35, 1.0, 1.0, 1.0, 1.0, 4.65, 0.5])
+    if header_cols[0].button(
         "Atlas",
         key="atlas_header_nav_Atlas",
         width="content",
         type="primary" if current_page == "Mission Control" else "secondary",
     ):
         _open_page(st, "Mission Control")
-    _render_global_search_control(st, top_cols[1])
-    _render_header_menu(st, top_cols[2])
-
-    nav_cols = st.columns([1.05, 1.05, 1.05, 1.05])
-    _render_top_navigation(st, nav_cols, record)
-    top_cols[0].caption(
-        f"{_safe_text(alpha_marker.get('label'), 'Controlled Alpha')} · {ALPHA_APP_VERSION_IDENTIFIER}"
+    _render_top_navigation(st, header_cols[1:5], record)
+    _render_global_search_control(st, header_cols[5])
+    _render_header_menu(
+        st,
+        header_cols[6],
+        active_page=_safe_text(current_page, "Mission Control"),
+        record=record,
     )
 
     if record is None or current_page == "Mission Control":
@@ -16524,7 +16559,7 @@ def _render_application_administration_page(
     _render_page_header(
         st,
         "Settings",
-        "Tenant and personal configuration with deterministic policy boundaries.",
+        "",
     )
     _render_workspace_section_header(
         st,
@@ -19859,7 +19894,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
     _render_page_header(
         st,
         "Projects",
-        "Primary project library for opening, creating, importing, and managing repository projects.",
+        "",
     )
 
     include_archived = st.checkbox("Show archived projects", value=False)
@@ -35659,7 +35694,8 @@ def _render_shell(
     global_search_query = _active_global_search_query(st)
 
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
-    st.caption(_breadcrumb(record, current_page))
+    if _should_render_shell_breadcrumb(st, current_page):
+        st.caption(_breadcrumb(record, current_page))
     mission_control_payload = None
     if current_page == "Mission Control":
         if record is not None:
@@ -35771,6 +35807,25 @@ def _render_shell(
         )
 
     _render_status_bar(st, record, context)
+
+
+def _should_render_shell_breadcrumb(st: Any, page: str) -> bool:
+    if page == "Object Workspace":
+        return True
+    selection = dict(st.session_state.get("atlas_context_selection") or {})
+    kind = _safe_text(selection.get("kind"), "")
+    if not kind:
+        return False
+    object_pages = {
+        "Knowledge",
+        "Equipment",
+        "Drawings",
+        "Specifications",
+        "BOM Review",
+        "Estimate",
+        "Product Resolution",
+    }
+    return page in object_pages
 
 
 def _build_workspace_service() -> ProjectWorkspaceService:

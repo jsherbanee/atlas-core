@@ -274,7 +274,7 @@ def atlas_stylesheet() -> str:
             margin: 0 auto;
             padding-left: 1rem;
             padding-right: 1rem;
-            padding-top: 0.75rem;
+            padding-top: 0.55rem;
         }}
         .atlas-statusbar {{
             border-top: 1px solid var(--atlas-border);
@@ -564,12 +564,14 @@ def atlas_stylesheet() -> str:
             box-shadow: none !important;
             background: transparent !important;
             color: #111827 !important;
-            min-width: max-content !important;
-            padding: 0.15rem 0.35rem !important;
+            min-width: 0 !important;
+            width: 100% !important;
+            padding: 0.2rem 0.35rem !important;
             font-weight: 600 !important;
             line-height: 1.1 !important;
             border-radius: var(--atlas-radius-sm) !important;
             font-size: var(--atlas-body-small-size) !important;
+            min-height: 2rem !important;
         }}
         .st-key-atlas_header_nav_Atlas button[kind="primary"],
         .st-key-atlas_header_nav_Transactions button[kind="primary"],
@@ -580,7 +582,7 @@ def atlas_stylesheet() -> str:
             color: var(--atlas-primary) !important;
         }}
         .st-key-atlas_header_nav_Transactions button {{
-            min-width: 8.5rem !important;
+            min-width: 7rem !important;
         }}
         .st-key-atlas_header_nav_Transactions button p {{
             white-space: nowrap !important;
@@ -645,6 +647,12 @@ def atlas_stylesheet() -> str:
             }}
         }}
         @media (max-width: 960px) {{
+            .st-key-atlas_header_nav_Transactions,
+            .st-key-atlas_header_nav_Projects,
+            .st-key-atlas_header_nav_Knowledge,
+            .st-key-atlas_header_nav_Reports {{
+                display: none !important;
+            }}
             .atlas-content-section {{
                 padding: var(--atlas-space-sm);
             }}

@@ -616,13 +616,37 @@ def test_application_nav_exposes_home_with_compatibility_route_key() -> None:
 
 
 def test_top_navigation_settings_menu_routes_to_administration() -> None:
-    st = _HomeContractStreamlit(pressed={"Settings"})
+    st = _HomeContractStreamlit(pressed={"☰", "Settings"})
     service = _FakeWorkspaceService([])
 
     app._render_header(st, service, None, None)
 
-    assert st.popover_labels == ["☰"]
     assert st.session_state["atlas_active_page"] == "Administration"
+    assert st.rerun_called is True
+
+
+def test_header_menu_routes_to_primary_pages() -> None:
+    st = _HomeContractStreamlit(pressed={"☰", "Knowledge"})
+
+    app._render_header_menu(
+        st,
+        st,
+        active_page="Mission Control",
+        record=None,
+    )
+
+    assert st.session_state["atlas_active_page"] == "Knowledge"
+    assert st.rerun_called is True
+
+
+def test_header_menu_closes_when_page_navigation_completes() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state = {"atlas_header_menu_open": True}
+
+    app._open_page(st, "Projects")
+
+    assert st.session_state["atlas_header_menu_open"] is False
+    assert st.session_state["atlas_active_page"] == "Projects"
     assert st.rerun_called is True
 
 
@@ -814,7 +838,17 @@ def test_header_uses_compact_responsive_column_contract() -> None:
 
     app._render_header(st, _FakeWorkspaceService([]), None, None)
 
-    assert st.column_specs[:2] == [[1.6, 5.2, 0.5], [1.05, 1.05, 1.05, 1.05]]
+    assert st.column_specs == [[1.35, 1.0, 1.0, 1.0, 1.0, 4.65, 0.5]]
+
+
+def test_header_is_single_row_and_omits_alpha_version_caption() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_header(st, _FakeWorkspaceService([]), None, None)
+
+    assert st.column_specs == [[1.35, 1.0, 1.0, 1.0, 1.0, 4.65, 0.5]]
+    assert all("Controlled Alpha" not in item for item in st.captions)
+    assert all("0.1.0-a02" not in item for item in st.captions)
 
 
 def test_top_navigation_order_places_transactions_first() -> None:
@@ -950,6 +984,29 @@ def test_breadcrumb_page_label_maps_administration_to_settings() -> None:
 
 def test_breadcrumb_for_mission_control_renders_home_for_users() -> None:
     assert app._breadcrumb(None, "Mission Control") == "Atlas / Home"
+
+
+def test_shell_breadcrumb_hides_redundant_workspace_labels() -> None:
+    st = _FakeStreamlit(session_state={"atlas_context_selection": {}})
+
+    assert app._should_render_shell_breadcrumb(st, "Mission Control") is False
+    assert app._should_render_shell_breadcrumb(st, "Projects") is False
+    assert app._should_render_shell_breadcrumb(st, "Knowledge") is False
+    assert app._should_render_shell_breadcrumb(st, "Transactions") is False
+
+
+def test_shell_breadcrumb_preserves_object_level_context() -> None:
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_context_selection": {
+                "kind": "equipment",
+                "data": {"equipment_id": "EQ-1"},
+            }
+        }
+    )
+
+    assert app._should_render_shell_breadcrumb(st, "BOM Review") is True
+    assert app._should_render_shell_breadcrumb(st, "Object Workspace") is True
 
 
 def test_breadcrumb_includes_selected_knowledge_product_context() -> None:
@@ -1234,6 +1291,17 @@ def test_injected_styles_include_transactions_primary_nav_contract() -> None:
     assert "calc(var(--atlas-display-l-size) * 1.5)" in stylesheet
 
 
+def test_injected_styles_define_predictable_responsive_header_collapse() -> None:
+    st = _HomeContractStreamlit()
+
+    app._inject_styles(st)
+
+    stylesheet = "\n".join(st.markdowns)
+    assert "@media (max-width: 960px)" in stylesheet
+    assert ".st-key-atlas_header_nav_Transactions" in stylesheet
+    assert "display: none !important;" in stylesheet
+
+
 def test_action_center_filters_to_high_priority_and_deduplicates() -> None:
     st = _HomeContractStreamlit()
     service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
@@ -1341,6 +1409,23 @@ def test_footer_shows_tenant_neutral_branding_without_diagnostics() -> None:
         phrase not in " ".join(st.captions)
         for phrase in ["Current workspace", "Section:", "Last intake", "Last review"]
     )
+
+
+def test_page_purpose_defaults_do_not_include_deprecated_explanatory_copy() -> None:
+    assert app._PAGE_PURPOSE_SUBTITLES == {}
+
+
+def test_deprecated_workspace_descriptive_copy_is_absent_from_source() -> None:
+    assert app.__file__ is not None
+    source = Path(app.__file__).read_text()
+    removed_copy = [
+        "Shared commercial and reference entities used across projects.",
+        "Commercial document workflows with deterministic lifecycle and revision controls.",
+        "Primary project library for opening, creating, importing, and managing repository projects.",
+        "Delivery-ready outputs and readiness summaries across active work.",
+        "Tenant and personal configuration with deterministic policy boundaries.",
+    ]
+    assert all(item not in source for item in removed_copy)
 
 
 def test_estimate_add_route_uses_dedicated_workspace_renderer(

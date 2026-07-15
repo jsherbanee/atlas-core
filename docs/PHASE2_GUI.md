@@ -36,6 +36,7 @@ Atlas Workspace Sprint U-02 completes end-to-end UX and workflow polish across a
 Atlas Workspace Sprint C-03 extends Transactions catalog-backed line insertion for Product/Service/Fee/Assembly item types, including assembly `expand` and `grouped` insertion options and credit memo compatibility, while preserving deterministic no-mutation behavior for issued revisions.
 Atlas Workspace Alpha UI Cleanup refines production-facing shell/navigation behavior by tightening active vs deferred route visibility, reducing duplicate action exposure, and removing tenant-facing implementation remnants without adding new business features.
 Atlas Workspace Alpha UI Cleanup (Responsive Navigation and Estimate Creation UX) standardizes top-header primary navigation ordering to Transactions, Projects, Knowledge, Reports (with Atlas as the fixed Home control), restores tenant-facing footer copyright text, and provides a dedicated Transactions > Estimates > Add workflow with dropdown-driven estimate details and catalog-backed Product/Service/Fee/Assembly line insertion.
+Atlas Workspace Alpha UI Cleanup (Header Consolidation and Copy Reduction) consolidates the shell to one shared header row (Atlas, Transactions, Projects, Knowledge, Reports, Search, Menu), removes redundant tenant-facing shell metadata and repeated descriptive page copy, and preserves continuity-critical object breadcrumbs.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.
@@ -60,6 +61,7 @@ Shell contract notes:
 - top-header primary navigation order is Transactions, Projects, Knowledge, Reports
 - Atlas remains the far-left Home action
 - tenant-facing footer text is `©2026 Corsa Systems. All rights reserved.`
+- header composition is one shared row; primary links collapse predictably at narrow widths instead of wrapping to a second row
 
 ## Workspace Modes
 Atlas now operates in two navigation modes:

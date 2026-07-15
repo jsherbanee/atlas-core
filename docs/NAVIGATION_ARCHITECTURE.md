@@ -23,6 +23,7 @@ This document defines the reusable navigation contract used by the shell and wor
 ## Current Implementation Notes
 
 - The application shell still uses header-based primary navigation
+- The shared shell uses one horizontal header row for Atlas, Transactions, Projects, Knowledge, Reports, Search, and Menu
 - Knowledge is the first workspace using the reusable secondary/tertiary navigation framework
 - Knowledge search results restore the active secondary group and tertiary page selection context
 - The framework is intended to be extended to additional workspaces without changing the contract shape
@@ -76,6 +77,7 @@ Sprint T-02 implements the first production Transactions navigation surface.
 Implemented behavior:
 - Transactions added to top-level primary header navigation
 - top-header primary navigation order is Atlas (Home), Transactions, Projects, Knowledge, Reports
+- at narrower widths, header primary links collapse behind the menu control instead of wrapping to a second row
 - Transactions workspace uses the shared secondary/tertiary navigation contract model
 - active secondary sections: Overview, Estimates, Sales Orders, Return Orders, Credit Memos, Customer Invoices
 - deferred secondary sections (visible but disabled/deferred): Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills
@@ -111,6 +113,7 @@ W-01 implementation note:
 
 - Search result opening preserves Knowledge navigation context
 - Knowledge navigation defaults are deterministic
+- shell-level breadcrumb suppression avoids redundant `Atlas / <workspace>` labels while preserving object-level continuity breadcrumbs
 - migrated object opens preserve object-level navigation context inside Object Workspace
 - context banner and return behavior remain deterministic across search and Working Set handoff paths
 - transaction deferred-route visibility and standalone Change Order removal are regression-covered
