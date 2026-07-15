@@ -509,7 +509,7 @@ class TenantManagerService:
         )
         if not active:
             raise PermissionError("active tenant context is required")
-        self._tenant_required(active)
+        self._assert_operational_access(active)
         return active
 
     def assert_same_tenant_reference(
@@ -541,6 +541,7 @@ class TenantManagerService:
         index_key: str,
         records: list[dict[str, Any]],
     ) -> None:
+        self._assert_operational_access(tenant_id)
         data = self._tenant_data(tenant_id)
         data.setdefault("search_indexes", {})
         data["search_indexes"][_safe_text(index_key, "default")] = [
@@ -551,18 +552,21 @@ class TenantManagerService:
     def get_search_index(
         self, *, tenant_id: str, index_key: str
     ) -> list[dict[str, Any]]:
+        self._assert_operational_access(tenant_id)
         data = self._tenant_data(tenant_id)
         index = dict(data.get("search_indexes") or {})
         rows = list(index.get(_safe_text(index_key, "default")) or [])
         return [deepcopy(dict(item)) for item in rows if isinstance(item, dict)]
 
     def append_job_record(self, *, tenant_id: str, job_payload: dict[str, Any]) -> None:
+        self._assert_operational_access(tenant_id)
         data = self._tenant_data(tenant_id)
         data.setdefault("jobs", [])
         data["jobs"].append(deepcopy(dict(job_payload)))
         self._touch_activity(tenant_id)
 
     def list_job_records(self, *, tenant_id: str) -> list[dict[str, Any]]:
+        self._assert_operational_access(tenant_id)
         rows = list(self._tenant_data(tenant_id).get("jobs") or [])
         return [deepcopy(dict(item)) for item in rows if isinstance(item, dict)]
 
@@ -574,6 +578,7 @@ class TenantManagerService:
         preference_key: str,
         preference_value: Any,
     ) -> None:
+        self._assert_operational_access(tenant_id)
         data = self._tenant_data(tenant_id)
         preferences = data.setdefault("user_preferences", {})
         user_preferences = dict(preferences.get(_safe_text(user_id, "")) or {})
@@ -582,6 +587,7 @@ class TenantManagerService:
         self._touch_activity(tenant_id)
 
     def user_preferences(self, *, tenant_id: str, user_id: str) -> dict[str, Any]:
+        self._assert_operational_access(tenant_id)
         data = self._tenant_data(tenant_id)
         return deepcopy(dict((data.get("user_preferences") or {}).get(user_id) or {}))
 
@@ -592,6 +598,7 @@ class TenantManagerService:
         user_id: str,
         object_ids: list[str],
     ) -> None:
+        self._assert_operational_access(tenant_id)
         data = self._tenant_data(tenant_id)
         working_set = data.setdefault("working_set", {})
         working_set[_safe_text(user_id, "")] = [
@@ -600,6 +607,7 @@ class TenantManagerService:
         self._touch_activity(tenant_id)
 
     def working_set(self, *, tenant_id: str, user_id: str) -> list[str]:
+        self._assert_operational_access(tenant_id)
         data = self._tenant_data(tenant_id)
         rows = list((data.get("working_set") or {}).get(user_id) or [])
         return [_safe_text(item, "") for item in rows if _safe_text(item, "")]
@@ -667,10 +675,16 @@ class TenantManagerService:
         tenant_id: str,
         organization_id: str,
     ) -> None:
+        normalized_tenant = _safe_text(tenant_id, "")
+        normalized_organization = _safe_text(organization_id, "")
+        if normalized_tenant != "local" or normalized_organization != "atlas":
+            raise PermissionError(
+                "platform tenant management is only available in the platform administration scope"
+            )
         decision = self.permissions_service.evaluate(
             AccessRequest(
-                tenant_id=_safe_text(tenant_id, "local"),
-                organization_id=_safe_text(organization_id, "atlas"),
+                tenant_id=normalized_tenant,
+                organization_id=normalized_organization,
                 principal_id=_safe_text(actor_id, "local-user"),
                 permission_key="platform.tenants.manage",
                 project_id=None,
@@ -843,3 +857,8 @@ class TenantManagerService:
         self.state.setdefault("audit_events", [])
         self.state["audit_events"].append(event.to_dict())
         self.state["audit_events"] = list(self.state["audit_events"])[-5000:]
+
+    def _assert_operational_access(self, tenant_id: str) -> None:
+        tenant = self._tenant_required(tenant_id)
+        if tenant.status != TenantStatus.ACTIVE:
+            raise PermissionError("tenant operational access requires active status")

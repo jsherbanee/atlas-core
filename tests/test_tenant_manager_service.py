@@ -115,6 +115,24 @@ def test_platform_admin_permission_enforced(tmp_path: Path) -> None:
         )
 
 
+def test_tenant_scope_admin_cannot_use_platform_management(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.permissions_service.assign_role(
+        tenant_id="tenant-a",
+        organization_id="org-tenant-a",
+        principal_id="owner-a",
+        role_key="tenant_administrator",
+        actor="tests",
+    )
+
+    with pytest.raises(PermissionError, match="platform administration scope"):
+        service.list_tenants(
+            actor_id="owner-a",
+            requester_tenant_id="tenant-a",
+            requester_organization_id="org-tenant-a",
+        )
+
+
 def test_search_job_settings_and_preferences_are_tenant_isolated(
     tmp_path: Path,
 ) -> None:
@@ -312,3 +330,35 @@ def test_recent_audit_events_capture_lifecycle_actions(tmp_path: Path) -> None:
     actions = {item["action"] for item in events}
     assert "tenant.status.suspended" in actions
     assert "tenant.status.active" in actions
+
+
+def test_suspended_tenant_cannot_access_operational_data(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=False,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+
+    service.suspend_sandbox(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+
+    with pytest.raises(PermissionError, match="active status"):
+        service.set_search_index(
+            tenant_id="tenant-a",
+            index_key="objects",
+            records=[{"id": "blocked"}],
+        )
+    with pytest.raises(PermissionError, match="active status"):
+        service.assert_active_tenant_context("tenant-a")

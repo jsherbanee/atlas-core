@@ -55,6 +55,7 @@ W-03 Universal Object Workspace shared UI migration is implemented for controlle
 Current engineering focus is post-W-03 validation, broader adapter coverage, deeper activity/history compatibility, and future object-family migration planning.
 
 P-07 Alpha blocker remediation is complete with default-safe transactions scope enforcement and regression validation.
+A-01 Final Alpha Readiness Audit and Release Candidate is complete with blocker-class tenancy hardening and full-gate validation.
 
 Epic E remains the next candidate epic only after architecture review and explicit sprint approval.
 
@@ -172,6 +173,7 @@ Production readiness should require:
 - implement deterministic document-generation and template engine foundation (P-05) with precedence-aware template resolution and revision snapshot reuse guarantees
 - remediate alpha blocker-class tenancy and authorization boundary gaps (P-07) without introducing new feature scope
 - implement tenant manager and sandbox provisioning foundation (M-01) with platform-admin lifecycle controls and tenant-isolated local sandbox paths
+- complete final alpha readiness audit and release-candidate package (A-01) with evidence-backed classification, blocker-only fixes, and reconciled status/readiness/release documentation
 - consolidate search and object-graph foundations
 - formalize rule-engine and diagnostics contracts
 - deliver deterministic roles and permissions foundation with centralized action gating and audit-ready permission events

@@ -10,6 +10,8 @@ Alpha data validation update: Epic C Sprint C-04 adds deterministic seed catalog
 
 Alpha infrastructure update: Sprint M-01 adds platform-admin tenant sandbox provisioning and isolation controls for deterministic multi-tenant alpha environments. See [TENANT_MANAGER.md](TENANT_MANAGER.md).
 
+Alpha release-candidate update: Sprint A-01 completes the final alpha readiness audit and release package, including blocker-class tenancy hardening, full quality-gate validation, and release-candidate documentation. See [ALPHA_READINESS.md](ALPHA_READINESS.md), [ALPHA_TEST_PLAN.md](ALPHA_TEST_PLAN.md), [ALPHA_KNOWN_LIMITATIONS.md](ALPHA_KNOWN_LIMITATIONS.md), [ALPHA_RELEASE_CHECKLIST.md](ALPHA_RELEASE_CHECKLIST.md), and [ALPHA_SANDBOX_GUIDE.md](ALPHA_SANDBOX_GUIDE.md).
+
 Current workspace-continuity stream: Epic W Workspace Intelligence.
 Scope: deterministic context persistence, cross-workspace continuity, search handoff, Working Set continuity, and repository-backed return context for already-implemented capabilities only.
 

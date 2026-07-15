@@ -19,6 +19,23 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Atlas Alpha Completion Sprint A-01 Final Alpha Readiness Audit and Release Candidate)
+
+### Improved
+
+- Completed an evidence-based alpha readiness audit package covering tenant isolation, permissions, immutable audit, attachment security, job idempotency, transactions, document generation, and navigation contract stability.
+- Tenant Manager platform administration operations now require explicit platform scope (`local`/`atlas`) in addition to `platform.tenants.manage` authorization checks.
+- Tenant Manager operational helper surfaces now enforce active-tenant status and reject suspended-tenant operational access for search indexes, jobs, preferences, working-set state, and active-context assertions.
+- Added regression coverage for tenant-scope admin restriction and suspended-tenant operational access denial.
+- Published alpha release-candidate package documents: `ALPHA_TEST_PLAN.md`, `ALPHA_KNOWN_LIMITATIONS.md`, `ALPHA_RELEASE_CHECKLIST.md`, and `ALPHA_SANDBOX_GUIDE.md`.
+
+### Quality
+
+- black --check .: passing
+- ruff check .: passing
+- mypy .: passing
+- pytest: full suite passing (1408 tests)
+
 ## Unreleased (Atlas Alpha Infrastructure Sprint M-01 Tenant Manager and Sandbox Provisioning)
 
 ### Improved

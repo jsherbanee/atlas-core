@@ -1,7 +1,7 @@
 # Alpha Readiness Report
 
 ## Scope
-Sprint P-07 Alpha Blocker Remediation on top of P-06 baseline (`7df177c`, `1366` passing tests).
+Sprint A-01 Final Alpha Readiness Audit and Release Candidate on top of the P-07 + M-01 baseline (`1408` passing tests).
 
 Audit domains:
 - roles and permissions
@@ -28,11 +28,11 @@ Audit domains:
   - `mypy .`
   - `pytest -q`
 
-Baseline full run at sprint start:
+Current full run baseline:
 - black: passing
 - ruff: passing
 - mypy: passing
-- pytest: 1366 passed
+- pytest: 1408 passed
 
 ## Capability Status
 Implemented:
@@ -70,6 +70,8 @@ High:
 
 Alpha blocking:
 - transactions scope discipline still depended on runtime context wiring; unscoped `TransactionsWorkspaceService` construction allowed multi-tenant mutation behavior in a single service instance.
+- tenant-scoped administrators could invoke platform tenant-management workflows outside the platform administration scope.
+- suspended tenants retained access to operational data helpers (search/jobs/preferences/working set) instead of enforcing active-status boundaries.
 
 ## Remediation Matrix
 | finding | affected subsystem | severity | proposed correction | tests required | documentation impact |
@@ -86,6 +88,16 @@ Corrected in P-07:
 Previously corrected in P-06 and retained:
 - explicit template scope enforcement.
 - attachment version extension allow-list enforcement.
+
+## Remediation Outcome (A-01)
+Corrected in A-01:
+- platform tenant-management operations now require platform scope (`tenant_id=local`, `organization_id=atlas`) in addition to permission evaluation.
+- tenant operational helpers now enforce active tenant status and reject access when tenant status is suspended or archived.
+- regression coverage added for tenant-scope admin restriction and suspended-tenant operational access denial.
+
+Validated evidence sets in A-01:
+- focused suites: 258 passing tests across tenant manager, permissions, immutable audit, attachments, jobs, transactions, document generation, and navigation contracts.
+- full gates: black, ruff, mypy, pytest all passing (`1408` tests).
 
 ## T-08 Follow-Up Note
 
@@ -172,6 +184,8 @@ No blocker-class cross-tenant leakage regressions were identified in M-01 valida
 - Transactions service construction now fails fast when active tenant/org scope is omitted.
 - Cross-scope explicit template assignment remains rejected.
 - Attachment version uploads continue to enforce allow-list consistency with initial uploads.
+- Platform tenant-management actions now require explicit platform administration scope and cannot be invoked from tenant-scoped contexts.
+- Suspended tenant operational helper access is now denied until tenant status is restored to active.
 
 ## Data Integrity Findings
 - Issued revision immutability remains enforced with template snapshot replay.
@@ -203,7 +217,7 @@ No blocker-class cross-tenant leakage regressions were identified in M-01 valida
 - Large-scale repository compatibility migration checks.
 
 ## Alpha Readiness Percentage
-Readiness score: 91%
+Readiness score: 96%
 
 Method:
 - weighted assessment across 14 audited domains

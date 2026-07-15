@@ -142,6 +142,7 @@ Post-1.0:
 - clear search and object-discovery experience
 - dependable project intake and export behavior
 - tenant-safe administration and support processes
+- release-candidate evidence package with explicit known-limitations transparency and operator sandbox runbook guidance
 
 ## Roadmap Summary
 Atlas is evolving from a bid-intelligence foundation into a complete lifecycle platform for AV and lighting systems integrators.

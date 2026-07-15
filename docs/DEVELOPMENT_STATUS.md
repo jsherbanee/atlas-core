@@ -100,9 +100,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1398 tests)
+- pytest: full suite passing (1408 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1398 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1408 passing tests.
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces
@@ -157,7 +157,7 @@ Current governance posture:
 Broader product direction remains aligned to the lifecycle-platform roadmap, while implementation sequencing should follow the approved roadmap and progressive refinement model.
 
 Secondary active focus:
-- P-07 alpha blocker remediation complete; continue P-08 readiness planning for attachment security depth within approved roadmap scope.
+- A-01 final alpha readiness audit and release-candidate package complete; continue P-08 readiness planning for attachment security depth within approved roadmap scope.
 - closeout regression monitoring and remaining page-migration debt triage for lower-priority advanced and object-detail surfaces.
 - explicit identifier discoverability across project creation, listing, open flows, global search, and project settings.
 - Epic E readiness assessment only (architecture review and sprint approval required; Epic E not started).

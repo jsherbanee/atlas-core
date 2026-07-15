@@ -51,6 +51,7 @@ Status: Active
 - U-01 Commercial Document Usability and Presentation Polish
 - U-02 End-to-End Application UX and Workflow Polish
 - M-01 Tenant Manager and Sandbox Provisioning
+- A-01 Final Alpha Readiness Audit and Release Candidate
 
 ### A-07 Scope
 
@@ -137,6 +138,19 @@ Explicitly out of scope:
 - AWS infrastructure provisioning
 - SSO/Cognito identity lifecycle
 - billing or self-service signup workflows
+
+### A-01 Scope
+
+- execute evidence-based alpha readiness audit and release-candidate classification across tenant isolation, authorization, auditability, attachment security, jobs, transactions, document generation, and workflow stability domains
+- classify findings into ready, ready with known limitations, alpha blocker, or deferred-beyond-alpha categories with repository evidence
+- remediate only confirmed alpha blocker defects in approved hardening categories without introducing new product capabilities
+- produce alpha release-candidate package documentation (test plan, known limitations, release checklist, sandbox guide) and reconcile status/readiness/release records
+
+Explicitly out of scope:
+
+- new feature expansion beyond approved alpha scope
+- AWS/SSO/billing/procurement/inventory/live QuickBooks transport activation
+- roadmap expansion beyond approved Phase 2 and alpha hardening boundaries
 
 ### A-08 Scope
 
