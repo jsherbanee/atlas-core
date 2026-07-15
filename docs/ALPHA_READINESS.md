@@ -147,6 +147,16 @@ Commercial-document usability and presentation polish now includes:
 
 No blocker-class tenant-isolation, issued-immutability, or cross-scope regressions were identified in U-01 validation.
 
+## U-02 Follow-Up Note
+
+U-02 end-to-end workflow validation now includes:
+- seeded acceptance-to-transaction continuity using approved estimate as base bid source for project commercial summary state
+- additive change-order validation through Sales Order change-order tracking in seeded workflow coverage
+- deductive change-order validation through Return Order change-order tracking and downstream Credit Memo traceability
+- user-facing settings terminology polish for seeded sample-data actions to remove implementation-facing phrasing
+
+No blocker-class tenant-isolation, issued-immutability, or cross-scope regressions were identified in U-02 validation.
+
 ## Security and Tenancy Findings
 - No active cross-tenant mutation regression remains in audited transactions paths with default service configuration.
 - Transactions service construction now fails fast when active tenant/org scope is omitted.

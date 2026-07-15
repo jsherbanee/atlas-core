@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -169,10 +170,17 @@ def test_seed_validation_proves_catalog_to_invoice_and_return_to_credit_memo() -
     assert validation["invoice_id"]
     assert validation["return_order_id"]
     assert validation["credit_memo_id"]
+    assert validation["additive_change_order_id"]
+    assert validation["deductive_change_order_id"]
     assert validation["credit_memo_source_traceable"] is True
     assert validation["policy_quote"]["policy"] == "cost_plus_percent"
     assert validation["manual_quote"]["policy"] == "manual"
     assert validation["manual_quote"]["manual_override_applied"] is True
+    change_summary = validation["project_change_summary"]
+    assert Decimal(change_summary["base_bid_value"]) > Decimal("0")
+    assert Decimal(change_summary["additive_change_total"]) > Decimal("0")
+    assert Decimal(change_summary["deductive_change_total"]) > Decimal("0")
+    assert len(change_summary["ordered_change_list"]) >= 2
 
 
 def test_seed_validation_generates_representative_pdfs() -> None:

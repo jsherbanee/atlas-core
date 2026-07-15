@@ -16295,11 +16295,11 @@ def _render_application_administration_page(
             ).lower() in {"1", "true", "yes"}
             if seed_actions_enabled:
                 with st.expander(
-                    "Development Seed Data (C-04)",
+                    "Sample Catalog Data (C-04)",
                     expanded=False,
                 ):
                     st.caption(
-                        "Administrator-only development action for deterministic C-04 sample catalog loading/reset."
+                        "Administrator-only action for deterministic C-04 sample catalog load, validation, and reset."
                     )
                     seed_service = CommercialCatalogSeedService(
                         _transactions_workspace_service(st).catalog_service
@@ -16376,7 +16376,7 @@ def _render_application_administration_page(
                         st.caption(settings_manage_access.reason)
             else:
                 st.caption(
-                    "Development seed actions are hidden. Set ATLAS_ENABLE_SEED_DATA_ACTIONS=true to enable administrator-only controls."
+                    "Sample catalog actions are hidden. Set ATLAS_ENABLE_SEED_DATA_ACTIONS=true to enable administrator-only controls."
                 )
 
         elif tertiary == "organization_profile":

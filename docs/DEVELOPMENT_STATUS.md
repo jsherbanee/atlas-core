@@ -76,7 +76,7 @@ Sprint S-01 completes Settings Workspace alpha scope with organization profile c
 Sprint U-01 completes commercial document usability and presentation polish across Transactions workflows by standardizing tertiary action contracts for Sales Orders, Return Orders, Credit Memos, and Customer Invoices; extending line-presentation sort parity (`unit_cost`, `discount`, `tax_rate`); consolidating export behavior to deterministic PDF actions; and improving source/lineage visibility in related-document views without introducing new transaction families, payments, inventory/procurement, or QuickBooks API transport.
 Sprint U-02 completes end-to-end application usability polish across Home, Projects, project lifecycle-facing surfaces, Transactions, Knowledge, Reports, and Settings by standardizing page-purpose identity captions, reducing development/prototype language in user-facing controls, improving roadmap-section guidance messaging, and validating responsive/state stability behavior without adding new features.
 Sprint C-03 implements the Commercial Catalog Foundation with unified catalog item types (product/service/fee/assembly), tenant-scoped pricing policy defaults, nexus-based tax rule selection with effective-date/priority/compound behavior, deterministic PDF catalog price-list inspection/preview/finalization with diagnostics and partial-success reporting, CSV/XLSX catalog imports (including assemblies and component rows), assembly versioning/nested expansion/cycle prevention/rollups, and transaction-level catalog line integration for Estimates, Sales Orders, Return Orders, Credit Memos, and Customer Invoices while preserving manual line workflows and issued-document immutability.
-Sprint C-04 implements deterministic seed catalog import and alpha validation data operations, including repeatable tenant-scoped seed loading/reset controls, explicit seed provenance tagging, representative CSV/XLSX/PDF import validation scenarios, and scripted catalog-to-transaction flow validation through Estimate -> Sales Order -> Customer Invoice and Return Order -> Credit Memo paths with PDF artifact generation.
+Sprint C-04 implements deterministic seed catalog import and alpha validation data operations, including repeatable tenant-scoped seed loading/reset controls, explicit seed provenance tagging, representative CSV/XLSX/PDF import validation scenarios, and scripted catalog-to-transaction flow validation through Estimate -> Sales Order -> Customer Invoice, additive/deductive change-order tracking, and Return Order -> Credit Memo paths with PDF artifact generation.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 
 X-01 through X-13 are closed.
@@ -99,9 +99,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1385 tests)
+- pytest: full suite passing (1398 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1385 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1398 passing tests.
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces

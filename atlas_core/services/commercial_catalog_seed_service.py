@@ -443,13 +443,41 @@ class CommercialCatalogSeedService:
             estimate,
             ApprovalState.APPROVED,
         )
-        workspace.issue_document(
-            document_id=estimate.document_id,
-            reason="seed workflow estimate issue",
+        workspace.set_project_base_bid(
+            tenant_id=tenant_id,
+            project_id="seed-project-alpha",
+            project_code="SEED-ALPHA",
+            reference_type="accepted_estimate",
+            reference_document_id=estimate.document_id,
+            actor=actor,
         )
         sales_order = workspace.create_sales_order_from_estimate(
             estimate_document_id=estimate.document_id,
             inherit_terms_from_estimate=True,
+        )
+
+        additive_change_order = workspace.create_draft(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            document_type=CommercialDocumentType.SALES_ORDER,
+            customer_id=estimate.customer_id,
+            project_id=estimate.project_id,
+            project_code=estimate.project_code,
+        )
+        workspace.add_catalog_line(
+            document_id=additive_change_order.document_id,
+            catalog_item_id=self._safe(product.get("catalog_item_id")),
+            quantity=Decimal("1"),
+        )
+        workspace.configure_change_order_tracking(
+            document_id=additive_change_order.document_id,
+            is_change_order=True,
+            change_reason="seed additive scope",
+        )
+
+        workspace.issue_document(
+            document_id=estimate.document_id,
+            reason="seed workflow estimate issue",
         )
         invoice = workspace.create_customer_invoice_draft(
             tenant_id=tenant_id,
@@ -491,6 +519,11 @@ class CommercialCatalogSeedService:
             catalog_item_id=self._safe(product.get("catalog_item_id")),
             quantity=Decimal("1"),
         )
+        workspace.configure_change_order_tracking(
+            document_id=return_order.document_id,
+            is_change_order=True,
+            change_reason="seed deductive scope",
+        )
         workspace.approve_return_order(
             document_id=return_order.document_id,
             reason="seed workflow return approval",
@@ -512,6 +545,10 @@ class CommercialCatalogSeedService:
             if self._safe(line.source_document_id) == return_order.document_id
             and self._safe(line.source_line_id)
         ]
+        project_change_summary = workspace.project_commercial_summary(
+            tenant_id=tenant_id,
+            project_id="seed-project-alpha",
+        )
 
         estimate_pdf = workspace.export_document_pdf(
             document_id=estimate.document_id,
@@ -532,8 +569,10 @@ class CommercialCatalogSeedService:
         return {
             "estimate_id": estimate.document_id,
             "sales_order_id": sales_order.document_id,
+            "additive_change_order_id": additive_change_order.document_id,
             "invoice_id": invoice.document_id,
             "return_order_id": return_order.document_id,
+            "deductive_change_order_id": return_order.document_id,
             "credit_memo_id": credit_memo.document_id,
             "estimate_pdf": {
                 "file_name": self._safe(estimate_pdf.get("file_name")),
@@ -559,6 +598,7 @@ class CommercialCatalogSeedService:
             "policy_quote": policy_quote,
             "manual_quote": manual_quote,
             "credit_memo_source_traceable": bool(traceable_credit_lines),
+            "project_change_summary": project_change_summary,
         }
 
     def _mark_seeded_catalog_items(

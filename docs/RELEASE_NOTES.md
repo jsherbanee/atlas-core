@@ -29,7 +29,7 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Seed package coverage includes representative manufacturers, vendors, products, services, fees, assemblies, assembly components, tax nexus records, and price-sheet imports.
 - Development/admin seed controls now support repeatable load, duplicate suppression, and seed-only reset preserving non-seed records.
 - Seed validation now includes representative CSV/XLSX/PDF import paths and deterministic import diagnostics behavior.
-- Scripted validation now covers catalog-backed Estimate -> Sales Order -> Customer Invoice and Return Order -> Credit Memo workflows, including representative PDF generation checks.
+- Scripted validation now covers catalog-backed Estimate -> Sales Order -> Customer Invoice, additive/deductive change-order tracking, and Return Order -> Credit Memo workflows, including representative PDF generation checks.
 
 ### Scope Notes
 
@@ -56,7 +56,7 @@ This document tracks product-facing changes for Atlas Preview releases.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1385 tests)
+- pytest: full suite passing (1398 tests)
 
 ## Unreleased (Atlas Alpha Completion Sprint U-02 End-to-End Application UX and Workflow Polish)
 
