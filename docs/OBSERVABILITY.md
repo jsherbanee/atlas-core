@@ -18,6 +18,21 @@ It covers logs, metrics, traces, alerts, health checks, dashboards, and incident
 - [REPORTING.md](REPORTING.md)
 - [AI_FOUNDATIONAL_KNOWLEDGE.md](AI_FOUNDATIONAL_KNOWLEDGE.md)
 - [AWS_ARCHITECTURE.md](AWS_ARCHITECTURE.md)
+- [ERROR_LOGGING.md](ERROR_LOGGING.md)
+
+## A-02 Controlled Alpha Baseline
+Implemented in A-02 pt 2:
+- tenant-scoped application error records with deterministic fingerprint grouping
+- per-occurrence history retention for repeated failures
+- sanitized message and stack-trace persistence (no raw secrets or filesystem paths)
+- user-facing Error ID references for support triage
+- administrator error-review workflow and sanitized diagnostics export
+- alpha health-check integration with recent-error severity counts and unresolved totals
+
+Current constraints:
+- local deterministic persistence only
+- no external telemetry or monitoring service integration in this sprint
+- no production alert-routing claims
 
 ## Observability Goals
 Atlas observability should help operators understand:

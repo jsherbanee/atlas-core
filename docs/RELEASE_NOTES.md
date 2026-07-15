@@ -19,6 +19,23 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Atlas Alpha Operations Sprint A-02 pt 2 Controlled Alpha Operations and Error Logging)
+
+### Improved
+
+- Atlas now logs unhandled application exceptions and explicit operational failures into tenant-scoped error records before showing user-safe messages.
+- Platform Management now includes an authorized Error Log surface with filters, detail view, status transitions, resolution notes, and sanitized diagnostics export.
+- Error records now provide deterministic fingerprint grouping with per-occurrence history and stable user-facing Error IDs.
+- Alpha Health Check now summarizes recent errors by severity and unresolved error counts while preserving redaction boundaries.
+- Alpha Feedback records can now link directly to related Error IDs for defect traceability.
+
+### Scope Notes
+
+- no external monitoring service integration
+- no raw secret/path/customer-data exposure in logs
+- no public stack-trace display
+- no new commercial workflow features
+
 ## Unreleased (Atlas Alpha Operations Sprint A-02 Controlled Alpha Deployment and Test Operations)
 
 ### Improved

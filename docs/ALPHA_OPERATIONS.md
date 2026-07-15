@@ -12,6 +12,8 @@ Implemented:
 - platform-management tenant workflow support for create/open/suspend/restore/archive/seed/reset/export/delete
 - administrator-only alpha health-check surface
 - tenant-scoped alpha feedback and defect records
+- centralized tenant-scoped application error logging with deterministic fingerprint grouping
+- platform-management error review workflow with status transitions and diagnostics export
 - settings access for known limitations and operator checklist guidance
 - defect-template download and environment-diagnostics capture
 
@@ -36,6 +38,15 @@ Out of scope:
 ### Tenant Scope Boundaries
 - Feedback records are tenant-scoped and reject cross-tenant diagnostics access.
 - Alpha health-check output is tenant-specific and does not include internal storage paths or secret references.
+- Application error logs are tenant-scoped by default; cross-tenant review is platform-admin-only in platform scope.
+- Suspended tenants cannot access operational error-log surfaces.
+
+### Error Logging Controls
+- Unhandled exceptions are logged before user-facing error messaging.
+- Explicitly handled operational failures log structured, sanitized error records.
+- Repeated failures are grouped by deterministic fingerprint and retain individual occurrence history.
+- User-facing error messaging provides a referenceable Error ID and does not expose raw stack traces.
+- Error status and resolution-note updates emit tenant audit events.
 
 ## Alpha Health Check Contract
 Administrator-only health checks provide:
@@ -47,7 +58,8 @@ Administrator-only health checks provide:
 - background-job health summary
 - attachment storage health summary
 - search-index status summary
-- recent errors (redacted)
+- recent errors by severity (redacted)
+- unresolved error count
 - last backup or export metadata
 - test-suite baseline reference
 
@@ -63,6 +75,7 @@ Structured tenant-scoped fields:
 - actual result
 - attachment references
 - environment diagnostics (redacted for sensitive keys)
+- related Error ID
 - status
 - resolution notes
 
@@ -77,3 +90,4 @@ Supported statuses:
 - [ALPHA_SANDBOX_GUIDE.md](ALPHA_SANDBOX_GUIDE.md)
 - [ALPHA_RELEASE_CHECKLIST.md](ALPHA_RELEASE_CHECKLIST.md)
 - [ALPHA_KNOWN_LIMITATIONS.md](ALPHA_KNOWN_LIMITATIONS.md)
+- [ERROR_LOGGING.md](ERROR_LOGGING.md)

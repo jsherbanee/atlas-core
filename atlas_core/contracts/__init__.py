@@ -93,6 +93,13 @@ from atlas_core.contracts.tenant_manager_contracts import (
     TenantMembership,
     TenantStatus,
 )
+from atlas_core.contracts.error_logging_contracts import (
+    ApplicationError,
+    ErrorContext,
+    ErrorOccurrence,
+    ErrorResolutionStatus,
+    ErrorSeverity,
+)
 
 __all__ = [
     "PlanReviewRequest",
@@ -170,4 +177,9 @@ __all__ = [
     "TenantEnvironment",
     "TenantMembership",
     "TenantStatus",
+    "ApplicationError",
+    "ErrorContext",
+    "ErrorOccurrence",
+    "ErrorResolutionStatus",
+    "ErrorSeverity",
 ]

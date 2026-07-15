@@ -10,6 +10,7 @@ Provide explicit transparency for known alpha constraints that are non-blocking 
 - Navigation/manual viewport validation evidence is contract- and regression-led in this release candidate; broader exploratory UX sweeps continue in follow-through hardening.
 - Controlled alpha release-channel marker is enforced; production designation is intentionally blocked in this build.
 - External ticketing integration is not enabled; defects remain in tenant-scoped alpha feedback records.
+- Error logging is repository-backed and local deterministic only; no external monitoring pipeline is enabled in this sprint.
 
 ## Deferred Beyond Alpha (Intentional)
 - SSO/Cognito/invitation lifecycle and production IAM controls.

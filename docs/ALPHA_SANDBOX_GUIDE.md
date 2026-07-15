@@ -37,12 +37,17 @@ Operator runbook for provisioning and validating isolated tenant sandboxes in th
 9. Submit one feedback record from sandbox A and one feedback record from sandbox B.
 10. Validate feedback lists are tenant-scoped and do not show cross-tenant records.
 11. Run alpha health check for each tenant and verify tenant-specific output.
+12. Trigger one controlled test error in sandbox A and one in sandbox B.
+13. Validate Error Log view shows tenant-scoped records with Error IDs and grouped occurrence counts.
+14. Verify stack traces/messages are sanitized and no raw paths/secrets are exposed.
+15. Link one feedback record to a valid Error ID and verify persistence.
 
 ## Lifecycle Guardrails
 - Suspended sandboxes should not accept operational helper access until restored.
 - Archived sandboxes remain non-operational and should require explicit lifecycle action before operational use.
 - Platform tenant-management actions must be run from platform scope only.
 - Alpha health checks must be administrator-only and should never expose internal paths or secret references.
+- Error logs must be tenant-scoped for tenant admins and cross-tenant metadata must remain platform-admin-only.
 
 ## Evidence Mapping
 Primary automated evidence for this runbook:

@@ -64,6 +64,7 @@ def test_settings_workspace_contract_has_expected_sections() -> None:
         "tenant_manager",
         "alpha_health_check",
         "feedback",
+        "error_log",
         "known_limitations",
         "operator_checklist",
     ]

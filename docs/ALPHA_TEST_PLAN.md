@@ -14,6 +14,8 @@ In scope:
 - commercial transactions and document generation stability
 - alpha health-check and diagnostics redaction behavior
 - tenant-scoped feedback and defect workflow operations
+- centralized application error logging capture, grouping, and status workflow
+- user-safe Error ID behavior and diagnostics export controls
 - navigation/state regression coverage for validated alpha surfaces
 
 Out of scope:
@@ -31,6 +33,9 @@ Out of scope:
 | Authorization boundaries | Deny-by-default, explicit platform-admin controls | `tests/test_permissions_service.py`, `tests/test_tenant_manager_service.py` | passing |
 | Alpha health check | Administrator-only health surface and redacted diagnostics output | `tests/test_tenant_manager_service.py` | passing |
 | Feedback and defect workflow | Structured tenant-scoped feedback lifecycle with status updates | `tests/test_tenant_manager_service.py` | passing |
+| Application error logging | Fingerprint grouping, redaction, occurrence history, and user-facing IDs | `tests/test_tenant_manager_service.py` | passing |
+| Error log access control | Tenant isolation, suspended-tenant rejection, and platform cross-tenant scope | `tests/test_tenant_manager_service.py` | passing |
+| Error status workflow | Acknowledged/investigating/resolved/reopened transitions with audit coverage | `tests/test_tenant_manager_service.py` | passing |
 | Immutable audit | Append-only chain and deterministic filtering/export | `tests/test_immutable_audit_service.py` | passing |
 | Attachment security | Tenant-scoped access and extension-policy enforcement | `tests/test_attachment_service.py` | passing |
 | Job reliability | Deterministic lifecycle and idempotent retry/cancel semantics | `tests/test_project_workspace_service.py` | passing |
@@ -43,10 +48,14 @@ Out of scope:
 ## Executed Commands
 Focused A-02 suites:
 - `.venv/bin/pytest -q tests/test_tenant_manager_service.py tests/test_phase2_settings_navigation.py`
-- Result: `16 passed`
+- Result: `19 passed`
 
 Explicit A-02 operational validation:
 - `.venv/bin/pytest -q tests/test_tenant_manager_service.py -k "two_sandbox_alpha_operations_are_isolated or alpha_feedback_is_tenant_scoped_and_structured or alpha_health_check_requires_platform_admin_and_redacts"`
+- Result: `3 passed`
+
+Explicit error-logging validation:
+- `.venv/bin/pytest -q tests/test_tenant_manager_service.py -k "application_error_fingerprinting_redaction_and_occurrences or application_error_tenant_scope_and_suspended_rejection or application_error_status_workflow_and_feedback_linking"`
 - Result: `3 passed`
 
 Full quality gates:
@@ -54,7 +63,7 @@ Full quality gates:
 - `.venv/bin/ruff check .`
 - `.venv/bin/mypy .`
 - `.venv/bin/pytest -q`
-- Result: `1412 passed`
+- Result: `1415 passed`
 
 ## A-02 Operations Verification
 - Controlled-alpha environment marker is visible in shell header/status and blocks accidental production designation.

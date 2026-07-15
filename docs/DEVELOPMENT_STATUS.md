@@ -77,6 +77,7 @@ Sprint U-01 completes commercial document usability and presentation polish acro
 Sprint U-02 completes end-to-end application usability polish across Home, Projects, project lifecycle-facing surfaces, Transactions, Knowledge, Reports, and Settings by standardizing page-purpose identity captions, reducing development/prototype language in user-facing controls, improving roadmap-section guidance messaging, and validating responsive/state stability behavior without adding new features.
 Sprint M-01 implements tenant manager and sandbox provisioning foundations for alpha infrastructure, including platform-admin sandbox lifecycle controls, deterministic isolated repository-path provisioning, tenant-scoped search/job/settings/preference containers, and guarded reset/export/delete workflows without introducing hosted infrastructure dependencies.
 Sprint A-02 implements controlled alpha deployment and test operations, including controlled-alpha environment labeling, administrator-only alpha health checks, tenant-scoped feedback/defect workflow capture, known-limitations access, and operator checklist guidance without introducing new product workflows.
+Sprint A-02 pt 2 implements centralized tenant-scoped application error logging and review workflow, including deterministic fingerprint grouping, occurrence history, user-facing Error IDs, status transitions with audit coverage, sanitized diagnostics export, and health-check unresolved-error/severity summaries.
 Sprint C-03 implements the Commercial Catalog Foundation with unified catalog item types (product/service/fee/assembly), tenant-scoped pricing policy defaults, nexus-based tax rule selection with effective-date/priority/compound behavior, deterministic PDF catalog price-list inspection/preview/finalization with diagnostics and partial-success reporting, CSV/XLSX catalog imports (including assemblies and component rows), assembly versioning/nested expansion/cycle prevention/rollups, and transaction-level catalog line integration for Estimates, Sales Orders, Return Orders, Credit Memos, and Customer Invoices while preserving manual line workflows and issued-document immutability.
 Sprint C-04 implements deterministic seed catalog import and alpha validation data operations, including repeatable tenant-scoped seed loading/reset controls, explicit seed provenance tagging, representative CSV/XLSX/PDF import validation scenarios, and scripted catalog-to-transaction flow validation through Estimate -> Sales Order -> Customer Invoice, additive/deductive change-order tracking, and Return Order -> Credit Memo paths with PDF artifact generation.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
@@ -101,9 +102,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1408 tests)
+- pytest: full suite passing (1415 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1408 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1415 passing tests.
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces

@@ -564,3 +564,257 @@ def test_two_sandbox_alpha_operations_are_isolated(tmp_path: Path) -> None:
     )
     assert health_a["tenant_id"] == "tenant-a"
     assert health_a["last_backup_or_export"]["last_export_at"] == ""
+
+
+def test_application_error_fingerprinting_redaction_and_occurrences(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=False,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+
+    first = service.log_application_error(
+        actor_id="owner-a",
+        tenant_id="tenant-a",
+        environment_label="Controlled Alpha",
+        application_version="1.5.0-alpha-a02",
+        severity="high",
+        exception_type="ValueError",
+        message="/Users/private/secrets.txt",
+        stack_trace="Traceback\nline /Users/private/secrets.txt\nsecret://token",
+        workspace="Transactions",
+        route="Transactions",
+        background_job_id="job-123",
+    )
+    second = service.log_application_error(
+        actor_id="owner-a",
+        tenant_id="tenant-a",
+        environment_label="Controlled Alpha",
+        application_version="1.5.0-alpha-a02",
+        severity="high",
+        exception_type="ValueError",
+        message="/Users/private/secrets.txt",
+        stack_trace="Traceback\nline /Users/private/secrets.txt\nsecret://token",
+        workspace="Transactions",
+        route="Transactions",
+        background_job_id="job-123",
+    )
+
+    assert first["error_id"] == second["error_id"]
+    assert second["occurrence_count"] == 2
+    assert second["summary"] == "[redacted-sensitive]"
+    assert "secret://" not in second["occurrences"][0]["sanitized_stack_trace"]
+    assert second["context"]["background_job_id"] == "job-123"
+
+
+def test_application_error_tenant_scope_and_suspended_rejection(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=False,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-b",
+            sandbox_label="Tenant B",
+            owner_user_id="owner-b",
+            seed_data_profile="profile-b",
+            enable_seed_data=False,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+
+    service.log_application_error(
+        actor_id="platform-admin",
+        tenant_id="tenant-a",
+        environment_label="Controlled Alpha",
+        application_version="1.5.0-alpha-a02",
+        severity="medium",
+        exception_type="RuntimeError",
+        message="a-error",
+        stack_trace="trace",
+        workspace="Settings",
+        route="Platform Management",
+    )
+    service.log_application_error(
+        actor_id="platform-admin",
+        tenant_id="tenant-b",
+        environment_label="Controlled Alpha",
+        application_version="1.5.0-alpha-a02",
+        severity="medium",
+        exception_type="RuntimeError",
+        message="b-error",
+        stack_trace="trace",
+        workspace="Settings",
+        route="Platform Management",
+    )
+
+    tenant_a_rows = service.list_application_errors(
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        actor_id="owner-a",
+        tenant_id="tenant-a",
+    )
+    assert len(tenant_a_rows) == 1
+    assert tenant_a_rows[0]["tenant_id"] == "tenant-a"
+
+    platform_rows = service.list_application_errors(
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        actor_id="platform-admin",
+        tenant_id=None,
+    )
+    assert len(platform_rows) >= 2
+
+    with pytest.raises(PermissionError, match="cross-tenant diagnostics"):
+        service.get_application_error_details(
+            requester_tenant_id="tenant-a",
+            requester_organization_id="org-tenant-a",
+            actor_id="owner-a",
+            tenant_id="tenant-b",
+            error_id=tenant_a_rows[0]["error_id"],
+        )
+
+    service.suspend_sandbox(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+    with pytest.raises(PermissionError, match="active status"):
+        service.list_application_errors(
+            requester_tenant_id="tenant-a",
+            requester_organization_id="org-tenant-a",
+            actor_id="owner-a",
+            tenant_id="tenant-a",
+        )
+
+
+def test_application_error_status_workflow_and_feedback_linking(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.create_sandbox(
+        request=SandboxProvisioningRequest(
+            tenant_id="tenant-a",
+            sandbox_label="Tenant A",
+            owner_user_id="owner-a",
+            seed_data_profile="profile-a",
+            enable_seed_data=False,
+        ),
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+    )
+
+    created = service.log_application_error(
+        actor_id="owner-a",
+        tenant_id="tenant-a",
+        environment_label="Controlled Alpha",
+        application_version="1.5.0-alpha-a02",
+        severity="critical",
+        exception_type="LookupError",
+        message="integration hook failed",
+        stack_trace="stack",
+        workspace="Transactions",
+        route="Transactions",
+        correlation_id="corr-1",
+        integration_hook="qbo.sync",
+    )
+
+    updated = service.update_application_error_status(
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        actor_id="owner-a",
+        tenant_id="tenant-a",
+        error_id=created["error_id"],
+        status="resolved",
+        resolution_notes="fixed by retry",
+    )
+    assert updated["status"] == "resolved"
+    assert updated["resolution_notes"] == "fixed by retry"
+
+    reopened = service.log_application_error(
+        actor_id="owner-a",
+        tenant_id="tenant-a",
+        environment_label="Controlled Alpha",
+        application_version="1.5.0-alpha-a02",
+        severity="critical",
+        exception_type="LookupError",
+        message="integration hook failed",
+        stack_trace="stack",
+        workspace="Transactions",
+        route="Transactions",
+        correlation_id="corr-1",
+        integration_hook="qbo.sync",
+    )
+    assert reopened["status"] == "reopened"
+
+    feedback = service.submit_alpha_feedback(
+        tenant_id="tenant-a",
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        user_id="owner-a",
+        workspace="Transactions",
+        object_or_transaction="invoice:INV-1",
+        severity="high",
+        reproduction_steps="step",
+        expected_result="ok",
+        actual_result="fail",
+        related_error_id=created["error_id"],
+    )
+    assert feedback["related_error_id"] == created["error_id"]
+
+    with pytest.raises(ValueError, match="application error does not exist"):
+        service.submit_alpha_feedback(
+            tenant_id="tenant-a",
+            requester_tenant_id="tenant-a",
+            requester_organization_id="org-tenant-a",
+            user_id="owner-a",
+            workspace="Transactions",
+            object_or_transaction="invoice:INV-1",
+            severity="high",
+            reproduction_steps="step",
+            expected_result="ok",
+            actual_result="fail",
+            related_error_id="ERR-DOES-NOT-EXIST",
+        )
+
+    health = service.alpha_health_check(
+        tenant_id="tenant-a",
+        actor_id="platform-admin",
+        requester_tenant_id="local",
+        requester_organization_id="atlas",
+        application_version="1.5.0-alpha-a02",
+        environment_label="Controlled Alpha",
+        test_suite_baseline_reference="1412 passing",
+    )
+    assert health["recent_errors_by_severity"]["critical"] >= 1
+    assert health["unresolved_error_count"] >= 1
+
+    diagnostics = service.export_application_error_diagnostics(
+        requester_tenant_id="tenant-a",
+        requester_organization_id="org-tenant-a",
+        actor_id="owner-a",
+        tenant_id="tenant-a",
+    )
+    assert diagnostics["tenant_id"] == "tenant-a"
+    assert diagnostics["errors"][0]["error_id"].startswith("ERR-")

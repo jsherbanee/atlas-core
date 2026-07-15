@@ -14,6 +14,7 @@ from pathlib import Path
 import platform
 import re
 import subprocess
+import traceback
 from typing import Any
 
 from atlas_core import __version__
@@ -4214,9 +4215,107 @@ def _alpha_feedback_defect_template() -> str:
             "Actual Result:",
             "Attachment References:",
             "Environment Diagnostics:",
+            "Related Error ID:",
             "Status (open|in_review|resolved|closed):",
             "Resolution Notes:",
         ]
+    )
+
+
+def _log_application_error(
+    st: Any,
+    *,
+    summary: str,
+    exception: Exception | None,
+    severity: str,
+    tenant_id: str,
+    organization_id: str,
+    user_id: str,
+    workspace: str,
+    route: str,
+    related_object_id: str | None = None,
+    related_object_type: str | None = None,
+    correlation_id: str | None = None,
+    background_job_id: str | None = None,
+    request_or_session_ref: str | None = None,
+    integration_hook: str | None = None,
+) -> str:
+    marker = _alpha_environment_marker()
+    safe_summary = _safe_text(summary, "Unexpected application failure")
+    exception_type = type(exception).__name__ if exception is not None else "Exception"
+    stack_trace = (
+        "".join(
+            traceback.format_exception(
+                type(exception), exception, exception.__traceback__
+            )
+        )
+        if exception is not None
+        else ""
+    )
+    message = str(exception) if exception is not None else safe_summary
+    try:
+        tenant_manager = _tenant_manager_workspace_service(st)
+        logged = tenant_manager.log_application_error(
+            actor_id=_safe_text(user_id, "atlas-ui"),
+            tenant_id=_safe_text(tenant_id, "local"),
+            environment_label=_safe_text(marker.get("label"), "Controlled Alpha"),
+            application_version=ALPHA_APP_VERSION_IDENTIFIER,
+            severity=_safe_text(severity, "medium"),
+            exception_type=exception_type,
+            message=message,
+            stack_trace=stack_trace,
+            workspace=_safe_text(workspace, "Atlas"),
+            route=_safe_text(route, "Unknown"),
+            related_object_id=related_object_id,
+            related_object_type=related_object_type,
+            correlation_id=correlation_id,
+            background_job_id=background_job_id,
+            request_or_session_ref=request_or_session_ref,
+            integration_hook=integration_hook,
+        )
+        _save_tenant_manager_workspace_state(st, tenant_manager)
+        return _safe_text(logged.get("error_id"), "ERR-UNAVAILABLE")
+    except Exception:
+        return "ERR-UNAVAILABLE"
+
+
+def _render_logged_error_message(
+    st: Any,
+    *,
+    summary: str,
+    exception: Exception | None,
+    severity: str,
+    tenant_id: str,
+    organization_id: str,
+    user_id: str,
+    workspace: str,
+    route: str,
+    related_object_id: str | None = None,
+    related_object_type: str | None = None,
+    correlation_id: str | None = None,
+    background_job_id: str | None = None,
+    request_or_session_ref: str | None = None,
+    integration_hook: str | None = None,
+) -> None:
+    error_id = _log_application_error(
+        st,
+        summary=summary,
+        exception=exception,
+        severity=severity,
+        tenant_id=tenant_id,
+        organization_id=organization_id,
+        user_id=user_id,
+        workspace=workspace,
+        route=route,
+        related_object_id=related_object_id,
+        related_object_type=related_object_type,
+        correlation_id=correlation_id,
+        background_job_id=background_job_id,
+        request_or_session_ref=request_or_session_ref,
+        integration_hook=integration_hook,
+    )
+    st.error(
+        f"{_safe_text(summary, 'Unexpected application failure')}. Reference Error ID: {error_id}"
     )
 
 
@@ -7124,6 +7223,12 @@ def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
             {
                 "tertiary_key": "feedback",
                 "label": "Alpha Feedback",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "error_log",
+                "label": "Error Log",
                 "action_type": "settings_view",
                 "required_selection": None,
             },
@@ -18003,6 +18108,171 @@ def _render_application_administration_page(
                 {},
             )
 
+        if tertiary == "error_log":
+            st.markdown("#### Application Error Log")
+            filter_cols = st.columns(4)
+            error_filter_severity = filter_cols[0].multiselect(
+                "Severity",
+                options=["low", "medium", "high", "critical"],
+                default=[],
+            )
+            error_filter_status = filter_cols[1].multiselect(
+                "Status",
+                options=[
+                    "new",
+                    "acknowledged",
+                    "investigating",
+                    "resolved",
+                    "ignored",
+                    "reopened",
+                ],
+                default=[],
+            )
+            error_filter_workspace = filter_cols[2].text_input("Workspace Filter")
+            error_filter_route = filter_cols[3].text_input("Route Filter")
+
+            target_tenant_for_errors = selected_tenant_id or None
+            error_rows = tenant_manager.list_application_errors(
+                requester_tenant_id=tenant_id,
+                requester_organization_id=organization_id,
+                actor_id=user_id,
+                tenant_id=target_tenant_for_errors,
+                severities=error_filter_severity or None,
+                statuses=error_filter_status or None,
+                limit=500,
+            )
+            if error_filter_workspace.strip():
+                token = error_filter_workspace.strip().lower()
+                error_rows = [
+                    item
+                    for item in error_rows
+                    if token in _safe_text(item.get("workspace"), "").lower()
+                ]
+            if error_filter_route.strip():
+                token = error_filter_route.strip().lower()
+                error_rows = [
+                    item
+                    for item in error_rows
+                    if token in _safe_text(item.get("route"), "").lower()
+                ]
+
+            if error_rows:
+                st.dataframe(error_rows, width="stretch", hide_index=True)
+                selected_error_id = st.selectbox(
+                    "Open Error Details",
+                    options=[
+                        _safe_text(item.get("error_id"), "") for item in error_rows
+                    ],
+                )
+                selected_error_summary = next(
+                    (
+                        item
+                        for item in error_rows
+                        if _safe_text(item.get("error_id"), "") == selected_error_id
+                    ),
+                    {},
+                )
+                selected_error_tenant = _safe_text(
+                    selected_error_summary.get("tenant_id"), selected_tenant_id
+                )
+                try:
+                    details = tenant_manager.get_application_error_details(
+                        requester_tenant_id=tenant_id,
+                        requester_organization_id=organization_id,
+                        actor_id=user_id,
+                        tenant_id=selected_error_tenant,
+                        error_id=selected_error_id,
+                    )
+                    st.json(details)
+                except Exception as exc:
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to load error details",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_error_tenant or tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Error Log",
+                    )
+                    details = {}
+
+                notes = st.text_area("Resolution Notes", value="", height=80)
+                status_cols = st.columns(6)
+                for status_label in [
+                    ("Mark Acknowledged", "acknowledged"),
+                    ("Mark Investigating", "investigating"),
+                    ("Mark Resolved", "resolved"),
+                    ("Mark Ignored", "ignored"),
+                    ("Reopen", "reopened"),
+                ]:
+                    if status_cols.pop(0).button(status_label[0], width="stretch"):
+                        try:
+                            tenant_manager.update_application_error_status(
+                                requester_tenant_id=tenant_id,
+                                requester_organization_id=organization_id,
+                                actor_id=user_id,
+                                tenant_id=selected_error_tenant,
+                                error_id=selected_error_id,
+                                status=status_label[1],
+                                resolution_notes=notes or None,
+                            )
+                            _save_tenant_manager_workspace_state(st, tenant_manager)
+                            st.success("Error status updated.")
+                            st.rerun()
+                        except Exception as exc:
+                            _render_logged_error_message(
+                                st,
+                                summary="Unable to update error status",
+                                exception=exc,
+                                severity="medium",
+                                tenant_id=selected_error_tenant or tenant_id,
+                                organization_id=organization_id,
+                                user_id=user_id,
+                                workspace="Settings",
+                                route="Platform Management > Error Log",
+                                related_object_id=selected_error_id,
+                                related_object_type="application_error",
+                            )
+
+                if st.button("Export Sanitized Diagnostics", width="stretch"):
+                    try:
+                        diagnostics_payload = (
+                            tenant_manager.export_application_error_diagnostics(
+                                requester_tenant_id=tenant_id,
+                                requester_organization_id=organization_id,
+                                actor_id=user_id,
+                                tenant_id=selected_error_tenant,
+                                statuses=error_filter_status or None,
+                                severities=error_filter_severity or None,
+                            )
+                        )
+                        st.download_button(
+                            "Download Error Diagnostics",
+                            data=json.dumps(
+                                diagnostics_payload, indent=2, sort_keys=True
+                            ),
+                            file_name=f"error-log-{selected_error_tenant}.json",
+                            mime="application/json",
+                            width="stretch",
+                        )
+                    except Exception as exc:
+                        _render_logged_error_message(
+                            st,
+                            summary="Unable to export diagnostics",
+                            exception=exc,
+                            severity="medium",
+                            tenant_id=selected_error_tenant or tenant_id,
+                            organization_id=organization_id,
+                            user_id=user_id,
+                            workspace="Settings",
+                            route="Platform Management > Error Log",
+                        )
+            else:
+                st.caption("No application errors matched the selected filters.")
+            return
+
         if tertiary == "known_limitations":
             st.markdown("#### Controlled Alpha Known Limitations")
             st.dataframe(
@@ -18092,7 +18362,17 @@ def _render_application_administration_page(
                     width="stretch",
                 )
             except Exception as exc:
-                st.error(f"Unable to build alpha health check: {exc}")
+                _render_logged_error_message(
+                    st,
+                    summary="Unable to build alpha health check",
+                    exception=exc,
+                    severity="medium",
+                    tenant_id=selected_tenant_id or tenant_id,
+                    organization_id=organization_id,
+                    user_id=user_id,
+                    workspace="Settings",
+                    route="Platform Management > Alpha Health Check",
+                )
             return
 
         if tertiary == "feedback":
@@ -18136,6 +18416,7 @@ def _render_application_administration_page(
                     options=["open", "in_review", "resolved", "closed"],
                     index=0,
                 )
+                feedback_related_error_id = st.text_input("Related Error ID", value="")
                 resolution_notes = st.text_area("Resolution Notes", height=80)
                 submitted = st.form_submit_button("Submit Feedback", width="stretch")
 
@@ -18171,6 +18452,7 @@ def _render_application_administration_page(
                             if item.strip()
                         ],
                         environment_diagnostics=parsed_diagnostics,
+                        related_error_id=feedback_related_error_id or None,
                         status=feedback_status,
                         resolution_notes=resolution_notes or None,
                     )
@@ -18178,7 +18460,17 @@ def _render_application_administration_page(
                     st.success("Feedback submitted.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Unable to submit feedback: {exc}")
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to submit feedback",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id or tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Alpha Feedback",
+                    )
 
             feedback_rows = tenant_manager.list_alpha_feedback(
                 tenant_id=selected_tenant_id,
@@ -18227,7 +18519,17 @@ def _render_application_administration_page(
                             st.success("Feedback updated.")
                             st.rerun()
                         except Exception as exc:
-                            st.error(f"Unable to update feedback: {exc}")
+                            _render_logged_error_message(
+                                st,
+                                summary="Unable to update feedback",
+                                exception=exc,
+                                severity="medium",
+                                tenant_id=selected_tenant_id or tenant_id,
+                                organization_id=organization_id,
+                                user_id=user_id,
+                                workspace="Settings",
+                                route="Platform Management > Alpha Feedback",
+                            )
             else:
                 st.caption("No feedback records have been submitted for this tenant.")
             return
@@ -18277,7 +18579,18 @@ def _render_application_administration_page(
                 st.success("Sandbox provisioned.")
                 st.rerun()
             except Exception as exc:
-                st.error(f"Unable to create sandbox: {exc}")
+                _render_logged_error_message(
+                    st,
+                    summary="Unable to create sandbox",
+                    exception=exc,
+                    severity="high",
+                    tenant_id=selected_tenant_id or tenant_id,
+                    organization_id=organization_id,
+                    user_id=user_id,
+                    workspace="Settings",
+                    route="Platform Management > Tenant Manager",
+                    related_object_type="tenant",
+                )
 
         if selectable_tenants:
 
@@ -18304,7 +18617,17 @@ def _render_application_administration_page(
                     st.success("Sandbox context opened for transactions workspace.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Unable to open sandbox: {exc}")
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to open sandbox",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id or tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tenant Manager",
+                    )
 
             if action_cols[1].button("Suspend", width="stretch"):
                 try:
@@ -18318,7 +18641,17 @@ def _render_application_administration_page(
                     st.success("Sandbox suspended.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Unable to suspend sandbox: {exc}")
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to suspend sandbox",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id or tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tenant Manager",
+                    )
 
             if action_cols[2].button("Restore", width="stretch"):
                 try:
@@ -18332,7 +18665,17 @@ def _render_application_administration_page(
                     st.success("Sandbox restored.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Unable to restore sandbox: {exc}")
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to restore sandbox",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id or tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tenant Manager",
+                    )
 
             if action_cols[3].button("Archive", width="stretch"):
                 try:
@@ -18346,7 +18689,17 @@ def _render_application_administration_page(
                     st.success("Sandbox archived.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Unable to archive sandbox: {exc}")
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to archive sandbox",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id or tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tenant Manager",
+                    )
 
             if action_cols[4].button("Load Seed Data", width="stretch"):
                 try:
@@ -18366,7 +18719,17 @@ def _render_application_administration_page(
                     st.success("Seed data loaded for sandbox.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Unable to load seed data: {exc}")
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to load seed data",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id or tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tenant Manager",
+                    )
 
             export_cache_key = f"atlas_tenant_export_payload::{selected_tenant_id}"
             if action_cols[5].button("Export Sandbox Data", width="stretch"):
@@ -18382,7 +18745,17 @@ def _render_application_administration_page(
                     _save_tenant_manager_workspace_state(st, tenant_manager)
                     st.success("Sandbox export generated.")
                 except Exception as exc:
-                    st.error(f"Unable to export sandbox data: {exc}")
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to export sandbox data",
+                        exception=exc,
+                        severity="medium",
+                        tenant_id=selected_tenant_id or tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tenant Manager",
+                    )
             export_payload = st.session_state.get(export_cache_key)
             if isinstance(export_payload, dict):
                 st.download_button(
@@ -18419,7 +18792,17 @@ def _render_application_administration_page(
                     st.success("Sandbox data reset completed.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Unable to reset sandbox: {exc}")
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to reset sandbox",
+                        exception=exc,
+                        severity="high",
+                        tenant_id=selected_tenant_id or tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tenant Manager",
+                    )
             if confirmation_cols[1].button("Delete Sandbox", width="stretch"):
                 try:
                     tenant_manager.delete_sandbox_guarded(
@@ -18433,7 +18816,17 @@ def _render_application_administration_page(
                     st.success("Sandbox deleted.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Unable to delete sandbox: {exc}")
+                    _render_logged_error_message(
+                        st,
+                        summary="Unable to delete sandbox",
+                        exception=exc,
+                        severity="high",
+                        tenant_id=selected_tenant_id or tenant_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        workspace="Settings",
+                        route="Platform Management > Tenant Manager",
+                    )
 
             st.markdown("#### Sandbox Health")
             st.json(tenant_manager.tenant_health(tenant_id=selected_tenant_id))
@@ -34510,56 +34903,89 @@ def main() -> None:
     st.set_page_config(page_title="Atlas Workspace", layout="wide")
     _inject_styles(st)
     _init_session_state(st)
+    try:
+        workspace_service = _build_workspace_service()
+        _ensure_active_workspace(st, workspace_service)
 
-    workspace_service = _build_workspace_service()
-    _ensure_active_workspace(st, workspace_service)
+        record = _active_record(st, workspace_service)
+        if record is not None:
+            _restore_workspace_state(st, workspace_service, record)
 
-    record = _active_record(st, workspace_service)
-    if record is not None:
-        _restore_workspace_state(st, workspace_service, record)
+        context = _load_context_for_record(record) if record is not None else None
+        if record is not None and context is not None:
+            record = _build_record_from_context(context, existing_record=record)
+            record.workspace_state = workspace_service.load_workspace_state(
+                record.workspace_id
+            )
+            record.pinned = bool(record.metadata.get("pinned", record.pinned))
+            record.is_reference = bool(
+                record.metadata.get("reference", record.is_reference)
+            )
+            record.archived = bool(record.metadata.get("archived", record.archived))
+            workspace_service.save_record(record)
+            _persist_repository_artifacts(workspace_service, record, context)
+            workspace_service.log_event(
+                record.workspace_id,
+                "review_executed",
+                {"source_mode": record.source_mode, "project_id": record.project_id},
+            )
 
-    context = _load_context_for_record(record) if record is not None else None
-    if record is not None and context is not None:
-        record = _build_record_from_context(context, existing_record=record)
-        record.workspace_state = workspace_service.load_workspace_state(
-            record.workspace_id
+        if st.session_state.get("atlas_active_page") not in ALL_ACTIVE_PAGES:
+            st.session_state["atlas_active_page"] = "Mission Control"
+
+        if record is None and st.session_state.get("atlas_active_page") not in {
+            "Mission Control",
+            "Projects",
+            "Pinned Projects",
+            "Reference Projects",
+            "Recent Projects",
+            "Create New Project",
+            "Open Existing Project",
+            "Knowledge",
+            "Transactions",
+            "Reports",
+            "Administration",
+        }:
+            st.session_state["atlas_active_page"] = "Mission Control"
+
+        _render_shell(st, workspace_service, record, context)
+        if record is not None:
+            workspace_service.save_workspace_state(
+                record.workspace_id,
+                _workspace_state_snapshot(st),
+            )
+    except Exception as exc:
+        active_tenant = _safe_text(
+            dict(st.session_state.get("atlas_transactions_workspace") or {}).get(
+                "tenant_id"
+            ),
+            "local",
         )
-        record.pinned = bool(record.metadata.get("pinned", record.pinned))
-        record.is_reference = bool(
-            record.metadata.get("reference", record.is_reference)
+        active_organization = _safe_text(
+            dict(st.session_state.get("atlas_transactions_workspace") or {}).get(
+                "organization_id"
+            ),
+            "atlas",
         )
-        record.archived = bool(record.metadata.get("archived", record.archived))
-        workspace_service.save_record(record)
-        _persist_repository_artifacts(workspace_service, record, context)
-        workspace_service.log_event(
-            record.workspace_id,
-            "review_executed",
-            {"source_mode": record.source_mode, "project_id": record.project_id},
+        active_primary = _safe_text(
+            st.session_state.get(_navigation_primary_state_key()), "Atlas"
         )
-
-    if st.session_state.get("atlas_active_page") not in ALL_ACTIVE_PAGES:
-        st.session_state["atlas_active_page"] = "Mission Control"
-
-    if record is None and st.session_state.get("atlas_active_page") not in {
-        "Mission Control",
-        "Projects",
-        "Pinned Projects",
-        "Reference Projects",
-        "Recent Projects",
-        "Create New Project",
-        "Open Existing Project",
-        "Knowledge",
-        "Transactions",
-        "Reports",
-        "Administration",
-    }:
-        st.session_state["atlas_active_page"] = "Mission Control"
-
-    _render_shell(st, workspace_service, record, context)
-    if record is not None:
-        workspace_service.save_workspace_state(
-            record.workspace_id,
-            _workspace_state_snapshot(st),
+        active_route = _safe_text(st.session_state.get("atlas_active_page"), "Unknown")
+        _render_logged_error_message(
+            st,
+            summary="Unexpected application error",
+            exception=exc,
+            severity="critical",
+            tenant_id=active_tenant,
+            organization_id=active_organization,
+            user_id=_safe_text(
+                st.session_state.get("atlas_settings_user_id"), "atlas-ui"
+            ),
+            workspace=active_primary,
+            route=active_route,
+            request_or_session_ref=_safe_text(
+                st.session_state.get("atlas_active_workspace_id"), "session"
+            ),
         )
 
 

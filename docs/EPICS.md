@@ -159,6 +159,8 @@ Explicitly out of scope:
 - operationalize sandbox test workflows for seed, reset, export, health checks, and tenant-scoped feedback capture
 - provide administrator-only alpha health-check view with redacted diagnostics and tenant-boundary-safe summaries
 - provide settings-accessible known-limitations and operator checklist guidance for repeatable alpha execution
+- implement centralized tenant-scoped application error logging, deterministic fingerprint grouping, occurrence history, and user-safe Error ID responses
+- provide authorized Error Log review workflows (filter/details/status transitions/resolution notes/export) with audit integration
 - add regression coverage for environment labeling, health-check enforcement, diagnostics redaction, feedback scoping, and sandbox isolation operations
 
 Explicitly out of scope:

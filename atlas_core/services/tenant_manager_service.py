@@ -11,6 +11,13 @@ import re
 from typing import Any
 
 from atlas_core.contracts.permissions_contracts import AccessRequest
+from atlas_core.contracts.error_logging_contracts import (
+    ApplicationError,
+    ErrorContext,
+    ErrorOccurrence,
+    ErrorResolutionStatus,
+    ErrorSeverity,
+)
 from atlas_core.contracts.tenant_manager_contracts import (
     SandboxProvisioningRequest,
     SandboxProvisioningResult,
@@ -74,6 +81,53 @@ def _redact_diagnostic_value(key: str, value: Any) -> Any:
             return "[redacted-path]"
         return text[:240]
     return value
+
+
+def _sanitize_free_text(value: Any, *, max_length: int = 1024) -> str:
+    sanitized = _safe_text(value, "")
+    if not sanitized:
+        return ""
+    lowered = sanitized.lower()
+    if "secret://" in lowered:
+        return "[redacted-secret-reference]"
+    if any(
+        token in lowered
+        for token in (
+            "password",
+            "passwd",
+            "token",
+            "secret",
+            "credential",
+            "authorization",
+            "api_key",
+            "private_key",
+        )
+    ):
+        return "[redacted-sensitive]"
+    if (
+        "/Users/" in sanitized
+        or sanitized.startswith("/")
+        or sanitized.startswith("~")
+        or "\\" in sanitized
+    ):
+        return "[redacted-path]"
+    redacted_email = re.sub(
+        r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+        "[redacted-email]",
+        sanitized,
+    )
+    return redacted_email[:max_length]
+
+
+def _sanitize_stack_trace(value: Any) -> str:
+    lines = [
+        _sanitize_free_text(item, max_length=320)
+        for item in _safe_text(value, "").splitlines()
+        if _safe_text(item, "")
+    ]
+    if not lines:
+        return "[stack-trace-unavailable]"
+    return "\n".join(lines[-40:])
 
 
 class TenantManagerService:
@@ -688,6 +742,364 @@ class TenantManagerService:
             "search_indexes": len(dict(data.get("search_indexes") or {})),
         }
 
+    def log_application_error(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        environment_label: str,
+        application_version: str,
+        severity: str,
+        exception_type: str,
+        message: str,
+        stack_trace: str,
+        workspace: str,
+        route: str,
+        related_object_id: str | None = None,
+        related_object_type: str | None = None,
+        correlation_id: str | None = None,
+        background_job_id: str | None = None,
+        request_or_session_ref: str | None = None,
+        integration_hook: str | None = None,
+    ) -> dict[str, Any]:
+        tenant = self._tenant_required(tenant_id)
+        data = self._tenant_data(tenant.tenant_id)
+        errors = data.setdefault("application_errors", [])
+
+        normalized_severity = _safe_text(severity, ErrorSeverity.MEDIUM.value).lower()
+        if normalized_severity not in {item.value for item in ErrorSeverity}:
+            normalized_severity = ErrorSeverity.MEDIUM.value
+
+        normalized_exception_type = _safe_text(exception_type, "Exception")
+        normalized_workspace = _safe_text(workspace, "Unknown")
+        normalized_route = _safe_text(route, "Unknown")
+        sanitized_message = _sanitize_free_text(message) or "[message-unavailable]"
+        sanitized_stack_trace = _sanitize_stack_trace(stack_trace)
+        normalized_related_object_type = _safe_text(related_object_type, "")
+        normalized_related_object_id = _safe_text(related_object_id, "")
+        normalized_correlation_id = _safe_text(correlation_id, "")
+        normalized_job_id = _safe_text(background_job_id, "")
+
+        fingerprint_source = "|".join(
+            [
+                tenant.tenant_id,
+                normalized_exception_type.lower(),
+                sanitized_message.lower(),
+                normalized_workspace.lower(),
+                normalized_route.lower(),
+                normalized_related_object_type.lower(),
+                normalized_related_object_id.lower(),
+                normalized_job_id.lower(),
+                normalized_correlation_id.lower(),
+            ]
+        )
+        fingerprint = hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()[
+            :20
+        ]
+
+        existing: dict[str, Any] | None = None
+        for item in errors:
+            candidate = dict(item)
+            if _safe_text(candidate.get("fingerprint"), "") == fingerprint:
+                existing = item
+                break
+
+        timestamp = now_iso()
+        error_id = (
+            _safe_text(existing.get("error_id"), "")
+            if isinstance(existing, dict)
+            else f"ERR-{hashlib.sha1(f'{tenant.tenant_id}:{fingerprint}'.encode('utf-8')).hexdigest()[:12].upper()}"
+        )
+        status = (
+            _safe_text(existing.get("status"), ErrorResolutionStatus.NEW.value)
+            if isinstance(existing, dict)
+            else ErrorResolutionStatus.NEW.value
+        )
+        if status == ErrorResolutionStatus.RESOLVED.value:
+            status = ErrorResolutionStatus.REOPENED.value
+
+        occurrence = ErrorOccurrence(
+            occurrence_id=f"error-occurrence:{hashlib.sha1(f'{error_id}:{timestamp}'.encode('utf-8')).hexdigest()[:16]}",
+            error_id=error_id,
+            timestamp=timestamp,
+            exception_type=normalized_exception_type,
+            sanitized_message=sanitized_message,
+            sanitized_stack_trace=sanitized_stack_trace,
+            actor_id=_safe_text(actor_id, "system") or None,
+        ).to_dict()
+
+        if not isinstance(existing, dict):
+            created = ApplicationError(
+                error_id=error_id,
+                fingerprint=fingerprint,
+                tenant_id=tenant.tenant_id,
+                actor_id=_safe_text(actor_id, "system") or None,
+                environment_label=_safe_text(environment_label, "Controlled Alpha"),
+                application_version=_safe_text(application_version, "0.0.0-alpha"),
+                severity=ErrorSeverity(normalized_severity),
+                status=ErrorResolutionStatus(status),
+                summary=sanitized_message,
+                context=ErrorContext(
+                    workspace=normalized_workspace,
+                    route=normalized_route,
+                    related_object_id=normalized_related_object_id or None,
+                    related_object_type=normalized_related_object_type or None,
+                    correlation_id=normalized_correlation_id or None,
+                    background_job_id=normalized_job_id or None,
+                    request_or_session_ref=request_or_session_ref,
+                    integration_hook=integration_hook,
+                ),
+                first_seen_at=timestamp,
+                last_seen_at=timestamp,
+                occurrence_count=1,
+            ).to_dict()
+            created["occurrences"] = [occurrence]
+            errors.append(created)
+            self._record_audit(
+                tenant_id=tenant.tenant_id,
+                actor_id=actor_id,
+                action="tenant.application_error.logged",
+                details={
+                    "error_id": error_id,
+                    "severity": normalized_severity,
+                    "status": status,
+                },
+            )
+            return deepcopy(created)
+
+        occurrences = list(existing.get("occurrences") or [])
+        occurrences.append(occurrence)
+        existing["occurrences"] = occurrences[-200:]
+        existing["last_seen_at"] = timestamp
+        existing["occurrence_count"] = int(existing.get("occurrence_count") or 1) + 1
+        existing["status"] = status
+        existing["severity"] = normalized_severity
+        existing["summary"] = sanitized_message
+        existing["environment_label"] = _safe_text(
+            environment_label, "Controlled Alpha"
+        )
+        existing["application_version"] = _safe_text(application_version, "0.0.0-alpha")
+        context = dict(existing.get("context") or {})
+        context.update(
+            {
+                "workspace": normalized_workspace,
+                "route": normalized_route,
+                "related_object_id": normalized_related_object_id or None,
+                "related_object_type": normalized_related_object_type or None,
+                "correlation_id": normalized_correlation_id or None,
+                "background_job_id": normalized_job_id or None,
+                "request_or_session_ref": _safe_text(request_or_session_ref, "")
+                or context.get("request_or_session_ref"),
+                "integration_hook": _safe_text(integration_hook, "")
+                or context.get("integration_hook"),
+            }
+        )
+        existing["context"] = context
+        if status == ErrorResolutionStatus.REOPENED.value:
+            self._record_audit(
+                tenant_id=tenant.tenant_id,
+                actor_id=actor_id,
+                action="tenant.application_error.reopened",
+                details={"error_id": error_id},
+            )
+        return deepcopy(existing)
+
+    def list_application_errors(
+        self,
+        *,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        actor_id: str,
+        tenant_id: str | None = None,
+        severities: list[str] | None = None,
+        statuses: list[str] | None = None,
+        limit: int = 250,
+    ) -> list[dict[str, Any]]:
+        is_platform_admin = self._is_platform_admin_scope_actor(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        )
+        requester_tenant = _safe_text(requester_tenant_id, "")
+        if not is_platform_admin:
+            self._assert_operational_access(requester_tenant)
+
+        requested_tenant = _safe_text(tenant_id, "")
+        if requested_tenant and not is_platform_admin:
+            self._assert_tenant_scope_request(
+                tenant_id=requested_tenant,
+                requester_tenant_id=requester_tenant_id,
+                requester_organization_id=requester_organization_id,
+            )
+
+        tenant_ids = (
+            [requested_tenant]
+            if requested_tenant
+            else sorted(dict(self.state.get("tenants") or {}).keys())
+        )
+        if not is_platform_admin and not requested_tenant:
+            tenant_ids = [requester_tenant]
+
+        selected_severities = {
+            _safe_text(item, "").lower() for item in list(severities or []) if item
+        }
+        selected_statuses = {
+            _safe_text(item, "").lower() for item in list(statuses or []) if item
+        }
+
+        rows: list[dict[str, Any]] = []
+        for current_tenant in tenant_ids:
+            if not _safe_text(current_tenant, ""):
+                continue
+            tenant_rows = list(
+                self._tenant_data(current_tenant).get("application_errors") or []
+            )
+            for item in tenant_rows:
+                payload = dict(item)
+                severity = _safe_text(payload.get("severity"), "").lower()
+                status = _safe_text(payload.get("status"), "").lower()
+                if selected_severities and severity not in selected_severities:
+                    continue
+                if selected_statuses and status not in selected_statuses:
+                    continue
+                context = dict(payload.get("context") or {})
+                rows.append(
+                    {
+                        "error_id": _safe_text(payload.get("error_id"), ""),
+                        "severity": severity,
+                        "summary": _safe_text(payload.get("summary"), ""),
+                        "tenant_id": _safe_text(
+                            payload.get("tenant_id"), current_tenant
+                        ),
+                        "workspace": _safe_text(context.get("workspace"), "Unknown"),
+                        "route": _safe_text(context.get("route"), "Unknown"),
+                        "related_object": (
+                            f"{_safe_text(context.get('related_object_type'), '')}:{_safe_text(context.get('related_object_id'), '')}".strip(
+                                ":"
+                            )
+                        ),
+                        "first_seen_at": _safe_text(payload.get("first_seen_at"), ""),
+                        "last_seen_at": _safe_text(payload.get("last_seen_at"), ""),
+                        "occurrence_count": int(payload.get("occurrence_count") or 0),
+                        "status": status,
+                    }
+                )
+
+        rows.sort(
+            key=lambda item: (
+                _safe_text(item.get("last_seen_at"), ""),
+                _safe_text(item.get("error_id"), ""),
+            )
+        )
+        return rows[-max(1, int(limit)) :]
+
+    def get_application_error_details(
+        self,
+        *,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        actor_id: str,
+        tenant_id: str,
+        error_id: str,
+    ) -> dict[str, Any]:
+        self._assert_error_log_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        rows = list(self._tenant_data(tenant_id).get("application_errors") or [])
+        for item in rows:
+            payload = dict(item)
+            if _safe_text(payload.get("error_id"), "") == _safe_text(error_id, ""):
+                return deepcopy(payload)
+        raise ValueError("application error does not exist")
+
+    def update_application_error_status(
+        self,
+        *,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        actor_id: str,
+        tenant_id: str,
+        error_id: str,
+        status: str,
+        resolution_notes: str | None = None,
+    ) -> dict[str, Any]:
+        self._assert_error_log_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        normalized_status = _safe_text(status, "").lower()
+        if normalized_status not in {item.value for item in ErrorResolutionStatus}:
+            raise ValueError("error status is invalid")
+
+        rows = list(self._tenant_data(tenant_id).get("application_errors") or [])
+        target: dict[str, Any] | None = None
+        for item in rows:
+            if _safe_text(dict(item).get("error_id"), "") == _safe_text(error_id, ""):
+                target = item
+                break
+        if not isinstance(target, dict):
+            raise ValueError("application error does not exist")
+
+        target["status"] = normalized_status
+        target["last_seen_at"] = now_iso()
+        if resolution_notes is not None:
+            target["resolution_notes"] = _sanitize_free_text(resolution_notes) or None
+        self._record_audit(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            action="tenant.application_error.status_updated",
+            details={"error_id": _safe_text(error_id, ""), "status": normalized_status},
+        )
+        return deepcopy(target)
+
+    def export_application_error_diagnostics(
+        self,
+        *,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        actor_id: str,
+        tenant_id: str,
+        statuses: list[str] | None = None,
+        severities: list[str] | None = None,
+    ) -> dict[str, Any]:
+        self._assert_error_log_access(
+            actor_id=actor_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            tenant_id=tenant_id,
+        )
+        summary_rows = self.list_application_errors(
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            statuses=statuses,
+            severities=severities,
+            limit=1000,
+        )
+        details: list[dict[str, Any]] = []
+        for item in summary_rows:
+            details.append(
+                self.get_application_error_details(
+                    requester_tenant_id=requester_tenant_id,
+                    requester_organization_id=requester_organization_id,
+                    actor_id=actor_id,
+                    tenant_id=tenant_id,
+                    error_id=_safe_text(item.get("error_id"), ""),
+                )
+            )
+        return {
+            "tenant_id": tenant_id,
+            "exported_at": now_iso(),
+            "exported_by": _safe_text(actor_id, "system"),
+            "errors": details,
+        }
+
     def submit_alpha_feedback(
         self,
         *,
@@ -703,6 +1115,7 @@ class TenantManagerService:
         actual_result: str,
         attachment_references: list[str] | None = None,
         environment_diagnostics: dict[str, Any] | None = None,
+        related_error_id: str | None = None,
         status: str = "open",
         resolution_notes: str | None = None,
     ) -> dict[str, Any]:
@@ -734,11 +1147,20 @@ class TenantManagerService:
             "environment_diagnostics": _redact_diagnostic_value(
                 "environment_diagnostics", dict(environment_diagnostics or {})
             ),
+            "related_error_id": _safe_text(related_error_id, "") or None,
             "status": normalized_status,
             "resolution_notes": _safe_text(resolution_notes, "") or None,
             "created_at": now_iso(),
             "updated_at": now_iso(),
         }
+        if record["related_error_id"]:
+            _ = self.get_application_error_details(
+                requester_tenant_id=requester_tenant_id,
+                requester_organization_id=requester_organization_id,
+                actor_id=user_id,
+                tenant_id=tenant_id,
+                error_id=record["related_error_id"],
+            )
         data = self._tenant_data(tenant_id)
         data.setdefault("alpha_feedback", [])
         data["alpha_feedback"].append(record)
@@ -882,25 +1304,77 @@ class TenantManagerService:
             and _safe_text(item.get("status"), "").lower() not in {"resolved", "closed"}
         ]
         export_meta = dict(data.get("export_history") or {})
-        recent_errors = [
-            {
-                "source": "job",
-                "status": _safe_text(item.get("status"), "unknown"),
-                "message": _safe_text(item.get("error"), ""),
-                "updated_at": _safe_text(item.get("updated_at"), ""),
-            }
-            for item in failed_jobs[-5:]
-        ] + [
-            {
-                "source": "feedback",
-                "feedback_id": _safe_text(item.get("feedback_id"), ""),
-                "severity": _safe_text(item.get("severity"), ""),
-                "workspace": _safe_text(item.get("workspace"), ""),
-                "status": _safe_text(item.get("status"), ""),
-                "updated_at": _safe_text(item.get("updated_at"), ""),
-            }
-            for item in high_feedback[-5:]
+        application_errors = [
+            dict(item)
+            for item in list(data.get("application_errors") or [])
+            if isinstance(item, dict)
         ]
+        unresolved_statuses = {
+            ErrorResolutionStatus.NEW.value,
+            ErrorResolutionStatus.ACKNOWLEDGED.value,
+            ErrorResolutionStatus.INVESTIGATING.value,
+            ErrorResolutionStatus.REOPENED.value,
+        }
+        unresolved_error_count = len(
+            [
+                item
+                for item in application_errors
+                if _safe_text(item.get("status"), "").lower() in unresolved_statuses
+            ]
+        )
+        recent_application_errors = sorted(
+            application_errors,
+            key=lambda item: (
+                _safe_text(item.get("last_seen_at"), ""),
+                _safe_text(item.get("error_id"), ""),
+            ),
+        )[-8:]
+        error_severity_counts = {
+            severity.value: len(
+                [
+                    item
+                    for item in application_errors
+                    if _safe_text(item.get("severity"), "").lower() == severity.value
+                ]
+            )
+            for severity in ErrorSeverity
+        }
+        recent_errors = (
+            [
+                {
+                    "source": "job",
+                    "status": _safe_text(item.get("status"), "unknown"),
+                    "message": _safe_text(item.get("error"), ""),
+                    "updated_at": _safe_text(item.get("updated_at"), ""),
+                }
+                for item in failed_jobs[-5:]
+            ]
+            + [
+                {
+                    "source": "feedback",
+                    "feedback_id": _safe_text(item.get("feedback_id"), ""),
+                    "severity": _safe_text(item.get("severity"), ""),
+                    "workspace": _safe_text(item.get("workspace"), ""),
+                    "status": _safe_text(item.get("status"), ""),
+                    "updated_at": _safe_text(item.get("updated_at"), ""),
+                }
+                for item in high_feedback[-5:]
+            ]
+            + [
+                {
+                    "source": "application_error",
+                    "error_id": _safe_text(item.get("error_id"), ""),
+                    "severity": _safe_text(item.get("severity"), ""),
+                    "status": _safe_text(item.get("status"), ""),
+                    "workspace": _safe_text(
+                        dict(item.get("context") or {}).get("workspace"), ""
+                    ),
+                    "message": _safe_text(item.get("summary"), ""),
+                    "updated_at": _safe_text(item.get("last_seen_at"), ""),
+                }
+                for item in recent_application_errors
+            ]
+        )
         health_payload = {
             "application_version": _safe_text(application_version, "n/a"),
             "environment_label": _safe_text(environment_label, "Controlled Alpha"),
@@ -957,6 +1431,8 @@ class TenantManagerService:
                 "index_count": len(search_indexes),
                 "record_count": int(search_record_count),
             },
+            "recent_errors_by_severity": error_severity_counts,
+            "unresolved_error_count": int(unresolved_error_count),
             "recent_errors": _redact_diagnostic_value("recent_errors", recent_errors),
             "last_backup_or_export": {
                 "last_export_at": _safe_text(export_meta.get("last_export_at"), ""),
@@ -973,6 +1449,7 @@ class TenantManagerService:
             details={
                 "tenant_status": tenant.status.value,
                 "failed_jobs": len(failed_jobs),
+                "unresolved_error_count": int(unresolved_error_count),
             },
         )
         return health_payload
@@ -1020,6 +1497,44 @@ class TenantManagerService:
             raise PermissionError(
                 decision.reason or "platform tenant management is not allowed"
             )
+
+    def _is_platform_admin_scope_actor(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        organization_id: str,
+    ) -> bool:
+        try:
+            self._assert_platform_admin(
+                actor_id=actor_id,
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+            )
+            return True
+        except PermissionError:
+            return False
+
+    def _assert_error_log_access(
+        self,
+        *,
+        actor_id: str,
+        requester_tenant_id: str,
+        requester_organization_id: str,
+        tenant_id: str,
+    ) -> None:
+        if self._is_platform_admin_scope_actor(
+            actor_id=actor_id,
+            tenant_id=requester_tenant_id,
+            organization_id=requester_organization_id,
+        ):
+            return
+        self._assert_tenant_scope_request(
+            tenant_id=tenant_id,
+            requester_tenant_id=requester_tenant_id,
+            requester_organization_id=requester_organization_id,
+        )
+        self._assert_operational_access(tenant_id)
 
     def _allocate_tenant_id(self, sandbox_label: str) -> str:
         token = _slug(sandbox_label)
@@ -1092,6 +1607,7 @@ class TenantManagerService:
             "working_set": {},
             "user_preferences": {},
             "alpha_feedback": [],
+            "application_errors": [],
             "export_history": {},
         }
 

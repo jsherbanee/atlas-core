@@ -114,3 +114,18 @@ Security controls include:
 Current M-01 constraints:
 - local deterministic sandbox provisioning only
 - no hosted infrastructure secrets or identity-provider lifecycle integration in this sprint
+
+## A-02 Error Logging Security Notes
+
+Sprint A-02 pt 2 introduces deterministic application error logging controls.
+
+Security controls include:
+- tenant-scoped error records with platform-admin-only cross-tenant review in platform scope
+- user-safe Error ID responses without raw stack-trace disclosure
+- sanitizer enforcement for secret references, credential-like tokens, file-system paths, and sensitive text patterns
+- suspended-tenant rejection for operational error-log access
+- audit event emission for error-status and resolution updates
+
+Current A-02 constraints:
+- local deterministic persistence only
+- no external monitoring/alert pipeline integration in this sprint
