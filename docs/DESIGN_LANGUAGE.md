@@ -125,6 +125,22 @@ U-01 remains a polish sprint, not a scope-expansion sprint:
 - no inventory/procurement activation
 - no post-D-03 epic starts
 
+## 8.3 Sprint U-02 End-to-End Application UX Polish
+
+Sprint U-02 extends behavior-preserving polish from transaction workflows to the full application shell and workspace surfaces:
+
+- ensure every major workspace presents clear page purpose and consistent identity cues
+- keep primary/secondary/tertiary navigation intent legible (area, family, action)
+- reduce prototype and implementation-facing language in user-visible controls and status messaging
+- keep roadmap-visible sections informative rather than dead-end controls by offering explicit next-step guidance
+- preserve responsive workstation behavior and readability at 820, 980, 1180, and 1366 widths
+
+U-02 remains strictly non-expansive:
+
+- no new product capabilities
+- no workflow ownership expansion into payments, inventory, or procurement execution
+- no roadmap expansion
+
 Hardening priorities:
 
 - recommendation clarity, prioritization, and direct navigation affordances

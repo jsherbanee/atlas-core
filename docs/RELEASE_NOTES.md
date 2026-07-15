@@ -21,6 +21,23 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Sprint P-03 Deterministic Background Job Framework)
 
+## Unreleased (Atlas Alpha Completion Sprint U-02 End-to-End Application UX and Workflow Polish)
+
+### Improved
+
+- Major workspace pages now consistently expose clear purpose captions through shared page-header behavior.
+- User-facing controls and workflow messaging now avoid implementation/prototype terminology in key settings and transactions surfaces.
+- Settings roadmap-visible sections now provide explicit guidance and deterministic return paths into active configuration workflows.
+- Transactions workflow language now uses clearer metadata-focused labels for queued email delivery metadata controls.
+- Responsive usability walkthroughs confirmed major workspace stability and no horizontal overflow at 820, 980, 1180, and 1366 widths.
+
+### Scope Notes
+
+- no new product capabilities
+- no new transaction families
+- no QuickBooks transport execution
+- no payment, inventory, or procurement workflow activation
+
 ## Unreleased (Atlas Alpha Completion Sprint U-01 Commercial Document Usability and Presentation Polish)
 
 ### Improved

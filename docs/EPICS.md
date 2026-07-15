@@ -49,6 +49,7 @@ Status: Active
 - T-09 Change Order Tracking Convention
 - S-01 Settings Workspace Completion
 - U-01 Commercial Document Usability and Presentation Polish
+- U-02 End-to-End Application UX and Workflow Polish
 
 ### A-07 Scope
 
@@ -108,6 +109,20 @@ Explicitly out of scope:
 - payment processing
 - inventory/procurement workflows
 - new transaction families or roadmap expansion
+
+### U-02 Scope
+
+- perform a comprehensive usability and consistency pass across primary application workspaces (Home, Projects, Lifecycle-related project surfaces, Transactions, Knowledge, Reports, Settings)
+- tighten secondary/tertiary navigation clarity and action-language consistency
+- ensure pages expose clear purpose, clear primary actions, shared design-system framing, and guided empty-state behavior
+- remove prototype/development-facing labels and redundant control language in user-facing UI
+- validate responsive behavior and state stability under required viewport widths
+
+Explicitly out of scope:
+
+- new product feature development
+- new transaction families or workflow-domain expansion
+- QuickBooks transport execution, payment processing, inventory/procurement activation
 
 ### A-08 Scope
 

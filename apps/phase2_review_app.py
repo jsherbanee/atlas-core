@@ -1252,10 +1252,33 @@ def _safe_text(value: Any, default: str = "Unknown") -> str:
     return str(value)
 
 
+_PAGE_PURPOSE_SUBTITLES: dict[str, str] = {
+    "Home": "Operational launchpad for active work, project continuity, and next-step actions.",
+    "Projects": "Project library for creating, opening, importing, and managing bid workspaces.",
+    "Knowledge": "Shared commercial and reference entities used across projects.",
+    "Transactions": "Commercial document workflows with deterministic lifecycle and revision controls.",
+    "Object Workspace": "Shared object context for summary, relationships, activity, and documents.",
+    "Reports": "Delivery-ready outputs and readiness summaries across active work.",
+    "Settings": "Tenant and personal configuration with deterministic policy boundaries.",
+    "Open Existing Project": "Browse repository projects and open the selected workspace.",
+    "Create New Project": "Create a bid workspace, then continue onboarding in Documents.",
+    "Overview": "Project health, next actions, and continuity signals.",
+    "Documents": "Upload source files, monitor extraction health, and run project analysis.",
+    "BOM Review": "Review extracted equipment scope, cost posture, and source traceability.",
+    "Scope & Risk": "Track scope gaps, RFIs, and ownership responsibilities.",
+    "Engineering Review": "Consolidate engineering insights, conflicts, and coordination actions.",
+    "Estimate": "Deterministic estimate structure, revisions, confidence, and export.",
+    "Notebook": "Engineering notes, decisions, and timeline context.",
+}
+
+
 def _render_page_header(st: Any, title: str, subtitle: str) -> None:
     st.subheader(title)
-    if subtitle and title in {"Open Existing Project", "Create New Project"}:
-        st.caption(subtitle)
+    resolved_subtitle = _safe_text(subtitle, "")
+    if not resolved_subtitle:
+        resolved_subtitle = _safe_text(_PAGE_PURPOSE_SUBTITLES.get(title), "")
+    if resolved_subtitle:
+        st.caption(resolved_subtitle)
 
 
 def _render_empty_state(st: Any, message: str) -> None:
@@ -6952,16 +6975,16 @@ def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
         ],
         "billing": [
             {
-                "tertiary_key": "future",
-                "label": "Future",
+                "tertiary_key": "overview",
+                "label": "Overview",
                 "action_type": "collection_view",
                 "required_selection": None,
             }
         ],
         "advanced": [
             {
-                "tertiary_key": "future",
-                "label": "Future",
+                "tertiary_key": "overview",
+                "label": "Overview",
                 "action_type": "collection_view",
                 "required_selection": None,
             }
@@ -7150,7 +7173,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
                             "visibility": True,
                             "enabled": True,
                             "required_selection": action.get("required_selection"),
-                            "empty_state_behavior": "Future settings modules are visible but intentionally not implemented in this sprint.",
+                            "empty_state_behavior": "Use the selected settings section controls to continue.",
                             "permission_hook": "future_permission_check",
                             "deterministic_fallback": default_action,
                         }
@@ -14368,7 +14391,7 @@ def _render_transactions_workspace_page(
 
         email_cols = st.columns(3)
         provider = email_cols[0].selectbox(
-            "Future Email Provider",
+            "Email Metadata Provider",
             options=["microsoft_365", "google_workspace", "smtp", "approved_other"],
             key=f"{prefix}_email_provider",
         )
@@ -14395,7 +14418,7 @@ def _render_transactions_workspace_page(
             height=120,
         )
         if st.button(
-            "Queue Future Email Metadata",
+            "Queue Email Delivery Metadata",
             key=f"{prefix}_queue_email_metadata",
             width="stretch",
         ):
@@ -14412,7 +14435,7 @@ def _render_transactions_workspace_page(
                     attached_revision_number=revision_number,
                 )
                 _save_transactions_workspace_state(st, service)
-                st.success("Future email metadata queued. No email was sent.")
+                st.success("Email delivery metadata queued. No email was sent.")
             except Exception as exc:
                 st.error(f"Unable to queue email metadata: {exc}")
 
@@ -15520,11 +15543,11 @@ def _render_transactions_workspace_page(
             [
                 {
                     "Demand Generated": "Yes",
-                    "Inventory": "Pending future sprint",
-                    "Purchasing": "Pending future sprint",
-                    "Labor": "Pending future sprint",
-                    "Scheduling": "Pending future sprint",
-                    "Project Execution": "Pending future sprint",
+                    "Inventory": "Outside alpha scope",
+                    "Purchasing": "Outside alpha scope",
+                    "Labor": "Outside alpha scope",
+                    "Scheduling": "Outside alpha scope",
+                    "Project Execution": "Outside alpha scope",
                 }
             ],
             width="stretch",
@@ -15879,7 +15902,7 @@ def _render_transactions_workspace_page(
                     st,
                     why_empty="No related documents are linked to this record.",
                     action_to_populate="Use relationship workflows when line-items and revisions are connected.",
-                    next_location="Object Workspace and future transaction relationship tools.",
+                    next_location="Object Workspace related-document and transaction views.",
                 )
         else:
             _render_data_table(
@@ -17226,7 +17249,7 @@ def _render_application_administration_page(
                 st.info(roles_view.reason)
             else:
                 st.caption(
-                    "System roles are stable and tenant-scoped. User administration is still evolving, so placeholder membership IDs are supported."
+                    "System roles are stable and tenant-scoped. Role assignments can be managed directly in this environment."
                 )
                 roles = permissions_service.list_system_roles()
                 st.dataframe(
@@ -17299,7 +17322,7 @@ def _render_application_administration_page(
                     )
                 else:
                     st.info(
-                        "No explicit role assignments exist yet. Local development remains backward-compatible for local-user."
+                        "No explicit role assignments exist yet. Assign a role to establish managed access."
                     )
 
                 if roles_manage.allowed:
@@ -17308,7 +17331,7 @@ def _render_application_administration_page(
                         principal_input = assign_cols[0].text_input(
                             "Member ID",
                             value="local-user",
-                            help="Use existing users when available or placeholder membership IDs during local development.",
+                            help="Enter the member identifier used for access evaluation in this environment.",
                         )
                         role_input = assign_cols[1].selectbox(
                             "Role",
@@ -17760,9 +17783,23 @@ def _render_application_administration_page(
             )
 
     else:
-        st.info(
-            "This settings section is intentionally marked as future scope for T-04."
+        _render_guided_empty_state(
+            st,
+            why_empty="This settings section is visible for roadmap continuity but is not active in the current alpha scope.",
+            action_to_populate="Use Organization Settings, Integrations, Security, or Personal Preferences for active configuration workflows.",
+            next_location="Open Organization Settings to continue configuration.",
         )
+        if st.button(
+            "Open Organization Settings",
+            key="atlas_settings_open_org_settings",
+            type="primary",
+            width="stretch",
+        ):
+            st.session_state[_navigation_secondary_state_key()] = (
+                "organization_settings"
+            )
+            st.session_state[_navigation_tertiary_state_key()] = "overview"
+            st.rerun()
 
 
 def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
@@ -18969,7 +19006,7 @@ def _render_estimate_page(
             [
                 {
                     "Category": category,
-                    "Generation Status": "Placeholder",
+                    "Generation Status": "Planned",
                     "Estimated Cost": 0.0,
                 }
                 for category in service.ACCESSORY_PLACEHOLDER_CATEGORIES
