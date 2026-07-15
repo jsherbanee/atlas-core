@@ -19,6 +19,24 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (Sprint P-01 Roles and Permissions Foundation)
+
+### Improved
+
+- Atlas now includes deterministic tenant-scoped roles and permissions contracts for role, assignment, policy, access decision, diagnostics, project overrides, and permission-change events.
+- Permissions evaluation now enforces deny-by-default, explicit allow/deny behavior, deterministic ordering, and explicit deny precedence.
+- Universal Object actions now use centralized permission-hook evaluation and resolve to visible-enabled, visible-disabled-with-reason, or hidden.
+- Settings now includes a minimal Organization -> Roles and Permissions surface for viewing system roles, inspecting role permissions, assigning roles, applying project-scoped overrides, and previewing effective access.
+- Local single-user development remains backward-compatible through scoped compatibility evaluation for local tenant context.
+
+### Scope Notes
+
+- no authentication implementation
+- no invitations or production user provisioning
+- no SSO or cloud identity-provider integration
+- no billing permission model
+- no QuickBooks permission integration
+
 ## Unreleased (Epic W Sprint W-03 Universal Object Workspace)
 
 ## Unreleased (Epic T Sprint T-05 Amendment Terms and Conditions Settings)

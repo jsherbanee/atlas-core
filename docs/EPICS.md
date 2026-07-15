@@ -38,6 +38,7 @@ Status: Active
 - T-05 Amendment Estimate and Sales Order Versioning, Duplication, and PDF Export
 - T-06 Return Orders and Credit Memos
 - T-07 Commercial Document Line Layout and Presentation
+- P-01 Roles and Permissions Foundation
 
 ### A-07 Scope
 
@@ -67,6 +68,22 @@ Explicitly out of scope:
 - QuickBooks implementation
 - UI implementation
 - Epic E implementation
+
+### P-01 Scope
+
+- implement deterministic tenant-scoped roles and permission contracts
+- implement tenant-scoped role assignment and permission evaluation service behavior
+- implement deny-by-default and explicit deny precedence behavior
+- implement project-level allow and deny overrides
+- integrate universal object action permission hooks into centralized action gating
+- add minimal Settings surface for roles, assignments, and effective-access diagnostics
+
+Explicitly out of scope:
+
+- authentication and invitation implementation
+- SSO or external identity-provider implementation
+- billing-permission model
+- QuickBooks integration scope expansion
 
 ## Epic G: Product Governance And Delivery Discipline
 

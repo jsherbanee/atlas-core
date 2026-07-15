@@ -196,6 +196,11 @@ Future releases should follow this structure.
 - Audience: Workspace, product, platform, and commercial-operations contributors.
 - When to reference: When changing settings navigation, numbering preferences, or personal preference boundaries.
 
+### [PERMISSIONS_AND_ROLES.md](PERMISSIONS_AND_ROLES.md)
+- Purpose: Defines deterministic tenant-scoped permissions, system roles, assignment/override behavior, and access evaluation rules.
+- Audience: Security, platform, workspace, and user-administration contributors.
+- When to reference: When changing authorization decisions, role assignments, permission hooks, or settings role-management behavior.
+
 ### [WORKSPACE_INTELLIGENCE.md](WORKSPACE_INTELLIGENCE.md)
 - Purpose: Defines the deterministic continuity layer for context persistence, return context, mixed-scope Working Set behavior, and cross-workspace handoff.
 - Audience: Workspace, search, UI, and platform contributors.

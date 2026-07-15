@@ -87,11 +87,18 @@ def _default_actions(
     *, archived: bool, document_available: bool
 ) -> list[UniversalObjectAction]:
     actions = [
-        UniversalObjectAction("open", "Open", "open", target_route="object"),
+        UniversalObjectAction(
+            "open",
+            "Open",
+            "open",
+            target_route="object",
+            permission_hook="object.view",
+        ),
         UniversalObjectAction(
             "edit",
             "Edit",
             "edit",
+            permission_hook="object.edit",
             enabled=not archived,
             disabled_reason=("Object is archived" if archived else None),
         ),
@@ -99,6 +106,7 @@ def _default_actions(
             "archive",
             "Archive",
             "archive",
+            permission_hook="object.archive_restore",
             enabled=not archived,
             destructive=True,
             confirmation_required=True,
@@ -108,20 +116,35 @@ def _default_actions(
             "restore",
             "Restore",
             "restore",
+            permission_hook="object.archive_restore",
             enabled=archived,
             disabled_reason=(None if archived else "Object is active"),
         ),
-        UniversalObjectAction("export", "Export", "export"),
-        UniversalObjectAction("view_activity", "View Activity", "view_activity"),
+        UniversalObjectAction(
+            "export",
+            "Export",
+            "export",
+            permission_hook="object.export",
+        ),
+        UniversalObjectAction(
+            "view_activity",
+            "View Activity",
+            "view_activity",
+            permission_hook="object.view",
+        ),
         UniversalObjectAction(
             "view_documents",
             "View Documents",
             "view_documents",
+            permission_hook="object.view",
             enabled=document_available,
             disabled_reason=(None if document_available else "No documents available"),
         ),
         UniversalObjectAction(
-            "return_to_origin", "Return to Origin", "return_to_origin"
+            "return_to_origin",
+            "Return to Origin",
+            "return_to_origin",
+            permission_hook="object.view",
         ),
     ]
     return actions

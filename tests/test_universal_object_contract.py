@@ -275,6 +275,23 @@ def test_registry_identity_resolution_and_presentation_helpers() -> None:
     assert "Related Products" in relationship_groups
 
 
+def test_universal_actions_include_permission_hooks() -> None:
+    registry = build_default_universal_object_registry()
+    payload = {"vendor": "ADI", "vendor_id": "vendor-adi"}
+
+    actions = registry.supported_actions(
+        "vendor",
+        payload,
+        tenant_id="local",
+        owning_workspace="Knowledge",
+    )
+
+    hooks = {action.action_key: action.permission_hook for action in actions}
+    assert hooks.get("open") == "object.view"
+    assert hooks.get("edit") == "object.edit"
+    assert hooks.get("archive") == "object.archive_restore"
+
+
 def test_project_payload_lifecycle_plan_drives_universal_object_state() -> None:
     registry = build_default_universal_object_registry()
     lifecycle_plan = build_default_lifecycle_plan(

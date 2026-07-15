@@ -63,6 +63,7 @@ Sprint T-05 amendment implements tenant Terms and Conditions settings blocks and
 Sprint T-05 amendment now also implements estimate and sales-order duplication, explicit revision lineage metadata, archive/restore revision-safe behavior, deterministic PDF export, and future email-delivery metadata hooks (non-executing).
 Sprint T-06 implements Return Orders and Credit Memos, including customer-side return workflow, deterministic credit calculation, linked Credit Memo generation, and QuickBooks-boundary-safe sync metadata.
 Sprint T-07 implements line presentation controls for commercial documents, including grouping, comment/spacer rows, explicit display ordering, presentation-aware sorting, and PDF layout preservation without changing authoritative totals.
+Sprint P-01 implements the Roles and Permissions Foundation, including deterministic tenant-scoped role and permission contracts/services, deny-by-default evaluation with explicit deny precedence, universal-object action permission-hook gating, and a minimal Settings surface for role assignment and effective-access diagnostics.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 
 X-01 through X-13 are closed.
@@ -85,7 +86,7 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1315 tests)
+- pytest: full suite passing (1326 tests)
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces

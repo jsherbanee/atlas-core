@@ -70,6 +70,7 @@ Progressive refinement principle:
 - maintain existing test coverage and regression safety
 - keep current UI and workspace behavior stable
 - align documentation with current implementation boundaries
+- establish deterministic tenant-scoped roles and permission-evaluation foundations before sensitive workflow expansion
 
 ### 2. Repository and Import Stability
 - harden repository contracts and project persistence behavior
@@ -166,6 +167,7 @@ Production readiness should require:
 - harden current repository-backed workspace behavior
 - consolidate search and object-graph foundations
 - formalize rule-engine and diagnostics contracts
+- deliver deterministic roles and permissions foundation with centralized action gating and audit-ready permission events
 - prepare cloud, observability, and recovery documentation
 - support future lifecycle-expansion subsystems without starting Epic E
 - define Transactions workspace and commercial-operations architecture before implementation

@@ -1,6 +1,6 @@
 # Settings Architecture
 
-This document defines the reusable Settings workspace foundation and scope boundaries introduced in Sprint T-04.
+This document defines the reusable Settings workspace foundation and scope boundaries introduced in Sprint T-04 and extended in Sprint P-01.
 
 ## Purpose
 
@@ -20,9 +20,13 @@ Visible but future-scoped sections:
 
 Out of scope:
 - identity and auth provider implementation
-- role and policy management UI
 - billing-provider integrations
 - external accounting sync configuration
+
+P-01 extension:
+- deterministic roles and permissions administration foundation is now active under Organization Settings
+- tenant-scoped role assignment and effective-access evaluation are now supported
+- project-scoped access overrides are now supported
 
 ## Navigation Contract
 
@@ -44,12 +48,12 @@ Organization tertiary actions:
 - `overview`
 - `commercial_numbering`
 - `terms_and_conditions`
+- `roles_permissions`
 - `audit`
 
 Personal tertiary actions:
-- `overview`
+- `profile`
 - `display`
-- `regional`
 
 ## Tenant and User Scope Model
 
@@ -134,6 +138,14 @@ Persisted areas:
 - personal preference defaults and updates
 - settings audit event recording
 
+`PermissionsService` is the authority for:
+- system role catalog and permission catalog
+- tenant policy state and deterministic serialization
+- role assignment and revocation
+- project-level allow/deny overrides
+- permission and action evaluation with deny-by-default behavior
+- permission change event recording
+
 Transactions integration:
 - transactions workspace service is initialized from serialized numbering policies supplied by settings
 - numbering policy updates that occur during transaction operations are synchronized back into settings state
@@ -181,3 +193,20 @@ T-05 revision/export interaction:
 - revisions preserve terms reference fields (block ID/version/source) and content snapshot history
 - later settings edits do not mutate historical revision terms content
 - document export and future email metadata are transaction-level controls, not settings-side transport behavior
+
+## Roles and Permissions Foundation (P-01)
+
+Settings now includes Organization -> Roles and Permissions with:
+
+- system-role visibility
+- permissions-by-role visibility
+- tenant-scoped role assignment controls
+- placeholder-member assignment support for local development while user administration remains in progress
+- effective-access preview with reasoned allow or deny decisions
+- project-level override controls and audit logging
+
+Scope boundaries remain:
+
+- no authentication implementation
+- no invitation workflow
+- no SSO or cloud identity provider integration

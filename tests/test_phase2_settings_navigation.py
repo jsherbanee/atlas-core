@@ -43,6 +43,7 @@ def test_settings_workspace_contract_has_expected_sections() -> None:
         "overview",
         "commercial_numbering",
         "terms_and_conditions",
+        "roles_permissions",
         "audit",
     ]
 

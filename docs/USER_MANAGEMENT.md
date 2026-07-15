@@ -151,3 +151,21 @@ Future administrative controls related to AI enablement, retention, and provider
 - The exact seat assignment model may vary by organization.
 - The final balance between user-level and organization-level administration screens remains open.
 - Final identity-provider provider selection remains implementation-dependent.
+
+## P-01 Implementation Note
+
+Sprint P-01 introduces foundational user-role administration behavior without implementing identity lifecycle:
+
+- deterministic system-role catalog
+- tenant-scoped role assignments
+- project-scoped access overrides
+- effective-access evaluation and diagnostics
+- permission-change audit events
+
+Current boundary remains:
+
+- no authentication or invitation lifecycle implementation
+- no SSO implementation
+- no production user provisioning workflow
+
+Placeholder member IDs are supported in local development settings to enable deterministic permission hardening while full membership administration remains future scope.

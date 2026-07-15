@@ -22,6 +22,19 @@ from atlas_core.contracts.universal_object_contract import (
     UniversalObjectPresentation,
     UniversalObjectRelationship,
 )
+from atlas_core.contracts.permissions_contracts import (
+    AccessDecision,
+    AccessDiagnostic,
+    AccessRequest,
+    AccessSurface,
+    Permission,
+    PermissionChangeEvent,
+    PermissionEffect,
+    ProjectAccessOverride,
+    Role,
+    RoleAssignment,
+    TenantPolicy,
+)
 
 __all__ = [
     "PlanReviewRequest",
@@ -40,4 +53,15 @@ __all__ = [
     "UniversalObjectMetadata",
     "UniversalObjectPresentation",
     "UniversalObjectRelationship",
+    "AccessDecision",
+    "AccessDiagnostic",
+    "AccessRequest",
+    "AccessSurface",
+    "Permission",
+    "PermissionChangeEvent",
+    "PermissionEffect",
+    "ProjectAccessOverride",
+    "Role",
+    "RoleAssignment",
+    "TenantPolicy",
 ]

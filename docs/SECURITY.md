@@ -50,3 +50,23 @@ The broader trust commitment is defined in [TRUST_CHARTER.md](TRUST_CHARTER.md).
 
 ## Reporting and Escalation
 Security issues should be reported through the normal project governance process and handled with urgency proportional to impact.
+
+## P-01 Roles and Permissions Foundation
+
+Sprint P-01 introduces deterministic tenant-scoped authorization foundations:
+
+- deny-by-default permission evaluation
+- explicit allow and explicit deny decisions
+- explicit deny precedence over allow
+- tenant and organization scope validation for assignments and policy records
+- project-scoped access overrides
+- human-readable denial reasons and diagnostic metadata
+- audit-ready permission change events
+
+Universal Object actions now evaluate permission hooks centrally and resolve to:
+
+- visible and enabled
+- visible but disabled with reason
+- hidden
+
+P-01 does not implement authentication, invitations, SSO, or production identity-provider provisioning.

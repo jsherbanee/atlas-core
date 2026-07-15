@@ -70,6 +70,7 @@ from atlas_core.services.resolver import EngineeringResolver, ResolverContext
 from atlas_core.services.runtime_workspace import ensure_runtime_workspace_root
 from atlas_core.services.sales_design_review_service import SalesDesignReviewService
 from atlas_core.services.scope_risk_review_service import ScopeRiskReviewService
+from atlas_core.services.permissions_service import PermissionsService
 from atlas_core.services.settings_service import SettingsService
 from atlas_core.services.specification_intelligence import (
     SpecificationIntelligenceEngine,
@@ -82,6 +83,7 @@ from atlas_core.services.universal_object_registry import (
     UniversalObjectRegistry,
     build_default_universal_object_registry,
 )
+from atlas_core.contracts.permissions_contracts import AccessRequest, PermissionEffect
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
@@ -3478,6 +3480,10 @@ def _default_settings_workspace_state() -> dict[str, Any]:
     return SettingsService.empty_state()
 
 
+def _default_permissions_workspace_state() -> dict[str, Any]:
+    return PermissionsService.empty_state()
+
+
 def _settings_workspace_state(st: Any) -> dict[str, Any]:
     state = st.session_state.get("atlas_settings_workspace")
     if isinstance(state, dict):
@@ -3493,6 +3499,23 @@ def _settings_workspace_service(st: Any) -> SettingsService:
 
 def _save_settings_workspace_state(st: Any, service: SettingsService) -> None:
     st.session_state["atlas_settings_workspace"] = service.to_dict()
+
+
+def _permissions_workspace_state(st: Any) -> dict[str, Any]:
+    state = st.session_state.get("atlas_permissions_workspace")
+    if isinstance(state, dict):
+        return dict(state)
+    default_state = _default_permissions_workspace_state()
+    st.session_state["atlas_permissions_workspace"] = default_state
+    return default_state
+
+
+def _permissions_workspace_service(st: Any) -> PermissionsService:
+    return PermissionsService(state=_permissions_workspace_state(st))
+
+
+def _save_permissions_workspace_state(st: Any, service: PermissionsService) -> None:
+    st.session_state["atlas_permissions_workspace"] = service.to_dict()
 
 
 def _transactions_workspace_state(st: Any) -> dict[str, Any]:
@@ -4087,6 +4110,10 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault(
         "atlas_settings_workspace", _default_settings_workspace_state()
     )
+    st.session_state.setdefault(
+        "atlas_permissions_workspace", _default_permissions_workspace_state()
+    )
+    st.session_state.setdefault("atlas_settings_user_id", "local-user")
     st.session_state.setdefault("atlas_transaction_estimate_engine_states", {})
     st.session_state.setdefault("atlas_transactions_selected_document_id", "")
     st.session_state.setdefault("atlas_price_list_signature", "")
@@ -6658,6 +6685,12 @@ def _settings_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": None,
             },
             {
+                "tertiary_key": "roles_permissions",
+                "label": "Roles and Permissions",
+                "action_type": "settings_view",
+                "required_selection": None,
+            },
+            {
                 "tertiary_key": "audit",
                 "label": "Audit",
                 "action_type": "history_activity_view",
@@ -8699,6 +8732,81 @@ def _object_workspace_relationship_rows(universal_object: Any) -> list[dict[str,
     return rows
 
 
+def _permission_scope_for_object(universal_object: Any, kind: str) -> str:
+    identity = getattr(universal_object, "identity", None)
+    owning_workspace = _safe_text(
+        getattr(identity, "owning_workspace", None), "Projects"
+    ).lower()
+    if owning_workspace == "transactions" or kind in {
+        "commercial_document",
+        "estimate",
+        "proposal",
+        "sales_order",
+        "purchase_order",
+        "request_for_quote",
+        "vendor_quote",
+        "receiving",
+        "vendor_bill",
+        "customer_invoice",
+        "change_order",
+    }:
+        return "transactions"
+    if owning_workspace == "knowledge" or kind in {
+        "customer",
+        "vendor",
+        "manufacturer",
+        "service",
+        "contact",
+        "location",
+        "master_product",
+    }:
+        return "knowledge"
+    return "projects"
+
+
+def _authorized_object_actions(
+    st: Any,
+    *,
+    kind: str,
+    universal_object: Any,
+) -> list[dict[str, Any]]:
+    transactions_state = _transactions_workspace_state(st)
+    tenant_id = _safe_text(st.session_state.get(_tenant_scope_key()), "local")
+    organization_id = _safe_text(transactions_state.get("organization_id"), "atlas")
+    principal_id = _safe_text(
+        st.session_state.get("atlas_settings_user_id"), "local-user"
+    )
+    project_id = (
+        _safe_text(st.session_state.get("atlas_active_workspace_id"), "") or None
+    )
+    scope = _permission_scope_for_object(universal_object, kind)
+    permissions_service = _permissions_workspace_service(st)
+
+    actions: list[dict[str, Any]] = []
+    for item in list(getattr(universal_object, "actions", []) or []):
+        payload = item.to_dict() if hasattr(item, "to_dict") else dict(item)
+        access = permissions_service.action_access(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            principal_id=principal_id,
+            permission_hook=_safe_text(payload.get("permission_hook"), "") or None,
+            action_key=_safe_text(payload.get("action_key"), ""),
+            workspace_scope=scope,
+            project_id=project_id,
+        )
+        if not access.visible:
+            continue
+        payload["enabled"] = bool(payload.get("enabled", True)) and access.enabled
+        if not payload["enabled"] and not _safe_text(
+            payload.get("disabled_reason"), ""
+        ):
+            payload["disabled_reason"] = _safe_text(access.reason, "Action unavailable")
+        payload["permission_key"] = access.permission_key
+        payload["access_diagnostics"] = access.decision.to_dict()
+        actions.append(payload)
+    return actions
+
+
 def _render_object_workspace_actions(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -8709,15 +8817,11 @@ def _render_object_workspace_actions(
     record: ProjectWorkspaceRecord | None,
 ) -> None:
     st.markdown("### Primary Actions")
-    actions = [
-        item.to_dict() if hasattr(item, "to_dict") else dict(item)
-        for item in list(getattr(universal_object, "actions", []) or [])
-        if bool(
-            dict(item.to_dict() if hasattr(item, "to_dict") else item).get(
-                "visible", True
-            )
-        )
-    ]
+    actions = _authorized_object_actions(
+        st,
+        kind=kind,
+        universal_object=universal_object,
+    )
     if not actions:
         st.caption("No actions available.")
         return
@@ -14655,6 +14759,19 @@ def _render_application_administration_page(
     organization_id = _safe_text(transactions_state.get("organization_id"), "atlas")
     user_id = _safe_text(st.session_state.get("atlas_settings_user_id"), "local-user")
     settings_service = _settings_workspace_service(st)
+    permissions_service = _permissions_workspace_service(st)
+    settings_access = permissions_service.evaluate(
+        AccessRequest(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            principal_id=user_id,
+            permission_key="settings.view",
+            project_id=None,
+        )
+    )
+    if not settings_access.allowed:
+        st.warning(settings_access.reason)
+        return
 
     if secondary == "organization_settings":
         if tertiary == "overview":
@@ -15240,15 +15357,291 @@ def _render_application_administration_page(
                         key="atlas_settings_terms_preview_content",
                     )
 
-        else:
+        elif tertiary == "roles_permissions":
+            roles_view = permissions_service.evaluate(
+                AccessRequest(
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                    principal_id=user_id,
+                    permission_key="users_roles.view",
+                    project_id=None,
+                )
+            )
+            roles_manage = permissions_service.evaluate(
+                AccessRequest(
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                    principal_id=user_id,
+                    permission_key="users_roles.manage",
+                    project_id=None,
+                )
+            )
+            if not roles_view.allowed:
+                st.info(roles_view.reason)
+            else:
+                st.caption(
+                    "System roles are stable and tenant-scoped. User administration is still evolving, so placeholder membership IDs are supported."
+                )
+                roles = permissions_service.list_system_roles()
+                st.dataframe(
+                    [
+                        {
+                            "Role": role.display_name,
+                            "Role Key": role.role_key,
+                            "System": role.system_role,
+                            "Allowed Permissions": len(role.allowed_permissions),
+                            "Denied Permissions": len(role.denied_permissions),
+                            "Description": _safe_text(role.description, ""),
+                        }
+                        for role in roles
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+
+                selected_role_key = st.selectbox(
+                    "Role Permission Detail",
+                    options=[role.role_key for role in roles],
+                    format_func=lambda key: next(
+                        (role.display_name for role in roles if role.role_key == key),
+                        key,
+                    ),
+                    key="atlas_settings_permissions_selected_role",
+                )
+                selected_role = next(
+                    role for role in roles if role.role_key == selected_role_key
+                )
+                st.dataframe(
+                    [
+                        {
+                            "Permission": permission.permission_key,
+                            "Category": permission.category,
+                            "Allowed": permission.permission_key
+                            in set(selected_role.allowed_permissions),
+                            "Denied": permission.permission_key
+                            in set(selected_role.denied_permissions),
+                        }
+                        for permission in permissions_service.list_permissions()
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+
+                assignments = permissions_service.list_role_assignments(
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                )
+                st.markdown("#### Role Assignments")
+                if assignments:
+                    st.dataframe(
+                        [
+                            {
+                                "Assignment ID": assignment.assignment_id,
+                                "Member": assignment.principal_id,
+                                "Role": assignment.role_key,
+                                "Project Scope": _safe_text(
+                                    assignment.project_id,
+                                    "All Projects",
+                                ),
+                                "Assigned By": assignment.assigned_by,
+                                "Assigned At": assignment.assigned_at,
+                            }
+                            for assignment in assignments
+                        ],
+                        width="stretch",
+                        hide_index=True,
+                    )
+                else:
+                    st.info(
+                        "No explicit role assignments exist yet. Local development remains backward-compatible for local-user."
+                    )
+
+                if roles_manage.allowed:
+                    with st.form("atlas_settings_roles_assignment_form"):
+                        assign_cols = st.columns(3)
+                        principal_input = assign_cols[0].text_input(
+                            "Member ID",
+                            value="local-user",
+                            help="Use existing users when available or placeholder membership IDs during local development.",
+                        )
+                        role_input = assign_cols[1].selectbox(
+                            "Role",
+                            options=[role.role_key for role in roles],
+                            format_func=lambda key: next(
+                                (
+                                    role.display_name
+                                    for role in roles
+                                    if role.role_key == key
+                                ),
+                                key,
+                            ),
+                        )
+                        project_scope_input = assign_cols[2].text_input(
+                            "Optional Project Scope",
+                            value="",
+                            placeholder="Leave blank for tenant-wide assignment",
+                        )
+                        create_assignment = st.form_submit_button(
+                            "Assign Role",
+                            width="stretch",
+                        )
+                    if create_assignment:
+                        try:
+                            permissions_service.assign_role(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                principal_id=principal_input,
+                                role_key=role_input,
+                                actor="atlas-ui",
+                                project_id=project_scope_input or None,
+                            )
+                            _save_permissions_workspace_state(st, permissions_service)
+                            st.success("Role assignment saved.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to assign role: {exc}")
+                else:
+                    st.caption(roles_manage.reason)
+
+                st.markdown("#### Project Access Overrides")
+                if roles_manage.allowed:
+                    with st.form("atlas_settings_project_override_form"):
+                        override_cols = st.columns(4)
+                        override_project = override_cols[0].text_input(
+                            "Project ID",
+                            value="",
+                            placeholder="required",
+                        )
+                        override_subject = override_cols[1].text_input(
+                            "Member ID",
+                            value="",
+                            placeholder="optional",
+                        )
+                        override_permission = override_cols[2].selectbox(
+                            "Permission",
+                            options=[
+                                permission.permission_key
+                                for permission in permissions_service.list_permissions()
+                            ],
+                        )
+                        override_effect = override_cols[3].selectbox(
+                            "Effect",
+                            options=[
+                                PermissionEffect.ALLOW.value,
+                                PermissionEffect.DENY.value,
+                            ],
+                        )
+                        override_reason = st.text_input(
+                            "Reason",
+                            value="",
+                            placeholder="Human-readable reason",
+                        )
+                        override_role = st.selectbox(
+                            "Optional Role Target",
+                            options=["", *[role.role_key for role in roles]],
+                            help="Provide role target when member target is blank.",
+                        )
+                        override_submit = st.form_submit_button(
+                            "Save Project Override",
+                            width="stretch",
+                        )
+                    if override_submit:
+                        try:
+                            permissions_service.set_project_override(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                project_id=override_project,
+                                permission_key=override_permission,
+                                effect=PermissionEffect(override_effect),
+                                reason=override_reason,
+                                actor="atlas-ui",
+                                principal_id=override_subject or None,
+                                role_key=override_role or None,
+                            )
+                            _save_permissions_workspace_state(st, permissions_service)
+                            st.success("Project override saved.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Unable to save override: {exc}")
+                else:
+                    st.caption(
+                        "Role-manage permission is required to set project overrides."
+                    )
+
+                st.markdown("#### Effective Access")
+                access_cols = st.columns(3)
+                access_member = access_cols[0].text_input(
+                    "Member To Evaluate",
+                    value="local-user",
+                    key="atlas_settings_effective_access_member",
+                )
+                access_project = access_cols[1].text_input(
+                    "Project Scope",
+                    value="",
+                    key="atlas_settings_effective_access_project",
+                )
+                access_permission = access_cols[2].selectbox(
+                    "Permission",
+                    options=[
+                        permission.permission_key
+                        for permission in permissions_service.list_permissions()
+                    ],
+                    key="atlas_settings_effective_access_permission",
+                )
+                access_decision = permissions_service.evaluate(
+                    AccessRequest(
+                        tenant_id=tenant_id,
+                        organization_id=organization_id,
+                        principal_id=access_member,
+                        permission_key=access_permission,
+                        project_id=access_project or None,
+                    )
+                )
+                effective = permissions_service.effective_permissions(
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                    principal_id=access_member,
+                    project_id=access_project or None,
+                )
+                st.dataframe(
+                    [
+                        {
+                            "Permission": access_permission,
+                            "Decision": access_decision.effect.value,
+                            "Allowed": access_decision.allowed,
+                            "Reason": access_decision.reason,
+                            "Resolved Roles": ", ".join(access_decision.resolved_roles)
+                            or "none",
+                        }
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+                st.caption(
+                    f"Allowed {len(effective['allowed'])} of {len(effective['allowed']) + len(effective['denied'])} permissions for this context."
+                )
+
+        elif tertiary == "audit":
             audit_rows = settings_service.audit_events(
                 tenant_id=tenant_id,
                 organization_id=organization_id,
             )
-            if not audit_rows:
-                st.info("No settings audit events recorded yet.")
+            permission_rows = permissions_service.permission_events(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+            )
+            if not audit_rows and not permission_rows:
+                st.info("No settings or permission audit events recorded yet.")
             else:
-                st.dataframe(audit_rows, width="stretch", hide_index=True)
+                if audit_rows:
+                    st.markdown("#### Settings Events")
+                    st.dataframe(audit_rows, width="stretch", hide_index=True)
+                if permission_rows:
+                    st.markdown("#### Permission Events")
+                    st.dataframe(permission_rows, width="stretch", hide_index=True)
+
+        else:
+            st.info("Select a valid settings subsection.")
 
     elif secondary == "personal_preferences":
         prefs = settings_service.personal_preferences(

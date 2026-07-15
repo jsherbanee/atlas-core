@@ -207,3 +207,15 @@ Atlas should eventually support organization lifecycle administration, enterpris
 - The exact partitioning mechanism for future persistence layers remains open.
 - The interaction between tenant deletion, audit retention, and legal export requirements remains policy-driven.
 - The final AWS implementation mix remains flexible.
+
+## P-01 Implementation Note
+
+Sprint P-01 delivers a deterministic authorization foundation aligned to this architecture:
+
+- role assignments are scoped to one tenant and one organization
+- permission evaluation is deny-by-default and tenant-bound
+- explicit project-level overrides are tenant and organization scoped
+- cross-tenant assignment leakage is prevented by evaluation scope matching
+- permission change events are recorded for auditability
+
+P-01 is a foundation sprint and does not deliver full tenant administration lifecycle flows.

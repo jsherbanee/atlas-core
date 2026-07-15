@@ -243,3 +243,15 @@ Implemented in L-02:
 Boundary rules:
 - lifecycle dashboard remains read-oriented visualization and inspection
 - lifecycle automation and downstream workflow execution remain out of scope
+
+## P-01 Permission Gating Note
+
+Sprint P-01 wires Universal Object actions into centralized permission evaluation through action permission hooks.
+
+Action rendering now resolves deterministically as:
+
+- visible and enabled
+- visible but disabled with explicit denial reason
+- hidden
+
+Authorization checks remain centralized in shared action evaluation and are not scattered across page-specific object UI code.
