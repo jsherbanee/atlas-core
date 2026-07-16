@@ -31,6 +31,7 @@ class _FakeStreamlit:
     session_state: dict[str, Any]
     rerun_called: bool = False
     captions: list[str] | None = None
+    query_params: dict[str, Any] | None = None
 
     def rerun(self) -> None:
         self.rerun_called = True
@@ -47,6 +48,7 @@ class _FakeStreamlit:
 class _HomeContractStreamlit:
     def __init__(self, *, pressed: set[str] | None = None) -> None:
         self.session_state: dict[str, Any] = {}
+        self.query_params: dict[str, Any] | None = None
         self._pressed = set(pressed or set())
         self.subheaders: list[str] = []
         self.markdowns: list[str] = []
@@ -68,7 +70,10 @@ class _HomeContractStreamlit:
     def subheader(self, text: str) -> None:
         self.subheaders.append(text)
 
-    def columns(self, count: int | list[Any]) -> list[_HomeContractStreamlit]:
+    def columns(
+        self, count: int | list[Any], **kwargs: Any
+    ) -> list[_HomeContractStreamlit]:
+        _ = kwargs
         self.column_specs.append(count)
         size = len(count) if isinstance(count, list) else count
         return [self for _ in range(size)]
@@ -271,7 +276,8 @@ class _CreatePageStreamlit:
             return False
         return self.submit
 
-    def columns(self, count: int) -> list[_CreatePageStreamlit]:
+    def columns(self, count: int, **kwargs: Any) -> list[_CreatePageStreamlit]:
+        _ = kwargs
         return [self for _ in range(count)]
 
     def metric(self, _label: str, _value: str) -> None:
@@ -615,14 +621,13 @@ def test_application_nav_exposes_home_with_compatibility_route_key() -> None:
     assert ("Administration", "Administration") not in app_workspace_entries
 
 
-def test_top_navigation_settings_menu_routes_to_administration() -> None:
-    st = _HomeContractStreamlit(pressed={"☰", "Settings"})
-    service = _FakeWorkspaceService([])
+def test_top_navigation_settings_routes_to_administration() -> None:
+    st = _FakeStreamlit(session_state={"atlas_active_page": "Mission Control"})
+    st.query_params = {"atlas_page": "Administration"}
 
-    app._render_header(st, service, None, None)
+    app._sync_active_page_from_query_params(st)
 
     assert st.session_state["atlas_active_page"] == "Administration"
-    assert st.rerun_called is True
 
 
 def test_header_menu_routes_to_primary_pages() -> None:
@@ -652,37 +657,48 @@ def test_header_menu_closes_when_page_navigation_completes() -> None:
 
 def test_atlas_button_routes_back_home() -> None:
     st = _HomeContractStreamlit(pressed={"Atlas"})
+    st.query_params = {}
     service = _FakeWorkspaceService([])
 
     app._render_header(st, service, None, None)
 
     assert st.session_state["atlas_active_page"] == "Mission Control"
     assert st.rerun_called is True
+    assert st.query_params["atlas_page"] == "Mission Control"
+    assert st.button_calls[0]["label"] == "Atlas"
     assert st.button_calls[0]["use_container_width"] is False
+    assert st.button_calls[0]["width"] == "content"
 
 
 def test_top_navigation_renders_primary_header_buttons() -> None:
-    st = _HomeContractStreamlit(pressed={"Projects"})
+    st = _HomeContractStreamlit()
 
-    app._render_top_navigation(st, st.columns(4))
+    app._render_top_navigation(st, st.columns(5))
 
-    assert st.session_state["atlas_active_page"] == "Projects"
     assert [call["label"] for call in st.button_calls] == [
         "Transactions",
         "Projects",
         "Knowledge",
         "Reports",
+        "Settings",
     ]
+    assert all(call["width"] == "content" for call in st.button_calls)
     assert all(call["use_container_width"] is False for call in st.button_calls)
 
 
 def test_top_navigation_hides_public_home_button() -> None:
-    st = _HomeContractStreamlit(pressed={"Home"})
+    st = _HomeContractStreamlit()
     st.session_state["atlas_active_page"] = "Projects"
 
-    app._render_top_navigation(st, st.columns(4))
+    app._render_top_navigation(st, st.columns(5))
 
-    assert st.session_state["atlas_active_page"] == "Projects"
+    assert [call["label"] for call in st.button_calls] == [
+        "Transactions",
+        "Projects",
+        "Knowledge",
+        "Reports",
+        "Settings",
+    ]
     assert all(call["label"] != "Home" for call in st.button_calls)
 
 
@@ -692,7 +708,7 @@ def test_top_navigation_highlights_projects_in_project_workspace() -> None:
 
     app._render_top_navigation(
         st,
-        st.columns(4),
+        st.columns(5),
         _project_record("project-a", "Project A"),
     )
 
@@ -700,13 +716,14 @@ def test_top_navigation_highlights_projects_in_project_workspace() -> None:
         call for call in st.button_calls if call["label"] == "Projects"
     )
     assert projects_call["type"] == "primary"
+    assert projects_call["width"] == "content"
 
 
 def test_top_navigation_highlights_knowledge_and_reports_workspaces() -> None:
     knowledge = _HomeContractStreamlit()
     knowledge.session_state["atlas_active_page"] = "Evidence"
 
-    app._render_top_navigation(knowledge, knowledge.columns(4))
+    app._render_top_navigation(knowledge, knowledge.columns(5))
 
     knowledge_call = next(
         call for call in knowledge.button_calls if call["label"] == "Knowledge"
@@ -716,12 +733,24 @@ def test_top_navigation_highlights_knowledge_and_reports_workspaces() -> None:
     reports = _HomeContractStreamlit()
     reports.session_state["atlas_active_page"] = "Reports"
 
-    app._render_top_navigation(reports, reports.columns(4))
+    app._render_top_navigation(reports, reports.columns(5))
 
     reports_call = next(
         call for call in reports.button_calls if call["label"] == "Reports"
     )
     assert reports_call["type"] == "primary"
+
+
+def test_top_navigation_routes_within_current_window() -> None:
+    st = _HomeContractStreamlit(pressed={"Projects"})
+    st.session_state["atlas_active_page"] = "Mission Control"
+    st.query_params = {}
+
+    app._render_top_navigation(st, st.columns(5))
+
+    assert st.session_state["atlas_active_page"] == "Projects"
+    assert st.query_params["atlas_page"] == "Projects"
+    assert st.rerun_called is True
 
 
 def test_knowledge_navigation_defaults_seed_secondary_and_tertiary_state() -> None:
@@ -831,6 +860,7 @@ def test_header_search_control_uses_simple_search_placeholder() -> None:
     assert st.text_inputs[0]["placeholder"] == "Search"
     assert st.text_inputs[0]["label_visibility"] == "collapsed"
     assert all("Global Object Search" not in item for item in st.markdowns)
+    assert st.button_calls[0]["label"] == "Atlas"
 
 
 def test_header_uses_compact_responsive_column_contract() -> None:
@@ -838,15 +868,15 @@ def test_header_uses_compact_responsive_column_contract() -> None:
 
     app._render_header(st, _FakeWorkspaceService([]), None, None)
 
-    assert st.column_specs == [[1.35, 1.0, 1.0, 1.0, 1.0, 4.65, 0.5]]
+    assert st.column_specs == [app.HEADER_NAV_COLUMN_SPEC]
 
 
-def test_header_is_single_row_and_omits_alpha_version_caption() -> None:
+def test_header_uses_single_responsive_row_and_omits_alpha_version_caption() -> None:
     st = _HomeContractStreamlit()
 
     app._render_header(st, _FakeWorkspaceService([]), None, None)
 
-    assert st.column_specs == [[1.35, 1.0, 1.0, 1.0, 1.0, 4.65, 0.5]]
+    assert st.column_specs == [app.HEADER_NAV_COLUMN_SPEC]
     assert all("Controlled Alpha" not in item for item in st.captions)
     assert all("0.1.0-a02" not in item for item in st.captions)
 
@@ -855,10 +885,27 @@ def test_top_navigation_order_places_transactions_first() -> None:
     st = _HomeContractStreamlit()
     st.session_state["atlas_active_page"] = "Transactions"
 
-    app._render_top_navigation(st, [st, st, st, st], None)
+    app._render_top_navigation(st, st.columns(5), None)
 
-    labels = [call["label"] for call in st.button_calls[:4]]
-    assert labels == ["Transactions", "Projects", "Knowledge", "Reports"]
+    assert [call["label"] for call in st.button_calls] == [
+        "Transactions",
+        "Projects",
+        "Knowledge",
+        "Reports",
+        "Settings",
+    ]
+
+
+def test_top_navigation_highlights_settings_workspace() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state["atlas_active_page"] = "Administration"
+
+    app._render_top_navigation(st, st.columns(5))
+
+    settings_call = next(
+        call for call in st.button_calls if call["label"] == "Settings"
+    )
+    assert settings_call["type"] == "primary"
 
 
 def test_group_for_page_keeps_internal_mission_control_compatibility() -> None:
@@ -1288,7 +1335,9 @@ def test_injected_styles_include_transactions_primary_nav_contract() -> None:
 
     stylesheet = "\n".join(st.markdowns)
     assert ".st-key-atlas_header_nav_Transactions button" in stylesheet
-    assert "calc(var(--atlas-display-l-size) * 1.5)" in stylesheet
+    assert ".st-key-atlas_header_nav_Settings button" in stylesheet
+    assert "--atlas-header-search-max-width" in stylesheet
+    assert "var(--atlas-heading-3-size)" in stylesheet
 
 
 def test_injected_styles_define_predictable_responsive_header_collapse() -> None:
@@ -1299,7 +1348,33 @@ def test_injected_styles_define_predictable_responsive_header_collapse() -> None
     stylesheet = "\n".join(st.markdowns)
     assert "@media (max-width: 960px)" in stylesheet
     assert ".st-key-atlas_header_nav_Transactions" in stylesheet
+    assert ".st-key-atlas_header_nav_Settings" in stylesheet
     assert "display: none !important;" in stylesheet
+    assert '[class*="st-key-atlas_global_search_input_"] input' in stylesheet
+    assert "overflow-x: clip" in stylesheet
+
+
+def test_home_page_renders_operational_sections() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_home_page(st, _FakeWorkspaceService([]), None, None, {})
+
+    rendered_text = "\n".join([*st.subheaders, *st.markdowns, *st.captions])
+    assert "Continue Working" in rendered_text
+    assert "Recent Projects" in rendered_text
+    assert "Action Center" in rendered_text
+    assert "Notifications" in rendered_text
+    assert "Favorites" in rendered_text
+
+
+def test_footer_renders_tenant_copyright_without_diagnostics() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_status_bar(st, None, None)
+
+    assert "©2026 Corsa Systems. All rights reserved." in st.captions
+    assert all("Atlas v" not in item for item in st.captions)
+    assert len(st.captions) >= 2
 
 
 def test_action_center_filters_to_high_priority_and_deduplicates() -> None:
@@ -1680,7 +1755,7 @@ def test_workspace_navigation_uses_two_column_shell_contract() -> None:
         content_renderer=lambda: rendered.__setitem__("content", True),
     )
 
-    assert [1.25, 4.75] in st.column_specs
+    assert app.BODY_SHELL_COLUMN_SPEC in st.column_specs
     assert rendered["content"] is True
 
 

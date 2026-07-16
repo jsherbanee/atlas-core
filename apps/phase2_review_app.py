@@ -258,8 +258,23 @@ REPORT_PAGES = [
 ]
 SETTINGS_PAGES = ["Project Settings", "Application Settings"]
 
+HEADER_NAV_COLUMN_SPEC = [1.1, 1.1, 0.95, 1.0, 0.95, 0.95, 2.7, 0.4]
+BODY_SHELL_COLUMN_SPEC = [1.35, 4.65]
+COMPACT_TERTIARY_COLUMNS = 4
+PRIMARY_HEADER_NAV_ITEMS: list[tuple[str, str]] = [
+    ("Transactions", "Transactions"),
+    ("Projects", "Projects"),
+    ("Knowledge", "Knowledge"),
+    ("Reports", "Reports"),
+    ("Settings", "Administration"),
+]
+HEADER_MENU_ITEMS: list[tuple[str, str]] = [
+    ("Home", "Mission Control"),
+    *PRIMARY_HEADER_NAV_ITEMS,
+]
+
 ALPHA_APP_VERSION_IDENTIFIER = f"{__version__}-a02"
-ALPHA_TEST_SUITE_BASELINE_REFERENCE = "1408 passing"
+ALPHA_TEST_SUITE_BASELINE_REFERENCE = "1444 passing"
 ALPHA_KNOWN_LIMITATIONS = [
     "Background jobs are local deterministic only in controlled alpha.",
     "Attachment malware scanning and quarantine adapters are not active in this release candidate.",
@@ -1197,6 +1212,29 @@ def _open_estimate_navigation_target(
     else:
         return
     st.rerun()
+
+
+def _render_primary_navigation_button(
+    st: Any,
+    host: Any,
+    *,
+    label: str,
+    page: str,
+    active_page: str,
+    record: ProjectWorkspaceRecord | None,
+) -> None:
+    is_active = _primary_navigation_is_active(
+        label,
+        active_page=active_page,
+        record=record,
+    )
+    if host.button(
+        label,
+        key=f"atlas_header_nav_{label}",
+        type="primary" if is_active else "secondary",
+        width="content",
+    ):
+        _open_page(st, page)
 
 
 def _safe_text(value: Any, default: str = "Unknown") -> str:
@@ -4778,6 +4816,7 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_active_page", "Mission Control")
     st.session_state.setdefault("atlas_layout_mode", "Desktop")
     st.session_state.setdefault("atlas_navigation_collapsed", False)
+    st.session_state.setdefault("atlas_header_menu_open", False)
     st.session_state.setdefault("atlas_project_selector", "Recent Projects")
     st.session_state.setdefault("atlas_workspace_action", "")
     st.session_state.setdefault("atlas_pending_open_path", "")
@@ -5729,9 +5768,33 @@ def _submit_global_search(st: Any) -> None:
     st.session_state["atlas_global_search_last_submitted"] = query
 
 
+def _set_active_page_query_param(st: Any, page: str) -> None:
+    query_params = getattr(st, "query_params", None)
+    if query_params is None:
+        return
+    try:
+        query_params["atlas_page"] = page
+    except Exception:
+        return
+
+
+def _sync_active_page_from_query_params(st: Any) -> None:
+    query_params = getattr(st, "query_params", None)
+    if query_params is None:
+        return
+    page = _safe_text(getattr(query_params, "get", lambda *_: None)("atlas_page"), "")
+    if not page:
+        return
+    if page == "Settings":
+        page = "Administration"
+    if page in ALL_ACTIVE_PAGES:
+        st.session_state["atlas_active_page"] = page
+
+
 def _open_page(st: Any, page: str) -> None:
     st.session_state["atlas_header_menu_open"] = False
     st.session_state["atlas_active_page"] = page
+    _set_active_page_query_param(st, page)
     st.rerun()
 
 
@@ -7907,7 +7970,7 @@ def _render_workspace_navigation(
         return
 
     grouped_sections = _group_navigation_sections(primary, mode, sections)
-    shell_cols = st.columns([1.25, 4.75])
+    shell_cols = st.columns(BODY_SHELL_COLUMN_SPEC, gap="small")
     with shell_cols[0]:
         for group_index, (group_name, section_group) in enumerate(grouped_sections):
             if group_index > 0:
@@ -7975,37 +8038,40 @@ def _render_workspace_navigation(
             if not _tertiary_action_requires_selection(st, item, record)
         ]
         if actions:
-            action_cols = st.columns(max(1, min(6, len(actions))))
-            for index, action in enumerate(actions):
-                key = _safe_text(action.get("tertiary_key"), "")
-                label = _safe_text(action.get("label"), key)
-                if action_cols[index % len(action_cols)].button(
-                    label,
-                    key=f"atlas_tertiary_{primary}_{mode}_{_safe_text(section.get('secondary_key'), '')}_{key}",
-                    type=(
-                        "primary"
-                        if key
-                        == _safe_text(
-                            st.session_state.get(_navigation_tertiary_state_key()),
-                            "",
-                        )
-                        else "secondary"
-                    ),
-                    disabled=not bool(action.get("enabled", True)),
-                    width="content",
-                ):
-                    st.session_state[_navigation_tertiary_state_key()] = key
-                    st.session_state[_navigation_prior_route_key()] = {
-                        "page": _safe_text(
-                            st.session_state.get("atlas_active_page"), ""
+            row_size = max(1, min(COMPACT_TERTIARY_COLUMNS, len(actions)))
+            for row_index in range(0, len(actions), row_size):
+                action_row = actions[row_index : row_index + row_size]
+                action_cols = st.columns([1.0] * len(action_row), gap="small")
+                for index, action in enumerate(action_row):
+                    key = _safe_text(action.get("tertiary_key"), "")
+                    label = _safe_text(action.get("label"), key)
+                    if action_cols[index].button(
+                        label,
+                        key=f"atlas_tertiary_{primary}_{mode}_{_safe_text(section.get('secondary_key'), '')}_{key}",
+                        type=(
+                            "primary"
+                            if key
+                            == _safe_text(
+                                st.session_state.get(_navigation_tertiary_state_key()),
+                                "",
+                            )
+                            else "secondary"
                         ),
-                        "workspace": primary,
-                        "mode": mode,
-                    }
-                    route = _safe_text(action.get("route"), "")
-                    if route:
-                        st.session_state["atlas_active_page"] = route
-                    st.rerun()
+                        disabled=not bool(action.get("enabled", True)),
+                        width="stretch",
+                    ):
+                        st.session_state[_navigation_tertiary_state_key()] = key
+                        st.session_state[_navigation_prior_route_key()] = {
+                            "page": _safe_text(
+                                st.session_state.get("atlas_active_page"), ""
+                            ),
+                            "workspace": primary,
+                            "mode": mode,
+                        }
+                        route = _safe_text(action.get("route"), "")
+                        if route:
+                            st.session_state["atlas_active_page"] = route
+                        st.rerun()
 
         if content_renderer is not None:
             content_renderer()
@@ -8039,27 +8105,19 @@ def _render_top_navigation(
     nav_columns: list[Any],
     record: ProjectWorkspaceRecord | None = None,
 ) -> None:
-    active_page = st.session_state.get("atlas_active_page", "Mission Control")
-    nav_items = [
-        ("Transactions", "Transactions"),
-        ("Projects", "Projects"),
-        ("Knowledge", "Knowledge"),
-        ("Reports", "Reports"),
-    ]
-
+    active_page = _safe_text(
+        st.session_state.get("atlas_active_page"), "Mission Control"
+    )
+    nav_items = PRIMARY_HEADER_NAV_ITEMS
     for column, (label, page) in zip(nav_columns, nav_items):
-        is_active = _primary_navigation_is_active(
-            label,
+        _render_primary_navigation_button(
+            st,
+            column,
+            label=label,
+            page=page,
             active_page=active_page,
             record=record,
         )
-        if column.button(
-            label,
-            key=f"atlas_header_nav_{label}",
-            type="primary" if is_active else "secondary",
-            width="content",
-        ):
-            _open_page(st, page)
 
 
 def _primary_navigation_is_active(
@@ -8074,6 +8132,15 @@ def _primary_navigation_is_active(
         return True
     if label == "Knowledge" and active_page in KNOWLEDGE_PAGES:
         return True
+    if label == "Reports" and active_page in REPORT_PAGES:
+        return True
+    if label == "Settings" and (
+        active_page in SETTINGS_PAGES
+        or active_page in {"Administration", "Workspace Settings"}
+    ):
+        return True
+    if label in {"Atlas", "Home"}:
+        return active_page == "Mission Control"
     return label == "Transactions" and active_page == "Transactions"
 
 
@@ -8099,12 +8166,7 @@ def _render_header_menu(
 
     menu = host.container(border=True)
     menu.caption("Navigate")
-    for label, page in [
-        ("Transactions", "Transactions"),
-        ("Projects", "Projects"),
-        ("Knowledge", "Knowledge"),
-        ("Reports", "Reports"),
-    ]:
+    for label, page in HEADER_MENU_ITEMS:
         if menu.button(
             label,
             key=f"atlas_header_menu_nav_{label}",
@@ -8121,14 +8183,6 @@ def _render_header_menu(
         ):
             _open_page(st, page)
 
-    if menu.button(
-        "Settings",
-        key="atlas_header_settings",
-        type="secondary",
-        width="stretch",
-    ):
-        _open_page(st, "Administration")
-
 
 def _render_header(
     st: Any,
@@ -8139,7 +8193,7 @@ def _render_header(
     _ = (workspace_service, context)
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
 
-    header_cols = st.columns([1.35, 1.0, 1.0, 1.0, 1.0, 4.65, 0.5])
+    header_cols = st.columns(HEADER_NAV_COLUMN_SPEC, gap="small")
     if header_cols[0].button(
         "Atlas",
         key="atlas_header_nav_Atlas",
@@ -8147,11 +8201,11 @@ def _render_header(
         type="primary" if current_page == "Mission Control" else "secondary",
     ):
         _open_page(st, "Mission Control")
-    _render_top_navigation(st, header_cols[1:5], record)
-    _render_global_search_control(st, header_cols[5])
+    _render_top_navigation(st, header_cols[1:6], record)
+    _render_global_search_control(st, header_cols[6])
     _render_header_menu(
         st,
-        header_cols[6],
+        header_cols[7],
         active_page=_safe_text(current_page, "Mission Control"),
         record=record,
     )
@@ -35838,6 +35892,7 @@ def main() -> None:
     st.set_page_config(page_title="Atlas Workspace", layout="wide")
     _inject_styles(st)
     _init_session_state(st)
+    _sync_active_page_from_query_params(st)
     try:
         workspace_service = _build_workspace_service()
         _ensure_active_workspace(st, workspace_service)

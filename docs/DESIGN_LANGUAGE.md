@@ -238,6 +238,18 @@ Completed transaction-entry UX contract:
 - catalog-backed line entry supports Product, Service, Fee, and Assembly item types
 - manual service-line insertion remains available without changing issued-document immutability rules
 
+## 8.6 Atlas Alpha UI Repair: Responsive Primary Navigation and Shared Shell
+
+This repair keeps behavior-preserving scope while restoring the shared shell's navigation ergonomics:
+
+- primary navigation uses fixed-width application buttons for Transactions, Projects, Knowledge, Reports, and Settings
+- Atlas remains the fixed-width Home control at the far left of the header
+- navigation routing stays within the current Streamlit session and same browser window
+- the global Search field remains bounded so it cannot force the header to wrap
+- primary navigation collapses into Menu at narrow widths instead of becoming browser-style hyperlinks
+- tertiary action rows wrap into deliberate compact groups rather than spilling across the shell
+- tenant-facing footer and table containment continue to align to the shared shell contract
+
 ## 8.5 Sprint X-09 Design System Foundation and Reusable Components
 
 Completion status:

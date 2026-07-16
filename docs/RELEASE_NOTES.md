@@ -24,9 +24,10 @@ This document tracks product-facing changes for Atlas Preview releases.
 ### Improved
 
 - Shared shell navigation now keeps Home, Projects, Knowledge, Transactions, Reports, and Settings behavior compact and production-facing.
-- Global header now renders as one shared row: Atlas, Transactions, Projects, Knowledge, Reports, Search, and Menu.
-- Header primary navigation order is now explicitly standardized as Transactions, Projects, Knowledge, Reports with Atlas fixed as the far-left Home control.
-- At narrower widths, header primary links collapse predictably behind Menu rather than wrapping into a second row.
+- Global header now renders as one shared row of fixed-width buttons: Atlas, Transactions, Projects, Knowledge, Reports, Search, and Menu.
+- Header primary navigation order is now explicitly standardized as Transactions, Projects, Knowledge, Reports, and Settings with Atlas fixed as the far-left Home control.
+- At narrower widths, header primary navigation collapses predictably behind Menu rather than wrapping into a second row.
+- Search now stays bounded so it does not force header wrapping, and Settings tertiary actions wrap into deliberate rows.
 - Transactions now emphasizes active commercial families and keeps deferred families visible as disabled/deferred routes; Change Orders remain a Sales Order/Return Order convention rather than a standalone transaction family.
 - Transactions > Estimates > Add now uses a dedicated estimate-creation workspace with dropdown-driven customer/project/project-code controls and catalog-backed Product/Service/Fee/Assembly line insertion.
 - Tenant-facing estimate creation intentionally excludes Vendor ID to reduce non-estimate data noise in the add flow.
@@ -34,13 +35,14 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Knowledge and Reports application-level wording now emphasizes user-facing data health and output readiness instead of implementation-facing language.
 - Settings tenant-facing surfaces now avoid build/test diagnostics and keep deferred sections explicitly disabled; platform operations remain in Platform Management.
 - Footer/status presentation restores tenant-facing branding text (`©2026 Corsa Systems. All rights reserved.`) and hides internal build diagnostics outside authorized platform-admin context.
+- Tables remain contained within the content shell with internal scrollbars instead of page-level overflow.
 - Redundant shell metadata labels and repeated descriptive page copy are removed from normal tenant-facing pages, while continuity-critical object breadcrumbs are preserved.
 
 ### Quality
 
 - full gates passing: `black --check .`, `ruff check .`, `mypy .`, `pytest`
-- full-suite validation: `1425 passed`
-- targeted navigation regression validation: `pytest tests/test_phase2_transactions_navigation.py tests/test_phase2_settings_navigation.py tests/test_phase2_global_search_working_set.py -q` -> `131 passed`
+- full-suite validation: `1444 passed`
+- targeted navigation regression validation: `pytest tests/test_phase2_global_search_working_set.py tests/test_phase2_settings_navigation.py -q` -> `140 passed`
 
 ### Scope Notes
 

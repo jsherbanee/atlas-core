@@ -23,7 +23,8 @@ This document defines the reusable navigation contract used by the shell and wor
 ## Current Implementation Notes
 
 - The application shell still uses header-based primary navigation
-- The shared shell uses one horizontal header row for Atlas, Transactions, Projects, Knowledge, Reports, Search, and Menu
+- The shared shell uses one horizontal header row for Atlas, Transactions, Projects, Knowledge, Reports, Search, and Menu with fixed-width buttons and same-window callback routing
+- At compact widths, the primary buttons collapse into Menu rather than behaving like browser hyperlinks
 - Knowledge is the first workspace using the reusable secondary/tertiary navigation framework
 - Knowledge search results restore the active secondary group and tertiary page selection context
 - The framework is intended to be extended to additional workspaces without changing the contract shape
@@ -116,6 +117,7 @@ W-01 implementation note:
 - shell-level breadcrumb suppression avoids redundant `Atlas / <workspace>` labels while preserving object-level continuity breadcrumbs
 - migrated object opens preserve object-level navigation context inside Object Workspace
 - context banner and return behavior remain deterministic across search and Working Set handoff paths
+- primary navigation buttons preserve same-window session state and do not open new tabs or windows
 - transaction deferred-route visibility and standalone Change Order removal are regression-covered
 - settings deferred-section disable behavior and platform-diagnostic scoping are regression-covered
 - The implementation is covered by app-level regression tests and full-suite validation

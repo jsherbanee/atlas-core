@@ -78,6 +78,7 @@ Sprint U-02 completes end-to-end application usability polish across Home, Proje
 Alpha UI Cleanup refines production-facing shell/navigation surfaces by tightening active vs deferred route clarity, removing tenant-facing implementation remnants, reducing duplicate action exposure, and preserving behavior contracts without adding new business workflows.
 Alpha UI Cleanup (Responsive Navigation and Estimate Creation UX) standardizes primary shell order to Transactions, Projects, Knowledge, Reports, restores tenant-facing footer copyright text, and adds a dedicated Transactions > Estimates > Add workflow with dropdown-driven estimate details and catalog-backed Product/Service/Fee/Assembly line controls.
 Alpha UI Cleanup (Header Consolidation and Copy Reduction) standardizes a one-row shared header (Atlas, Transactions, Projects, Knowledge, Reports, Search, Menu), removes redundant tenant-facing shell metadata and repeated descriptive copy, and preserves continuity-critical object breadcrumbs and deterministic settings navigation.
+Atlas Workspace Alpha UI Repair standardizes fixed-width primary navigation buttons, same-window routing, bounded search, deliberate Settings tertiary wrapping, and table containment across the shared shell.
 Sprint M-01 implements tenant manager and sandbox provisioning foundations for alpha infrastructure, including platform-admin sandbox lifecycle controls, deterministic isolated repository-path provisioning, tenant-scoped search/job/settings/preference containers, and guarded reset/export/delete workflows without introducing hosted infrastructure dependencies.
 Sprint A-02 implements controlled alpha deployment and test operations, including controlled-alpha environment labeling, administrator-only alpha health checks, tenant-scoped feedback/defect workflow capture, known-limitations access, and operator checklist guidance without introducing new product workflows.
 Sprint A-02 pt 2 implements centralized tenant-scoped application error logging and review workflow, including deterministic fingerprint grouping, occurrence history, user-facing Error IDs, status transitions with audit coverage, sanitized diagnostics export, and health-check unresolved-error/severity summaries.
@@ -107,14 +108,14 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1425 tests)
+- pytest: full suite passing (1444 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1425 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1444 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 
 Latest A-04 targeted validation baseline: 25 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
-Latest Alpha UI Cleanup navigation/estimate-add targeted validation baseline: 131 passing tests (`tests/test_phase2_global_search_working_set.py`, `tests/test_phase2_transactions_navigation.py`, `tests/test_phase2_settings_navigation.py`).
+Latest Alpha UI Cleanup navigation/estimate-add targeted validation baseline: 140 passing tests (`tests/test_phase2_global_search_working_set.py`, `tests/test_phase2_settings_navigation.py`).
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces
