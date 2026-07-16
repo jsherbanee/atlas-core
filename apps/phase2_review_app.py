@@ -258,7 +258,7 @@ REPORT_PAGES = [
 ]
 SETTINGS_PAGES = ["Project Settings", "Application Settings"]
 
-HEADER_NAV_COLUMN_SPEC = [1.1, 1.1, 0.95, 1.0, 0.95, 0.95, 2.7, 0.4]
+HEADER_NAV_COLUMN_SPEC = [0.95, 1.1, 0.9, 0.95, 0.9, 0.9, 2.35]
 BODY_SHELL_COLUMN_SPEC = [1.35, 4.65]
 COMPACT_TERTIARY_COLUMNS = 4
 PRIMARY_HEADER_NAV_ITEMS: list[tuple[str, str]] = [
@@ -267,10 +267,6 @@ PRIMARY_HEADER_NAV_ITEMS: list[tuple[str, str]] = [
     ("Knowledge", "Knowledge"),
     ("Reports", "Reports"),
     ("Settings", "Administration"),
-]
-HEADER_MENU_ITEMS: list[tuple[str, str]] = [
-    ("Home", "Mission Control"),
-    *PRIMARY_HEADER_NAV_ITEMS,
 ]
 
 ALPHA_APP_VERSION_IDENTIFIER = f"{__version__}-a02"
@@ -434,48 +430,38 @@ PROJECT_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
 
 KNOWLEDGE_SECONDARY_GROUPS: list[tuple[str, list[str]]] = [
     (
-        "Reusable Entities",
+        "Knowledge",
         [
-            "Manufacturers",
-            "Vendors",
             "Customers",
-            "Services",
             "Contacts",
             "Locations",
-            "Projects",
-        ],
-    ),
-    (
-        "Commercial Library",
-        [
+            "Vendors",
+            "Manufacturers",
             "Products",
+            "Services",
             "Price Lists",
             "Imports",
-            "Import History",
             "Assemblies",
         ],
-    ),
-    (
-        "Knowledge Overview",
-        ["Summary", "Commercial Health"],
     ),
 ]
 
 KNOWLEDGE_SECONDARY_BY_PAGE: dict[str, str] = {
-    "Summary": "Knowledge Overview",
-    "Commercial Health": "Knowledge Overview",
-    "Manufacturers": "Reusable Entities",
-    "Vendors": "Reusable Entities",
-    "Customers": "Reusable Entities",
-    "Services": "Reusable Entities",
-    "Contacts": "Reusable Entities",
-    "Locations": "Reusable Entities",
-    "Projects": "Reusable Entities",
-    "Products": "Commercial Library",
-    "Price Lists": "Commercial Library",
-    "Imports": "Commercial Library",
-    "Import History": "Commercial Library",
-    "Assemblies": "Commercial Library",
+    "Knowledge": "Knowledge",
+    "Summary": "Knowledge",
+    "Commercial Health": "Knowledge",
+    "Manufacturers": "Knowledge",
+    "Vendors": "Knowledge",
+    "Customers": "Knowledge",
+    "Services": "Knowledge",
+    "Contacts": "Knowledge",
+    "Locations": "Knowledge",
+    "Projects": "Knowledge",
+    "Products": "Knowledge",
+    "Price Lists": "Knowledge",
+    "Imports": "Knowledge",
+    "Import History": "Knowledge",
+    "Assemblies": "Knowledge",
 }
 
 KNOWLEDGE_TERTIARY_BY_KIND: dict[str, str] = {
@@ -492,9 +478,9 @@ KNOWLEDGE_TERTIARY_BY_KIND: dict[str, str] = {
 }
 
 KNOWLEDGE_TERTIARY_BY_PAGE: dict[str, str] = {
-    "Knowledge": "Summary",
-    "Summary": "Summary",
-    "Commercial Health": "Commercial Health",
+    "Knowledge": "Knowledge",
+    "Summary": "Knowledge",
+    "Commercial Health": "Knowledge",
     "Manufacturers": "Manufacturers",
     "Vendors": "Vendors",
     "Customers": "Customers",
@@ -1307,23 +1293,9 @@ def _render_notice_panel(st: Any, title: str, body: str) -> None:
 
 def _navigation_section_group(primary: str, mode: str, secondary_key: str) -> str:
     if primary == "Knowledge":
-        if secondary_key in {"customers", "contacts", "locations"}:
-            return "Accounts"
-        if secondary_key in {"vendors", "manufacturers", "products", "services"}:
-            return "Commercial"
-        if secondary_key in {"price_lists", "imports", "assemblies"}:
-            return "Operations"
-        return "Summary"
+        return ""
     if primary == "Transactions":
-        if secondary_key in {
-            "estimates",
-            "sales_orders",
-            "return_orders",
-            "credit_memos",
-            "customer_invoices",
-        }:
-            return "Active"
-        return "Overview"
+        return ""
     if primary == "Settings":
         if secondary_key in {
             "organization_settings",
@@ -4816,7 +4788,6 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault("atlas_active_page", "Mission Control")
     st.session_state.setdefault("atlas_layout_mode", "Desktop")
     st.session_state.setdefault("atlas_navigation_collapsed", False)
-    st.session_state.setdefault("atlas_header_menu_open", False)
     st.session_state.setdefault("atlas_project_selector", "Recent Projects")
     st.session_state.setdefault("atlas_workspace_action", "")
     st.session_state.setdefault("atlas_pending_open_path", "")
@@ -5792,7 +5763,6 @@ def _sync_active_page_from_query_params(st: Any) -> None:
 
 
 def _open_page(st: Any, page: str) -> None:
-    st.session_state["atlas_header_menu_open"] = False
     st.session_state["atlas_active_page"] = page
     _set_active_page_query_param(st, page)
     st.rerun()
@@ -5826,20 +5796,20 @@ def _knowledge_tertiary_state_key() -> str:
 
 
 def _knowledge_navigation_defaults(st: Any) -> None:
-    st.session_state.setdefault(_knowledge_secondary_state_key(), "Knowledge Overview")
-    st.session_state.setdefault(_knowledge_tertiary_state_key(), "Summary")
+    st.session_state.setdefault(_knowledge_secondary_state_key(), "Knowledge")
+    st.session_state.setdefault(_knowledge_tertiary_state_key(), "Knowledge")
 
 
 def _knowledge_secondary_group_for_page(page: str) -> str:
-    return KNOWLEDGE_SECONDARY_BY_PAGE.get(page, "Knowledge Overview")
+    return KNOWLEDGE_SECONDARY_BY_PAGE.get(page, "Knowledge")
 
 
 def _knowledge_tertiary_page_for_kind(kind: str) -> str:
-    return KNOWLEDGE_TERTIARY_BY_KIND.get(kind, "Summary")
+    return KNOWLEDGE_TERTIARY_BY_KIND.get(kind, "Knowledge")
 
 
 def _knowledge_tertiary_page_for_route(page: str) -> str:
-    return KNOWLEDGE_TERTIARY_BY_PAGE.get(page, "Summary")
+    return KNOWLEDGE_TERTIARY_BY_PAGE.get(page, "Knowledge")
 
 
 def _set_knowledge_navigation_selection(
@@ -5873,12 +5843,8 @@ def _knowledge_content_view_from_shell(st: Any) -> str:
             st.session_state.get(_knowledge_tertiary_state_key()), "Summary"
         )
 
-    if secondary == "overview":
-        if tertiary == "data_health":
-            return "Commercial Health"
-        if tertiary == "recent_activity":
-            return "Import History"
-        return "Summary"
+    if secondary in {"landing", "Knowledge", ""}:
+        return "Knowledge"
 
     secondary_to_view = {
         "customers": "Customers",
@@ -5897,7 +5863,7 @@ def _knowledge_content_view_from_shell(st: Any) -> str:
         if tertiary in {"completed", "activity", "import_history"}:
             return "Import History"
         return "Imports"
-    return _safe_text(st.session_state.get(_knowledge_tertiary_state_key()), "Summary")
+    return "Knowledge"
 
 
 def _sync_knowledge_content_state(st: Any) -> str:
@@ -5914,50 +5880,40 @@ def _render_knowledge_navigation_frame(st: Any) -> None:
     _knowledge_navigation_defaults(st)
     active_secondary = _safe_text(
         st.session_state.get(_knowledge_secondary_state_key()),
-        "Knowledge Overview",
+        "Knowledge",
     )
     active_tertiary = _safe_text(
         st.session_state.get(_knowledge_tertiary_state_key()),
-        "Summary",
+        "Knowledge",
     )
 
     st.markdown("### Knowledge Navigation")
-    st.caption(f"Secondary: {active_secondary} · Tertiary: {active_tertiary}")
-    secondary_cols = st.columns([1.1, 1.1, 1.1])
-    for column, (group_name, pages) in zip(secondary_cols, KNOWLEDGE_SECONDARY_GROUPS):
-        is_active = group_name == active_secondary or active_tertiary in pages
-        if column.button(
-            group_name,
-            key=f"atlas_knowledge_secondary_{group_name}",
-            type="primary" if is_active else "secondary",
-            width="stretch",
-        ):
-            st.session_state[_knowledge_secondary_state_key()] = group_name
-            if pages:
-                st.session_state[_knowledge_tertiary_state_key()] = pages[0]
-            st.rerun()
-
-    selected_pages = next(
-        (
-            pages
-            for group_name, pages in KNOWLEDGE_SECONDARY_GROUPS
-            if group_name == active_secondary
-        ),
-        list(KNOWLEDGE_TERTIARY_BY_PAGE.values()),
-    )
-    tertiary_columns = st.columns(max(1, len(selected_pages)))
-    for column, page in zip(tertiary_columns, selected_pages):
-        if column.button(
-            page,
-            key=f"atlas_knowledge_tertiary_{page}",
-            type="primary" if page == active_tertiary else "secondary",
-            width="stretch",
-        ):
-            st.session_state[_knowledge_tertiary_state_key()] = page
-            st.session_state[_knowledge_secondary_state_key()] = (
-                _knowledge_secondary_group_for_page(page)
-            )
-            st.rerun()
+    st.caption(f"Active: {active_secondary} · Focus: {active_tertiary}")
+    pages = [
+        "Customers",
+        "Contacts",
+        "Locations",
+        "Vendors",
+        "Manufacturers",
+        "Products",
+        "Services",
+        "Price Lists",
+        "Imports",
+        "Assemblies",
+    ]
+    for row_index in range(0, len(pages), 2):
+        row = pages[row_index : row_index + 2]
+        cols = st.columns([1.0] * len(row))
+        for index, page in enumerate(row):
+            if cols[index].button(
+                page,
+                key=f"atlas_knowledge_tertiary_{page}",
+                type="primary" if page == active_tertiary else "secondary",
+                width="stretch",
+            ):
+                st.session_state[_knowledge_secondary_state_key()] = "Knowledge"
+                st.session_state[_knowledge_tertiary_state_key()] = page
+                st.rerun()
 
 
 def _navigation_primary_state_key() -> str:
@@ -6450,10 +6406,10 @@ def _open_knowledge_selection(
     st.session_state[_navigation_mode_state_key()] = "application"
     st.session_state[_navigation_secondary_state_key()] = _safe_text(
         _secondary_key_for_page("Knowledge", "application", knowledge_page),
-        "overview",
+        "landing",
     )
     st.session_state[_navigation_tertiary_state_key()] = (
-        "summary" if kind == "overview" else "browse"
+        "landing" if kind == "overview" else "browse"
     )
     _knowledge_navigation_defaults(st)
     _set_knowledge_navigation_selection(st, kind=kind, page=knowledge_page)
@@ -7101,28 +7057,12 @@ def _transactions_secondary_templates() -> dict[str, list[dict[str, Any]]]:
     ]
 
     return {
-        "overview": [
-            {
-                "tertiary_key": "summary",
-                "label": "Summary",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-        ],
         "estimates": [item.copy() for item in active_with_document_actions],
         "sales_orders": [item.copy() for item in active_with_document_actions],
         "return_orders": [item.copy() for item in active_with_document_actions],
         "credit_memos": [item.copy() for item in active_with_document_actions],
         "customer_invoices": [item.copy() for item in active_with_document_actions],
         "purchase_orders": [
-            {
-                "tertiary_key": "deferred",
-                "label": "Deferred",
-                "action_type": "collection_view",
-                "required_selection": None,
-            }
-        ],
-        "rfqs": [
             {
                 "tertiary_key": "deferred",
                 "label": "Deferred",
@@ -7318,7 +7258,6 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
     if primary == "Knowledge":
         templates = _knowledge_secondary_templates()
         sections = [
-            ("overview", "Library Health"),
             ("customers", "Customers"),
             ("contacts", "Contacts"),
             ("locations", "Locations"),
@@ -7386,21 +7325,18 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
     if primary == "Transactions":
         templates = _transactions_secondary_templates()
         sections = [
-            ("overview", "Overview"),
             ("estimates", "Estimates"),
             ("sales_orders", "Sales Orders"),
             ("return_orders", "Return Orders"),
+            ("customer_invoices", "Invoices"),
             ("credit_memos", "Credit Memos"),
             ("purchase_orders", "Purchase Orders (Deferred)"),
-            ("rfqs", "RFQs (Deferred)"),
             ("vendor_quotes", "Vendor Quotes (Deferred)"),
             ("receiving", "Receiving (Deferred)"),
             ("vendor_bills", "Vendor Bills (Deferred)"),
-            ("customer_invoices", "Customer Invoices"),
         ]
         deferred_secondary = {
             "purchase_orders",
-            "rfqs",
             "vendor_quotes",
             "receiving",
             "vendor_bills",
@@ -7771,9 +7707,7 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
 def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
     if primary == "Knowledge":
         page_map = {
-            "Knowledge": "overview",
-            "Summary": "overview",
-            "Commercial Health": "overview",
+            "Knowledge": "landing",
             "Customers": "customers",
             "Contacts": "contacts",
             "Locations": "locations",
@@ -7790,7 +7724,7 @@ def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
 
     if primary != "Projects":
         if primary == "Transactions":
-            return "overview" if page == "Transactions" else None
+            return "estimates" if page == "Transactions" else None
         if primary == "Settings":
             if page == "Administration":
                 return "organization_settings"
@@ -7914,8 +7848,12 @@ def _sync_workspace_navigation_state(
             for item in sections
             if _safe_text(item.get("secondary_key"), "") == active_secondary
         ),
-        sections[0],
+        None,
     )
+    if section is None:
+        st.session_state[_navigation_secondary_state_key()] = active_secondary
+        st.session_state[_navigation_tertiary_state_key()] = "landing"
+        return
     st.session_state[_navigation_secondary_state_key()] = _safe_text(
         section.get("secondary_key"),
         "",
@@ -7973,9 +7911,10 @@ def _render_workspace_navigation(
     shell_cols = st.columns(BODY_SHELL_COLUMN_SPEC, gap="small")
     with shell_cols[0]:
         for group_index, (group_name, section_group) in enumerate(grouped_sections):
-            if group_index > 0:
+            if group_name and group_index > 0:
                 st.caption(" ")
-            st.caption(group_name)
+            if group_name:
+                st.caption(group_name)
             for section in section_group:
                 secondary_key = _safe_text(section.get("secondary_key"), "")
                 is_active = secondary_key == _safe_text(
@@ -8025,8 +7964,12 @@ def _render_workspace_navigation(
                     st.session_state.get(_navigation_secondary_state_key()), ""
                 )
             ),
-            sections[0],
+            {},
         )
+        if not section:
+            if content_renderer is not None:
+                content_renderer()
+            return
         actions = [
             item
             for item in list(section.get("supported_tertiary_actions") or [])
@@ -8144,46 +8087,6 @@ def _primary_navigation_is_active(
     return label == "Transactions" and active_page == "Transactions"
 
 
-def _render_header_menu(
-    st: Any,
-    host: Any,
-    *,
-    active_page: str,
-    record: ProjectWorkspaceRecord | None,
-) -> None:
-    is_open = bool(st.session_state.get("atlas_header_menu_open", False))
-    if host.button(
-        "☰",
-        key="atlas_header_menu_toggle",
-        type="secondary",
-        width="content",
-    ):
-        st.session_state["atlas_header_menu_open"] = not is_open
-        st.rerun()
-
-    if not bool(st.session_state.get("atlas_header_menu_open", False)):
-        return
-
-    menu = host.container(border=True)
-    menu.caption("Navigate")
-    for label, page in HEADER_MENU_ITEMS:
-        if menu.button(
-            label,
-            key=f"atlas_header_menu_nav_{label}",
-            type=(
-                "primary"
-                if _primary_navigation_is_active(
-                    label,
-                    active_page=active_page,
-                    record=record,
-                )
-                else "secondary"
-            ),
-            width="stretch",
-        ):
-            _open_page(st, page)
-
-
 def _render_header(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -8203,12 +8106,6 @@ def _render_header(
         _open_page(st, "Mission Control")
     _render_top_navigation(st, header_cols[1:6], record)
     _render_global_search_control(st, header_cols[6])
-    _render_header_menu(
-        st,
-        header_cols[7],
-        active_page=_safe_text(current_page, "Mission Control"),
-        record=record,
-    )
 
     if record is None or current_page == "Mission Control":
         st.session_state["atlas_active_project_name"] = ""
@@ -11162,8 +11059,6 @@ def _render_application_knowledge_page(
     manufacturer_products = list(library_state.get("manufacturer_products") or [])
     vendor_offers = list(library_state.get("vendor_offers") or [])
     commercial_service = _commercial_service(st)
-    commercial_dashboard = commercial_service.dashboard_summary()
-    product_dashboard = product_service.dashboard_summary()
     commercial_import_history = commercial_service.import_history_rows()
 
     import_history: list[dict[str, Any]] = []
@@ -11188,139 +11083,44 @@ def _render_application_knowledge_page(
         key=lambda row: _safe_text(row.get("timestamp"), ""), reverse=True
     )
 
-    cards = st.columns(8)
-    _metric_card(cards[0], "Manufacturers", str(len(manufacturer_rows)))
-    _metric_card(cards[1], "Vendors", str(len(vendor_rows)))
-    _metric_card(cards[2], "Products", str(commercial_dashboard.get("products", 0)))
-    _metric_card(
-        cards[3],
-        "Vendor Offerings",
-        str(commercial_dashboard.get("vendor_offerings", 0)),
-    )
-    _metric_card(
-        cards[4],
-        "Active Price Lists",
-        str(commercial_dashboard.get("active_price_sheets", 0)),
-    )
-    _metric_card(
-        cards[5],
-        "Pricing Stale",
-        str(commercial_dashboard.get("pricing_stale", 0)),
-    )
-    _metric_card(
-        cards[6],
-        "Missing From Latest",
-        str(commercial_dashboard.get("products_missing_from_latest_version", 0)),
-    )
-    _metric_card(
-        cards[7],
-        "Avg Confidence",
-        str(product_dashboard.get("average_confidence", 0.0)),
-    )
-
-    if active_knowledge_view == "Summary":
-        _render_data_table(
-            st,
-            [
-                {
-                    "Knowledge Area": "Manufacturers",
-                    "State": "Healthy" if manufacturer_rows else "No records yet",
-                    "Why It Matters": "Standardized manufacturer identity supports deterministic product matching.",
-                    "Next Action": "Review manufacturer tiers and preferred vendor paths.",
-                },
-                {
-                    "Knowledge Area": "Vendors",
-                    "State": "Healthy" if vendor_rows else "No records yet",
-                    "Why It Matters": "Vendor normalization improves price list reconciliation and availability context.",
-                    "Next Action": "Review vendor types and active status.",
-                },
-                {
-                    "Knowledge Area": "Customers",
-                    "State": (
-                        "Healthy"
-                        if customer_entities or project_customers
-                        else "No records yet"
-                    ),
-                    "Why It Matters": "Customer history supports portfolio-level context and repeatability.",
-                    "Next Action": "Import or create projects to populate customer records.",
-                },
-                {
-                    "Knowledge Area": "Services",
-                    "State": "Healthy" if service_entities else "No records yet",
-                    "Why It Matters": "Service entities model operational capabilities linked to customers and products.",
-                    "Next Action": "Create reusable service definitions and connect them via Relationships.",
-                },
-                {
-                    "Knowledge Area": "Products (Master Library)",
-                    "State": "Healthy" if product_rows else "No records yet",
-                    "Why It Matters": "Canonical products reduce alias ambiguity across projects.",
-                    "Next Action": "Run project analysis to generate equipment rows and master product mappings.",
-                },
-                {
-                    "Knowledge Area": "Commercial Knowledge",
-                    "State": (
-                        "Healthy"
-                        if commercial_dashboard.get("active_price_sheets", 0)
-                        else "Needs data"
-                    ),
-                    "Why It Matters": "Immutable price-sheet versions preserve historical commercial context for deterministic bid recreation.",
-                    "Next Action": "Upload manufacturer/vendor price lists and review Import History change reports.",
-                },
-                {
-                    "Knowledge Area": "Knowledge Imports",
-                    "State": "Healthy" if import_history else "No records yet",
-                    "Why It Matters": "Import history provides auditability for reusable knowledge.",
-                    "Next Action": "Import project packages or document sets to create import events.",
-                },
-            ],
-        )
-
-    if active_knowledge_view == "Commercial Health":
-        freshness = commercial_dashboard.get("knowledge_freshness", {})
-        _render_data_table(
-            st,
-            [
-                {
-                    "Manufacturers": commercial_dashboard.get("manufacturers", 0),
-                    "Vendors": commercial_dashboard.get("vendors", 0),
-                    "Products": commercial_dashboard.get("products", 0),
-                    "Vendor Offerings": commercial_dashboard.get("vendor_offerings", 0),
-                    "Active Price Sheets": commercial_dashboard.get(
-                        "active_price_sheets", 0
-                    ),
-                    "Latest Imports": len(
-                        commercial_dashboard.get("latest_imports") or []
-                    ),
-                    "Products Missing Pricing": commercial_dashboard.get(
-                        "products_missing_pricing", 0
-                    ),
-                    "Pricing Stale": commercial_dashboard.get("pricing_stale", 0),
-                    "Recently Updated": commercial_dashboard.get("recently_updated", 0),
-                    "Missing From Latest Version": commercial_dashboard.get(
-                        "products_missing_from_latest_version", 0
-                    ),
-                    "Coverage Percentage": commercial_dashboard.get(
-                        "coverage_percentage", 0.0
-                    ),
-                    "Knowledge Freshness": f"fresh={freshness.get('fresh', 0)} review={freshness.get('review_recommended', 0)} stale={freshness.get('stale', 0)} missing={freshness.get('missing', 0)}",
-                    "Commercial Confidence": commercial_dashboard.get(
-                        "commercial_confidence", 0.0
-                    ),
-                    "Active Products": product_dashboard.get("active_products", 0),
-                    "Missing Preferred Vendor": product_dashboard.get(
-                        "missing_preferred_vendor", 0
-                    ),
-                    "Recent Price Changes": product_dashboard.get(
-                        "recent_price_changes", 0
-                    ),
-                    "New Products": product_dashboard.get("new_products", 0),
-                    "EOL/Obsolete": product_dashboard.get("end_of_life_products", 0),
-                    "Replacement Candidates": product_dashboard.get(
-                        "replacement_candidates", 0
-                    ),
-                }
-            ],
-        )
+    if active_knowledge_view == "Knowledge":
+        _render_section_title(st, "Knowledge")
+        st.caption("Browse reusable entity families.")
+        assembly_state = dict(_estimate_engine_service(st).state.get("assembly_state") or {})
+        landing_rows: list[tuple[str, int, str]] = [
+            ("Customers", len(customer_entities) + len(project_customers), "customers"),
+            ("Contacts", len(contact_entities), "contacts"),
+            ("Locations", len(location_entities), "locations"),
+            ("Vendors", len(vendor_rows), "vendors"),
+            ("Manufacturers", len(manufacturer_rows), "manufacturers"),
+            ("Products", len(product_rows), "products"),
+            ("Services", len(service_entities), "services"),
+            ("Price Lists", len(uploaded_price_lists), "price_lists"),
+            ("Imports", len(import_history), "imports"),
+            ("Assemblies", len(list((assembly_state.get("assemblies") or {}).values())), "assemblies"),
+        ]
+        for row_index in range(0, len(landing_rows), 2):
+            landing_group = landing_rows[row_index : row_index + 2]
+            cols = st.columns([1.0] * len(landing_group), gap="small")
+            for index, (label, count, page) in enumerate(landing_group):
+                with cols[index]:
+                    st.caption(f"{count} records")
+                    if st.button(
+                        label,
+                        key=f"atlas_ck_landing_{page}",
+                        width="stretch",
+                    ):
+                        st.session_state["atlas_active_page"] = "Knowledge"
+                        st.session_state[_navigation_primary_state_key()] = "Knowledge"
+                        st.session_state[_navigation_mode_state_key()] = "application"
+                        st.session_state[_navigation_secondary_state_key()] = _safe_text(
+                            _secondary_key_for_page("Knowledge", "application", label),
+                            "landing",
+                        )
+                        st.session_state[_navigation_tertiary_state_key()] = "browse"
+                        _set_knowledge_navigation_selection(st, page=label)
+                        st.rerun()
+        return
 
     if active_knowledge_view == "Manufacturers":
         _render_section_title(st, "Manufacturers")
@@ -13749,37 +13549,14 @@ def _render_transactions_workspace_page(
     _ = workspace_service
     _render_page_header(st, "Transactions", "")
     service = _transactions_workspace_service(st)
-    metrics = service.overview_metrics()
-
-    cards = st.columns(8)
-    _metric_card(cards[0], "Drafts", str(metrics.draft_documents))
-    _metric_card(cards[1], "Pending Approval", str(metrics.pending_approval))
-    _metric_card(cards[2], "Issued", str(metrics.issued_documents))
-    _metric_card(cards[3], "Open POs", str(metrics.open_purchase_orders))
-    _metric_card(
-        cards[4],
-        "Partially Received",
-        str(metrics.partially_received_purchase_orders),
-    )
-    _metric_card(
-        cards[5],
-        "Vendor Bills Pending Sync",
-        str(metrics.vendor_bills_pending_sync),
-    )
-    _metric_card(
-        cards[6],
-        "Customer Invoices Pending Sync",
-        str(metrics.customer_invoices_pending_sync),
-    )
-    _metric_card(cards[7], "Sync Failures", str(metrics.sync_failures))
 
     secondary = _safe_text(
         st.session_state.get(_navigation_secondary_state_key()),
-        "overview",
+        "estimates",
     )
     tertiary = _safe_text(
         st.session_state.get(_navigation_tertiary_state_key()),
-        "summary",
+        "browse",
     )
     document_type = _transaction_document_type_for_secondary(secondary)
 
@@ -13789,26 +13566,16 @@ def _render_transactions_workspace_page(
 
     deferred_secondary = {
         "purchase_orders",
-        "rfqs",
         "vendor_quotes",
         "receiving",
         "vendor_bills",
     }
 
-    if secondary == "change_orders":
-        st.session_state[_navigation_secondary_state_key()] = "sales_orders"
-        st.session_state[_navigation_tertiary_state_key()] = "browse"
-        st.info(
-            "Change Orders are managed as a filter convention on Sales Orders and Return Orders."
-        )
-        st.rerun()
-        return
-
     if secondary in deferred_secondary:
         _render_guided_empty_state(
             st,
             why_empty="This transaction family is deferred and is not active in controlled alpha.",
-            action_to_populate="Use Estimates, Sales Orders, Return Orders, Credit Memos, or Customer Invoices.",
+            action_to_populate="Use Estimates, Sales Orders, Return Orders, Credit Memos, or Invoices.",
             next_location="Open Sales Orders or Return Orders for change-order workflows.",
         )
         if st.button(
@@ -13820,192 +13587,6 @@ def _render_transactions_workspace_page(
             st.session_state[_navigation_secondary_state_key()] = "sales_orders"
             st.session_state[_navigation_tertiary_state_key()] = "browse"
             st.rerun()
-        return
-
-    if secondary == "change_orders":
-        project_cols = st.columns([2, 2, 3])
-        project_id = project_cols[0].text_input(
-            "Project ID",
-            key="atlas_transactions_change_orders_project_id",
-        )
-        project_code = project_cols[1].text_input(
-            "Project Code",
-            key="atlas_transactions_change_orders_project_code",
-        )
-        project_search = project_cols[2].text_input(
-            "Search Change Orders",
-            key="atlas_transactions_change_orders_search",
-            placeholder="CO #, reason, document number, customer",
-        )
-
-        if not _safe_text(project_id, ""):
-            _render_guided_empty_state(
-                st,
-                why_empty="Change-order tracking is project-scoped.",
-                action_to_populate="Enter a Project ID to view/additive and deductive change-order activity.",
-                next_location="Use Sales Orders and Return Orders to create change orders.",
-            )
-            return
-
-        base_bid_cols = st.columns(4)
-        reference_type = base_bid_cols[0].selectbox(
-            "Base Bid Source",
-            options=[
-                "accepted_estimate",
-                "originating_sales_order",
-                "imported_contract_amount",
-            ],
-            key="atlas_transactions_change_orders_base_bid_source",
-        )
-        reference_document_id = base_bid_cols[1].text_input(
-            "Base Bid Document ID",
-            key="atlas_transactions_change_orders_base_bid_document_id",
-        )
-        imported_contract_amount = Decimal(
-            str(
-                base_bid_cols[2].number_input(
-                    "Imported Contract Amount",
-                    min_value=0.0,
-                    value=0.0,
-                    step=100.0,
-                    key="atlas_transactions_change_orders_base_bid_amount",
-                )
-            )
-        )
-        if base_bid_cols[3].button(
-            "Set Base Bid",
-            key="atlas_transactions_change_orders_set_base_bid",
-            width="stretch",
-        ):
-            try:
-                service.set_project_base_bid(
-                    tenant_id="local",
-                    project_id=project_id,
-                    project_code=project_code or None,
-                    reference_type=reference_type,
-                    reference_document_id=reference_document_id or None,
-                    imported_contract_amount=(
-                        imported_contract_amount
-                        if reference_type == "imported_contract_amount"
-                        else None
-                    ),
-                    actor="atlas-ui",
-                )
-                _save_transactions_workspace_state(st, service)
-                st.success("Base bid reference assigned for project.")
-                st.rerun()
-            except Exception as exc:
-                st.error(f"Unable to assign base bid: {exc}")
-
-        try:
-            summary = service.project_commercial_summary(
-                tenant_id="local",
-                project_id=project_id,
-            )
-        except Exception as exc:
-            st.error(f"Unable to load project commercial summary: {exc}")
-            return
-
-        st.dataframe(
-            [
-                {
-                    "Project": _safe_text(summary.get("project_code"), project_id),
-                    "Original Contract": _safe_text(summary.get("base_bid_value"), "0"),
-                    "Net Additions": _safe_text(
-                        summary.get("additive_change_total"), "0"
-                    ),
-                    "Net Deductions": _safe_text(
-                        summary.get("deductive_change_total"), "0"
-                    ),
-                    "Net Change": _safe_text(summary.get("net_change_total"), "0"),
-                    "Current Contract Value": _safe_text(
-                        summary.get("revised_contract_value"), "0"
-                    ),
-                    "Pending Change Value": _safe_text(
-                        summary.get("pending_change_value"), "0"
-                    ),
-                    "Approved Change Value": _safe_text(
-                        summary.get("approved_change_value"), "0"
-                    ),
-                    "Invoiced Change Value": _safe_text(
-                        summary.get("invoiced_change_value"), "0"
-                    ),
-                    "Outstanding Change Value": _safe_text(
-                        summary.get("outstanding_change_value"), "0"
-                    ),
-                    "Change-Order Status": _safe_text(
-                        summary.get("change_order_status"), "none"
-                    ),
-                }
-            ],
-            width="stretch",
-            hide_index=True,
-        )
-
-        ordered_change_list = list(summary.get("ordered_change_list") or [])
-        if project_search.strip():
-            needle = project_search.strip().lower()
-            ordered_change_list = [
-                item
-                for item in ordered_change_list
-                if needle
-                in " ".join(
-                    [
-                        _safe_text(item.get("change_order_number"), ""),
-                        _safe_text(item.get("document_id"), ""),
-                        _safe_text(item.get("related_sales_order_or_return_order"), ""),
-                        _safe_text(item.get("description"), ""),
-                        _safe_text(item.get("customer_id"), ""),
-                    ]
-                ).lower()
-            ]
-
-        if not ordered_change_list:
-            st.caption(
-                "No additive or deductive change orders are recorded for this project yet."
-            )
-            return
-        st.dataframe(
-            [
-                {
-                    "CO #": _safe_text(item.get("change_order_number"), ""),
-                    "Description": _safe_text(item.get("description"), ""),
-                    "Type": _safe_text(item.get("change_order_type"), ""),
-                    "Status": _safe_text(item.get("status"), ""),
-                    "Amount": _safe_text(item.get("amount"), "0"),
-                    "Invoice Status": _safe_text(item.get("invoice_status"), ""),
-                    "Sales/Return Document": _safe_text(
-                        item.get("related_sales_order_or_return_order"), ""
-                    ),
-                    "Customer": _safe_text(item.get("customer_id"), ""),
-                }
-                for item in ordered_change_list
-            ],
-            width="stretch",
-            hide_index=True,
-        )
-        return
-
-    if secondary == "overview":
-        recent = service.list_documents(include_archived=True)[:30]
-        if not recent:
-            _render_guided_empty_state(
-                st,
-                why_empty="No commercial transactions have been created.",
-                action_to_populate="Open any transaction family and use Add to create your first draft.",
-                next_location="Start with Estimates or Sales Orders.",
-            )
-            if st.button(
-                "Open Estimates",
-                key="atlas_transactions_overview_open_estimates_empty",
-                type="primary",
-                width="content",
-            ):
-                st.session_state[_navigation_secondary_state_key()] = "estimates"
-                st.session_state[_navigation_tertiary_state_key()] = "browse"
-                st.rerun()
-            return
-        _render_data_table(st, [_transaction_row(item) for item in recent])
         return
 
     if document_type is None:
@@ -14479,6 +14060,21 @@ def _render_transactions_workspace_page(
             action_to_populate="Use Add to create a draft or broaden filters.",
             next_location="Use Browse in this section to review transaction documents.",
         )
+        add_label_map = {
+            CommercialDocumentType.ESTIMATE: "Add Estimate",
+            CommercialDocumentType.SALES_ORDER: "Add Sales Order",
+            CommercialDocumentType.RETURN_ORDER: "Add Return Order",
+            CommercialDocumentType.CREDIT_MEMO: "Add Credit Memo",
+            CommercialDocumentType.CUSTOMER_INVOICE: "Add Invoice",
+        }
+        if st.button(
+            add_label_map.get(document_type, "Add Draft"),
+            key=f"{prefix}_empty_state_add",
+            type="primary",
+            width="content",
+        ):
+            st.session_state[_navigation_tertiary_state_key()] = "add"
+            st.rerun()
         return
 
     st.dataframe(

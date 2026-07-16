@@ -47,15 +47,14 @@ ATLAS_TOKENS: dict[str, dict[str, str]] = {
         "max_content_width": "1440px",
         "input_height": "34px",
         "control_height": "34px",
-        "header_wordmark_width": "6rem",
-        "header_transactions_width": "7.25rem",
-        "header_projects_width": "6rem",
+        "header_wordmark_width": "5.15rem",
+        "header_transactions_width": "6.95rem",
+        "header_projects_width": "5.8rem",
         "header_knowledge_width": "6.25rem",
-        "header_reports_width": "6rem",
-        "header_settings_width": "6rem",
-        "header_menu_width": "2.4rem",
-        "header_search_min_width": "13rem",
-        "header_search_max_width": "23rem",
+        "header_reports_width": "5.6rem",
+        "header_settings_width": "5.6rem",
+        "header_search_min_width": "9.5rem",
+        "header_search_max_width": "15rem",
         "header_breakpoint_compact": "960px",
         "header_breakpoint_narrow": "840px",
         "body_secondary_nav_ratio": "1.35",
@@ -142,7 +141,6 @@ def atlas_stylesheet() -> str:
             --atlas-header-knowledge-width: {layout['header_knowledge_width']};
             --atlas-header-reports-width: {layout['header_reports_width']};
             --atlas-header-settings-width: {layout['header_settings_width']};
-            --atlas-header-menu-width: {layout['header_menu_width']};
             --atlas-header-search-min-width: {layout['header_search_min_width']};
             --atlas-header-search-max-width: {layout['header_search_max_width']};
             --atlas-header-breakpoint-compact: {layout['header_breakpoint_compact']};
@@ -593,11 +591,11 @@ def atlas_stylesheet() -> str:
             background: var(--atlas-surface) !important;
             color: #111827 !important;
             min-width: 0 !important;
-            padding: 0.2rem 0.35rem !important;
+            padding: 0.18rem 0.3rem !important;
             font-weight: 600 !important;
             line-height: 1.1 !important;
             border-radius: var(--atlas-radius-sm) !important;
-            font-size: var(--atlas-body-small-size) !important;
+            font-size: 0.79rem !important;
             min-height: 2rem !important;
             white-space: nowrap !important;
             overflow: hidden !important;
@@ -661,11 +659,6 @@ def atlas_stylesheet() -> str:
             max-width: var(--atlas-header-settings-width) !important;
             min-width: var(--atlas-header-settings-width) !important;
         }}
-        .st-key-atlas_header_menu_toggle button {{
-            width: var(--atlas-header-menu-width) !important;
-            max-width: var(--atlas-header-menu-width) !important;
-            min-width: var(--atlas-header-menu-width) !important;
-        }}
         [class*="st-key-atlas_global_search_input_"] input {{
             width: 100% !important;
             min-width: var(--atlas-header-search-min-width) !important;
@@ -686,19 +679,16 @@ def atlas_stylesheet() -> str:
                 gap: var(--atlas-space-xs);
             }}
             [class*="st-key-atlas_global_search_input_"] input {{
-                max-width: 18rem !important;
+                max-width: 12.5rem !important;
             }}
         }}
         @media (max-width: 960px) {{
-            .st-key-atlas_header_nav_Transactions,
-            .st-key-atlas_header_nav_Projects,
-            .st-key-atlas_header_nav_Knowledge,
-            .st-key-atlas_header_nav_Reports,
-            .st-key-atlas_header_nav_Settings {{
-                display: none !important;
+            [class*="st-key-atlas_header_nav_"] button {{
+                padding-left: 0.24rem !important;
+                padding-right: 0.24rem !important;
             }}
             [class*="st-key-atlas_global_search_input_"] input {{
-                max-width: 15rem !important;
+                max-width: 11rem !important;
             }}
             .atlas-content-section {{
                 padding: var(--atlas-space-sm);
@@ -706,7 +696,7 @@ def atlas_stylesheet() -> str:
         }}
         @media (max-width: 840px) {{
             [class*="st-key-atlas_global_search_input_"] input {{
-                max-width: 13.5rem !important;
+                max-width: 9.5rem !important;
             }}
         }}
         </style>

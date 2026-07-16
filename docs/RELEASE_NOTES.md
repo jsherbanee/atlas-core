@@ -19,17 +19,19 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
-## Unreleased (Atlas Alpha UI Cleanup Navigation, Density, and Production-Surface Refinement)
+## Unreleased (Atlas Alpha UI Cleanup Navigation Simplification and Functional Knowledge Links)
 
 ### Improved
 
 - Shared shell navigation now keeps Home, Projects, Knowledge, Transactions, Reports, and Settings behavior compact and production-facing.
-- Global header now renders as one shared row of fixed-width buttons: Atlas, Transactions, Projects, Knowledge, Reports, Search, and Menu.
+- Global header now renders as one shared row of fixed-width buttons: Atlas, Transactions, Projects, Knowledge, Reports, Settings, and Search.
 - Header primary navigation order is now explicitly standardized as Transactions, Projects, Knowledge, Reports, and Settings with Atlas fixed as the far-left Home control.
-- At narrower widths, header primary navigation collapses predictably behind Menu rather than wrapping into a second row.
+- At narrower widths, header primary navigation compresses predictably instead of wrapping into a second row or opening a burger menu.
 - Search now stays bounded so it does not force header wrapping, and Settings tertiary actions wrap into deliberate rows.
-- Transactions now emphasizes active commercial families and keeps deferred families visible as disabled/deferred routes; Change Orders remain a Sales Order/Return Order convention rather than a standalone transaction family.
-- Transactions > Estimates > Add now uses a dedicated estimate-creation workspace with dropdown-driven customer/project/project-code controls and catalog-backed Product/Service/Fee/Assembly line insertion.
+- Transactions now emphasizes active commercial families and keeps deferred families visible as disabled/deferred routes; Overview and RFQs are removed from the secondary surface and Invoices now appears before Credit Memos.
+- Transactions overview and summary/status-card surfaces are removed so the page stays focused on family navigation, a concise empty state, and the primary add action.
+- Knowledge navigation is flattened into a single family list and the functional Vendor, Manufacturer, Product, and Service workspaces now open in the same window.
+- Knowledge landing and summary/status-card surfaces are removed so the default landing view stays concise.
 - Tenant-facing estimate creation intentionally excludes Vendor ID to reduce non-estimate data noise in the add flow.
 - Projects library overview navigation is denser and less duplicative, with operational actions consolidated into contextual actions.
 - Knowledge and Reports application-level wording now emphasizes user-facing data health and output readiness instead of implementation-facing language.
@@ -41,7 +43,7 @@ This document tracks product-facing changes for Atlas Preview releases.
 ### Quality
 
 - full gates passing: `black --check .`, `ruff check .`, `mypy .`, `pytest`
-- full-suite validation: `1444 passed`
+- full-suite validation: `1452 passed`
 - targeted navigation regression validation: `pytest tests/test_phase2_global_search_working_set.py tests/test_phase2_settings_navigation.py -q` -> `140 passed`
 
 ### Scope Notes

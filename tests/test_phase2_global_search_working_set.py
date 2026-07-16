@@ -10,6 +10,7 @@ import sys
 from typing import Any, Literal
 
 from atlas_core.domain import Project, ProjectStatus
+from atlas_core.services.master_library import CommercialProductService
 from atlas_core.services.project_workspace_service import (
     ProjectWorkspaceRecord,
     ProjectWorkspaceService,
@@ -57,7 +58,14 @@ class _HomeContractStreamlit:
         self.popover_labels: list[str] = []
         self.column_specs: list[Any] = []
         self.text_inputs: list[dict[str, Any]] = []
+        self.selectbox_calls: list[dict[str, Any]] = []
         self.button_calls: list[dict[str, Any]] = []
+        self.warnings: list[str] = []
+        self.infos: list[str] = []
+        self.errors: list[str] = []
+        self.successes: list[str] = []
+        self.text_areas: list[dict[str, Any]] = []
+        self.download_buttons: list[dict[str, Any]] = []
         self.rerun_called = False
 
     def __enter__(self) -> _HomeContractStreamlit:
@@ -110,6 +118,59 @@ class _HomeContractStreamlit:
         _ = (type, use_container_width, width, key, disabled)
         return label in self._pressed
 
+    def selectbox(
+        self,
+        label: str,
+        options: list[Any],
+        index: int = 0,
+        **kwargs: Any,
+    ) -> Any:
+        self.selectbox_calls.append({"label": label, "options": list(options), **kwargs})
+        if not options:
+            return ""
+        if 0 <= index < len(options):
+            return options[index]
+        return options[0]
+
+    def checkbox(self, _label: str, *, value: bool = False, **kwargs: Any) -> bool:
+        _ = kwargs
+        return value
+
+    def expander(self, _label: str, expanded: bool = False) -> _HomeContractStreamlit:
+        _ = expanded
+        return self
+
+    def warning(self, text: str) -> None:
+        self.warnings.append(text)
+
+    def info(self, text: str) -> None:
+        self.infos.append(text)
+
+    def error(self, text: str) -> None:
+        self.errors.append(text)
+
+    def success(self, text: str) -> None:
+        self.successes.append(text)
+
+    def number_input(self, _label: str, *, value: float = 0.0, **kwargs: Any) -> float:
+        _ = kwargs
+        return value
+
+    def text_area(self, label: str, value: str = "", **kwargs: Any) -> str:
+        self.text_areas.append({"label": label, "value": value, **kwargs})
+        return value
+
+    def multiselect(self, _label: str, **kwargs: Any) -> list[Any]:
+        _ = kwargs
+        return []
+
+    def download_button(self, label: str, **kwargs: Any) -> bool:
+        self.download_buttons.append({"label": label, **kwargs})
+        return False
+
+    def file_uploader(self, *_args: Any, **_kwargs: Any) -> Any:
+        return None
+
     def markdown(self, text: str, **kwargs: Any) -> None:
         _ = kwargs
         self.markdowns.append(text)
@@ -155,6 +216,75 @@ class _FakeWorkspaceService:
         ]
         self._records.insert(0, record)
         return Path("workspace.json")
+
+
+def _seed_knowledge_service(entity_type: str) -> CommercialProductService:
+    service = CommercialProductService()
+    service.create_manufacturer(
+        manufacturer_id="mfr-qsc",
+        canonical_name="QSC",
+        display_name="QSC",
+        manufacturer_code="QSC",
+    )
+    service.create_vendor(
+        vendor_id="vendor-avp",
+        canonical_name="AV Partner",
+        display_name="AV Partner",
+        vendor_code="AVP",
+    )
+    if entity_type == "vendor":
+        service.create_vendor(
+            vendor_id="vendor-01",
+            canonical_name="Vendor One",
+            display_name="Vendor One",
+            vendor_code="V01",
+        )
+    elif entity_type == "manufacturer":
+        service.create_manufacturer(
+            manufacturer_id="mfr-01",
+            canonical_name="Manufacturer One",
+            display_name="Manufacturer One",
+            manufacturer_code="M01",
+        )
+    elif entity_type == "product":
+        service.import_price_list_version(
+            manufacturer="QSC",
+            vendor="AV Partner",
+            source_file="seed.csv",
+            file_bytes=b"seed",
+            import_user="tester",
+            rows=[
+                {
+                    "vendor": "AV Partner",
+                    "manufacturer": "QSC",
+                    "manufacturer_sku": "Core 110f",
+                    "canonical_sku": "CORE-110F",
+                    "alternate_skus": ["CORE110F"],
+                    "description": "DSP",
+                    "product_family": "General",
+                    "category": "dsp",
+                    "discipline": "audio",
+                    "lifecycle_status": "active",
+                    "preferred_cost": 1200.0,
+                    "msrp": 2999.0,
+                    "preferred_vendor": "AV Partner",
+                    "vendor_sku": "AVP-CORE110F",
+                    "vendor_type": "distributor",
+                    "availability_status": "in_stock",
+                    "lead_time": "2 weeks",
+                    "effective_date": "2026-01-01",
+                    "date_verified": "2026-01-05",
+                }
+            ],
+            effective_date="2026-01-01",
+        )
+    elif entity_type == "service":
+        service.create_service_entity(
+            service_id="svc-01",
+            canonical_name="Service One",
+            display_name="Service One",
+        )
+    return service
 
 
 class _NullContext:
@@ -630,31 +760,6 @@ def test_top_navigation_settings_routes_to_administration() -> None:
     assert st.session_state["atlas_active_page"] == "Administration"
 
 
-def test_header_menu_routes_to_primary_pages() -> None:
-    st = _HomeContractStreamlit(pressed={"☰", "Knowledge"})
-
-    app._render_header_menu(
-        st,
-        st,
-        active_page="Mission Control",
-        record=None,
-    )
-
-    assert st.session_state["atlas_active_page"] == "Knowledge"
-    assert st.rerun_called is True
-
-
-def test_header_menu_closes_when_page_navigation_completes() -> None:
-    st = _HomeContractStreamlit()
-    st.session_state = {"atlas_header_menu_open": True}
-
-    app._open_page(st, "Projects")
-
-    assert st.session_state["atlas_header_menu_open"] is False
-    assert st.session_state["atlas_active_page"] == "Projects"
-    assert st.rerun_called is True
-
-
 def test_atlas_button_routes_back_home() -> None:
     st = _HomeContractStreamlit(pressed={"Atlas"})
     st.query_params = {}
@@ -668,6 +773,7 @@ def test_atlas_button_routes_back_home() -> None:
     assert st.button_calls[0]["label"] == "Atlas"
     assert st.button_calls[0]["use_container_width"] is False
     assert st.button_calls[0]["width"] == "content"
+    assert all(call["label"] != "☰" for call in st.button_calls)
 
 
 def test_top_navigation_renders_primary_header_buttons() -> None:
@@ -753,13 +859,192 @@ def test_top_navigation_routes_within_current_window() -> None:
     assert st.rerun_called is True
 
 
+def test_header_omits_burger_menu_and_keeps_primary_row_fixed() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_header(st, _FakeWorkspaceService([]), None, None)
+
+    assert st.button_calls[0]["label"] == "Atlas"
+    assert len(st.button_calls) == 6
+    assert all(call["label"] != "☰" for call in st.button_calls)
+    assert st.popover_labels == []
+
+
+def test_transactions_navigation_contract_uses_expected_order_and_labels() -> None:
+    contract = app._workspace_navigation_contract("Transactions", "application")
+
+    assert [item["secondary_key"] for item in contract] == [
+        "estimates",
+        "sales_orders",
+        "return_orders",
+        "customer_invoices",
+        "credit_memos",
+        "purchase_orders",
+        "vendor_quotes",
+        "receiving",
+        "vendor_bills",
+    ]
+    assert [item["label"] for item in contract] == [
+        "Estimates",
+        "Sales Orders",
+        "Return Orders",
+        "Invoices",
+        "Credit Memos",
+        "Purchase Orders (Deferred)",
+        "Vendor Quotes (Deferred)",
+        "Receiving (Deferred)",
+        "Vendor Bills (Deferred)",
+    ]
+    assert all(
+        item["enabled"] is False
+        for item in contract
+        if item["secondary_key"] in {"purchase_orders", "vendor_quotes", "receiving", "vendor_bills"}
+    )
+
+
+def test_knowledge_navigation_contract_is_flat_and_ordered() -> None:
+    contract = app._workspace_navigation_contract("Knowledge", "application")
+
+    assert [item["secondary_key"] for item in contract] == [
+        "customers",
+        "contacts",
+        "locations",
+        "vendors",
+        "manufacturers",
+        "products",
+        "services",
+        "price_lists",
+        "imports",
+        "assemblies",
+    ]
+    assert [item["label"] for item in contract] == [
+        "Customers",
+        "Contacts",
+        "Locations",
+        "Vendors",
+        "Manufacturers",
+        "Products",
+        "Services",
+        "Price Lists",
+        "Imports",
+        "Assemblies",
+    ]
+
+
+def test_knowledge_landing_renders_compact_family_actions() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_application_knowledge_page(st, _FakeWorkspaceService([]))
+
+    rendered_labels = [call["label"] for call in st.button_calls]
+    assert "Customers" in rendered_labels
+    assert "Vendors" in rendered_labels
+    assert "Manufacturers" in rendered_labels
+    assert "Products" in rendered_labels
+    assert "Services" in rendered_labels
+    assert all("Knowledge Area" not in item for item in st.markdowns)
+    assert all("Why It Matters" not in item for item in st.markdowns)
+
+
+@pytest.mark.parametrize(
+    ("secondary", "expected_labels"),
+    [
+        (
+            "vendors",
+            {
+                "Create Vendor",
+                "Save Vendor Edits",
+                "Archive Vendor",
+                "Restore Vendor",
+            },
+        ),
+        (
+            "manufacturers",
+            {
+                "Create Manufacturer",
+                "Save Manufacturer Edits",
+                "Archive Manufacturer",
+                "Restore Manufacturer",
+            },
+        ),
+        (
+            "products",
+            {
+                "Create Product and Vendor Offering",
+                "Save Product Edits",
+                "Archive Product",
+                "Restore Product",
+            },
+        ),
+        (
+            "services",
+            {
+                "Create Service",
+                "Save Service Edits",
+                "Archive Service",
+                "Restore Service",
+            },
+        ),
+    ],
+)
+def test_knowledge_entity_workspaces_render_crud_actions(
+    secondary: str, expected_labels: set[str]
+) -> None:
+    st = _HomeContractStreamlit()
+    entity_type_by_secondary = {
+        "vendors": "vendor",
+        "manufacturers": "manufacturer",
+        "products": "product",
+        "services": "service",
+    }
+    service = _seed_knowledge_service(entity_type_by_secondary[secondary])
+    st.session_state["atlas_price_list_library"] = {
+        "commercial_products": service.to_dict(),
+    }
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): secondary,
+            app._navigation_tertiary_state_key(): "browse",
+        }
+    )
+
+    app._render_application_knowledge_page(st, _FakeWorkspaceService([]))
+
+    rendered_labels = {call["label"] for call in st.button_calls}
+    assert expected_labels <= rendered_labels
+
+
+def test_transactions_workspace_source_omits_overview_status_cards() -> None:
+    source = inspect.getsource(app._render_transactions_workspace_page)
+
+    assert "Pending Approval" not in source
+    assert "Partially Received" not in source
+    assert "Vendor Bills Pending Sync" not in source
+    assert "Customer Invoices Pending Sync" not in source
+    assert "Sync Failures" not in source
+    assert '"overview"' not in source
+
+
+def test_knowledge_workspace_source_omits_summary_tables_and_health_cards() -> None:
+    source = inspect.getsource(app._render_application_knowledge_page)
+
+    assert "Knowledge Area" not in source
+    assert "Why It Matters" not in source
+    assert "Next Action" not in source
+    assert "Library Health" not in source
+    assert "Commercial Health" not in source
+
+
 def test_knowledge_navigation_defaults_seed_secondary_and_tertiary_state() -> None:
     st = _FakeStreamlit(session_state={})
 
     app._knowledge_navigation_defaults(st)
 
-    assert st.session_state["atlas_knowledge_secondary_group"] == "Knowledge Overview"
-    assert st.session_state["atlas_knowledge_tertiary_page"] == "Summary"
+    assert st.session_state["atlas_knowledge_secondary_group"] == "Knowledge"
+    assert st.session_state["atlas_knowledge_tertiary_page"] == "Knowledge"
 
 
 def test_knowledge_navigation_selection_maps_entity_kinds() -> None:
@@ -767,7 +1052,7 @@ def test_knowledge_navigation_selection_maps_entity_kinds() -> None:
 
     app._set_knowledge_navigation_selection(st, kind="manufacturer")
 
-    assert st.session_state["atlas_knowledge_secondary_group"] == "Reusable Entities"
+    assert st.session_state["atlas_knowledge_secondary_group"] == "Knowledge"
     assert st.session_state["atlas_knowledge_tertiary_page"] == "Manufacturers"
 
 
@@ -861,6 +1146,7 @@ def test_header_search_control_uses_simple_search_placeholder() -> None:
     assert st.text_inputs[0]["label_visibility"] == "collapsed"
     assert all("Global Object Search" not in item for item in st.markdowns)
     assert st.button_calls[0]["label"] == "Atlas"
+    assert st.popover_labels == []
 
 
 def test_header_uses_compact_responsive_column_contract() -> None:
@@ -1337,10 +1623,11 @@ def test_injected_styles_include_transactions_primary_nav_contract() -> None:
     assert ".st-key-atlas_header_nav_Transactions button" in stylesheet
     assert ".st-key-atlas_header_nav_Settings button" in stylesheet
     assert "--atlas-header-search-max-width" in stylesheet
+    assert ".st-key-atlas_header_menu_toggle" not in stylesheet
     assert "var(--atlas-heading-3-size)" in stylesheet
 
 
-def test_injected_styles_define_predictable_responsive_header_collapse() -> None:
+def test_injected_styles_define_predictable_search_compression() -> None:
     st = _HomeContractStreamlit()
 
     app._inject_styles(st)
@@ -1349,8 +1636,9 @@ def test_injected_styles_define_predictable_responsive_header_collapse() -> None
     assert "@media (max-width: 960px)" in stylesheet
     assert ".st-key-atlas_header_nav_Transactions" in stylesheet
     assert ".st-key-atlas_header_nav_Settings" in stylesheet
-    assert "display: none !important;" in stylesheet
     assert '[class*="st-key-atlas_global_search_input_"] input' in stylesheet
+    assert "max-width: 11rem" in stylesheet
+    assert "max-width: 9.5rem" in stylesheet
     assert "overflow-x: clip" in stylesheet
 
 
@@ -1689,7 +1977,7 @@ def test_open_search_reference_sets_knowledge_navigation_state() -> None:
     app._open_search_reference(st, service, reference)
 
     assert st.session_state["atlas_active_page"] == "Object Workspace"
-    assert st.session_state["atlas_knowledge_secondary_group"] == "Reusable Entities"
+    assert st.session_state["atlas_knowledge_secondary_group"] == "Knowledge"
     assert st.session_state["atlas_knowledge_tertiary_page"] == "Vendors"
     assert st.session_state["atlas_context_selection"]["kind"] == "vendor"
     assert st.session_state["atlas_return_context"]["source_route"] == "Mission Control"

@@ -77,8 +77,9 @@ Sprint U-01 completes commercial document usability and presentation polish acro
 Sprint U-02 completes end-to-end application usability polish across Home, Projects, project lifecycle-facing surfaces, Transactions, Knowledge, Reports, and Settings by standardizing page-purpose identity captions, reducing development/prototype language in user-facing controls, improving roadmap-section guidance messaging, and validating responsive/state stability behavior without adding new features.
 Alpha UI Cleanup refines production-facing shell/navigation surfaces by tightening active vs deferred route clarity, removing tenant-facing implementation remnants, reducing duplicate action exposure, and preserving behavior contracts without adding new business workflows.
 Alpha UI Cleanup (Responsive Navigation and Estimate Creation UX) standardizes primary shell order to Transactions, Projects, Knowledge, Reports, restores tenant-facing footer copyright text, and adds a dedicated Transactions > Estimates > Add workflow with dropdown-driven estimate details and catalog-backed Product/Service/Fee/Assembly line controls.
-Alpha UI Cleanup (Header Consolidation and Copy Reduction) standardizes a one-row shared header (Atlas, Transactions, Projects, Knowledge, Reports, Search, Menu), removes redundant tenant-facing shell metadata and repeated descriptive copy, and preserves continuity-critical object breadcrumbs and deterministic settings navigation.
+Alpha UI Cleanup (Header Consolidation and Copy Reduction) standardizes a one-row shared header (Atlas, Transactions, Projects, Knowledge, Reports, Settings, Search), removes redundant tenant-facing shell metadata and repeated descriptive copy, and preserves continuity-critical object breadcrumbs and deterministic settings navigation.
 Atlas Workspace Alpha UI Repair standardizes fixed-width primary navigation buttons, same-window routing, bounded search, deliberate Settings tertiary wrapping, and table containment across the shared shell.
+Atlas Workspace Alpha UI Cleanup (Navigation Simplification and Functional Knowledge Links) removes the burger/menu shell, simplifies Transactions and Knowledge navigation contracts, and restores direct same-window Knowledge workspaces for Vendors, Manufacturers, Products, and Services.
 Sprint M-01 implements tenant manager and sandbox provisioning foundations for alpha infrastructure, including platform-admin sandbox lifecycle controls, deterministic isolated repository-path provisioning, tenant-scoped search/job/settings/preference containers, and guarded reset/export/delete workflows without introducing hosted infrastructure dependencies.
 Sprint A-02 implements controlled alpha deployment and test operations, including controlled-alpha environment labeling, administrator-only alpha health checks, tenant-scoped feedback/defect workflow capture, known-limitations access, and operator checklist guidance without introducing new product workflows.
 Sprint A-02 pt 2 implements centralized tenant-scoped application error logging and review workflow, including deterministic fingerprint grouping, occurrence history, user-facing Error IDs, status transitions with audit coverage, sanitized diagnostics export, and health-check unresolved-error/severity summaries.
@@ -108,9 +109,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1444 tests)
+- pytest: full suite passing (1452 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1444 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1452 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 
@@ -259,7 +260,7 @@ Current workspace behavior:
 - Estimate workspace now consumes deterministic Product Resolution outputs and blocks pricing on unresolved/generic/low-confidence resolution states.
 - Price List Library now imports into immutable Price Sheet Versions and Price Records through Commercial Knowledge services.
 - Price List Library now supports C-02 structured commercial price-sheet ingestion for CSV, XLSX, and PDF through deterministic draft/validate/finalize controls with lifecycle diagnostics, unresolved-count visibility, and completeness metrics while preserving legacy fallback parsing for non-tabular imports.
-- Knowledge workspace now supports K-02 operational customer/service entity workflows (create, list, archive, restore) and framework-backed summary metrics.
+- Knowledge workspace now supports K-02 operational customer, service, vendor, manufacturer, and product entity workflows (create, list, archive, restore) and framework-backed summary metrics.
 - Import History page now exposes deterministic version-level change summaries and historical replay of previous commercial versions.
 - Knowledge workspace now includes Commercial Health metrics for coverage, freshness, missing pricing, stale pricing, and commercial confidence.
 - Deterministic pricing lines now include selected price record/vendor offering/version traceability, freshness/status/warnings, confidence rationale, and manual override provenance.

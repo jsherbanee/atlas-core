@@ -16,8 +16,8 @@ Atlas Workspace UI Sprint 6 adds an object navigation layer that connects equipm
 Atlas Workspace UI Sprint 7 adds persistent Global Object Search and a project-scoped Working Set for active review objects.
 
 Atlas Workspace Sprint 7.5 performs UI repair and runtime-state isolation: shared project context header rendering, configuration-driven navigation (including disabled future lifecycle sections), shared object detail section scaffolding, breadcrumb normalization, meaningful empty-state messaging, and mutable runtime project storage outside immutable repository fixtures.
-Atlas Workspace UI Sprint X-05 moves primary navigation into the top header, renames Administration publicly to Settings via an upper-right hamburger menu, and replaces Home recent activity with a deterministic Recent Projects list.
-Atlas Workspace UI Sprint X-06 keeps the header-based shell while removing the public Home button, simplifying the Search control, removing the visible Settings trigger label, removing the History dropdown, and constraining the shell to a centered workstation-style width.
+Atlas Workspace UI Sprint X-05 moves primary navigation into the top header, exposes Settings as a normal primary destination, and replaces Home recent activity with a deterministic Recent Projects list.
+Atlas Workspace UI Sprint X-06 keeps the header-based shell while removing the public Home button, simplifying the Search control, removing the History dropdown, and constraining the shell to a centered workstation-style width.
 Atlas Workspace UI Sprint X-07 keeps the bounded shell but turns global search into a focused results mode with compact navigation, meaningful-query gating, and direct row-click navigation while active.
 Atlas Workspace UI Sprint X-08 keeps the visual-system shell posture (background #FAFAF9, primary accent #004225, neutral surfaces) and fixes search clear-state runtime flow by separating widget input from submitted query state with safe widget-key reset on Clear Search.
 Atlas Workspace UI Sprint X-09 establishes a reusable design-system foundation (shared tokens, centralized stylesheet authority, and reusable UI primitives) and migrates Home, Projects, Knowledge, and Reports to those primitives without changing workflow behavior.
@@ -36,7 +36,8 @@ Atlas Workspace Sprint U-02 completes end-to-end UX and workflow polish across a
 Atlas Workspace Sprint C-03 extends Transactions catalog-backed line insertion for Product/Service/Fee/Assembly item types, including assembly `expand` and `grouped` insertion options and credit memo compatibility, while preserving deterministic no-mutation behavior for issued revisions.
 Atlas Workspace Alpha UI Cleanup refines production-facing shell/navigation behavior by tightening active vs deferred route visibility, reducing duplicate action exposure, and removing tenant-facing implementation remnants without adding new business features.
 Atlas Workspace Alpha UI Cleanup (Responsive Navigation and Estimate Creation UX) standardizes top-header primary navigation ordering to Transactions, Projects, Knowledge, Reports (with Atlas as the fixed Home control), restores tenant-facing footer copyright text, and provides a dedicated Transactions > Estimates > Add workflow with dropdown-driven estimate details and catalog-backed Product/Service/Fee/Assembly line insertion.
-Atlas Workspace Alpha UI Cleanup (Header Consolidation and Copy Reduction) consolidates the shell to one shared header row of fixed-width controls (Atlas, Transactions, Projects, Knowledge, Reports, Search, Menu), routes navigation through the current Streamlit session, removes redundant tenant-facing shell metadata and repeated descriptive page copy, and preserves continuity-critical object breadcrumbs.
+Atlas Workspace Alpha UI Cleanup (Header Consolidation and Copy Reduction) consolidates the shell to one shared header row of fixed-width controls (Atlas, Transactions, Projects, Knowledge, Reports, Settings, Search), routes navigation through the current Streamlit session, removes redundant tenant-facing shell metadata and repeated descriptive page copy, and preserves continuity-critical object breadcrumbs.
+Atlas Workspace Alpha UI Cleanup (Navigation Simplification and Functional Knowledge Links) removes the burger/menu shell, simplifies Transactions to active and deferred family lists without overview/status-card noise, and restores direct same-window Knowledge workspaces for Vendors, Manufacturers, Products, and Services.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.
@@ -58,7 +59,7 @@ Sprint K-02 extends Knowledge workspace operations with framework-backed Custome
 The shell remains visible while page content changes.
 
 Shell contract notes:
-- top-header primary navigation order is Transactions, Projects, Knowledge, Reports
+- top-header primary navigation order is Transactions, Projects, Knowledge, Reports, Settings
 - Atlas remains the far-left Home action
 - tenant-facing footer text is `©2026 Corsa Systems. All rights reserved.`
 - header composition is one shared row; primary links collapse predictably at narrow widths instead of wrapping to a second row
@@ -341,11 +342,13 @@ Project Settings includes stakeholder linkage backed by shared Organizations:
 Knowledge is application-wide and cross-project.
 
 Knowledge landing sections:
-- Summary
-- Manufacturers
-- Vendors
 - Customers
+- Contacts
+- Locations
+- Vendors
+- Manufacturers
 - Products
+- Services
 - Price Lists
 - Imports
 - Assemblies
@@ -464,9 +467,9 @@ Sprint X-04 home/search refinement notes:
 
 Transactions alpha navigation posture:
 
-- active families: Overview, Estimates, Sales Orders, Return Orders, Credit Memos, Customer Invoices
+- active families: Estimates, Sales Orders, Return Orders, Invoices, Credit Memos
 - Change Orders remain a convention/filter inside Sales Orders and Return Orders (not a standalone secondary family)
-- deferred families are visibly deferred/disabled: Purchase Orders, RFQs, Vendor Quotes, Receiving, Vendor Bills
+- deferred families are visibly deferred/disabled: Purchase Orders, Vendor Quotes, Receiving, Vendor Bills
 
 Settings alpha visibility posture:
 

@@ -20,17 +20,15 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
 
     secondary_keys = [item["secondary_key"] for item in contract]
     assert secondary_keys == [
-        "overview",
         "estimates",
         "sales_orders",
         "return_orders",
+        "customer_invoices",
         "credit_memos",
         "purchase_orders",
-        "rfqs",
         "vendor_quotes",
         "receiving",
         "vendor_bills",
-        "customer_invoices",
     ]
 
     estimate_section = next(
@@ -97,25 +95,8 @@ def test_transactions_workspace_contract_has_expected_sections() -> None:
         "export_pdf",
     ]
 
-    customer_invoice_section = next(
-        item for item in contract if item["secondary_key"] == "customer_invoices"
-    )
-    customer_invoice_actions = [
-        entry["tertiary_key"]
-        for entry in customer_invoice_section.get("supported_tertiary_actions", [])
-    ]
-    assert customer_invoice_actions == [
-        "add",
-        "browse",
-        "lines",
-        "related_documents",
-        "activity",
-        "export_pdf",
-    ]
-
     deferred_sections = {
         "purchase_orders",
-        "rfqs",
         "vendor_quotes",
         "receiving",
         "vendor_bills",

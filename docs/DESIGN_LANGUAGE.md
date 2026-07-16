@@ -164,7 +164,7 @@ X-05 continues product hardening with a top-header primary navigation model and 
 X-05 focus is navigation clarity and terminology consistency:
 
 - move primary navigation into the header rather than a left-column rail
-- expose Administration publicly as Settings from an upper-right hamburger menu
+- expose Settings as a normal primary navigation destination in the shared header
 - replace Home recent activity with a deterministic Recent Projects list
 
 ## 8.3 Sprint X-06 Responsive Shell Posture
@@ -180,10 +180,10 @@ X-06 focus is workstation-style responsiveness and shell simplification:
 - Atlas is the sole Home action
 - remove the public Home navigation tab from the shell
 - simplify the global Search control to a label-free input with the Search placeholder
-- expose Settings only as a dropdown option behind an icon-only menu trigger
+- keep Settings as a fixed primary header destination
 - remove the History dropdown from the global shell
 - keep Home content centered within a reasonable maximum width so it remains readable on large displays
-- allow header and action areas to wrap cleanly on narrower desktop and split-screen widths
+- allow header and action areas to compress cleanly on narrower desktop and split-screen widths
 
 Remaining responsive UX debt:
 
@@ -337,7 +337,7 @@ This hardening pass keeps behavior-preserving scope and focuses on shell density
 
 Global shell rules:
 
-- use a single shared header row for Atlas, primary navigation, global search, and menu control
+- use a single shared header row for Atlas, primary navigation, Settings, and global search
 - keep Transactions first in primary navigation order
 - keep Atlas as the Home control
 - preserve active-state behavior while avoiding page-specific header implementations
