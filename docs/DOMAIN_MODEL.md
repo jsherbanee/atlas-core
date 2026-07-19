@@ -104,6 +104,12 @@ K-02 implementation note:
 - Relationships: has many Contact, Opportunity, Project, Contract, Purchase Order.
 - Lifecycle Role: Persistent legal and operational identity across all phases.
 
+Knowledge merge implementation note:
+- Organization now also supports Customer, Vendor, and Manufacturer business roles.
+- Shared identity belongs to Organization; role-specific identifiers and settings remain in separate Customer, Vendor, and Manufacturer profiles.
+- One Organization may carry any combination of these business roles without forcing duplicate legal-party records.
+- Merge is explicit, audited, tenant-scoped, and preserves merged legacy role records as read-only redirects.
+
 X-03 implementation note:
 - Atlas now uses shared Organization records for project stakeholder linkage in bid-workspace flows.
 - Organization role classification supports Owner/Client, General Contractor, Electrical Contractor, Architect, Consultant, Engineer, and Other.

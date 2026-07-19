@@ -16,6 +16,9 @@ class OrganizationRole(str, Enum):
     ARCHITECT = "architect"
     CONSULTANT = "consultant"
     ENGINEER = "engineer"
+    CUSTOMER = "customer"
+    VENDOR = "vendor"
+    MANUFACTURER = "manufacturer"
     OTHER = "other"
 
 
@@ -33,6 +36,11 @@ class Organization:
     active: bool = True
     aliases: list[str] = field(default_factory=list)
     notes: str | None = None
+    tenant_id: str = "local"
+    organization_scope_id: str = "atlas"
+    role_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
+    merge_history: list[dict[str, Any]] = field(default_factory=list)
+    redirected_from: list[dict[str, Any]] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
@@ -48,6 +56,9 @@ class Organization:
         address: str | None = None,
         notes: str | None = None,
         aliases: list[str] | None = None,
+        tenant_id: str = "local",
+        organization_scope_id: str = "atlas",
+        role_profiles: dict[str, dict[str, Any]] | None = None,
     ) -> "Organization":
         normalized = _normalize_name(name)
         display_name = name.strip()
@@ -63,6 +74,9 @@ class Organization:
             address=_optional_text(address),
             notes=_optional_text(notes),
             aliases=[item for item in list(aliases or []) if _optional_text(item)],
+            tenant_id=tenant_id.strip() or "local",
+            organization_scope_id=organization_scope_id.strip() or "atlas",
+            role_profiles=dict(role_profiles or {}),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -79,6 +93,11 @@ class Organization:
             "active": self.active,
             "aliases": list(self.aliases),
             "notes": self.notes,
+            "tenant_id": self.tenant_id,
+            "organization_scope_id": self.organization_scope_id,
+            "role_profiles": dict(self.role_profiles),
+            "merge_history": [dict(item) for item in self.merge_history],
+            "redirected_from": [dict(item) for item in self.redirected_from],
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -111,6 +130,23 @@ class Organization:
                 if str(item).strip()
             ],
             notes=_optional_text(payload.get("notes")),
+            tenant_id=str(payload.get("tenant_id") or "local"),
+            organization_scope_id=str(payload.get("organization_scope_id") or "atlas"),
+            role_profiles={
+                str(key): dict(value)
+                for key, value in dict(payload.get("role_profiles") or {}).items()
+                if isinstance(value, dict)
+            },
+            merge_history=[
+                dict(item)
+                for item in list(payload.get("merge_history") or [])
+                if isinstance(item, dict)
+            ],
+            redirected_from=[
+                dict(item)
+                for item in list(payload.get("redirected_from") or [])
+                if isinstance(item, dict)
+            ],
             created_at=str(payload.get("created_at") or datetime.now(UTC).isoformat()),
             updated_at=str(payload.get("updated_at") or datetime.now(UTC).isoformat()),
         )

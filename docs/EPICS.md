@@ -55,6 +55,7 @@ Status: Active
 - A-02 Controlled Alpha Deployment and Test Operations
 - A-03 Alpha Tester Onboarding and Controlled Rollout
 - A-04 Alpha Launch, Feedback Triage, and Stabilization Loop
+- K-04 Unified Organization Records and Entity Merge
 
 ### A-07 Scope
 

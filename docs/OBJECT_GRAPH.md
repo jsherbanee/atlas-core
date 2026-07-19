@@ -67,6 +67,12 @@ K-02 implementation note:
 K-03 implementation note:
 - Framework-managed contact, location, and project entities now participate in deterministic search, import/export, and explicit relationship upserts alongside the existing customer/service/manufacturer/vendor/product graph.
 
+Organization merge implementation note:
+- Customer, Vendor, and Manufacturer role records can be consolidated under a surviving Organization graph node.
+- Supported Knowledge relationships are deterministically reassigned from merged source role records to the surviving Organization entity.
+- Merge provenance preserves source entity IDs, actor, reason, conflict resolutions, and relationship reassignment counts.
+- Cross-tenant or cross-organization-scope graph merges are rejected.
+
 ## Versioning
 The graph should support versioned edges and nodes so historical context can be reproduced when inputs change.
 

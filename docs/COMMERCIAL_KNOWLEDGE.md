@@ -24,6 +24,12 @@ Knowledge consolidation note:
 - Catalog owns reusable sellable Products, Services, Fees, and Assemblies for transaction insertion.
 - Contacts, addresses, import history, and price-list provenance remain preserved as contextual record data rather than standalone Knowledge secondary workspaces.
 
+Organization merge note:
+- Customer, Vendor, and Manufacturer records may now consolidate into one shared Organization while retaining distinct role profiles.
+- Customer IDs, Vendor IDs, and Manufacturer IDs remain stable role identifiers and are not collapsed into a generic number.
+- Vendor price lists, vendor offerings, and manufacturer/product associations keep their commercial meaning; the merge layer only redirects supported Knowledge graph references to the surviving Organization.
+- Issued commercial-document snapshots remain immutable and may retain historical displayed names while future routing can resolve legacy IDs to the Organization.
+
 ## Architectural Rule
 Products do not own prices.
 

@@ -235,3 +235,14 @@ Still deferred:
 - billing and subscription lifecycle integration
 
 P-01 is a foundation sprint and does not deliver full tenant administration lifecycle flows.
+
+## Organization Merge Tenant Boundary
+
+Organization merge requires active tenant and organization scope.
+
+Current behavior:
+- merge services fail closed when tenant or organization scope is blank
+- surviving Organization and source records must resolve inside the active scope
+- duplicate suggestions are tenant-scoped and organization-scoped
+- `knowledge.edit` permission is required for merge confirmation
+- cross-tenant and cross-organization-scope merges are rejected before mutation

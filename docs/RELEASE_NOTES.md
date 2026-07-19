@@ -36,6 +36,7 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Knowledge secondary and tertiary navigation now renders as a compact contextual accordion without literal disclosure markers or duplicate content headings.
 - Customer Browse now defaults to Customer Name ascending, supports sortable table headings, and opens selected rows into Customer Details context.
 - Customer Add now uses a single Customer Name field with generated Customer ID preview/allocation and removes tenant-facing JSON controls from normal Knowledge screens.
+- Customer, Vendor, and Manufacturer records can now be consolidated into shared Organization records with explicit duplicate review, merge preview, role profiles, redirected legacy records, and merge history.
 - Catalog now exposes Products, Services, Fees, Assemblies, Browse, Add, Import, and Activity as contextual tertiary actions without adding procurement, inventory, or CRM workflows.
 - Tenant-facing estimate creation intentionally excludes Vendor ID to reduce non-estimate data noise in the add flow.
 - Projects library overview navigation is denser and less duplicative, with operational actions consolidated into contextual actions.

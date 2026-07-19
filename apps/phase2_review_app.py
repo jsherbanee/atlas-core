@@ -67,6 +67,7 @@ from atlas_core.services.master_library import (
 from atlas_core.services.master_library.commercial_product_service import (
     ALLOWED_PURCHASING_CHANNELS,
 )
+from atlas_core.services.organization_merge_service import OrganizationMergeService
 from atlas_core.services.phase2_review_context_service import (
     DEFAULT_MAW_REFERENCE_PACKAGE,
     build_intake_review_context,
@@ -1549,6 +1550,264 @@ def _sort_customer_rows(
         ),
         reverse=reverse,
     )
+
+
+def _knowledge_merge_access(st: Any) -> tuple[bool, str]:
+    transactions_state = _transactions_workspace_state(st)
+    tenant_id = _safe_text(st.session_state.get(_tenant_scope_key()), "local")
+    organization_id = _safe_text(transactions_state.get("organization_id"), "atlas")
+    principal_id = _safe_text(
+        st.session_state.get("atlas_settings_user_id"), "local-user"
+    )
+    decision = _permissions_workspace_service(st).evaluate(
+        AccessRequest(
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+            principal_id=principal_id,
+            permission_key="knowledge.edit",
+        )
+    )
+    allowed = decision.effect == PermissionEffect.ALLOW
+    return allowed, _safe_text(decision.reason, "")
+
+
+def _organization_merge_service(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    product_service: CommercialProductService,
+) -> OrganizationMergeService | None:
+    organization_directory = getattr(workspace_service, "organization_directory", None)
+    if organization_directory is None:
+        return None
+    transactions_state = _transactions_workspace_state(st)
+    return OrganizationMergeService(
+        organization_directory=organization_directory,
+        product_service=product_service,
+        tenant_id=_safe_text(st.session_state.get(_tenant_scope_key()), "local"),
+        organization_scope_id=_safe_text(
+            transactions_state.get("organization_id"), "atlas"
+        ),
+    )
+
+
+def _render_organization_merge_controls(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    product_service: CommercialProductService,
+    *,
+    entity_id: str,
+    key_prefix: str,
+) -> None:
+    merge_service = _organization_merge_service(st, workspace_service, product_service)
+    if merge_service is None:
+        return
+    can_merge, denial_reason = _knowledge_merge_access(st)
+    current_entity = product_service.get_knowledge_entity(entity_id)
+    if not current_entity:
+        return
+    attributes = dict(current_entity.get("attributes") or {})
+    if _safe_text(attributes.get("merge_status"), "") == "redirected":
+        target = merge_service.legacy_redirect(entity_id) or {}
+        st.info(
+            "This record has been merged and redirects to "
+            f"{_safe_text(target.get('display_name'), 'the surviving Organization')}."
+        )
+        return
+
+    with st.expander("Organization Merge", expanded=False):
+        if not can_merge:
+            st.caption(
+                denial_reason
+                or "Organization merge requires knowledge edit permission."
+            )
+            return
+        if st.button(
+            "Find Possible Duplicates",
+            key=f"{key_prefix}_find_duplicates",
+            width="stretch",
+        ):
+            suggestions = merge_service.duplicate_suggestions_for_role_record(entity_id)
+            st.session_state[f"{key_prefix}_suggestions"] = suggestions
+            try:
+                merge_service.product_service._append_knowledge_audit(
+                    event_type="organization_duplicate_reviewed",
+                    entity_id=entity_id,
+                    payload={"suggestion_count": len(suggestions)},
+                )
+            except Exception:
+                pass
+        suggestions = list(st.session_state.get(f"{key_prefix}_suggestions") or [])
+        if suggestions:
+            st.dataframe(
+                [
+                    {
+                        "Organization": item.get("display_name"),
+                        "Roles": ", ".join(list(item.get("roles") or [])),
+                        "Reasons": ", ".join(list(item.get("reasons") or [])),
+                    }
+                    for item in suggestions
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+        primary_org = None
+        if st.button(
+            "Use Current Record As Primary Organization",
+            key=f"{key_prefix}_primary_org",
+            width="stretch",
+        ):
+            primary_org = merge_service.ensure_organization_for_role_record(entity_id)
+            st.session_state[f"{key_prefix}_primary_org_id"] = (
+                primary_org.organization_id
+            )
+            _save_commercial_product_state(st, product_service)
+            st.success("Organization profile prepared.")
+        primary_org_id = _safe_text(
+            st.session_state.get(f"{key_prefix}_primary_org_id"), ""
+        )
+        source_options = [
+            item
+            for item in product_service.list_knowledge_entities(include_inactive=False)
+            if _safe_text(item.get("entity_type"), "")
+            in {"customer", "vendor", "manufacturer"}
+            and _safe_text(item.get("entity_id"), "") != entity_id
+        ]
+        selected_sources = st.multiselect(
+            "Select Records",
+            options=[_safe_text(item.get("entity_id"), "") for item in source_options],
+            format_func=lambda value: _safe_text(
+                next(
+                    (
+                        item.get("display_name")
+                        for item in source_options
+                        if _safe_text(item.get("entity_id"), "") == value
+                    ),
+                    value,
+                ),
+                value,
+            ),
+            key=f"{key_prefix}_source_records",
+        )
+        actor = st.text_input("Actor", key=f"{key_prefix}_actor")
+        reason = st.text_input("Merge Reason", key=f"{key_prefix}_reason")
+        if primary_org_id and selected_sources:
+            preview = merge_service.preview_merge(
+                primary_organization_id=primary_org_id,
+                source_entity_ids=list(selected_sources),
+            )
+            st.dataframe(
+                [
+                    {
+                        "Field": item.get("field"),
+                        "Primary": item.get("primary_value"),
+                        "Source": item.get("source_value"),
+                        "Resolution": item.get("resolution"),
+                    }
+                    for item in list(preview.get("conflicts") or [])
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            st.caption(
+                "Roles after merge: "
+                + ", ".join(list(preview.get("roles_after") or []))
+            )
+            counts = dict(preview.get("relationship_reassignment_preview") or {})
+            st.caption(
+                "Relationship preview: "
+                f"{int(counts.get('knowledge_relationships', 0))} Knowledge links"
+            )
+            confirm = st.checkbox(
+                "I understand this administrative merge is not automatically reversible.",
+                key=f"{key_prefix}_confirm",
+            )
+            if st.button(
+                "Confirm Merge",
+                key=f"{key_prefix}_confirm_merge",
+                width="stretch",
+                disabled=not confirm,
+            ):
+                try:
+                    merge_service.confirm_merge(
+                        primary_organization_id=primary_org_id,
+                        source_entity_ids=list(selected_sources),
+                        actor=actor,
+                        reason=reason,
+                        permission_granted=can_merge,
+                    )
+                    _save_commercial_product_state(st, product_service)
+                    st.success("Organization merge completed.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to merge organization records: {exc}")
+
+
+def _organization_payload_attributes(data: dict[str, Any]) -> dict[str, Any]:
+    return dict(data.get("attributes") or data)
+
+
+def _render_organization_role_profile_summary(st: Any, data: dict[str, Any]) -> None:
+    attributes = _organization_payload_attributes(data)
+    role_profiles = dict(attributes.get("role_profiles") or {})
+    roles = list(attributes.get("roles") or data.get("roles") or role_profiles.keys())
+    if roles:
+        st.markdown("### Active Roles")
+        st.dataframe(
+            [{"Role": _safe_text(role, "").title()} for role in roles],
+            width="stretch",
+            hide_index=True,
+        )
+    rows: list[dict[str, Any]] = []
+    shared_fields = {
+        "legal_name",
+        "canonical_name",
+        "display_name",
+        "website",
+        "primary_phone",
+        "primary_email",
+        "phone",
+        "email",
+        "address",
+        "addresses",
+        "contacts",
+        "notes",
+        "status",
+    }
+    for role, profile in role_profiles.items():
+        for key, value in dict(profile).items():
+            if key in shared_fields:
+                continue
+            rows.append(
+                {
+                    "Role": _safe_text(role, "").title(),
+                    "Field": key.replace("_", " ").title(),
+                    "Value": (
+                        ", ".join([_safe_text(item, "") for item in value])
+                        if isinstance(value, list)
+                        else _safe_text(value, "")
+                    ),
+                }
+            )
+    if rows:
+        st.markdown("### Role Profiles")
+        st.dataframe(rows, width="stretch", hide_index=True)
+    merge_history = list(attributes.get("merge_history") or [])
+    if merge_history:
+        st.markdown("### Merge History")
+        st.dataframe(
+            [
+                {
+                    "Timestamp": item.get("timestamp"),
+                    "Actor": item.get("actor"),
+                    "Reason": item.get("reason"),
+                    "Correlation": item.get("correlation_id"),
+                    "Sources": len(list(item.get("source_records") or [])),
+                }
+                for item in merge_history
+            ],
+            width="stretch",
+            hide_index=True,
+        )
 
 
 def _responsive_control_columns(
@@ -9732,6 +9991,8 @@ def _render_universal_object_workspace_page(
                 width="stretch",
                 hide_index=True,
             )
+        if kind == "organization":
+            _render_organization_role_profile_summary(st, data)
 
     elif selected_view == "Details":
         st.markdown("### Details")
@@ -9747,6 +10008,8 @@ def _render_universal_object_workspace_page(
             for key, value in dict(data).items()
         ]
         _render_data_table(st, detail_rows[:60])
+        if kind == "organization":
+            _render_organization_role_profile_summary(st, data)
 
     elif selected_view == "Relationships":
         st.markdown("### Relationships")
@@ -11345,6 +11608,13 @@ def _render_application_knowledge_page(
                     data=selected_manufacturer,
                     key_prefix="atlas_ck_mfr",
                 )
+                _render_organization_merge_controls(
+                    st,
+                    workspace_service,
+                    product_service,
+                    entity_id=f"manufacturer:{selected_manufacturer_id}",
+                    key_prefix="atlas_ck_mfr_merge",
+                )
                 _render_contextual_contacts_and_addresses(
                     st,
                     owner_name=_safe_text(
@@ -11573,6 +11843,13 @@ def _render_application_knowledge_page(
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Unable to restore vendor: {exc}")
+                _render_organization_merge_controls(
+                    st,
+                    workspace_service,
+                    product_service,
+                    entity_id=f"vendor:{selected_vendor_id}",
+                    key_prefix="atlas_ck_vendor_merge",
+                )
                 _render_contextual_contacts_and_addresses(
                     st,
                     owner_name=_safe_text(
@@ -11930,6 +12207,13 @@ def _render_application_knowledge_page(
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Unable to restore customer: {exc}")
+                _render_organization_merge_controls(
+                    st,
+                    workspace_service,
+                    product_service,
+                    entity_id=f"customer:{selected_customer_id}",
+                    key_prefix="atlas_ck_customer_merge",
+                )
 
                 _render_related_projects_section(
                     st,

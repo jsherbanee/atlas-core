@@ -49,6 +49,7 @@ SUPPORTED_KNOWLEDGE_ENTITY_TYPES = {
     "manufacturer",
     "vendor",
     "product",
+    "organization",
     "contact",
     "location",
     "project",
@@ -751,6 +752,38 @@ class CommercialProductService:
             or None
         )
 
+    def upsert_organization_entity(
+        self,
+        *,
+        organization_id: str,
+        canonical_name: str,
+        display_name: str | None = None,
+        roles: list[str] | None = None,
+        aliases: list[str] | None = None,
+        notes: str = "",
+        attributes: dict[str, Any] | None = None,
+        active: bool = True,
+    ) -> dict[str, Any]:
+        if not self._safe(organization_id):
+            raise ValueError("organization_id cannot be blank")
+        return self._upsert_knowledge_entity(
+            entity_id=f"organization:{self._safe(organization_id)}",
+            entity_type="organization",
+            canonical_name=canonical_name,
+            display_name=display_name,
+            aliases=list(aliases or []),
+            notes=notes,
+            active=active,
+            attributes={
+                "organization_id": self._safe(organization_id),
+                "roles": sorted(
+                    {self._safe(item) for item in list(roles or []) if self._safe(item)}
+                ),
+                **dict(attributes or {}),
+            },
+            fail_on_duplicate=False,
+        )
+
     def update_knowledge_entity(
         self,
         *,
@@ -803,6 +836,140 @@ class CommercialProductService:
         if self.get_knowledge_entity(entity_id) is None:
             raise ValueError("Knowledge entity not found")
         self._set_knowledge_entity_active(entity_id=entity_id, active=active)
+
+    def link_role_entity_to_organization(
+        self,
+        *,
+        entity_id: str,
+        organization_id: str,
+        role: str,
+    ) -> dict[str, Any]:
+        current = self.get_knowledge_entity(entity_id)
+        if current is None:
+            raise ValueError("Knowledge entity not found")
+        attributes = dict(current.get("attributes") or {})
+        attributes["organization_id"] = self._safe(organization_id)
+        attributes["organization_role"] = self._safe(role).lower()
+        updated = self.update_knowledge_entity(
+            entity_id=entity_id,
+            updates={"attributes": attributes},
+        )
+        self._append_knowledge_audit(
+            event_type="knowledge_role_linked_to_organization",
+            entity_id=entity_id,
+            payload={
+                "organization_id": self._safe(organization_id),
+                "role": self._safe(role).lower(),
+            },
+        )
+        return updated
+
+    def mark_role_entity_merged(
+        self,
+        *,
+        entity_id: str,
+        organization_id: str,
+        actor: str,
+        reason: str,
+        correlation_id: str,
+    ) -> dict[str, Any]:
+        current = self.get_knowledge_entity(entity_id)
+        if current is None:
+            raise ValueError("Knowledge entity not found")
+        attributes = dict(current.get("attributes") or {})
+        attributes.update(
+            {
+                "merge_status": "redirected",
+                "merged_into_organization_id": self._safe(organization_id),
+                "merge_actor": self._safe(actor),
+                "merge_reason": self._safe(reason),
+                "merge_correlation_id": self._safe(correlation_id),
+                "merged_at": self._now_iso(),
+                "read_only": True,
+            }
+        )
+        aliases = {
+            self._safe(item)
+            for item in list(current.get("aliases") or [])
+            if self._safe(item)
+        }
+        aliases.update(
+            {
+                self._safe(current.get("canonical_name"), ""),
+                self._safe(current.get("display_name"), ""),
+                entity_id,
+            }
+        )
+        updated = self.update_knowledge_entity(
+            entity_id=entity_id,
+            updates={
+                "aliases": sorted({item for item in aliases if item}),
+                "attributes": attributes,
+                "active": False,
+            },
+        )
+        self._append_knowledge_audit(
+            event_type="knowledge_role_merged_redirected",
+            entity_id=entity_id,
+            payload={
+                "organization_id": self._safe(organization_id),
+                "actor": self._safe(actor),
+                "reason": self._safe(reason),
+                "correlation_id": self._safe(correlation_id),
+            },
+        )
+        return updated
+
+    def reassign_knowledge_relationships(
+        self,
+        *,
+        source_entity_ids: list[str],
+        target_entity_id: str,
+    ) -> dict[str, int]:
+        sources = {self._safe(item) for item in source_entity_ids if self._safe(item)}
+        target = self._safe(target_entity_id)
+        if not target:
+            raise ValueError("target_entity_id is required")
+        if target not in self.state.get("knowledge_entities", {}):
+            raise ValueError("target relationship entity must exist")
+        if not sources:
+            return {"relationships_reassigned": 0}
+        original = list(self.state.get("knowledge_relationships", {}).values())
+        rewritten: dict[str, dict[str, Any]] = {}
+        reassigned = 0
+        for item in original:
+            row = dict(item)
+            changed = False
+            if self._safe(row.get("source_entity_id"), "") in sources:
+                row["source_entity_id"] = target
+                changed = True
+            if self._safe(row.get("target_entity_id"), "") in sources:
+                row["target_entity_id"] = target
+                changed = True
+            if row.get("source_entity_id") == row.get("target_entity_id"):
+                reassigned += 1 if changed else 0
+                continue
+            if changed:
+                reassigned += 1
+                row["relationship_id"] = self._knowledge_relationship_id(
+                    source_entity_id=self._safe(row.get("source_entity_id"), ""),
+                    target_entity_id=self._safe(row.get("target_entity_id"), ""),
+                    relationship_type=self._safe(row.get("relationship_type"), ""),
+                )
+                row["updated_at"] = self._now_iso()
+            rewritten[self._safe(row.get("relationship_id"), "")] = row
+        self.state["knowledge_relationships"] = rewritten
+        if reassigned:
+            self._append_knowledge_audit(
+                event_type="knowledge_relationships_reassigned",
+                entity_id=target,
+                payload={
+                    "source_entity_ids": sorted(sources),
+                    "target_entity_id": target,
+                    "relationships_reassigned": reassigned,
+                },
+            )
+        return {"relationships_reassigned": reassigned}
 
     def get_customer(self, customer_id: str) -> dict[str, Any] | None:
         return self.get_knowledge_entity(f"customer:{self._safe(customer_id)}")

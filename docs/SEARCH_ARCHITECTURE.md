@@ -72,6 +72,12 @@ W-03 search note:
 - read-only supported families (Drawing, Specification, Equipment) expose compatibility actions to open authoritative engineering pages
 - unsupported object families continue to use compatibility routing to avoid workflow regression
 
+Organization merge search note:
+- merged Customer, Vendor, and Manufacturer source records retain legacy IDs and aliases for deterministic lookup
+- active browse/search surfaces exclude redirected source records by default
+- legacy merged results can resolve to the surviving Organization with merge provenance
+- duplicate suggestions are advisory and explainable by deterministic signals such as normalized name, website domain, email domain, phone, tax identifier reference, address, and aliases
+
 ## Permissions And Tenant Scope
 Search results must respect:
 - tenant boundaries

@@ -76,6 +76,14 @@ Out of scope:
 - real-time streaming pipelines
 - cloud-native audit bus deployment
 
+## Organization Merge Audit
+
+Organization merge workflows emit deterministic Knowledge audit events for duplicate review, role-profile creation, preview, confirmation, failed merge, relationship reassignment, and legacy-record redirection.
+
+Merge audit payloads include primary Organization, source role records, actor, reason, selected conflict resolutions when provided, reassignment counts, correlation ID, timestamp, tenant ID, and organization scope ID.
+
+The current local implementation records these events in the existing Knowledge audit log; future immutable-audit transport can consume the same deterministic payloads without creating a second merge-audit model.
+
 ## P-04 Attachment Audit Integration
 
 Sprint P-04 unified attachment operations emit immutable audit actions when project context is available.

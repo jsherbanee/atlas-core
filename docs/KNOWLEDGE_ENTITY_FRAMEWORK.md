@@ -27,6 +27,13 @@ Implemented in K-03:
 - explicit relationship support for project-linked knowledge entities
 - Knowledge page operational controls for contact, location, and project workflows
 
+Implemented Organization merge refinement:
+- Customer, Vendor, and Manufacturer Knowledge role records can link to one shared Organization authority record
+- Organization records own shared identity fields and keep role-specific Customer, Vendor, and Manufacturer profiles separate
+- merge preview/confirmation is explicit, deterministic, permission-gated, tenant-scoped, and audited
+- merged source role records become inactive read-only redirects with preserved aliases, legacy IDs, actor, reason, timestamp, and correlation ID
+- supported Knowledge relationships are reassigned to the surviving Organization entity while role identifiers remain stable
+
 Out of scope:
 - procurement execution and purchase-order workflows
 - service ticketing and installed-asset lifecycle management
@@ -74,6 +81,8 @@ Core APIs:
 - deterministic relationship upsert/list
 - bundle export/import
 - summary metrics via `knowledge_entity_summary`
+- Organization merge orchestration via `OrganizationMergeService`
+- Organization Knowledge entity compatibility via `upsert_organization_entity`, role linking, redirect marking, and Knowledge relationship reassignment
 
 ## Backward Compatibility
 - Existing manufacturer, vendor, and product commercial APIs remain the source of truth for commercial creation and still upsert into the framework.
