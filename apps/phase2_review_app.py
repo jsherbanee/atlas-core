@@ -440,66 +440,62 @@ KNOWLEDGE_SECONDARY_GROUPS: list[tuple[str, list[str]]] = [
         "Knowledge",
         [
             "Customers",
-            "Contacts",
-            "Locations",
             "Vendors",
             "Manufacturers",
-            "Products",
-            "Services",
-            "Price Lists",
-            "Imports",
-            "Assemblies",
+            "Catalog",
         ],
     ),
 ]
 
 KNOWLEDGE_SECONDARY_BY_PAGE: dict[str, str] = {
-    "Knowledge": "Knowledge",
-    "Summary": "Knowledge",
-    "Commercial Health": "Knowledge",
-    "Manufacturers": "Knowledge",
-    "Vendors": "Knowledge",
-    "Customers": "Knowledge",
-    "Services": "Knowledge",
-    "Contacts": "Knowledge",
-    "Locations": "Knowledge",
-    "Projects": "Knowledge",
-    "Products": "Knowledge",
-    "Price Lists": "Knowledge",
-    "Imports": "Knowledge",
-    "Import History": "Knowledge",
-    "Assemblies": "Knowledge",
-}
-
-KNOWLEDGE_TERTIARY_BY_KIND: dict[str, str] = {
-    "manufacturer": "Manufacturers",
-    "vendor": "Vendors",
-    "customer": "Customers",
-    "service": "Services",
-    "contact": "Contacts",
-    "location": "Locations",
-    "project": "Projects",
-    "master_product": "Products",
-    "price_list": "Price Lists",
-    "assembly": "Assemblies",
-}
-
-KNOWLEDGE_TERTIARY_BY_PAGE: dict[str, str] = {
-    "Knowledge": "Knowledge",
-    "Summary": "Knowledge",
-    "Commercial Health": "Knowledge",
+    "Knowledge": "Customers",
+    "Summary": "Customers",
+    "Commercial Health": "Catalog",
     "Manufacturers": "Manufacturers",
     "Vendors": "Vendors",
     "Customers": "Customers",
-    "Services": "Services",
-    "Contacts": "Contacts",
-    "Locations": "Locations",
-    "Projects": "Projects",
-    "Products": "Products",
-    "Price Lists": "Price Lists",
-    "Imports": "Imports",
-    "Import History": "Import History",
-    "Assemblies": "Assemblies",
+    "Services": "Catalog",
+    "Contacts": "Customers",
+    "Locations": "Customers",
+    "Projects": "Customers",
+    "Products": "Catalog",
+    "Price Lists": "Vendors",
+    "Imports": "Catalog",
+    "Import History": "Catalog",
+    "Assemblies": "Catalog",
+    "Catalog": "Catalog",
+}
+
+KNOWLEDGE_TERTIARY_BY_KIND: dict[str, str] = {
+    "manufacturer": "browse",
+    "vendor": "browse",
+    "customer": "browse",
+    "service": "services",
+    "contact": "contacts",
+    "location": "addresses",
+    "project": "projects",
+    "master_product": "products",
+    "price_list": "price_lists",
+    "assembly": "assemblies",
+}
+
+KNOWLEDGE_TERTIARY_BY_PAGE: dict[str, str] = {
+    "Knowledge": "browse",
+    "Summary": "browse",
+    "Commercial Health": "activity",
+    "Manufacturers": "browse",
+    "Vendors": "browse",
+    "Customers": "browse",
+    "Services": "services",
+    "Contacts": "contacts",
+    "Locations": "addresses",
+    "Projects": "projects",
+    "Products": "products",
+    "Price Lists": "price_lists",
+    "Imports": "import",
+    "Import History": "activity",
+    "Assemblies": "assemblies",
+    "Catalog": "browse",
 }
 
 NAVIGATION_ACTION_TYPES = {
@@ -1372,6 +1368,125 @@ def _render_status_badge(st: Any, label: str, tone: str = "neutral") -> None:
 
 def _render_data_table(st: Any, rows: list[dict[str, Any]]) -> None:
     st.dataframe(rows, width="stretch", hide_index=True)
+
+
+def _entity_matches_owner(item: dict[str, Any], owner_name: str) -> bool:
+    owner = _safe_text(owner_name, "").lower()
+    if not owner:
+        return False
+    attributes = dict(item.get("attributes") or {})
+    candidates = [
+        item.get("display_name"),
+        item.get("canonical_name"),
+        attributes.get("organization"),
+        attributes.get("customer"),
+        attributes.get("vendor"),
+        attributes.get("manufacturer"),
+        attributes.get("external_identifier"),
+    ]
+    return any(owner in _safe_text(candidate, "").lower() for candidate in candidates)
+
+
+def _render_contextual_contacts_and_addresses(
+    st: Any,
+    *,
+    owner_name: str,
+    contacts: list[dict[str, Any]],
+    locations: list[dict[str, Any]],
+    key_prefix: str,
+) -> None:
+    matched_contacts = [
+        item for item in contacts if _entity_matches_owner(item, owner_name)
+    ]
+    matched_locations = [
+        item for item in locations if _entity_matches_owner(item, owner_name)
+    ]
+    with st.expander("Contacts", expanded=False):
+        if not matched_contacts:
+            st.caption("No contextual contacts are linked to this record.")
+        else:
+            st.dataframe(
+                [
+                    {
+                        "Contact": _safe_text(
+                            item.get("display_name"),
+                            _safe_text(item.get("canonical_name"), "Contact"),
+                        ),
+                        "Email": _safe_text(
+                            dict(item.get("attributes") or {}).get("email"), ""
+                        ),
+                        "Phone": _safe_text(
+                            dict(item.get("attributes") or {}).get("phone"), ""
+                        ),
+                        "Title": _safe_text(
+                            dict(item.get("attributes") or {}).get("title"), ""
+                        ),
+                        "Active": bool(item.get("active", True)),
+                    }
+                    for item in matched_contacts
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+    with st.expander("Addresses", expanded=False):
+        if not matched_locations:
+            st.caption("No contextual addresses are linked to this record.")
+        else:
+            st.dataframe(
+                [
+                    {
+                        "Address": _safe_text(
+                            item.get("display_name"),
+                            _safe_text(item.get("canonical_name"), "Address"),
+                        ),
+                        "Line 1": _safe_text(
+                            dict(item.get("attributes") or {}).get("address_line1"),
+                            "",
+                        ),
+                        "City": _safe_text(
+                            dict(item.get("attributes") or {}).get("city"), ""
+                        ),
+                        "State": _safe_text(
+                            dict(item.get("attributes") or {}).get("state"), ""
+                        ),
+                        "Postal": _safe_text(
+                            dict(item.get("attributes") or {}).get("postal_code"), ""
+                        ),
+                        "Active": bool(item.get("active", True)),
+                    }
+                    for item in matched_locations
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+    _ = key_prefix
+
+
+def _render_vendor_price_lists(
+    st: Any,
+    *,
+    vendor_name: str,
+    uploaded_price_lists: list[dict[str, Any]],
+    vendor_offers: list[dict[str, Any]],
+) -> None:
+    vendor = _safe_text(vendor_name, "").lower()
+    price_lists = [
+        item
+        for item in uploaded_price_lists
+        if vendor and vendor in _safe_text(item.get("vendor"), "").lower()
+    ]
+    offers = [
+        item
+        for item in vendor_offers
+        if vendor and vendor in _safe_text(item.get("vendor"), "").lower()
+    ]
+    with st.expander("Price Lists", expanded=False):
+        if price_lists:
+            st.dataframe(price_lists, width="stretch", hide_index=True)
+        else:
+            st.caption("No vendor-linked price lists are available for this vendor.")
+        if offers:
+            st.dataframe(offers[:300], width="stretch", hide_index=True)
 
 
 def _responsive_control_columns(
@@ -5803,8 +5918,8 @@ def _knowledge_tertiary_state_key() -> str:
 
 
 def _knowledge_navigation_defaults(st: Any) -> None:
-    st.session_state.setdefault(_knowledge_secondary_state_key(), "Knowledge")
-    st.session_state.setdefault(_knowledge_tertiary_state_key(), "Knowledge")
+    st.session_state.setdefault(_knowledge_secondary_state_key(), "Customers")
+    st.session_state.setdefault(_knowledge_tertiary_state_key(), "Browse")
 
 
 def _knowledge_secondary_group_for_page(page: str) -> str:
@@ -5813,6 +5928,18 @@ def _knowledge_secondary_group_for_page(page: str) -> str:
 
 def _knowledge_tertiary_page_for_kind(kind: str) -> str:
     return KNOWLEDGE_TERTIARY_BY_KIND.get(kind, "Knowledge")
+
+
+def _knowledge_secondary_key_for_kind(kind: str) -> str:
+    if kind in {"customer", "contact", "location", "project"}:
+        return "customers"
+    if kind in {"vendor", "price_list"}:
+        return "vendors"
+    if kind == "manufacturer":
+        return "manufacturers"
+    if kind in {"master_product", "service", "assembly"}:
+        return "catalog"
+    return "customers"
 
 
 def _knowledge_tertiary_page_for_route(page: str) -> str:
@@ -5836,8 +5963,23 @@ def _set_knowledge_navigation_selection(
         st.session_state[_knowledge_tertiary_state_key()] = (
             _knowledge_tertiary_page_for_kind(kind)
         )
-        st.session_state[_knowledge_secondary_state_key()] = (
-            _knowledge_secondary_group_for_page(_knowledge_tertiary_page_for_kind(kind))
+        st.session_state[_knowledge_secondary_state_key()] = _safe_text(
+            KNOWLEDGE_SECONDARY_BY_PAGE.get(
+                {
+                    "customer": "Customers",
+                    "vendor": "Vendors",
+                    "manufacturer": "Manufacturers",
+                    "master_product": "Catalog",
+                    "service": "Catalog",
+                    "assembly": "Catalog",
+                    "price_list": "Vendors",
+                    "contact": "Customers",
+                    "location": "Customers",
+                    "project": "Customers",
+                }.get(kind, "Customers"),
+                "Customers",
+            ),
+            "Customers",
         )
 
 
@@ -5851,25 +5993,30 @@ def _knowledge_content_view_from_shell(st: Any) -> str:
         )
 
     if secondary in {"landing", "Knowledge", ""}:
-        return "Knowledge"
+        return "Customers"
 
     secondary_to_view = {
         "customers": "Customers",
-        "contacts": "Contacts",
-        "locations": "Locations",
         "vendors": "Vendors",
         "manufacturers": "Manufacturers",
         "products": "Products",
         "services": "Services",
         "price_lists": "Price Lists",
+        "imports": "Import History",
         "assemblies": "Assemblies",
     }
     if secondary in secondary_to_view:
         return secondary_to_view[secondary]
-    if secondary == "imports":
-        if tertiary in {"completed", "activity", "import_history"}:
+    if secondary == "catalog":
+        if tertiary == "services":
+            return "Services"
+        if tertiary == "fees":
+            return "Fees"
+        if tertiary == "assemblies":
+            return "Assemblies"
+        if tertiary in {"import", "activity"}:
             return "Import History"
-        return "Imports"
+        return "Products"
     return "Knowledge"
 
 
@@ -6411,13 +6558,10 @@ def _open_knowledge_selection(
     st.session_state["atlas_active_page"] = "Knowledge"
     st.session_state[_navigation_primary_state_key()] = "Knowledge"
     st.session_state[_navigation_mode_state_key()] = "application"
-    st.session_state[_navigation_secondary_state_key()] = _safe_text(
-        _secondary_key_for_page("Knowledge", "application", knowledge_page),
-        "landing",
+    st.session_state[_navigation_secondary_state_key()] = (
+        _knowledge_secondary_key_for_kind(kind)
     )
-    st.session_state[_navigation_tertiary_state_key()] = (
-        "landing" if kind == "overview" else "browse"
-    )
+    st.session_state[_navigation_tertiary_state_key()] = knowledge_page
     _knowledge_navigation_defaults(st)
     _set_knowledge_navigation_selection(st, kind=kind, page=knowledge_page)
     _set_context_selection(st, kind, dict(data))
@@ -6584,33 +6728,7 @@ def _render_related_projects_section(
 
 def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
     return {
-        "overview": [
-            {
-                "tertiary_key": "summary",
-                "label": "Summary",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "recent_activity",
-                "label": "Recent Activity",
-                "action_type": "history_activity_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "data_health",
-                "label": "Data Health",
-                "action_type": "operational_view",
-                "required_selection": None,
-            },
-        ],
         "customers": [
-            {
-                "tertiary_key": "add",
-                "label": "Add",
-                "action_type": "create_action",
-                "required_selection": None,
-            },
             {
                 "tertiary_key": "browse",
                 "label": "Browse",
@@ -6618,15 +6736,27 @@ def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": None,
             },
             {
-                "tertiary_key": "edit",
-                "label": "Edit",
-                "action_type": "edit_action",
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "details",
+                "label": "Details",
+                "action_type": "detail_view",
                 "required_selection": "entity",
             },
             {
-                "tertiary_key": "relationships",
-                "label": "Relationships",
-                "action_type": "relationship_view",
+                "tertiary_key": "contacts",
+                "label": "Contacts",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "addresses",
+                "label": "Addresses",
+                "action_type": "detail_view",
                 "required_selection": "entity",
             },
             {
@@ -6636,127 +6766,31 @@ def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": "entity",
             },
             {
+                "tertiary_key": "transactions",
+                "label": "Transactions",
+                "action_type": "history_activity_view",
+                "required_selection": "entity",
+            },
+            {
                 "tertiary_key": "activity",
                 "label": "Activity",
                 "action_type": "history_activity_view",
                 "required_selection": None,
             },
-        ],
-        "contacts": [
             {
-                "tertiary_key": "add",
-                "label": "Add",
-                "action_type": "create_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "browse",
-                "label": "Browse",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "edit",
-                "label": "Edit",
+                "tertiary_key": "archive",
+                "label": "Archive",
                 "action_type": "edit_action",
                 "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "relationships",
-                "label": "Relationships",
-                "action_type": "relationship_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "activity",
-                "label": "Activity",
-                "action_type": "history_activity_view",
-                "required_selection": None,
-            },
-        ],
-        "locations": [
-            {
-                "tertiary_key": "add",
-                "label": "Add",
-                "action_type": "create_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "browse",
-                "label": "Browse",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "edit",
-                "label": "Edit",
-                "action_type": "edit_action",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "relationships",
-                "label": "Relationships",
-                "action_type": "relationship_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "activity",
-                "label": "Activity",
-                "action_type": "history_activity_view",
-                "required_selection": None,
             },
         ],
         "vendors": [
             {
-                "tertiary_key": "add",
-                "label": "Add",
-                "action_type": "create_action",
-                "required_selection": None,
-            },
-            {
                 "tertiary_key": "browse",
                 "label": "Browse",
                 "action_type": "collection_view",
                 "required_selection": None,
             },
-            {
-                "tertiary_key": "edit",
-                "label": "Edit",
-                "action_type": "edit_action",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "relationships",
-                "label": "Relationships",
-                "action_type": "relationship_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "transactions",
-                "label": "View Transactions",
-                "action_type": "history_activity_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "import",
-                "label": "Import",
-                "action_type": "import_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "export",
-                "label": "Export",
-                "action_type": "export_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "activity",
-                "label": "Activity",
-                "action_type": "history_activity_view",
-                "required_selection": None,
-            },
-        ],
-        "manufacturers": [
             {
                 "tertiary_key": "add",
                 "label": "Add",
@@ -6764,40 +6798,40 @@ def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": None,
             },
             {
-                "tertiary_key": "browse",
-                "label": "Browse",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "edit",
-                "label": "Edit",
-                "action_type": "edit_action",
+                "tertiary_key": "details",
+                "label": "Details",
+                "action_type": "detail_view",
                 "required_selection": "entity",
             },
             {
-                "tertiary_key": "relationships",
-                "label": "Relationships",
-                "action_type": "relationship_view",
+                "tertiary_key": "contacts",
+                "label": "Contacts",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "addresses",
+                "label": "Addresses",
+                "action_type": "detail_view",
+                "required_selection": "entity",
+            },
+            {
+                "tertiary_key": "price_lists",
+                "label": "Price Lists",
+                "action_type": "history_activity_view",
                 "required_selection": "entity",
             },
             {
                 "tertiary_key": "products",
                 "label": "Products",
                 "action_type": "detail_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "vendors",
-                "label": "Vendors",
-                "action_type": "detail_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "knowledge",
-                "label": "Knowledge",
-                "action_type": "detail_view",
                 "required_selection": None,
+            },
+            {
+                "tertiary_key": "transactions",
+                "label": "Transactions",
+                "action_type": "history_activity_view",
+                "required_selection": "entity",
             },
             {
                 "tertiary_key": "activity",
@@ -6805,14 +6839,14 @@ def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "action_type": "history_activity_view",
                 "required_selection": None,
             },
-        ],
-        "products": [
             {
-                "tertiary_key": "add",
-                "label": "Add",
-                "action_type": "create_action",
-                "required_selection": None,
+                "tertiary_key": "archive",
+                "label": "Archive",
+                "action_type": "edit_action",
+                "required_selection": "entity",
             },
+        ],
+        "manufacturers": [
             {
                 "tertiary_key": "browse",
                 "label": "Browse",
@@ -6820,39 +6854,33 @@ def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": None,
             },
             {
-                "tertiary_key": "edit",
-                "label": "Edit",
-                "action_type": "edit_action",
+                "tertiary_key": "add",
+                "label": "Add",
+                "action_type": "create_action",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "details",
+                "label": "Details",
+                "action_type": "detail_view",
                 "required_selection": "entity",
             },
             {
-                "tertiary_key": "relationships",
-                "label": "Relationships",
+                "tertiary_key": "default_vendor",
+                "label": "Default Vendor",
                 "action_type": "relationship_view",
                 "required_selection": "entity",
             },
             {
-                "tertiary_key": "vendor_offerings",
-                "label": "Vendor Offerings",
+                "tertiary_key": "contacts",
+                "label": "Contacts",
                 "action_type": "detail_view",
                 "required_selection": "entity",
             },
             {
-                "tertiary_key": "commercial_history",
-                "label": "Commercial History",
-                "action_type": "history_activity_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "import",
-                "label": "Import",
-                "action_type": "import_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "export",
-                "label": "Export",
-                "action_type": "export_action",
+                "tertiary_key": "products",
+                "label": "Products",
+                "action_type": "detail_view",
                 "required_selection": None,
             },
             {
@@ -6861,8 +6889,44 @@ def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "action_type": "history_activity_view",
                 "required_selection": None,
             },
+            {
+                "tertiary_key": "archive",
+                "label": "Archive",
+                "action_type": "edit_action",
+                "required_selection": "entity",
+            },
         ],
-        "services": [
+        "catalog": [
+            {
+                "tertiary_key": "products",
+                "label": "Products",
+                "action_type": "detail_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "services",
+                "label": "Services",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "fees",
+                "label": "Fees",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "assemblies",
+                "label": "Assemblies",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
+            {
+                "tertiary_key": "browse",
+                "label": "Browse",
+                "action_type": "collection_view",
+                "required_selection": None,
+            },
             {
                 "tertiary_key": "add",
                 "label": "Add",
@@ -6870,147 +6934,9 @@ def _knowledge_secondary_templates() -> dict[str, list[dict[str, Any]]]:
                 "required_selection": None,
             },
             {
-                "tertiary_key": "browse",
-                "label": "Browse",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "edit",
-                "label": "Edit",
-                "action_type": "edit_action",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "relationships",
-                "label": "Relationships",
-                "action_type": "relationship_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "lifecycle_usage",
-                "label": "Lifecycle Usage",
-                "action_type": "detail_view",
-                "required_selection": "entity",
-            },
-            {
                 "tertiary_key": "import",
                 "label": "Import",
                 "action_type": "import_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "export",
-                "label": "Export",
-                "action_type": "export_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "activity",
-                "label": "Activity",
-                "action_type": "history_activity_view",
-                "required_selection": None,
-            },
-        ],
-        "price_lists": [
-            {
-                "tertiary_key": "browse",
-                "label": "Browse",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "import",
-                "label": "Import",
-                "action_type": "import_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "drafts",
-                "label": "Drafts",
-                "action_type": "operational_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "import_history",
-                "label": "Import History",
-                "action_type": "history_activity_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "change_reports",
-                "label": "Change Reports",
-                "action_type": "history_activity_view",
-                "required_selection": None,
-            },
-        ],
-        "imports": [
-            {
-                "tertiary_key": "new_import",
-                "label": "New Import",
-                "action_type": "import_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "pending",
-                "label": "Pending",
-                "action_type": "operational_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "completed",
-                "label": "Completed",
-                "action_type": "history_activity_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "rejected_rows",
-                "label": "Rejected Rows",
-                "action_type": "history_activity_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "activity",
-                "label": "Activity",
-                "action_type": "history_activity_view",
-                "required_selection": None,
-            },
-        ],
-        "assemblies": [
-            {
-                "tertiary_key": "add",
-                "label": "Add",
-                "action_type": "create_action",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "browse",
-                "label": "Browse",
-                "action_type": "collection_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "edit",
-                "label": "Edit",
-                "action_type": "edit_action",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "components",
-                "label": "Components",
-                "action_type": "detail_view",
-                "required_selection": "entity",
-            },
-            {
-                "tertiary_key": "preview",
-                "label": "Preview",
-                "action_type": "detail_view",
-                "required_selection": None,
-            },
-            {
-                "tertiary_key": "versions",
-                "label": "Versions",
-                "action_type": "history_activity_view",
                 "required_selection": None,
             },
             {
@@ -7266,15 +7192,9 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
         templates = _knowledge_secondary_templates()
         sections = [
             ("customers", "Customers"),
-            ("contacts", "Contacts"),
-            ("locations", "Locations"),
             ("vendors", "Vendors"),
             ("manufacturers", "Manufacturers"),
-            ("products", "Products"),
-            ("services", "Services"),
-            ("price_lists", "Price Lists"),
-            ("imports", "Imports"),
-            ("assemblies", "Assemblies"),
+            ("catalog", "Catalog"),
         ]
         transaction_sections: list[dict[str, Any]] = []
         for secondary_key, label in sections:
@@ -7714,20 +7634,21 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
 def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
     if primary == "Knowledge":
         page_map = {
-            "Knowledge": "landing",
+            "Knowledge": "customers",
             "Customers": "customers",
-            "Contacts": "contacts",
-            "Locations": "locations",
+            "Contacts": "customers",
+            "Locations": "customers",
             "Vendors": "vendors",
             "Manufacturers": "manufacturers",
-            "Products": "products",
-            "Services": "services",
-            "Price Lists": "price_lists",
-            "Imports": "imports",
-            "Import History": "imports",
-            "Assemblies": "assemblies",
+            "Products": "catalog",
+            "Services": "catalog",
+            "Price Lists": "vendors",
+            "Imports": "catalog",
+            "Import History": "catalog",
+            "Assemblies": "catalog",
+            "Catalog": "catalog",
         }
-        return page_map.get(page, "overview")
+        return page_map.get(page, "customers")
 
     if primary != "Projects":
         if primary == "Transactions":
@@ -7838,14 +7759,7 @@ def _sync_workspace_navigation_state(
         and page == "Knowledge"
         and selection_kind in _knowledge_selection_kinds()
     ):
-        derived_secondary = _safe_text(
-            _secondary_key_for_page(
-                "Knowledge",
-                "application",
-                _knowledge_tertiary_page_for_kind(selection_kind),
-            ),
-            derived_secondary,
-        )
+        derived_secondary = _knowledge_secondary_key_for_kind(selection_kind)
     if derived_secondary and not (primary == "Transactions" and page == "Transactions"):
         active_secondary = derived_secondary
 
@@ -10276,11 +10190,12 @@ def _open_search_reference(
             _set_knowledge_navigation_selection(st, kind=selection_kind)
             st.session_state[_navigation_primary_state_key()] = "Knowledge"
             st.session_state[_navigation_mode_state_key()] = "application"
-            st.session_state[_navigation_secondary_state_key()] = _safe_text(
-                _secondary_key_for_page("Knowledge", "application", "Knowledge"),
-                "overview",
+            st.session_state[_navigation_secondary_state_key()] = (
+                _knowledge_secondary_key_for_kind(selection_kind)
             )
-            st.session_state[_navigation_tertiary_state_key()] = "browse"
+            st.session_state[_navigation_tertiary_state_key()] = (
+                _knowledge_tertiary_page_for_kind(selection_kind)
+            )
         elif selection_kind in {"project", "project_record"}:
             st.session_state[_navigation_primary_state_key()] = "Projects"
             st.session_state[_navigation_mode_state_key()] = "active"
@@ -10318,11 +10233,12 @@ def _open_search_reference(
         )
         st.session_state[_navigation_primary_state_key()] = "Knowledge"
         st.session_state[_navigation_mode_state_key()] = "application"
-        st.session_state[_navigation_secondary_state_key()] = _safe_text(
-            _secondary_key_for_page("Knowledge", "application", route),
-            "overview",
+        st.session_state[_navigation_secondary_state_key()] = (
+            _knowledge_secondary_key_for_kind(selection_kind)
         )
-        st.session_state[_navigation_tertiary_state_key()] = "browse"
+        st.session_state[_navigation_tertiary_state_key()] = (
+            _knowledge_tertiary_page_for_kind(selection_kind)
+        )
     elif route in PROJECTS_LIBRARY_PAGES:
         st.session_state[_navigation_primary_state_key()] = "Projects"
         st.session_state[_navigation_mode_state_key()] = "library"
@@ -11147,53 +11063,7 @@ def _render_application_knowledge_page(
     )
 
     if active_knowledge_view == "Knowledge":
-        _render_section_title(st, "Knowledge")
-        st.caption("Browse reusable entity families.")
-        assembly_state = dict(
-            _estimate_engine_service(st).state.get("assembly_state") or {}
-        )
-        landing_rows: list[tuple[str, int, str]] = [
-            ("Customers", len(customer_entities) + len(project_customers), "customers"),
-            ("Contacts", len(contact_entities), "contacts"),
-            ("Locations", len(location_entities), "locations"),
-            ("Vendors", len(vendor_rows), "vendors"),
-            ("Manufacturers", len(manufacturer_rows), "manufacturers"),
-            ("Products", len(product_rows), "products"),
-            ("Services", len(service_entities), "services"),
-            ("Price Lists", len(uploaded_price_lists), "price_lists"),
-            ("Imports", len(import_history), "imports"),
-            (
-                "Assemblies",
-                len(list((assembly_state.get("assemblies") or {}).values())),
-                "assemblies",
-            ),
-        ]
-        for row_index in range(0, len(landing_rows), 2):
-            landing_group = landing_rows[row_index : row_index + 2]
-            cols = st.columns([1.0] * len(landing_group), gap="small")
-            for index, (label, count, page) in enumerate(landing_group):
-                with cols[index]:
-                    st.caption(f"{count} records")
-                    if st.button(
-                        label,
-                        key=f"atlas_ck_landing_{page}",
-                        width="stretch",
-                    ):
-                        st.session_state["atlas_active_page"] = "Knowledge"
-                        st.session_state[_navigation_primary_state_key()] = "Knowledge"
-                        st.session_state[_navigation_mode_state_key()] = "application"
-                        st.session_state[_navigation_secondary_state_key()] = (
-                            _safe_text(
-                                _secondary_key_for_page(
-                                    "Knowledge", "application", label
-                                ),
-                                "landing",
-                            )
-                        )
-                        st.session_state[_navigation_tertiary_state_key()] = "browse"
-                        _set_knowledge_navigation_selection(st, page=label)
-                        st.rerun()
-        return
+        active_knowledge_view = "Customers"
 
     if active_knowledge_view == "Manufacturers":
         _render_section_title(st, "Manufacturers")
@@ -11363,6 +11233,49 @@ def _render_application_knowledge_page(
                     data=selected_manufacturer,
                     key_prefix="atlas_ck_mfr",
                 )
+                _render_contextual_contacts_and_addresses(
+                    st,
+                    owner_name=_safe_text(
+                        selected_manufacturer.get("canonical_name"),
+                        _safe_text(selected_manufacturer.get("display_name"), ""),
+                    ),
+                    contacts=contact_entities,
+                    locations=location_entities,
+                    key_prefix="atlas_ck_mfr_context",
+                )
+                manufacturer_name = _safe_text(
+                    selected_manufacturer.get("canonical_name"),
+                    _safe_text(selected_manufacturer.get("display_name"), ""),
+                )
+                related_offers = [
+                    item
+                    for item in vendor_offers
+                    if manufacturer_name.lower()
+                    in _safe_text(item.get("manufacturer"), "").lower()
+                ]
+                with st.expander("Default Vendor", expanded=False):
+                    if not related_offers:
+                        st.caption(
+                            "No default vendor relationship is established from existing vendor offerings."
+                        )
+                    else:
+                        st.dataframe(
+                            [
+                                {
+                                    "Vendor": _safe_text(item.get("vendor"), ""),
+                                    "Vendor SKU": _safe_text(
+                                        item.get("vendor_sku"), ""
+                                    ),
+                                    "Channel": _safe_text(
+                                        item.get("purchasing_channel"), ""
+                                    ),
+                                    "Active": bool(item.get("active", True)),
+                                }
+                                for item in related_offers[:100]
+                            ],
+                            width="stretch",
+                            hide_index=True,
+                        )
 
             st.dataframe(
                 [
@@ -11548,6 +11461,25 @@ def _render_application_knowledge_page(
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Unable to restore vendor: {exc}")
+                _render_contextual_contacts_and_addresses(
+                    st,
+                    owner_name=_safe_text(
+                        selected_vendor.get("canonical_name"),
+                        _safe_text(selected_vendor.get("display_name"), ""),
+                    ),
+                    contacts=contact_entities,
+                    locations=location_entities,
+                    key_prefix="atlas_ck_vendor_context",
+                )
+                _render_vendor_price_lists(
+                    st,
+                    vendor_name=_safe_text(
+                        selected_vendor.get("canonical_name"),
+                        _safe_text(selected_vendor.get("display_name"), ""),
+                    ),
+                    uploaded_price_lists=uploaded_price_lists,
+                    vendor_offers=vendor_offers,
+                )
 
             st.dataframe(
                 [
@@ -11722,6 +11654,16 @@ def _render_application_knowledge_page(
                     entity_kind="customer",
                     data=selected_customer,
                     key_prefix="atlas_ck_customer",
+                )
+                _render_contextual_contacts_and_addresses(
+                    st,
+                    owner_name=_safe_text(
+                        selected_customer.get("canonical_name"),
+                        _safe_text(selected_customer.get("display_name"), ""),
+                    ),
+                    contacts=contact_entities,
+                    locations=location_entities,
+                    key_prefix="atlas_ck_customer_context",
                 )
 
             customer_search = st.text_input(
@@ -12991,6 +12933,68 @@ def _render_application_knowledge_page(
                         ),
                     }
                     for item in visible
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
+    if active_knowledge_view == "Fees":
+        st.markdown("### Fees")
+        fee_cols = st.columns(4)
+        fee_code = fee_cols[0].text_input("Fee Code", key="atlas_ck_fee_code")
+        fee_name = fee_cols[1].text_input("Fee Name", key="atlas_ck_fee_name")
+        fee_price = fee_cols[2].number_input(
+            "Default Price",
+            min_value=0.0,
+            value=0.0,
+            step=1.0,
+            key="atlas_ck_fee_default_price",
+        )
+        fee_tax_category = fee_cols[3].text_input(
+            "Tax Category",
+            value="standard",
+            key="atlas_ck_fee_tax_category",
+        )
+        fee_description = st.text_input(
+            "Fee Description", key="atlas_ck_fee_description"
+        )
+        if st.button("Create Fee", key="atlas_ck_create_fee", width="stretch"):
+            try:
+                commercial_service.upsert_catalog_item(
+                    catalog_item_id=None,
+                    item_type="fee",
+                    code=fee_code,
+                    name=fee_name,
+                    description=fee_description,
+                    default_sales_price=float(fee_price),
+                    tax_category=fee_tax_category,
+                    source="knowledge_catalog",
+                )
+                _save_commercial_knowledge_state(st, commercial_service)
+                st.success("Fee created.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to create fee: {exc}")
+
+        fee_rows = commercial_service.list_catalog_items(
+            item_type="fee", include_archived=True
+        )
+        if not fee_rows:
+            st.caption("No fee catalog items are defined.")
+        else:
+            st.dataframe(
+                [
+                    {
+                        "Code": _safe_text(item.get("code"), ""),
+                        "Fee": _safe_text(item.get("name"), ""),
+                        "Default Price": _safe_text(
+                            item.get("default_sales_price"), ""
+                        ),
+                        "Tax Category": _safe_text(item.get("tax_category"), ""),
+                        "Status": _safe_text(item.get("status"), ""),
+                        "Archived": bool(item.get("archived", False)),
+                    }
+                    for item in fee_rows
                 ],
                 width="stretch",
                 hide_index=True,

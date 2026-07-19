@@ -39,6 +39,7 @@ Atlas Workspace Alpha UI Cleanup (Responsive Navigation and Estimate Creation UX
 Atlas Workspace Alpha UI Cleanup (Header Consolidation and Copy Reduction) consolidates the shell to one shared header row of fixed-width controls (Atlas, Transactions, Projects, Knowledge, Reports, Settings, Search), routes navigation through the current Streamlit session, removes redundant tenant-facing shell metadata and repeated descriptive page copy, and preserves continuity-critical object breadcrumbs.
 Atlas Workspace Alpha UI Cleanup (Navigation Simplification and Functional Knowledge Links) removes the burger/menu shell, simplifies Transactions to active and deferred family lists without overview/status-card noise, and restores direct same-window Knowledge workspaces for Vendors, Manufacturers, Products, and Services.
 Atlas Workspace Alpha UI Cleanup (Accordion Navigation Refinement) keeps primary header navigation unchanged while moving tertiary actions into the left secondary navigation column as a deterministic accordion, removing the duplicate tertiary row above page content.
+Atlas Workspace Knowledge Refinement consolidates Knowledge around Customers, Vendors, Manufacturers, and Catalog; removes duplicate central entity-family navigation; moves Price Lists under Vendors; and treats Contacts, Addresses, Imports, and Assemblies as contextual tertiary/catalog surfaces.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.

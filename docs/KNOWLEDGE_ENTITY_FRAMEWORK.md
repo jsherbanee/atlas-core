@@ -87,6 +87,12 @@ The Knowledge workspace now supports:
 - global search object references for customer/service entity records
 - reusable Knowledge secondary and tertiary navigation state for deterministic search handoff and future workspace reuse
 
+Knowledge consolidation note:
+- visible Knowledge secondary navigation is limited to Customers, Vendors, Manufacturers, and Catalog
+- Contact and Location entities remain supported compatibility objects but are managed contextually under customer, vendor, manufacturer, and tenant organization surfaces
+- Price Lists and Imports remain preserved compatibility data but are reached through Vendor Price Lists, Catalog provenance/import, and entity activity/history instead of standalone Knowledge secondary routes
+- Catalog is the business workspace for reusable Products, Services, Fees, and Assemblies
+
 X-12 navigation note:
 - Knowledge is the first workspace to use the reusable three-level navigation contract while preserving the existing entity workflows and deterministic state model.
 

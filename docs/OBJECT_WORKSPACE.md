@@ -89,6 +89,11 @@ Primary migrated object families:
 - Location
 - Project
 
+Knowledge consolidation note:
+- Customer, Vendor, Manufacturer, Product, Service, Contact, Location, and Project object adapters remain supported.
+- Contacts and Locations are no longer standalone visible Knowledge secondary routes, but search and Working Set handoff still preserve their Universal Object compatibility.
+- Catalog objects continue to open through Knowledge/Object Workspace handoff without introducing new entity authorities.
+
 Read-only object-workspace compatibility families:
 - Drawing
 - Specification

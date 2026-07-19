@@ -47,3 +47,8 @@ Registry identity supports deterministic grouping for:
 
 K-02 implementation note:
 - Manufacturer records continue to synchronize into the shared Knowledge Entity Framework, and now participate in the same operational lifecycle semantics (active/archive/restore) used across core knowledge entities.
+
+Knowledge consolidation note:
+- Manufacturers appear as a visible Knowledge secondary workspace for product identity, support, contacts, products, activity, and archive/restore.
+- Default Vendor is represented from existing vendor-offering and relationship data where available.
+- Manufacturers do not own purchasing price lists, procurement workflows, or direct-buy behavior in the Knowledge workspace.

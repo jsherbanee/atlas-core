@@ -18,6 +18,12 @@ K-02 integration note:
 - Core commercial identities (manufacturer, vendor, product, service) are synchronized with the shared Knowledge Entity Framework so operational knowledge workflows and commercial state remain deterministic and aligned.
 - Shared Knowledge workspaces now expose same-window browse/add/edit/archive/restore flows for vendors, manufacturers, products, and services without duplicating CRUD services.
 
+Knowledge consolidation note:
+- Vendors are the Knowledge workspace home for price-list visibility and vendor-offering context.
+- Manufacturers remain product identity and support references; they do not own purchasing price lists.
+- Catalog owns reusable sellable Products, Services, Fees, and Assemblies for transaction insertion.
+- Contacts, addresses, import history, and price-list provenance remain preserved as contextual record data rather than standalone Knowledge secondary workspaces.
+
 ## Architectural Rule
 Products do not own prices.
 

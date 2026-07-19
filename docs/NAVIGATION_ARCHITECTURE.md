@@ -135,3 +135,13 @@ Implemented behavior:
 - the separate tertiary action row above main content is removed
 - stale secondary selections are reset to the current workspace contract when switching primary workspaces
 - search and return-context handoff continue using the existing primary/secondary/tertiary session-state keys
+
+## Knowledge Consolidation
+
+Knowledge visible secondary navigation is now:
+- Customers
+- Vendors
+- Manufacturers
+- Catalog
+
+Contacts, Locations, Price Lists, Imports, and Assemblies are removed from visible secondary navigation while their data remains reachable through contextual tertiary actions, vendor price-list surfaces, catalog import/provenance/activity, and Universal Object handoff.

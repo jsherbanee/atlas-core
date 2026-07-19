@@ -3,6 +3,11 @@
 ## Scope
 Sprint C-03 introduces a tenant-scoped commercial catalog foundation that supports Product, Service, Fee, and Assembly item types with deterministic pricing/tax behavior and import provenance.
 
+Knowledge workspace note:
+- Catalog is the visible Knowledge secondary section for Products, Services, Fees, and Assemblies.
+- Assemblies remain catalog items and are not a standalone Knowledge secondary route.
+- Catalog import and activity surfaces preserve CSV, XLSX, PDF, provenance, diagnostics, and immutable version history without moving assembly logic into Transactions.
+
 ## Catalog Item Model
 Catalog items include:
 - stable catalog ID and code

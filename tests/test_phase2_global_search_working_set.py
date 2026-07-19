@@ -125,7 +125,9 @@ class _HomeContractStreamlit:
         index: int = 0,
         **kwargs: Any,
     ) -> Any:
-        self.selectbox_calls.append({"label": label, "options": list(options), **kwargs})
+        self.selectbox_calls.append(
+            {"label": label, "options": list(options), **kwargs}
+        )
         if not options:
             return ""
         if 0 <= index < len(options):
@@ -898,7 +900,8 @@ def test_transactions_navigation_contract_uses_expected_order_and_labels() -> No
     assert all(
         item["enabled"] is False
         for item in contract
-        if item["secondary_key"] in {"purchase_orders", "vendor_quotes", "receiving", "vendor_bills"}
+        if item["secondary_key"]
+        in {"purchase_orders", "vendor_quotes", "receiving", "vendor_bills"}
     )
 
 
@@ -907,41 +910,39 @@ def test_knowledge_navigation_contract_is_flat_and_ordered() -> None:
 
     assert [item["secondary_key"] for item in contract] == [
         "customers",
-        "contacts",
-        "locations",
         "vendors",
         "manufacturers",
-        "products",
-        "services",
-        "price_lists",
-        "imports",
-        "assemblies",
+        "catalog",
     ]
     assert [item["label"] for item in contract] == [
         "Customers",
-        "Contacts",
-        "Locations",
         "Vendors",
         "Manufacturers",
-        "Products",
-        "Services",
-        "Price Lists",
-        "Imports",
-        "Assemblies",
+        "Catalog",
+    ]
+    catalog = next(item for item in contract if item["secondary_key"] == "catalog")
+    assert [item["tertiary_key"] for item in catalog["supported_tertiary_actions"]] == [
+        "products",
+        "services",
+        "fees",
+        "assemblies",
+        "browse",
+        "add",
+        "import",
+        "activity",
     ]
 
 
-def test_knowledge_landing_renders_compact_family_actions() -> None:
+def test_knowledge_landing_does_not_render_duplicate_family_actions() -> None:
     st = _HomeContractStreamlit()
 
     app._render_application_knowledge_page(st, _FakeWorkspaceService([]))
 
     rendered_labels = [call["label"] for call in st.button_calls]
-    assert "Customers" in rendered_labels
-    assert "Vendors" in rendered_labels
-    assert "Manufacturers" in rendered_labels
-    assert "Products" in rendered_labels
-    assert "Services" in rendered_labels
+    assert "Customers" not in rendered_labels
+    assert "Vendors" not in rendered_labels
+    assert "Manufacturers" not in rendered_labels
+    assert "Catalog" not in rendered_labels
     assert all("Knowledge Area" not in item for item in st.markdowns)
     assert all("Why It Matters" not in item for item in st.markdowns)
 
@@ -1017,6 +1018,46 @@ def test_knowledge_entity_workspaces_render_crud_actions(
     assert expected_labels <= rendered_labels
 
 
+def test_hidden_knowledge_pages_route_to_contextual_secondary_sections() -> None:
+    assert (
+        app._secondary_key_for_page("Knowledge", "application", "Contacts")
+        == "customers"
+    )
+    assert (
+        app._secondary_key_for_page("Knowledge", "application", "Locations")
+        == "customers"
+    )
+    assert (
+        app._secondary_key_for_page("Knowledge", "application", "Price Lists")
+        == "vendors"
+    )
+    assert (
+        app._secondary_key_for_page("Knowledge", "application", "Assemblies")
+        == "catalog"
+    )
+    assert (
+        app._secondary_key_for_page("Knowledge", "application", "Catalog") == "catalog"
+    )
+
+
+def test_catalog_fees_route_to_fee_workspace() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "catalog",
+            app._navigation_tertiary_state_key(): "fees",
+        }
+    )
+
+    app._render_application_knowledge_page(st, _FakeWorkspaceService([]))
+
+    assert "### Fees" in st.markdowns
+    assert any(call["label"] == "Create Fee" for call in st.button_calls)
+
+
 def test_transactions_workspace_source_omits_overview_status_cards() -> None:
     source = inspect.getsource(app._render_transactions_workspace_page)
 
@@ -1043,8 +1084,8 @@ def test_knowledge_navigation_defaults_seed_secondary_and_tertiary_state() -> No
 
     app._knowledge_navigation_defaults(st)
 
-    assert st.session_state["atlas_knowledge_secondary_group"] == "Knowledge"
-    assert st.session_state["atlas_knowledge_tertiary_page"] == "Knowledge"
+    assert st.session_state["atlas_knowledge_secondary_group"] == "Customers"
+    assert st.session_state["atlas_knowledge_tertiary_page"] == "Browse"
 
 
 def test_knowledge_navigation_selection_maps_entity_kinds() -> None:
@@ -1052,8 +1093,8 @@ def test_knowledge_navigation_selection_maps_entity_kinds() -> None:
 
     app._set_knowledge_navigation_selection(st, kind="manufacturer")
 
-    assert st.session_state["atlas_knowledge_secondary_group"] == "Knowledge"
-    assert st.session_state["atlas_knowledge_tertiary_page"] == "Manufacturers"
+    assert st.session_state["atlas_knowledge_secondary_group"] == "Manufacturers"
+    assert st.session_state["atlas_knowledge_tertiary_page"] == "browse"
 
 
 def test_context_selection_populates_project_object_state() -> None:
@@ -1977,8 +2018,8 @@ def test_open_search_reference_sets_knowledge_navigation_state() -> None:
     app._open_search_reference(st, service, reference)
 
     assert st.session_state["atlas_active_page"] == "Object Workspace"
-    assert st.session_state["atlas_knowledge_secondary_group"] == "Knowledge"
-    assert st.session_state["atlas_knowledge_tertiary_page"] == "Vendors"
+    assert st.session_state["atlas_knowledge_secondary_group"] == "Vendors"
+    assert st.session_state["atlas_knowledge_tertiary_page"] == "browse"
     assert st.session_state["atlas_context_selection"]["kind"] == "vendor"
     assert st.session_state["atlas_return_context"]["source_route"] == "Mission Control"
     assert st.rerun_called is True

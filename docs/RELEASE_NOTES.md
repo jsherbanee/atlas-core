@@ -32,6 +32,8 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Transactions overview and summary/status-card surfaces are removed so the page stays focused on family navigation, a concise empty state, and the primary add action.
 - Knowledge navigation is flattened into a single family list and the functional Vendor, Manufacturer, Product, and Service workspaces now open in the same window.
 - Knowledge landing and summary/status-card surfaces are removed so the default landing view stays concise.
+- Knowledge secondary navigation is consolidated to Customers, Vendors, Manufacturers, and Catalog; Contacts, Addresses, Price Lists, Imports, and Assemblies now appear contextually under the relevant record or catalog surface.
+- Catalog now exposes Products, Services, Fees, Assemblies, Browse, Add, Import, and Activity as contextual tertiary actions without adding procurement, inventory, or CRM workflows.
 - Tenant-facing estimate creation intentionally excludes Vendor ID to reduce non-estimate data noise in the add flow.
 - Projects library overview navigation is denser and less duplicative, with operational actions consolidated into contextual actions.
 - Knowledge and Reports application-level wording now emphasizes user-facing data health and output readiness instead of implementation-facing language.

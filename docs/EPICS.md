@@ -118,6 +118,7 @@ Explicitly out of scope:
 ### U-02 Scope
 
 - perform a comprehensive usability and consistency pass across primary application workspaces (Home, Projects, Lifecycle-related project surfaces, Transactions, Knowledge, Reports, Settings)
+- consolidate Knowledge around Customers, Vendors, Manufacturers, and Catalog while preserving existing entity, search, Universal Object, and commercial catalog authorities
 - tighten secondary/tertiary navigation clarity and action-language consistency
 - ensure pages expose clear purpose, clear primary actions, shared design-system framing, and guided empty-state behavior
 - remove prototype/development-facing labels and redundant control language in user-facing UI
