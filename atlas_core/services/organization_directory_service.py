@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from atlas_core.domain import Organization, OrganizationRole, ProjectStakeholder
+from atlas_core.domain import (
+    Organization,
+    OrganizationRole,
+    ProjectStakeholder,
+    parse_organization_role,
+)
 
 BUSINESS_ORGANIZATION_ROLES = {
     OrganizationRole.CUSTOMER,
@@ -323,9 +328,9 @@ class OrganizationDirectoryService:
         if organization is None:
             raise ValueError("Primary organization not found")
         organization.supported_roles = [
-            OrganizationRole(role)
+            parse_organization_role(role)
             for role in list(preview.get("roles_after") or [])
-            if role in {item.value for item in OrganizationRole}
+            if _role_can_parse(role)
         ]
         organization.role_profiles = dict(preview.get("role_profiles_after") or {})
         organization.aliases = sorted(
@@ -476,10 +481,21 @@ def normalize_name(value: str) -> str:
 
 
 def _coerce_business_role(value: Any) -> OrganizationRole | None:
-    text = str(value or "").strip().lower()
-    if text in {role.value for role in BUSINESS_ORGANIZATION_ROLES}:
-        return OrganizationRole(text)
+    try:
+        role = parse_organization_role(value)
+    except ValueError:
+        return None
+    if role in BUSINESS_ORGANIZATION_ROLES:
+        return role
     return None
+
+
+def _role_can_parse(value: Any) -> bool:
+    try:
+        parse_organization_role(value)
+    except ValueError:
+        return False
+    return True
 
 
 def _merge_profile(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:

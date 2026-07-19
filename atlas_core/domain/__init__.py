@@ -38,6 +38,7 @@ from atlas_core.domain.organization import (
     Organization,
     OrganizationRole,
     ProjectStakeholder,
+    parse_organization_role,
 )
 from atlas_core.domain.project_lifecycle import ProjectLifecycleEvent
 from atlas_core.domain.purchase_order import (
@@ -260,6 +261,7 @@ __all__ = [
     "Organization",
     "OrganizationRole",
     "ProjectStakeholder",
+    "parse_organization_role",
     "ProjectLifecycleEvent",
     "EstimateBaseline",
     "EstimateBaselineStatus",

@@ -22,6 +22,22 @@ class OrganizationRole(str, Enum):
     OTHER = "other"
 
 
+def parse_organization_role(value: Any) -> OrganizationRole:
+    if isinstance(value, OrganizationRole):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError("organization role cannot be blank")
+    by_value = {item.value: item for item in OrganizationRole}
+    if text in by_value:
+        return by_value[text]
+    by_name = {item.name: item for item in OrganizationRole}
+    upper_text = text.upper()
+    if upper_text in by_name:
+        return by_name[upper_text]
+    raise ValueError(f"unknown organization role: {text}")
+
+
 @dataclass
 class Organization:
     organization_id: str
@@ -115,9 +131,9 @@ class Organization:
             display_name=resolved_display,
             normalized_name=normalized_name or _normalize_name(resolved_canonical),
             supported_roles=[
-                OrganizationRole(str(item))
+                parse_organization_role(item)
                 for item in list(payload.get("supported_roles") or [])
-                if str(item) in {role.value for role in OrganizationRole}
+                if _role_can_parse(item)
             ],
             website=_optional_text(payload.get("website")),
             phone=_optional_text(payload.get("phone")),
@@ -204,8 +220,8 @@ class ProjectStakeholder:
     def from_dict(cls, payload: dict[str, Any]) -> "ProjectStakeholder":
         role_text = str(payload.get("role") or OrganizationRole.OTHER.value)
         role = (
-            OrganizationRole(role_text)
-            if role_text in {item.value for item in OrganizationRole}
+            parse_organization_role(role_text)
+            if _role_can_parse(role_text)
             else OrganizationRole.OTHER
         )
         return cls(
@@ -229,6 +245,14 @@ def _optional_text(value: Any) -> str | None:
         return None
     normalized = value.strip()
     return normalized or None
+
+
+def _role_can_parse(value: Any) -> bool:
+    try:
+        parse_organization_role(value)
+    except ValueError:
+        return False
+    return True
 
 
 def _normalize_name(value: str) -> str:

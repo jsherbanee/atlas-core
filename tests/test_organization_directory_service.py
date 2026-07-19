@@ -56,3 +56,31 @@ def test_project_stakeholder_linking_supports_multi_role_reuse(tmp_path: Path) -
         OrganizationRole.OWNER_CLIENT.value,
         OrganizationRole.ENGINEER.value,
     }
+
+
+def test_merge_preview_accepts_legacy_uppercase_business_role(tmp_path: Path) -> None:
+    service = OrganizationDirectoryService(tmp_path / "AtlasProjects")
+    org = service.create_organization(
+        name="Unified Business",
+        role=OrganizationRole.CUSTOMER,
+        tenant_id="local",
+        organization_scope_id="atlas",
+        role_profiles={"customer": {"identifiers": ["CUST-1"]}},
+    )
+
+    preview = service.preview_merge(
+        primary_organization_id=org.organization_id,
+        source_organizations=[
+            {
+                "source_entity_id": "vendor:VEND-1",
+                "role": "VENDOR",
+                "display_name": "Unified Business Supply",
+                "profile": {"identifiers": ["VEND-1"]},
+            }
+        ],
+        tenant_id="local",
+        organization_scope_id="atlas",
+    )
+
+    assert preview["roles_after"] == ["customer", "vendor"]
+    assert preview["role_profiles_after"]["vendor"]["identifiers"] == ["VEND-1"]

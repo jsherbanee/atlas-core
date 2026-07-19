@@ -34,6 +34,7 @@ from atlas_core.domain import (
     OrganizationRole,
     Project,
     ProjectStatus,
+    parse_organization_role,
 )
 from atlas_core.domain.commercial_document import (
     ApprovalState,
@@ -35128,7 +35129,7 @@ def _render_settings_page(
             options=role_options,
             key=f"atlas_settings_stakeholder_role_{record.workspace_id}",
         )
-        selected_role = OrganizationRole(selected_role_value)
+        selected_role = parse_organization_role(selected_role_value)
         lookup_query = st.text_input(
             "Search existing organizations",
             key=f"atlas_settings_stakeholder_lookup_{record.workspace_id}",

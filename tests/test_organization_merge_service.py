@@ -1,7 +1,9 @@
 from pathlib import Path
+import importlib
 
 import pytest
 
+from atlas_core.domain import Organization, OrganizationRole, parse_organization_role
 from atlas_core.services.master_library import CommercialProductService
 from atlas_core.services.organization_directory_service import (
     OrganizationDirectoryService,
@@ -20,6 +22,53 @@ def _merge_service(
         tenant_id="local",
         organization_scope_id="atlas",
     )
+
+
+def test_merge_service_and_streamlit_app_import_safely() -> None:
+    merge_module = importlib.import_module(
+        "atlas_core.services.organization_merge_service"
+    )
+    app_module = importlib.import_module("apps.phase2_review_app")
+
+    assert merge_module.ROLE_ENTITY_TYPES["customer"] is OrganizationRole.CUSTOMER
+    assert hasattr(app_module, "_render_organization_merge_controls")
+
+
+def test_authoritative_business_role_members_and_serialized_values() -> None:
+    assert OrganizationRole.CUSTOMER.value == "customer"
+    assert OrganizationRole.VENDOR.value == "vendor"
+    assert OrganizationRole.MANUFACTURER.value == "manufacturer"
+    assert parse_organization_role("customer") is OrganizationRole.CUSTOMER
+    assert parse_organization_role("CUSTOMER") is OrganizationRole.CUSTOMER
+    assert parse_organization_role("vendor") is OrganizationRole.VENDOR
+    assert parse_organization_role("VENDOR") is OrganizationRole.VENDOR
+    assert parse_organization_role("manufacturer") is OrganizationRole.MANUFACTURER
+    assert parse_organization_role("MANUFACTURER") is OrganizationRole.MANUFACTURER
+    with pytest.raises(ValueError):
+        parse_organization_role("customer_vendor")
+
+
+def test_organization_deserializes_lowercase_and_uppercase_role_representations() -> (
+    None
+):
+    organization = Organization.from_dict(
+        {
+            "organization_id": "org-test",
+            "canonical_name": "Role Test",
+            "supported_roles": ["customer", "VENDOR", "MANUFACTURER"],
+        }
+    )
+
+    assert organization.supported_roles == [
+        OrganizationRole.CUSTOMER,
+        OrganizationRole.VENDOR,
+        OrganizationRole.MANUFACTURER,
+    ]
+    assert organization.to_dict()["supported_roles"] == [
+        "customer",
+        "vendor",
+        "manufacturer",
+    ]
 
 
 def test_same_role_customer_merge_redirects_legacy_record_and_reassigns_relationships(
@@ -90,6 +139,16 @@ def test_same_role_customer_merge_redirects_legacy_record_and_reassigns_relation
     assert product_service.search_knowledge_entities(
         "Acme Systems West", entity_type="customer", include_inactive=True
     )
+
+
+def test_role_entity_type_mapping_uses_authoritative_enum_members() -> None:
+    from atlas_core.services.organization_merge_service import ROLE_ENTITY_TYPES
+
+    assert ROLE_ENTITY_TYPES == {
+        "customer": OrganizationRole.CUSTOMER,
+        "vendor": OrganizationRole.VENDOR,
+        "manufacturer": OrganizationRole.MANUFACTURER,
+    }
 
 
 def test_cross_role_organization_consolidation_preserves_role_identifiers(
