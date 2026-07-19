@@ -121,3 +121,17 @@ W-01 implementation note:
 - transaction deferred-route visibility and standalone Change Order removal are regression-covered
 - settings deferred-section disable behavior and platform-diagnostic scoping are regression-covered
 - The implementation is covered by app-level regression tests and full-suite validation
+
+## Accordion Navigation Refinement
+
+The shared workspace shell now presents secondary and tertiary navigation as a
+left-column accordion.
+
+Implemented behavior:
+- primary header navigation remains unchanged
+- the selected secondary section expands in the left column
+- tertiary actions render directly beneath the active secondary section
+- inactive secondary sections remain collapsed
+- the separate tertiary action row above main content is removed
+- stale secondary selections are reset to the current workspace contract when switching primary workspaces
+- search and return-context handoff continue using the existing primary/secondary/tertiary session-state keys

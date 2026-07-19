@@ -1,5 +1,7 @@
 """Atlas Workspace v1.5 project-centric shell for Phase 2 review outputs."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -14,8 +16,13 @@ from pathlib import Path
 import platform
 import re
 import subprocess
+import sys
 import traceback
 from typing import Any, Callable
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from atlas_core import __version__
 from atlas_core.domain import (
@@ -7851,9 +7858,11 @@ def _sync_workspace_navigation_state(
         None,
     )
     if section is None:
-        st.session_state[_navigation_secondary_state_key()] = active_secondary
-        st.session_state[_navigation_tertiary_state_key()] = "landing"
-        return
+        section = next(
+            (item for item in sections if bool(item.get("enabled", True))),
+            sections[0],
+        )
+        active_secondary = _safe_text(section.get("secondary_key"), "")
     st.session_state[_navigation_secondary_state_key()] = _safe_text(
         section.get("secondary_key"),
         "",
@@ -7890,6 +7899,135 @@ def _tertiary_action_requires_selection(
     return False
 
 
+def _visible_tertiary_actions(
+    st: Any,
+    section: dict[str, Any],
+    record: ProjectWorkspaceRecord | None,
+) -> list[dict[str, Any]]:
+    actions = [
+        item
+        for item in list(section.get("supported_tertiary_actions") or [])
+        if bool(item.get("visibility", True))
+    ]
+    return [
+        item
+        for item in actions
+        if not _tertiary_action_requires_selection(st, item, record)
+    ]
+
+
+def _default_tertiary_action(section: dict[str, Any]) -> str:
+    actions = list(section.get("supported_tertiary_actions") or [])
+    return _safe_text(
+        section.get("default_tertiary_action"),
+        _safe_text(actions[0].get("tertiary_key"), "") if actions else "",
+    )
+
+
+def _set_navigation_prior_route(st: Any, *, primary: str, mode: str) -> None:
+    st.session_state[_navigation_prior_route_key()] = {
+        "page": _safe_text(st.session_state.get("atlas_active_page"), ""),
+        "workspace": primary,
+        "mode": mode,
+    }
+
+
+def _open_secondary_navigation_section(
+    st: Any,
+    *,
+    primary: str,
+    mode: str,
+    section: dict[str, Any],
+) -> None:
+    st.session_state[_navigation_secondary_state_key()] = _safe_text(
+        section.get("secondary_key"), ""
+    )
+    st.session_state[_navigation_tertiary_state_key()] = _default_tertiary_action(
+        section
+    )
+    _set_navigation_prior_route(st, primary=primary, mode=mode)
+    st.session_state["atlas_active_page"] = _safe_text(
+        section.get("route"),
+        _safe_text(st.session_state.get("atlas_active_page"), "Mission Control"),
+    )
+    st.rerun()
+
+
+def _open_tertiary_navigation_action(
+    st: Any,
+    *,
+    primary: str,
+    mode: str,
+    action: dict[str, Any],
+) -> None:
+    st.session_state[_navigation_tertiary_state_key()] = _safe_text(
+        action.get("tertiary_key"), ""
+    )
+    _set_navigation_prior_route(st, primary=primary, mode=mode)
+    route = _safe_text(action.get("route"), "")
+    if route:
+        st.session_state["atlas_active_page"] = route
+    st.rerun()
+
+
+def _render_secondary_navigation_section(
+    st: Any,
+    *,
+    primary: str,
+    mode: str,
+    section: dict[str, Any],
+    record: ProjectWorkspaceRecord | None,
+) -> None:
+    secondary_key = _safe_text(section.get("secondary_key"), "")
+    section_label = _safe_text(section.get("label"), secondary_key)
+    is_active = secondary_key == _safe_text(
+        st.session_state.get(_navigation_secondary_state_key()),
+        "",
+    )
+    is_enabled = bool(section.get("enabled", True))
+    actions = _visible_tertiary_actions(st, section, record)
+    has_actions = bool(actions)
+    active_marker = "[v]" if is_active and has_actions else "[>]" if has_actions else ""
+    context_marker = " *" if bool(section.get("selected_record_requirement")) else ""
+    label = f"{active_marker} {section_label}{context_marker}".strip()
+    if st.button(
+        label,
+        key=f"atlas_secondary_{primary}_{mode}_{secondary_key}",
+        type="primary" if is_active else "secondary",
+        width="stretch",
+        disabled=not is_enabled,
+    ):
+        _open_secondary_navigation_section(
+            st,
+            primary=primary,
+            mode=mode,
+            section=section,
+        )
+
+    if not is_active:
+        return
+
+    for action in actions:
+        key = _safe_text(action.get("tertiary_key"), "")
+        label = _safe_text(action.get("label"), key)
+        is_tertiary_active = key == _safe_text(
+            st.session_state.get(_navigation_tertiary_state_key()), ""
+        )
+        if st.button(
+            f"   {label}",
+            key=f"atlas_accordion_tertiary_{primary}_{mode}_{secondary_key}_{key}",
+            type="primary" if is_tertiary_active else "secondary",
+            disabled=not bool(action.get("enabled", True)),
+            width="content",
+        ):
+            _open_tertiary_navigation_action(
+                st,
+                primary=primary,
+                mode=mode,
+                action=action,
+            )
+
+
 def _render_workspace_navigation(
     st: Any,
     record: ProjectWorkspaceRecord | None,
@@ -7916,43 +8054,13 @@ def _render_workspace_navigation(
             if group_name:
                 st.caption(group_name)
             for section in section_group:
-                secondary_key = _safe_text(section.get("secondary_key"), "")
-                is_active = secondary_key == _safe_text(
-                    st.session_state.get(_navigation_secondary_state_key()),
-                    "",
+                _render_secondary_navigation_section(
+                    st,
+                    primary=primary,
+                    mode=mode,
+                    section=section,
+                    record=record,
                 )
-                if st.button(
-                    _safe_text(section.get("label"), secondary_key),
-                    key=f"atlas_secondary_{primary}_{mode}_{secondary_key}",
-                    type="primary" if is_active else "secondary",
-                    width="stretch",
-                    disabled=not bool(section.get("enabled", True)),
-                ):
-                    st.session_state[_navigation_secondary_state_key()] = secondary_key
-                    actions = list(section.get("supported_tertiary_actions") or [])
-                    st.session_state[_navigation_tertiary_state_key()] = _safe_text(
-                        section.get("default_tertiary_action"),
-                        (
-                            _safe_text(actions[0].get("tertiary_key"), "")
-                            if actions
-                            else ""
-                        ),
-                    )
-                    st.session_state[_navigation_prior_route_key()] = {
-                        "page": _safe_text(
-                            st.session_state.get("atlas_active_page"), ""
-                        ),
-                        "workspace": primary,
-                        "mode": mode,
-                    }
-                    st.session_state["atlas_active_page"] = _safe_text(
-                        section.get("route"),
-                        _safe_text(
-                            st.session_state.get("atlas_active_page"),
-                            "Mission Control",
-                        ),
-                    )
-                    st.rerun()
 
     with shell_cols[1]:
         section = next(
@@ -7970,51 +8078,6 @@ def _render_workspace_navigation(
             if content_renderer is not None:
                 content_renderer()
             return
-        actions = [
-            item
-            for item in list(section.get("supported_tertiary_actions") or [])
-            if bool(item.get("visibility", True))
-        ]
-        actions = [
-            item
-            for item in actions
-            if not _tertiary_action_requires_selection(st, item, record)
-        ]
-        if actions:
-            row_size = max(1, min(COMPACT_TERTIARY_COLUMNS, len(actions)))
-            for row_index in range(0, len(actions), row_size):
-                action_row = actions[row_index : row_index + row_size]
-                action_cols = st.columns([1.0] * len(action_row), gap="small")
-                for index, action in enumerate(action_row):
-                    key = _safe_text(action.get("tertiary_key"), "")
-                    label = _safe_text(action.get("label"), key)
-                    if action_cols[index].button(
-                        label,
-                        key=f"atlas_tertiary_{primary}_{mode}_{_safe_text(section.get('secondary_key'), '')}_{key}",
-                        type=(
-                            "primary"
-                            if key
-                            == _safe_text(
-                                st.session_state.get(_navigation_tertiary_state_key()),
-                                "",
-                            )
-                            else "secondary"
-                        ),
-                        disabled=not bool(action.get("enabled", True)),
-                        width="stretch",
-                    ):
-                        st.session_state[_navigation_tertiary_state_key()] = key
-                        st.session_state[_navigation_prior_route_key()] = {
-                            "page": _safe_text(
-                                st.session_state.get("atlas_active_page"), ""
-                            ),
-                            "workspace": primary,
-                            "mode": mode,
-                        }
-                        route = _safe_text(action.get("route"), "")
-                        if route:
-                            st.session_state["atlas_active_page"] = route
-                        st.rerun()
 
         if content_renderer is not None:
             content_renderer()
@@ -11086,7 +11149,9 @@ def _render_application_knowledge_page(
     if active_knowledge_view == "Knowledge":
         _render_section_title(st, "Knowledge")
         st.caption("Browse reusable entity families.")
-        assembly_state = dict(_estimate_engine_service(st).state.get("assembly_state") or {})
+        assembly_state = dict(
+            _estimate_engine_service(st).state.get("assembly_state") or {}
+        )
         landing_rows: list[tuple[str, int, str]] = [
             ("Customers", len(customer_entities) + len(project_customers), "customers"),
             ("Contacts", len(contact_entities), "contacts"),
@@ -11097,7 +11162,11 @@ def _render_application_knowledge_page(
             ("Services", len(service_entities), "services"),
             ("Price Lists", len(uploaded_price_lists), "price_lists"),
             ("Imports", len(import_history), "imports"),
-            ("Assemblies", len(list((assembly_state.get("assemblies") or {}).values())), "assemblies"),
+            (
+                "Assemblies",
+                len(list((assembly_state.get("assemblies") or {}).values())),
+                "assemblies",
+            ),
         ]
         for row_index in range(0, len(landing_rows), 2):
             landing_group = landing_rows[row_index : row_index + 2]
@@ -11113,9 +11182,13 @@ def _render_application_knowledge_page(
                         st.session_state["atlas_active_page"] = "Knowledge"
                         st.session_state[_navigation_primary_state_key()] = "Knowledge"
                         st.session_state[_navigation_mode_state_key()] = "application"
-                        st.session_state[_navigation_secondary_state_key()] = _safe_text(
-                            _secondary_key_for_page("Knowledge", "application", label),
-                            "landing",
+                        st.session_state[_navigation_secondary_state_key()] = (
+                            _safe_text(
+                                _secondary_key_for_page(
+                                    "Knowledge", "application", label
+                                ),
+                                "landing",
+                            )
                         )
                         st.session_state[_navigation_tertiary_state_key()] = "browse"
                         _set_knowledge_navigation_selection(st, page=label)

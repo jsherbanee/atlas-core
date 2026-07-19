@@ -148,7 +148,26 @@ def test_sync_workspace_navigation_state_sets_settings_defaults() -> None:
     assert st.session_state["atlas_active_secondary_section"] == "organization_settings"
 
 
-def test_settings_tertiary_actions_wrap_into_deliberate_rows() -> None:
+def test_sync_workspace_navigation_state_clears_stale_secondary_on_primary_switch() -> (
+    None
+):
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_active_page": "Transactions",
+            "atlas_active_secondary_section": "platform_management",
+            "atlas_active_tertiary_action": "error_log",
+            "atlas_context_selection": {},
+        }
+    )
+
+    app._sync_workspace_navigation_state(st, record=None)
+
+    assert st.session_state["atlas_active_primary_workspace"] == "Transactions"
+    assert st.session_state["atlas_active_secondary_section"] == "estimates"
+    assert st.session_state["atlas_active_tertiary_action"] == "browse"
+
+
+def test_settings_navigation_renders_tertiary_actions_as_left_accordion() -> None:
     st = _FakeStreamlit(
         session_state={
             "atlas_active_page": "Administration",
@@ -162,8 +181,11 @@ def test_settings_tertiary_actions_wrap_into_deliberate_rows() -> None:
     app._render_workspace_navigation(st, None)
 
     assert app.BODY_SHELL_COLUMN_SPEC in st.column_specs
-    assert st.column_specs.count([1.0, 1.0, 1.0, 1.0]) >= 2
-    assert [1.0] in st.column_specs
+    assert [1.0, 1.0, 1.0, 1.0] not in st.column_specs
+    labels = [str(item["label"]) for item in st.button_calls]
+    assert "[v] Platform Management" in labels
+    assert "   Tenant Manager" in labels
+    assert "   Error Log" in labels
 
 
 def test_alpha_environment_marker_blocks_production_designation(
