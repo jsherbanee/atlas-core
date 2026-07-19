@@ -82,6 +82,7 @@ Atlas Workspace Alpha UI Repair standardizes fixed-width primary navigation butt
 Atlas Workspace Alpha UI Cleanup (Navigation Simplification and Functional Knowledge Links) removes the burger/menu shell, simplifies Transactions and Knowledge navigation contracts, and restores direct same-window Knowledge workspaces for Vendors, Manufacturers, Products, and Services.
 Atlas Workspace Alpha UI Cleanup (Accordion Navigation Refinement) consolidates secondary and tertiary navigation into a shared left-column accordion, removes the separate tertiary row above page content, and clears stale secondary state when primary workspace context changes.
 Atlas Workspace Knowledge Refinement consolidates visible Knowledge navigation to Customers, Vendors, Manufacturers, and Catalog while preserving contextual Contacts, Addresses, Vendor Price Lists, Catalog Fees, Assemblies, import history, global search, and Universal Object compatibility.
+Atlas Workspace Knowledge Repair converts the Knowledge accordion to compact contextual navigation, upgrades Customer Browse with deterministic sortable table behavior and detail handoff, adds generated non-reusing Customer IDs, and removes tenant-facing JSON controls from normal Knowledge workflows.
 Sprint M-01 implements tenant manager and sandbox provisioning foundations for alpha infrastructure, including platform-admin sandbox lifecycle controls, deterministic isolated repository-path provisioning, tenant-scoped search/job/settings/preference containers, and guarded reset/export/delete workflows without introducing hosted infrastructure dependencies.
 Sprint A-02 implements controlled alpha deployment and test operations, including controlled-alpha environment labeling, administrator-only alpha health checks, tenant-scoped feedback/defect workflow capture, known-limitations access, and operator checklist guidance without introducing new product workflows.
 Sprint A-02 pt 2 implements centralized tenant-scoped application error logging and review workflow, including deterministic fingerprint grouping, occurrence history, user-facing Error IDs, status transitions with audit coverage, sanitized diagnostics export, and health-check unresolved-error/severity summaries.
@@ -111,9 +112,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1452 tests)
+- pytest: full suite passing (1460 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1452 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1460 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 

@@ -92,6 +92,8 @@ Knowledge consolidation note:
 - Contact and Location entities remain supported compatibility objects but are managed contextually under customer, vendor, manufacturer, and tenant organization surfaces
 - Price Lists and Imports remain preserved compatibility data but are reached through Vendor Price Lists, Catalog provenance/import, and entity activity/history instead of standalone Knowledge secondary routes
 - Catalog is the business workspace for reusable Products, Services, Fees, and Assemblies
+- Customer Add accepts one Customer Name, allocates tenant-scoped Customer IDs only on create, and stores duplicate canonical/display naming internally for compatibility
+- tenant-facing Knowledge screens avoid JSON import/export controls; CSV remains available in contextual and advanced entity workflows
 
 X-12 navigation note:
 - Knowledge is the first workspace to use the reusable three-level navigation contract while preserving the existing entity workflows and deterministic state model.

@@ -286,6 +286,17 @@ def _seed_knowledge_service(entity_type: str) -> CommercialProductService:
             canonical_name="Service One",
             display_name="Service One",
         )
+    elif entity_type == "customer":
+        service.create_customer(
+            customer_id="CUST-0001",
+            canonical_name="Beta Customer",
+            display_name="Beta Customer",
+        )
+        service.create_customer(
+            customer_id="CUST-0002",
+            canonical_name="Alpha Customer",
+            display_name="Alpha Customer",
+        )
     return service
 
 
@@ -947,6 +958,88 @@ def test_knowledge_landing_does_not_render_duplicate_family_actions() -> None:
     assert all("Why It Matters" not in item for item in st.markdowns)
 
 
+def test_workspace_navigation_uses_compact_labels_without_literal_arrows() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "customers",
+            app._navigation_tertiary_state_key(): "browse",
+        }
+    )
+
+    app._render_workspace_navigation(st, record=None)
+
+    labels = [call["label"] for call in st.button_calls]
+    assert "Customers" in labels
+    assert "Vendors" in labels
+    assert "Manufacturers" in labels
+    assert "Catalog" in labels
+    assert all("[v]" not in label and "[>]" not in label for label in labels)
+    assert "   Browse" in labels
+
+
+def test_customer_sort_defaults_name_ascending_and_toggles_direction() -> None:
+    rows = [
+        {"Customer Name": "Beta", "Customer ID": "CUST-0002"},
+        {"Customer Name": "Alpha", "Customer ID": "CUST-0001"},
+    ]
+    st = _HomeContractStreamlit()
+
+    column, direction = app._customer_sort_state(st)
+    assert column == "Customer Name"
+    assert direction == "asc"
+    assert (
+        app._sort_customer_rows(rows, column=column, direction=direction)[0][
+            "Customer Name"
+        ]
+        == "Alpha"
+    )
+
+    app._toggle_customer_sort(st, "Customer Name")
+    column, direction = app._customer_sort_state(st)
+    assert direction == "desc"
+    assert (
+        app._sort_customer_rows(rows, column=column, direction=direction)[0][
+            "Customer Name"
+        ]
+        == "Beta"
+    )
+
+
+def test_customer_id_preview_and_allocation_are_non_reusing() -> None:
+    st = _HomeContractStreamlit()
+    service = CommercialProductService()
+
+    first_preview = app._preview_customer_id(st, service)
+    second_preview = app._preview_customer_id(st, service)
+    allocated = app._allocate_customer_id(st, service)
+
+    assert first_preview == "CUST-0001"
+    assert second_preview == "CUST-0001"
+    assert allocated == "CUST-0001"
+    assert app._preview_customer_id(st, service) == "CUST-0002"
+
+
+def test_customer_id_preview_uses_settings_numbering_policy() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state["atlas_settings_workspace"] = {
+        "knowledge_numbering": {
+            "customer": {
+                "prefix": "CLIENT",
+                "separator": "-",
+                "sequence_padding": 3,
+                "next_sequence": 7,
+                "allocated_ids": [],
+            }
+        }
+    }
+
+    assert app._preview_customer_id(st, CommercialProductService()) == "CLIENT-007"
+
+
 @pytest.mark.parametrize(
     ("secondary", "expected_labels"),
     [
@@ -1056,6 +1149,27 @@ def test_catalog_fees_route_to_fee_workspace() -> None:
 
     assert "### Fees" in st.markdowns
     assert any(call["label"] == "Create Fee" for call in st.button_calls)
+
+
+def test_customer_workspace_uses_single_name_field_and_no_json_controls() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "customers",
+            app._navigation_tertiary_state_key(): "add",
+        }
+    )
+
+    app._render_application_knowledge_page(st, _FakeWorkspaceService([]))
+
+    labels = [item["label"] for item in st.text_inputs]
+    assert "Customer Name" in labels
+    assert "Canonical Name" not in labels
+    assert "Display Name" not in labels
+    assert all("JSON" not in call["label"] for call in st.download_buttons)
 
 
 def test_transactions_workspace_source_omits_overview_status_cards() -> None:

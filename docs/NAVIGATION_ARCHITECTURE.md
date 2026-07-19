@@ -132,6 +132,7 @@ Implemented behavior:
 - the selected secondary section expands in the left column
 - tertiary actions render directly beneath the active secondary section
 - inactive secondary sections remain collapsed
+- secondary and tertiary labels render as compact navigation text without literal disclosure markers
 - the separate tertiary action row above main content is removed
 - stale secondary selections are reset to the current workspace contract when switching primary workspaces
 - search and return-context handoff continue using the existing primary/secondary/tertiary session-state keys
@@ -145,3 +146,10 @@ Knowledge visible secondary navigation is now:
 - Catalog
 
 Contacts, Locations, Price Lists, Imports, and Assemblies are removed from visible secondary navigation while their data remains reachable through contextual tertiary actions, vendor price-list surfaces, catalog import/provenance/activity, and Universal Object handoff.
+
+Knowledge repair note:
+- Knowledge keeps one expanded secondary section at a time: Customers, Vendors, Manufacturers, or Catalog
+- record-specific tertiary links stay contextual and only become useful once the related record is selected
+- Customer Browse defaults to Customer Name ascending, exposes sortable table headers, and opens the selected record into Details/current context
+- Customer Add uses a single Customer Name field with non-consuming Customer ID preview and consuming allocation on create
+- normal tenant-facing Knowledge surfaces avoid JSON controls; CSV export remains available in contextual/advanced areas

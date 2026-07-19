@@ -471,6 +471,9 @@ Tertiary navigation should be action-oriented.
 It should answer what the user can do in the current area rather than repeat the current page name.
 Preferred examples include Browse, Add, Edit, Relationships, Import, Export, Decisions, Timeline, Equipment, Labor, Summary, and similar task verbs or deliverable-focused actions.
 
+Secondary/tertiary navigation should read as navigation, not as a form or diagnostic display.
+Use compact labels, quiet indentation for tertiary actions, one visible expanded context, and no literal text disclosure symbols.
+
 Navigation should remove implementation noise.
 Avoid exposing framework labels, diagnostic terms, duplicate workspace labels, development banners, or explanatory text that does not help the user act.
 

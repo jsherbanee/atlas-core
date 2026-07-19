@@ -183,7 +183,8 @@ def test_settings_navigation_renders_tertiary_actions_as_left_accordion() -> Non
     assert app.BODY_SHELL_COLUMN_SPEC in st.column_specs
     assert [1.0, 1.0, 1.0, 1.0] not in st.column_specs
     labels = [str(item["label"]) for item in st.button_calls]
-    assert "[v] Platform Management" in labels
+    assert "Platform Management" in labels
+    assert all("[v]" not in label and "[>]" not in label for label in labels)
     assert "   Tenant Manager" in labels
     assert "   Error Log" in labels
 

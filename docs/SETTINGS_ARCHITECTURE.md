@@ -135,6 +135,17 @@ Validation rules:
 - token usage must align to enabled policy flags
 - duplicate family signatures that could collide are rejected
 
+## Knowledge Entity Numbering
+
+Customer IDs use a tenant-scoped knowledge numbering policy stored under `knowledge_numbering.customer`.
+
+Current behavior:
+- default format is `CUST-0001`
+- preview is non-consuming
+- allocation occurs only when a customer is created
+- allocated IDs are not reused
+- the policy is separate from commercial document numbering and can be promoted to a first-class Settings UI without changing the Customer workflow contract
+
 ## Personal Preferences Model
 
 Initial preference fields:

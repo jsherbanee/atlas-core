@@ -622,6 +622,47 @@ def atlas_stylesheet() -> str:
         [class*="st-key-atlas_top_nav_"] button[kind="primary"]:hover {{
             background: var(--atlas-primary-soft-hover) !important;
         }}
+        [class*="st-key-atlas_secondary_"] button {{
+            min-height: 30px !important;
+            height: 30px !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+            padding: 0.18rem 0.45rem !important;
+            border-color: transparent !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }}
+        [class*="st-key-atlas_secondary_"] button[kind="primary"] {{
+            background: var(--atlas-primary-soft) !important;
+            border-color: color-mix(in srgb, var(--atlas-primary) 18%, white) !important;
+            color: var(--atlas-primary) !important;
+        }}
+        [class*="st-key-atlas_secondary_"] button:hover {{
+            background: var(--atlas-hover) !important;
+        }}
+        [class*="st-key-atlas_accordion_tertiary_"] button {{
+            min-height: 26px !important;
+            height: 26px !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+            margin-left: 0.55rem !important;
+            padding: 0.1rem 0.45rem !important;
+            border-color: transparent !important;
+            background: transparent !important;
+            color: #4b5563 !important;
+            box-shadow: none !important;
+            font-size: var(--atlas-caption-size) !important;
+            font-weight: 500 !important;
+        }}
+        [class*="st-key-atlas_accordion_tertiary_"] button[kind="primary"] {{
+            background: var(--atlas-surface) !important;
+            border-left: 2px solid var(--atlas-primary) !important;
+            color: var(--atlas-primary) !important;
+        }}
+        [class*="st-key-atlas_accordion_tertiary_"] button:hover {{
+            background: var(--atlas-hover) !important;
+            color: #111827 !important;
+        }}
         .st-key-atlas_header_nav_Atlas button {{
             width: var(--atlas-header-wordmark-width) !important;
             max-width: var(--atlas-header-wordmark-width) !important;

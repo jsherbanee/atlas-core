@@ -1239,7 +1239,9 @@ _PAGE_PURPOSE_SUBTITLES: dict[str, str] = {}
 
 
 def _render_page_header(st: Any, title: str, subtitle: str) -> None:
-    st.subheader(title)
+    resolved_title = _safe_text(title, "")
+    if resolved_title:
+        st.subheader(resolved_title)
     resolved_subtitle = _safe_text(subtitle, "")
     if resolved_subtitle:
         st.caption(resolved_subtitle)
@@ -1487,6 +1489,66 @@ def _render_vendor_price_lists(
             st.caption("No vendor-linked price lists are available for this vendor.")
         if offers:
             st.dataframe(offers[:300], width="stretch", hide_index=True)
+
+
+def _customer_display_name(item: dict[str, Any]) -> str:
+    return _safe_text(
+        item.get("display_name"),
+        _safe_text(item.get("canonical_name"), "Customer"),
+    )
+
+
+def _customer_id_from_entity(item: dict[str, Any]) -> str:
+    return _safe_text(
+        dict(item.get("attributes") or {}).get("customer_id"),
+        _safe_text(item.get("entity_id"), "").replace("customer:", ""),
+    )
+
+
+def _customer_sort_state(st: Any) -> tuple[str, str]:
+    return (
+        _safe_text(st.session_state.get("atlas_customer_sort_column"), "Customer Name"),
+        _safe_text(st.session_state.get("atlas_customer_sort_direction"), "asc"),
+    )
+
+
+def _toggle_customer_sort(st: Any, column: str) -> None:
+    current_column, current_direction = _customer_sort_state(st)
+    st.session_state["atlas_customer_sort_column"] = column
+    st.session_state["atlas_customer_sort_direction"] = (
+        "desc" if current_column == column and current_direction == "asc" else "asc"
+    )
+
+
+def _customer_sort_indicator(st: Any, column: str) -> str:
+    current_column, current_direction = _customer_sort_state(st)
+    if current_column != column:
+        return ""
+    return " (A-Z)" if current_direction == "asc" else " (Z-A)"
+
+
+def _sort_customer_rows(
+    rows: list[dict[str, Any]], *, column: str, direction: str
+) -> list[dict[str, Any]]:
+    sort_key = {
+        "Customer Name": "Customer Name",
+        "Customer ID": "Customer ID",
+        "City / State": "City / State",
+        "Active Projects": "Active Projects",
+        "Open Transactions": "Open Transactions",
+        "Status": "Status",
+        "Last Updated": "Last Updated",
+    }.get(column, "Customer Name")
+    reverse = direction == "desc"
+    return sorted(
+        rows,
+        key=lambda item: (
+            int(item.get(sort_key) or 0)
+            if sort_key in {"Active Projects", "Open Transactions"}
+            else _safe_text(item.get(sort_key), "").lower()
+        ),
+        reverse=reverse,
+    )
 
 
 def _responsive_control_columns(
@@ -3605,6 +3667,76 @@ def _settings_workspace_service(st: Any) -> SettingsService:
 
 def _save_settings_workspace_state(st: Any, service: SettingsService) -> None:
     st.session_state["atlas_settings_workspace"] = service.to_dict()
+
+
+def _customer_numbering_policy(st: Any) -> dict[str, Any]:
+    settings_state = _settings_workspace_state(st)
+    scoped = settings_state.setdefault("knowledge_numbering", {})
+    policy = scoped.setdefault(
+        "customer",
+        {
+            "prefix": "CUST",
+            "separator": "-",
+            "sequence_padding": 4,
+            "next_sequence": 1,
+            "allocated_ids": [],
+        },
+    )
+    return dict(policy)
+
+
+def _save_customer_numbering_policy(st: Any, policy: dict[str, Any]) -> None:
+    settings_state = _settings_workspace_state(st)
+    settings_state.setdefault("knowledge_numbering", {})["customer"] = dict(policy)
+    st.session_state["atlas_settings_workspace"] = settings_state
+
+
+def _format_customer_id(policy: dict[str, Any], sequence: int) -> str:
+    prefix = _safe_text(policy.get("prefix"), "CUST")
+    separator = _safe_text(policy.get("separator"), "-")
+    padding = int(policy.get("sequence_padding") or 4)
+    return f"{prefix}{separator}{sequence:0{padding}d}"
+
+
+def _preview_customer_id(st: Any, product_service: CommercialProductService) -> str:
+    policy = _customer_numbering_policy(st)
+    allocated = {
+        _safe_text(item, "") for item in list(policy.get("allocated_ids") or [])
+    }
+    existing = {
+        _safe_text(
+            dict(item.get("attributes") or {}).get("customer_id"),
+            _safe_text(item.get("entity_id"), "").replace("customer:", ""),
+        )
+        for item in product_service.list_customers(include_inactive=True)
+    }
+    sequence = int(policy.get("next_sequence") or 1)
+    while True:
+        candidate = _format_customer_id(policy, sequence)
+        if candidate not in allocated and candidate not in existing:
+            return candidate
+        sequence += 1
+
+
+def _allocate_customer_id(st: Any, product_service: CommercialProductService) -> str:
+    policy = _customer_numbering_policy(st)
+    allocated = [
+        _safe_text(item, "") for item in list(policy.get("allocated_ids") or [])
+    ]
+    sequence = int(policy.get("next_sequence") or 1)
+    while True:
+        candidate = _format_customer_id(policy, sequence)
+        if (
+            candidate not in set(allocated)
+            and product_service.get_customer(candidate) is None
+        ):
+            break
+        sequence += 1
+    allocated.append(candidate)
+    policy["allocated_ids"] = allocated
+    policy["next_sequence"] = sequence + 1
+    _save_customer_numbering_policy(st, policy)
+    return candidate
 
 
 def _permissions_workspace_state(st: Any) -> dict[str, Any]:
@@ -7900,10 +8032,8 @@ def _render_secondary_navigation_section(
     )
     is_enabled = bool(section.get("enabled", True))
     actions = _visible_tertiary_actions(st, section, record)
-    has_actions = bool(actions)
-    active_marker = "[v]" if is_active and has_actions else "[>]" if has_actions else ""
     context_marker = " *" if bool(section.get("selected_record_requirement")) else ""
-    label = f"{active_marker} {section_label}{context_marker}".strip()
+    label = f"{section_label}{context_marker}".strip()
     if st.button(
         label,
         key=f"atlas_secondary_{primary}_{mode}_{secondary_key}",
@@ -8578,13 +8708,8 @@ def _render_knowledge_entity_import_export_controls(
         include_inactive=True,
         query=export_filter,
     )
-    json_export = product_service.export_knowledge_entities_json(
-        entity_type=entity_type,
-        include_inactive=True,
-        query=export_filter,
-    )
 
-    export_cols = st.columns(3)
+    export_cols = st.columns(2)
     export_cols[0].download_button(
         "Download CSV Template",
         data=template,
@@ -8601,15 +8726,6 @@ def _render_knowledge_entity_import_export_controls(
         key=f"{key_prefix}_csv_export",
         width="stretch",
     )
-    export_cols[2].download_button(
-        "Export JSON",
-        data=json_export,
-        file_name=f"{entity_type}_export.json",
-        mime="application/json",
-        key=f"{key_prefix}_json_export",
-        width="stretch",
-    )
-
     uploaded = st.file_uploader(
         f"Import {entity_type.title()} CSV",
         type=["csv"],
@@ -10937,7 +11053,7 @@ def _render_home_page(
 def _render_application_knowledge_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    _render_page_header(st, "Knowledge", "")
+    _render_page_header(st, "", "")
     active_knowledge_view = _sync_knowledge_content_state(st)
 
     project_rows = _project_library_rows(
@@ -10950,10 +11066,6 @@ def _render_application_knowledge_page(
     vendor_rows = product_service.list_vendors()
     project_customers = sorted(
         {_safe_text(item.get("customer"), "n/a") for item in project_rows}
-    )
-    customer_entities = product_service.list_knowledge_entities(
-        entity_type="customer",
-        include_inactive=True,
     )
     service_entities = product_service.list_service_entities(include_inactive=True)
     contact_entities = product_service.list_knowledge_entities(
@@ -11516,21 +11628,51 @@ def _render_application_knowledge_page(
                 )
 
     if active_knowledge_view == "Customers":
-        _render_section_title(st, "Customers")
-        with st.expander("Add Customer", expanded=False):
-            c_cols = st.columns(2)
-            c_id = c_cols[0].text_input("Customer ID", key="atlas_ck_customer_id")
-            c_name = c_cols[1].text_input(
-                "Canonical Name", key="atlas_ck_customer_name"
+        active_tertiary = _safe_text(
+            st.session_state.get(_navigation_tertiary_state_key()), "browse"
+        )
+        project_customer_counts = {
+            customer: sum(
+                1
+                for item in project_rows
+                if _safe_text(item.get("customer"), "") == customer
             )
-            c_display = c_cols[0].text_input(
-                "Display Name", key="atlas_ck_customer_display"
+            for customer in project_customers
+        }
+
+        if active_tertiary == "add":
+            _render_section_title(st, "Add Customer")
+            preview_customer_id = _preview_customer_id(st, product_service)
+            st.caption(f"Customer ID preview: {preview_customer_id}")
+            form_cols = st.columns(2)
+            customer_name = form_cols[0].text_input(
+                "Customer Name", key="atlas_ck_customer_name"
             )
-            c_notes = c_cols[1].text_input("Notes", key="atlas_ck_customer_notes")
+            customer_status = form_cols[1].selectbox(
+                "Status",
+                options=["Active", "Inactive"],
+                key="atlas_ck_customer_status",
+            )
+            website = form_cols[0].text_input(
+                "Website", key="atlas_ck_customer_website"
+            )
+            primary_email = form_cols[1].text_input(
+                "Primary Email", key="atlas_ck_customer_primary_email"
+            )
+            primary_phone = form_cols[0].text_input(
+                "Primary Phone", key="atlas_ck_customer_primary_phone"
+            )
+            billing_address = st.text_input(
+                "Billing Address", key="atlas_ck_customer_billing_address"
+            )
+            shipping_address = st.text_input(
+                "Shipping Address", key="atlas_ck_customer_shipping_address"
+            )
+            notes = st.text_input("Notes", key="atlas_ck_customer_notes")
             duplicates = product_service.detect_duplicate_knowledge_entities(
                 entity_type="customer",
-                canonical_name=c_name,
-                normalized_name=product_service.normalize_name(c_name),
+                canonical_name=customer_name,
+                normalized_name=product_service.normalize_name(customer_name),
             )
             if duplicates:
                 st.warning("Potential duplicate customer names detected.")
@@ -11540,82 +11682,223 @@ def _render_application_knowledge_page(
                 width="stretch",
             ):
                 try:
-                    product_service.create_customer(
-                        customer_id=c_id,
-                        canonical_name=c_name,
-                        display_name=c_display,
-                        notes=c_notes,
+                    if not _safe_text(customer_name, ""):
+                        raise ValueError("Customer Name is required")
+                    customer_id = _allocate_customer_id(st, product_service)
+                    created = product_service.create_customer(
+                        customer_id=customer_id,
+                        canonical_name=customer_name,
+                        display_name=customer_name,
+                        notes=notes,
+                        active=customer_status == "Active",
+                        attributes={
+                            "status": customer_status.lower(),
+                            "website": website,
+                            "primary_email": primary_email,
+                            "primary_phone": primary_phone,
+                            "billing_address": billing_address,
+                            "shipping_address": shipping_address,
+                        },
                     )
                     _save_commercial_product_state(st, product_service)
+                    _set_context_selection(st, "customer", created)
+                    st.session_state[_navigation_selected_entity_type_key()] = (
+                        "customer"
+                    )
+                    st.session_state[_navigation_selected_entity_id_key()] = customer_id
+                    st.session_state[_navigation_tertiary_state_key()] = "details"
                     st.success("Customer created.")
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to create customer: {exc}")
+            return
 
-        if not customer_entities and not project_customers:
-            _render_guided_empty_state(
-                st,
-                why_empty="No customer records are currently available.",
-                action_to_populate="Create or import projects so Atlas can index customer ownership.",
-                next_location="Go to Projects and create/import a project.",
+        include_archived = st.checkbox(
+            "Show archived customers",
+            value=False,
+            key="atlas_ck_customer_show_archived",
+        )
+        customer_search = st.text_input(
+            "Search Customers",
+            key="atlas_ck_customer_table_search",
+            placeholder="customer name, ID, city, state",
+        )
+        source_customers = product_service.list_customers(
+            include_inactive=include_archived
+        )
+        customer_rows: list[dict[str, Any]] = []
+        for item in source_customers:
+            attributes = dict(item.get("attributes") or {})
+            display_name = _customer_display_name(item)
+            city_state = " / ".join(
+                [
+                    value
+                    for value in [
+                        _safe_text(attributes.get("city"), ""),
+                        _safe_text(attributes.get("state"), ""),
+                    ]
+                    if value
+                ]
             )
-        else:
-            project_customer_counts = {
-                customer: sum(
-                    1
-                    for item in project_rows
-                    if _safe_text(item.get("customer"), "") == customer
+            customer_rows.append(
+                {
+                    "Customer Name": display_name,
+                    "Customer ID": _customer_id_from_entity(item),
+                    "Primary Contact": _safe_text(
+                        attributes.get("primary_email"),
+                        _safe_text(attributes.get("primary_phone"), ""),
+                    ),
+                    "City / State": city_state,
+                    "Active Projects": project_customer_counts.get(display_name, 0),
+                    "Open Transactions": 0,
+                    "Status": _safe_text(
+                        attributes.get("status"),
+                        "Active" if bool(item.get("active", True)) else "Archived",
+                    ).title(),
+                    "Last Updated": _safe_text(item.get("updated_at"), ""),
+                    "_entity": item,
+                }
+            )
+
+        for customer in project_customers:
+            if customer in {
+                _safe_text(item.get("Customer Name"), "") for item in customer_rows
+            }:
+                continue
+            customer_rows.append(
+                {
+                    "Customer Name": customer,
+                    "Customer ID": "project-derived",
+                    "Primary Contact": "",
+                    "City / State": "",
+                    "Active Projects": project_customer_counts.get(customer, 0),
+                    "Open Transactions": 0,
+                    "Status": "Active",
+                    "Last Updated": "",
+                    "_entity": {"customer": customer, "customer_id": "project-derived"},
+                }
+            )
+
+        if customer_search.strip():
+            query_value = customer_search.strip().lower()
+            customer_rows = [
+                item
+                for item in customer_rows
+                if any(
+                    query_value in _safe_text(item.get(field), "").lower()
+                    for field in [
+                        "Customer Name",
+                        "Customer ID",
+                        "Primary Contact",
+                        "City / State",
+                    ]
                 )
-                for customer in project_customers
-            }
-            if customer_entities:
-                action_customer_id = st.selectbox(
-                    "Customer Workflow",
-                    options=[
-                        _safe_text(
-                            item.get("attributes", {}).get("customer_id"),
-                            _safe_text(item.get("entity_id"), ""),
-                        )
-                        for item in customer_entities
-                    ],
-                    key="atlas_ck_customer_workflow_select",
-                )
-                selected_customer = (
-                    product_service.get_customer(action_customer_id) or {}
-                )
+            ]
+
+        sort_columns = [
+            "Customer Name",
+            "Customer ID",
+            "City / State",
+            "Active Projects",
+            "Open Transactions",
+            "Status",
+            "Last Updated",
+        ]
+        sort_header_cols = st.columns(len(sort_columns))
+        for index, column in enumerate(sort_columns):
+            if sort_header_cols[index].button(
+                f"{column}{_customer_sort_indicator(st, column)}",
+                key=f"atlas_customer_sort_{column.lower().replace(' ', '_').replace('/', '')}",
+                width="stretch",
+            ):
+                _toggle_customer_sort(st, column)
+                st.rerun()
+
+        sort_column, sort_direction = _customer_sort_state(st)
+        customer_rows = _sort_customer_rows(
+            customer_rows, column=sort_column, direction=sort_direction
+        )
+        st.dataframe(
+            [
+                {key: value for key, value in item.items() if not key.startswith("_")}
+                for item in customer_rows
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+        selectable_rows = [
+            item
+            for item in customer_rows
+            if _safe_text(item.get("Customer ID"), "") != "project-derived"
+        ]
+        if selectable_rows:
+            selected_label = st.selectbox(
+                "Open Customer",
+                options=[
+                    f"{_safe_text(item.get('Customer Name'), '')} ({_safe_text(item.get('Customer ID'), '')})"
+                    for item in selectable_rows
+                ],
+                key="atlas_ck_customer_workflow_select",
+            )
+            selected_index = [
+                f"{_safe_text(item.get('Customer Name'), '')} ({_safe_text(item.get('Customer ID'), '')})"
+                for item in selectable_rows
+            ].index(selected_label)
+            selected_row = selectable_rows[selected_index]
+            selected_customer_id = _safe_text(selected_row.get("Customer ID"), "")
+            selected_customer = dict(selected_row.get("_entity") or {})
+            st.session_state[_navigation_selected_entity_type_key()] = "customer"
+            st.session_state[_navigation_selected_entity_id_key()] = (
+                selected_customer_id
+            )
+            _set_context_selection(st, "customer", selected_customer)
+            if active_tertiary == "browse":
+                st.session_state[_navigation_tertiary_state_key()] = "details"
+                st.rerun()
+
+            if active_tertiary in {
+                "details",
+                "contacts",
+                "addresses",
+                "projects",
+                "transactions",
+                "activity",
+                "archive",
+                "browse",
+            }:
+                _render_section_title(st, "Customer Details")
                 edit_cols = st.columns(2)
-                edit_display = edit_cols[0].text_input(
-                    "Edit Customer Display",
-                    value=_safe_text(selected_customer.get("display_name"), ""),
-                    key="atlas_ck_customer_edit_display",
+                edit_name = edit_cols[0].text_input(
+                    "Customer Name",
+                    value=_customer_display_name(selected_customer),
+                    key="atlas_ck_customer_edit_name",
                 )
-                edit_aliases = edit_cols[1].text_input(
-                    "Edit Customer Aliases",
-                    value=";".join(list(selected_customer.get("aliases") or [])),
-                    key="atlas_ck_customer_edit_aliases",
+                edit_status = edit_cols[1].selectbox(
+                    "Status",
+                    options=["Active", "Inactive"],
+                    index=0 if bool(selected_customer.get("active", True)) else 1,
+                    key="atlas_ck_customer_edit_status",
                 )
                 edit_notes = st.text_input(
-                    "Edit Customer Notes",
+                    "Notes",
                     value=_safe_text(selected_customer.get("notes"), ""),
                     key="atlas_ck_customer_edit_notes",
                 )
                 action_cols = st.columns(3)
                 if action_cols[0].button(
-                    "Save Customer Edits",
+                    "Save Customer",
                     key="atlas_ck_customer_edit_save",
                     width="stretch",
                 ):
                     try:
                         product_service.update_customer(
-                            action_customer_id,
+                            selected_customer_id,
                             updates={
-                                "display_name": edit_display,
-                                "aliases": [
-                                    _safe_text(item)
-                                    for item in re.split(r"[;,|]", edit_aliases)
-                                    if _safe_text(item)
-                                ],
+                                "canonical_name": edit_name,
+                                "display_name": edit_name,
                                 "notes": edit_notes,
+                                "active": edit_status == "Active",
                             },
                         )
                         _save_commercial_product_state(st, product_service)
@@ -11629,7 +11912,7 @@ def _render_application_knowledge_page(
                     width="stretch",
                 ):
                     try:
-                        product_service.set_customer_active(action_customer_id, False)
+                        product_service.set_customer_active(selected_customer_id, False)
                         _save_commercial_product_state(st, product_service)
                         st.success("Customer archived.")
                         st.rerun()
@@ -11641,7 +11924,7 @@ def _render_application_knowledge_page(
                     width="stretch",
                 ):
                     try:
-                        product_service.set_customer_active(action_customer_id, True)
+                        product_service.set_customer_active(selected_customer_id, True)
                         _save_commercial_product_state(st, product_service)
                         st.success("Customer restored.")
                         st.rerun()
@@ -11657,69 +11940,23 @@ def _render_application_knowledge_page(
                 )
                 _render_contextual_contacts_and_addresses(
                     st,
-                    owner_name=_safe_text(
-                        selected_customer.get("canonical_name"),
-                        _safe_text(selected_customer.get("display_name"), ""),
-                    ),
+                    owner_name=_customer_display_name(selected_customer),
                     contacts=contact_entities,
                     locations=location_entities,
                     key_prefix="atlas_ck_customer_context",
                 )
 
-            customer_search = st.text_input(
-                "Customer Table Search",
-                key="atlas_ck_customer_table_search",
-                placeholder="customer name",
-            )
-            customer_rows = []
-            for item in customer_entities:
-                display_name = _safe_text(
-                    item.get("display_name"),
-                    _safe_text(item.get("canonical_name"), "Customer"),
-                )
-                customer_rows.append(
-                    {
-                        "Customer": display_name,
-                        "Customer ID": _safe_text(
-                            item.get("attributes", {}).get("customer_id"),
-                            _safe_text(item.get("entity_id"), ""),
-                        ),
-                        "Projects": project_customer_counts.get(display_name, 0),
-                        "Active": bool(item.get("active", True)),
-                        "Relationships": len(
-                            product_service.list_knowledge_relationships(
-                                source_entity_id=_safe_text(item.get("entity_id"), "")
-                            )
-                        ),
-                        "Updated": _safe_text(item.get("updated_at"), ""),
-                    }
-                )
+        if active_tertiary in {"activity", "archive"}:
+            events = [
+                event
+                for event in product_service.list_knowledge_audit_events(limit=100)
+                if _safe_text(event.get("entity_id"), "").startswith("customer:")
+            ]
+            if events:
+                st.dataframe(events[:100], width="stretch", hide_index=True)
 
-            for customer in project_customers:
-                if customer in {
-                    _safe_text(item.get("Customer"), "") for item in customer_rows
-                }:
-                    continue
-                customer_rows.append(
-                    {
-                        "Customer": customer,
-                        "Customer ID": "project-derived",
-                        "Projects": project_customer_counts.get(customer, 0),
-                        "Active": True,
-                        "Relationships": 0,
-                        "Updated": "",
-                    }
-                )
-
-            if customer_search.strip():
-                query_value = customer_search.strip().lower()
-                customer_rows = [
-                    item
-                    for item in customer_rows
-                    if query_value in _safe_text(item.get("Customer"), "").lower()
-                ]
-            st.dataframe(customer_rows, width="stretch", hide_index=True)
-            with st.expander("Customer CSV/JSON Import Export", expanded=False):
+        if active_tertiary == "activity":
+            with st.expander("Customer CSV", expanded=False):
                 _render_knowledge_entity_import_export_controls(
                     st,
                     product_service,
