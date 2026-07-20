@@ -43,6 +43,21 @@ def render_data_table(st: Any, rows: list[dict[str, Any]]) -> None:
     st.dataframe(rows, width="stretch", hide_index=True)
 
 
+def render_control_bar(
+    st: Any,
+    controls: Sequence[Callable[[Any], Any]],
+    *,
+    columns_spec: Sequence[float] | int | None = None,
+) -> list[Any]:
+    if not controls:
+        return []
+    columns = st.columns(columns_spec or len(controls))
+    values: list[Any] = []
+    for column, renderer in zip(columns, controls):
+        values.append(renderer(column))
+    return values
+
+
 def render_empty_state(st: Any, message: str) -> None:
     st.markdown(render_empty_state_html(message), unsafe_allow_html=True)
 
@@ -131,6 +146,36 @@ def render_object_action_bar(
             column.caption(
                 _safe_text(action.get("disabled_reason"), "Action unavailable")
             )
+
+
+def render_object_inspector(
+    st: Any,
+    *,
+    object_name: str,
+    description: str,
+    badges: Sequence[str],
+    summary_rows: Sequence[dict[str, Any]] | None = None,
+    actions: Sequence[dict[str, Any]] | None = None,
+    key_prefix: str = "atlas_object_inspector",
+    summary_title: str = "Selected Record",
+) -> None:
+    st.markdown(f"#### {escape(_safe_text(object_name, 'Object'))}")
+    resolved_description = _safe_text(description, "")
+    if resolved_description:
+        st.caption(resolved_description)
+
+    resolved_badges = [
+        escape(_safe_text(badge, "")) for badge in badges if _safe_text(badge, "")
+    ]
+    if resolved_badges:
+        st.markdown(" ".join([f"`{badge}`" for badge in resolved_badges]))
+
+    if summary_rows:
+        render_section_title(st, summary_title)
+        render_data_table(st, list(summary_rows))
+
+    if actions:
+        render_object_action_bar(st, actions, key_prefix=key_prefix)
 
 
 def render_object_header(

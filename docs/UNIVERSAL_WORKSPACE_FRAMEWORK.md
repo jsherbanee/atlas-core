@@ -36,6 +36,8 @@ Use the framework when migrating or adding surfaces in this order:
 
 This order keeps navigation and object selection stable while allowing presentation details to converge.
 
+Projects and Transactions are the active migration targets using this order; both keep their service-layer behavior intact while converging on the shared shell grammar.
+
 ## Compatibility Boundaries
 
 The framework intentionally stays below the business-domain layer. It should not:

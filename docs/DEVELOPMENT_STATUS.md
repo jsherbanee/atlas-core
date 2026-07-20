@@ -25,6 +25,7 @@ The current stabilization baseline candidate includes a project-specific Atlas w
 Sprint 3 UX delivery added guided project review progression, explicit review status modeling, checklist visibility, and a concise project summary report center with deterministic exports.
 Sprint 4 UI refinement adds repository-backed Open Existing Project, a stronger Projects library workflow, application-wide Knowledge scope, compact active-project identity, concise breadcrumbs, and a two-column Project Workspace layout (no persistent third context column).
 Sprint X-14 migrates the Projects library onto the shared Universal Workspace Framework with common page headers, metrics, selected-project inspectors, and maintenance controls while preserving repository-backed actions and active-project workflows.
+Sprint X-14 also migrates the Transactions workspace onto the shared Universal Workspace Framework with common page headers, filters, selected-document inspectors, and maintenance controls while preserving commercial-document services, numbering, revision immutability, export, attachments, audit, permissions, global search, Working Set, return context, tenant isolation, and commercial lineage.
 Sprint 5 introduces an Equipment Object Workspace that treats equipment as first-class engineering objects with deterministic detail, relationship navigation, evidence, and recommended actions.
 Sprint 6 implements the Atlas object navigation layer, adding shared object navigation patterns across Drawings, Specifications, Equipment, global object search, and Relationship Explorer.
 Sprint 7 delivers persistent Global Object Search and Working Set workflows, including deterministic ranking, grouped result presentation, local search history, and object-context breadcrumbs.
@@ -117,9 +118,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1499 tests)
+- pytest: full suite passing (1500 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1492 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1500 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 

@@ -21,6 +21,25 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Atlas Alpha UI Cleanup Navigation Simplification and Functional Knowledge Links)
 
+## Unreleased (Atlas Epic X-14 Transactions Workspace Migration)
+
+### Improved
+
+- Transactions now uses the shared Universal Workspace Framework for page framing, filter controls, and selected-document inspection while keeping commercial-document services and rules unchanged.
+- The Transactions shell keeps active families focused on Estimates, Sales Orders, Return Orders, Invoices, and Credit Memos while preserving the deferred commercial routes.
+- Responsive validation confirmed the migrated Transactions shell stays contained at desktop and narrower widths without horizontal overflow.
+
+### Quality
+
+- full-suite validation: `1500 passed`
+- touched-file checks: `black`, `ruff`, and `mypy` passing
+
+### Scope Notes
+
+- no new transaction types
+- no new commercial business logic
+- no QuickBooks transport execution
+
 ### Improved
 
 - Shared shell navigation now keeps Home, Projects, Knowledge, Transactions, Reports, and Settings behavior compact and production-facing.

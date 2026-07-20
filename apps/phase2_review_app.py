@@ -114,8 +114,10 @@ from atlas_core.ui.design_system import (
 )
 from atlas_core.ui.workspace_framework import (
     render_data_table as _shared_render_data_table,
+    render_control_bar as _shared_render_control_bar,
     render_guided_empty_state as _shared_render_guided_empty_state,
     render_object_header as _shared_render_object_header,
+    render_object_inspector as _shared_render_object_inspector,
     render_page_header as _shared_render_page_header,
     render_section_title as _shared_render_section_title,
 )
@@ -16311,16 +16313,21 @@ def _render_transactions_workspace_page(
         return
 
     prefix = f"atlas_transactions_{secondary}_{tertiary}"
-    filters = st.columns([3, 2])
-    search_query = filters[0].text_input(
-        "Search Transactions",
-        key=f"{prefix}_search",
-        placeholder="document number, project, customer, vendor",
-    )
-    include_archived = filters[1].checkbox(
-        "Include Archived",
-        key=f"{prefix}_include_archived",
-        value=False,
+    search_query, include_archived = _shared_render_control_bar(
+        st,
+        [
+            lambda column: column.text_input(
+                "Search Transactions",
+                key=f"{prefix}_search",
+                placeholder="document number, project, customer, vendor",
+            ),
+            lambda column: column.checkbox(
+                "Include Archived",
+                key=f"{prefix}_include_archived",
+                value=False,
+            ),
+        ],
+        columns_spec=[3, 2],
     )
 
     rows = service.list_documents(
@@ -16810,6 +16817,41 @@ def _render_transactions_workspace_page(
     }
     _set_context_selection(st, selected_kind, selection_payload)
 
+    object_header_title = _safe_text(
+        selected_document.document_number or selected_document.document_id,
+        "Transaction",
+    )
+    selected_rows = [
+        {
+            "Field": "Document Number",
+            "Value": _safe_text(selected_document.document_number, "-"),
+        },
+        {
+            "Field": "Document Type",
+            "Value": _safe_text(selected_document.document_type.value, "-"),
+        },
+        {
+            "Field": "Customer",
+            "Value": _safe_text(selected_document.customer_id, "-"),
+        },
+        {
+            "Field": "Project",
+            "Value": _safe_text(selected_document.project_code, "-"),
+        },
+        {
+            "Field": "Status",
+            "Value": _safe_text(selected_document.lifecycle_state.value, "-"),
+        },
+        {
+            "Field": "Approval",
+            "Value": _safe_text(selected_document.approval_state.value, "-"),
+        },
+        {
+            "Field": "Sync",
+            "Value": _safe_text(selected_document.sync_metadata.status.value, "-"),
+        },
+    ]
+
     estimate_engine: EstimateEngineService | None = None
     estimate_row: dict[str, Any] = {}
     selected_revision_id = ""
@@ -16856,22 +16898,10 @@ def _render_transactions_workspace_page(
             service=estimate_engine,
         )
 
-    action_cols = st.columns([1.2, 1.2, 1.4, 2.2])
-    if action_cols[0].button(
-        "Open Object Workspace", key=f"{prefix}_open_workspace", width="stretch"
-    ):
+    def _open_object_workspace() -> None:
         st.session_state["atlas_active_page"] = "Object Workspace"
-        st.rerun()
-    if action_cols[1].button(
-        (
-            "Archive"
-            if selected_document.lifecycle_state
-            != CommercialDocumentLifecycleState.ARCHIVED
-            else "Restore"
-        ),
-        key=f"{prefix}_archive_restore",
-        width="stretch",
-    ):
+
+    def _toggle_archive_state() -> None:
         if (
             selected_document.lifecycle_state
             == CommercialDocumentLifecycleState.ARCHIVED
@@ -16881,19 +16911,8 @@ def _render_transactions_workspace_page(
             service.archive_document(selected_document.document_id)
         _save_transactions_workspace_state(st, service)
         st.rerun()
-    if action_cols[2].button(
-        "Refresh Terms Snapshot",
-        key=f"{prefix}_refresh_terms",
-        width="stretch",
-        disabled=(
-            not selected_document.is_mutable
-            or selected_document.document_type
-            not in {
-                CommercialDocumentType.ESTIMATE,
-                CommercialDocumentType.SALES_ORDER,
-            }
-        ),
-    ):
+
+    def _refresh_terms_snapshot() -> None:
         try:
             service.refresh_draft_terms(document_id=selected_document.document_id)
             _save_transactions_workspace_state(st, service)
@@ -16901,14 +16920,8 @@ def _render_transactions_workspace_page(
             st.rerun()
         except Exception as exc:
             st.error(f"Unable to refresh terms snapshot: {exc}")
-    if (
-        selected_document.document_type == CommercialDocumentType.ESTIMATE
-        and action_cols[3].button(
-            "Create Sales Order",
-            key=f"{prefix}_create_sales_order",
-            width="stretch",
-        )
-    ):
+
+    def _create_sales_order_from_estimate() -> None:
         try:
             inherit_terms = bool(
                 st.session_state.get(f"{prefix}_inherit_terms_from_estimate", True)
@@ -16927,6 +16940,64 @@ def _render_transactions_workspace_page(
             st.rerun()
         except Exception as exc:
             st.error(f"Unable to create sales order from estimate: {exc}")
+
+    _shared_render_object_inspector(
+        st,
+        object_name=object_header_title,
+        description=_safe_text(
+            selected_document.document_type.value.replace("_", " "),
+            "Transaction document",
+        ),
+        badges=[
+            _safe_text(selected_document.document_type.value, ""),
+            _safe_text(selected_document.lifecycle_state.value, ""),
+            _safe_text(selected_document.approval_state.value, ""),
+        ],
+        summary_rows=selected_rows,
+        actions=[
+            {
+                "label": "Open Object Workspace",
+                "action_key": "open_workspace",
+                "on_click": _open_object_workspace,
+            },
+            {
+                "label": (
+                    "Archive"
+                    if selected_document.lifecycle_state
+                    != CommercialDocumentLifecycleState.ARCHIVED
+                    else "Restore"
+                ),
+                "action_key": "archive_restore",
+                "on_click": _toggle_archive_state,
+            },
+            {
+                "label": "Refresh Terms Snapshot",
+                "action_key": "refresh_terms",
+                "enabled": (
+                    selected_document.is_mutable
+                    and selected_document.document_type
+                    in {
+                        CommercialDocumentType.ESTIMATE,
+                        CommercialDocumentType.SALES_ORDER,
+                    }
+                ),
+                "disabled_reason": (
+                    "Only mutable estimate and sales order drafts can refresh terms."
+                ),
+                "on_click": _refresh_terms_snapshot,
+            },
+            {
+                "label": "Create Sales Order",
+                "action_key": "create_sales_order",
+                "visible": (
+                    selected_document.document_type == CommercialDocumentType.ESTIMATE
+                ),
+                "on_click": _create_sales_order_from_estimate,
+            },
+        ],
+        key_prefix=f"transaction_{selected_document.document_id}",
+        summary_title="Selected Record",
+    )
 
     if selected_document.document_type == CommercialDocumentType.ESTIMATE:
         st.checkbox(

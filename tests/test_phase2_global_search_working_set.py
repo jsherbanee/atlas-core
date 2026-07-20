@@ -1601,6 +1601,13 @@ def test_transactions_workspace_source_omits_overview_status_cards() -> None:
     assert '"overview"' not in source
 
 
+def test_transactions_workspace_source_uses_shared_framework_helpers() -> None:
+    source = inspect.getsource(app._render_transactions_workspace_page)
+
+    assert "_shared_render_control_bar" in source
+    assert "_shared_render_object_inspector" in source
+
+
 def test_knowledge_workspace_source_omits_summary_tables_and_health_cards() -> None:
     source = inspect.getsource(app._render_application_knowledge_page)
 
