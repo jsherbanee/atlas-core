@@ -18,6 +18,10 @@ sys.modules[_SPEC.name] = app
 _SPEC.loader.exec_module(app)
 
 
+def _label_tail(label: str) -> str:
+    return label[2:] if label.startswith(("⌄ ", "› ")) else label
+
+
 class _FakeStreamlit:
     def __init__(self, *, session_state: dict[str, object] | None = None) -> None:
         self.session_state = dict(session_state or {})
@@ -183,10 +187,11 @@ def test_settings_navigation_renders_tertiary_actions_as_left_accordion() -> Non
     assert app.BODY_SHELL_COLUMN_SPEC in st.column_specs
     assert [1.0, 1.0, 1.0, 1.0] not in st.column_specs
     labels = [str(item["label"]) for item in st.button_calls]
-    assert "Platform Management" in labels
+    label_tails = [_label_tail(label) for label in labels]
+    assert "Platform Management" in label_tails
     assert all("[v]" not in label and "[>]" not in label for label in labels)
-    assert "Tenant Manager" in labels
-    assert "Error Log" in labels
+    assert "Tenant Manager" in label_tails
+    assert "Error Log" in label_tails
     assert "   Tenant Manager" not in labels
 
 

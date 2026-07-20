@@ -129,17 +129,21 @@ controlled left-column accordion.
 
 Implemented behavior:
 - primary header navigation remains unchanged
-- Projects, Transactions, Knowledge, Reports, and Settings use the same first-column disclosure renderer
+- the accordion is an application-shell capability and is not owned by Knowledge or any individual page
+- Projects, active Project workspaces, Transactions, Knowledge, Reports, and Settings use the same first-column disclosure renderer
+- page-specific accordion implementations are prohibited for first-column navigation
 - the selected secondary section is the single expanded section in the left column
 - opening one secondary section closes the previously expanded section in the same workspace
-- clicking the active secondary section collapses it without opening another section
-- compact tertiary actions render directly beneath the active section and do not collapse their parent
+- clicking the active secondary section collapses it, clears the active tertiary action, and does not open another section
+- compact indented tertiary actions render directly beneath the active section and do not collapse their parent
 - inactive secondary sections remain collapsed on rerender
+- section headers use the shared controlled chevron/header treatment rather than native Streamlit expander state
 - secondary and tertiary labels render as compact navigation text without literal disclosure markers
 - the separate tertiary action row above main content is removed
 - stale secondary selections are reset to the current workspace contract when switching primary workspaces
 - search and return-context handoff continue using the existing primary/secondary/tertiary session-state keys
 - the first-column accordion does not use independent widget-owned open booleans
+- native expanders remain allowed only for record-content disclosures, not workspace navigation
 
 ## Knowledge Consolidation
 

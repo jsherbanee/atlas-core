@@ -12,6 +12,7 @@ Use [ROADMAP.md](ROADMAP.md) for executive milestone communication.
 - Sprint items are tracked under epic IDs (for example, C-01, C-02).
 - Keep this document implementation-oriented and current.
 - Preserve architecture boundaries from [ARCHITECTURE.md](ARCHITECTURE.md) and [DOMAIN_MODEL.md](DOMAIN_MODEL.md).
+- First-column secondary/tertiary navigation is an application-shell capability; sprint work must reuse the shared controlled accordion and must not introduce page-specific navigation expanders or independent open-state booleans.
 
 Atlas's long-term product direction is a complete lifecycle platform for AV and lighting systems integrators. Current implementation remains centered on Phase 2 Bid Intelligence, with Epic E not started.
 

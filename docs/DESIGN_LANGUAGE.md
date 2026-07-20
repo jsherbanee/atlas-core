@@ -473,7 +473,7 @@ Preferred examples include Browse, Add, Edit, Relationships, Import, Export, Dec
 
 Secondary/tertiary navigation should read as navigation, not as a form or diagnostic display.
 Use compact labels, quiet indentation for tertiary actions, one visible expanded context, and no literal text disclosure symbols.
-Use the shared controlled disclosure renderer for first-column workspace navigation so only one secondary section can be expanded at a time.
+Use the shared controlled disclosure renderer for first-column workspace navigation so only one secondary section can be expanded at a time; do not create page-owned navigation expanders.
 
 Navigation should remove implementation noise.
 Avoid exposing framework labels, diagnostic terms, duplicate workspace labels, development banners, or explanatory text that does not help the user act.

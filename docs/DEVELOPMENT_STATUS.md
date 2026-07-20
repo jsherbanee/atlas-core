@@ -83,8 +83,9 @@ Atlas Workspace Alpha UI Cleanup (Navigation Simplification and Functional Knowl
 Atlas Workspace Alpha UI Cleanup (Accordion Navigation Refinement) consolidates secondary and tertiary navigation into a shared left-column accordion, removes the separate tertiary row above page content, and clears stale secondary state when primary workspace context changes.
 Atlas Workspace Knowledge Refinement consolidates visible Knowledge navigation to Customers, Vendors, Manufacturers, and Catalog while preserving contextual Contacts, Addresses, Vendor Price Lists, Catalog Fees, Assemblies, import history, global search, and Universal Object compatibility.
 Atlas Workspace Knowledge Repair converts the Knowledge accordion to compact contextual navigation, upgrades Customer Browse with deterministic sortable table behavior and detail handoff, adds generated non-reusing Customer IDs, and removes tenant-facing JSON controls from normal Knowledge workflows.
-Atlas Workspace Knowledge Cleanup replaces the custom Knowledge accordion with native disclosure sections, removes redundant Customer sort controls, and uses a single compact Customer selector as the primary browse/detail selection mechanism.
+Atlas Workspace Knowledge Cleanup replaces the custom Knowledge accordion with controlled disclosure sections, removes redundant Customer sort controls, and uses a single compact Customer selector as the primary browse/detail selection mechanism.
 Atlas Workspace App-Wide Navigation Refactor enforces exclusive first-column accordion behavior across Projects, Transactions, Knowledge, Reports, and Settings with one active expanded secondary section and deterministic collapse behavior.
+Atlas Workspace App-Wide Navigation Hotfix makes exclusive accordion navigation a shared application-shell component with controlled chevron headers, indented tertiary links, page-change synchronization, collapse-cleared tertiary state, and no page-specific navigation expander paths.
 Atlas Workspace Organization Merge implements shared Organization records for Customer, Vendor, and Manufacturer consolidation with deterministic duplicate suggestions, explicit preview/confirm workflow, role profiles, Knowledge relationship reassignment, redirected legacy records, tenant/permission enforcement, and merge-history visibility.
 Sprint M-01 implements tenant manager and sandbox provisioning foundations for alpha infrastructure, including platform-admin sandbox lifecycle controls, deterministic isolated repository-path provisioning, tenant-scoped search/job/settings/preference containers, and guarded reset/export/delete workflows without introducing hosted infrastructure dependencies.
 Sprint A-02 implements controlled alpha deployment and test operations, including controlled-alpha environment labeling, administrator-only alpha health checks, tenant-scoped feedback/defect workflow capture, known-limitations access, and operator checklist guidance without introducing new product workflows.
@@ -115,14 +116,14 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1489 tests)
+- pytest: full suite passing (1492 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1489 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1492 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 
 Latest A-04 targeted validation baseline: 25 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
-Latest Alpha UI Cleanup navigation/estimate-add targeted validation baseline: 174 passing tests (`tests/test_phase2_global_search_working_set.py`, `tests/test_phase2_settings_navigation.py`).
+Latest Alpha UI Cleanup navigation/estimate-add targeted validation baseline: 177 passing tests (`tests/test_phase2_global_search_working_set.py`, `tests/test_phase2_settings_navigation.py`).
 
 ## Manual Validation (L-01)
 - validated canonical project lifecycle display in Create Project, Project Settings, project lists, and Project Object Workspace compatibility surfaces

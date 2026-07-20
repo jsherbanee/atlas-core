@@ -114,7 +114,7 @@ Persisted continuity state includes:
 - bounded return context
 - bounded navigation history
 - current primary/secondary/tertiary workspace state
-- first-column accordion expansion through the active secondary workspace state, without independent widget-owned open flags
+- first-column accordion expansion through the active secondary workspace state, without independent widget-owned open flags or page-owned navigation booleans
 
 Not persisted:
 - transient widget-owned values

@@ -6492,6 +6492,10 @@ def _navigation_prior_route_key() -> str:
     return "atlas_prior_route_context"
 
 
+def _navigation_synced_page_key() -> str:
+    return "atlas_navigation_synced_page"
+
+
 def _raw_session_text(st: Any, key: str, default: str = "") -> str:
     value = st.session_state.get(key, default)
     if value is None:
@@ -7733,22 +7737,61 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             tuple[str, str, str, list[tuple[str, str, str, None, str]]]
         ] = [
             (
-                "overview",
-                "Overview",
+                "project_reporting",
+                "Project Reporting",
                 "Reports",
-                [("browse", "Browse", "collection_view", None, "Reports")],
-            ),
-            (
-                "readiness",
-                "Readiness",
-                "Reports",
-                [("browse", "Browse", "collection_view", None, "Reports")],
+                [
+                    (
+                        "project_summary",
+                        "Project Summary",
+                        "collection_view",
+                        None,
+                        "Reports",
+                    ),
+                    (
+                        "estimator_brief",
+                        "Estimator Brief",
+                        "collection_view",
+                        None,
+                        "Reports",
+                    ),
+                ],
             ),
             (
                 "exports",
                 "Exports",
                 "Reports",
-                [("browse", "Browse", "export_action", None, "Reports")],
+                [
+                    ("bom_export", "BOM Export", "export_action", None, "Reports"),
+                    (
+                        "scope_risk_export",
+                        "Scope and Risk Export",
+                        "export_action",
+                        None,
+                        "Reports",
+                    ),
+                    (
+                        "engineering_review_export",
+                        "Engineering Review Export",
+                        "export_action",
+                        None,
+                        "Reports",
+                    ),
+                ],
+            ),
+            (
+                "processing",
+                "Processing",
+                "Reports",
+                [
+                    (
+                        "processing_status",
+                        "Processing Status",
+                        "collection_view",
+                        None,
+                        "Reports",
+                    )
+                ],
             ),
         ]
         return [
@@ -8119,12 +8162,12 @@ def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
             return None
         if primary == "Reports":
             page_map = {
-                "Reports": "overview",
-                "Readiness": "readiness",
-                "Estimator Brief": "overview",
+                "Reports": "project_reporting",
+                "Readiness": "processing",
+                "Estimator Brief": "project_reporting",
                 "Exports": "exports",
             }
-            return page_map.get(page, "overview")
+            return page_map.get(page, "project_reporting")
         return None
     if mode == "library":
         page_map = {
@@ -8198,6 +8241,7 @@ def _sync_workspace_navigation_state(
     page = _safe_text(st.session_state.get("atlas_active_page"), "Mission Control")
     previous_primary = _raw_session_text(st, _navigation_primary_state_key())
     previous_mode = _raw_session_text(st, _navigation_mode_state_key())
+    previous_page = _raw_session_text(st, _navigation_synced_page_key())
     primary = _active_primary_workspace(page, record)
     mode = _active_workspace_mode(page, record)
     st.session_state[_navigation_primary_state_key()] = primary
@@ -8222,9 +8266,10 @@ def _sync_workspace_navigation_state(
     secondary_state_key = _navigation_secondary_state_key()
     has_secondary_state = secondary_state_key in st.session_state
     workspace_changed = previous_primary != primary or previous_mode != mode
+    page_changed = bool(previous_page) and previous_page != page
     active_secondary = (
         _raw_session_text(st, secondary_state_key)
-        if has_secondary_state and not workspace_changed
+        if has_secondary_state and not workspace_changed and not page_changed
         else _safe_text(sections[0].get("secondary_key"), "")
     )
     derived_secondary = _safe_text(_secondary_key_for_page(primary, mode, page), "")
@@ -8236,13 +8281,14 @@ def _sync_workspace_navigation_state(
         derived_secondary = _knowledge_secondary_key_for_kind(selection_kind)
     if (
         derived_secondary
-        and (workspace_changed or not has_secondary_state)
+        and (workspace_changed or page_changed or not has_secondary_state)
         and not (primary == "Transactions" and page == "Transactions")
     ):
         active_secondary = derived_secondary
 
     if not active_secondary:
         st.session_state[secondary_state_key] = ""
+        st.session_state[_navigation_synced_page_key()] = page
         return
 
     section = next(
@@ -8278,6 +8324,7 @@ def _sync_workspace_navigation_state(
     }:
         active_tertiary = default_tertiary
     st.session_state[_navigation_tertiary_state_key()] = active_tertiary
+    st.session_state[_navigation_synced_page_key()] = page
 
 
 def _tertiary_action_requires_selection(
@@ -8338,6 +8385,7 @@ def _open_secondary_navigation_section(
     secondary_key = _safe_text(section.get("secondary_key"), "")
     if secondary_key == _raw_session_text(st, _navigation_secondary_state_key()):
         st.session_state[_navigation_secondary_state_key()] = ""
+        st.session_state[_navigation_tertiary_state_key()] = ""
         _set_navigation_prior_route(st, primary=primary, mode=mode)
         st.rerun()
         return
@@ -8372,7 +8420,12 @@ def _open_tertiary_navigation_action(
     st.rerun()
 
 
-def _render_secondary_navigation_section(
+def _accordion_header_label(label: str, *, expanded: bool) -> str:
+    chevron = "⌄" if expanded else "›"
+    return f"{chevron} {label}"
+
+
+def _render_controlled_accordion_navigation_section(
     st: Any,
     *,
     primary: str,
@@ -8391,7 +8444,7 @@ def _render_secondary_navigation_section(
     context_marker = " *" if bool(section.get("selected_record_requirement")) else ""
     label = f"{section_label}{context_marker}".strip()
     if st.button(
-        label,
+        _accordion_header_label(label, expanded=is_active),
         key=f"atlas_secondary_{primary}_{mode}_{secondary_key}",
         type="primary" if is_active else "secondary",
         width="stretch",
@@ -8413,7 +8466,8 @@ def _render_secondary_navigation_section(
         is_tertiary_active = key == _safe_text(
             st.session_state.get(_navigation_tertiary_state_key()), ""
         )
-        if st.button(
+        tertiary_cols = st.columns([0.16, 0.84], gap="small")
+        if tertiary_cols[1].button(
             label,
             key=f"atlas_accordion_tertiary_{primary}_{mode}_{secondary_key}_{key}",
             type="primary" if is_tertiary_active else "secondary",
@@ -8499,7 +8553,7 @@ def _render_workspace_navigation(
             if group_name:
                 st.caption(group_name)
             for section in section_group:
-                _render_secondary_navigation_section(
+                _render_controlled_accordion_navigation_section(
                     st,
                     primary=primary,
                     mode=mode,
@@ -8619,44 +8673,6 @@ def _render_header(
         st.session_state["atlas_active_project_name"] = ""
         return
     st.session_state["atlas_active_project_name"] = record.project.name
-
-
-def _nav_buttons(
-    st: Any,
-    host: Any,
-    mode: str,
-    record: ProjectWorkspaceRecord | None,
-) -> None:
-    active_page = st.session_state.get("atlas_active_page", "Mission Control")
-    nav_groups = (
-        APPLICATION_NAV_GROUPS
-        if active_page == "Mission Control"
-        else _navigation_groups(record)
-    )
-
-    if record is not None and active_page != "Mission Control":
-        host.markdown("### Active Project")
-        host.caption("Project workspace")
-        host.markdown("---")
-
-    for group_name, entries in nav_groups:
-        with host.expander(
-            group_name,
-            expanded=active_page in [item[1] for item in entries],
-        ):
-            for label, page in entries:
-                is_future_disabled = page in DISABLED_LIFECYCLE_PAGES
-                if host.button(
-                    label,
-                    key=f"atlas_nav_{mode}_{group_name}_{label}_{page}",
-                    type="primary" if active_page == page else "secondary",
-                    disabled=is_future_disabled,
-                    width="stretch",
-                ):
-                    st.session_state["atlas_active_page"] = page
-                    st.rerun()
-                if is_future_disabled:
-                    host.caption(f"{label} is reserved for future lifecycle scope.")
 
 
 def _render_object_metadata_table(

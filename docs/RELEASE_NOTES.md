@@ -34,7 +34,7 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Knowledge landing and summary/status-card surfaces are removed so the default landing view stays concise.
 - Knowledge secondary navigation is consolidated to Customers, Vendors, Manufacturers, and Catalog; Contacts, Addresses, Price Lists, Imports, and Assemblies now appear contextually under the relevant record or catalog surface.
 - Knowledge secondary and tertiary navigation now renders as a compact contextual accordion without literal disclosure markers or duplicate content headings.
-- First-column workspace navigation now uses a shared controlled accordion across Projects, Transactions, Knowledge, Reports, and Settings, so opening one secondary section closes the prior section and clicking the active section collapses it.
+- First-column workspace navigation now uses a shared application-shell controlled accordion across Projects, active Project workspaces, Transactions, Knowledge, Reports, and Settings, so opening one secondary section closes the prior section, clicking the active section collapses it, and page-specific navigation expanders are prohibited.
 - Customer Browse now defaults to Customer Name ascending and opens the selected compact Customer selector record into Customer Details context.
 - Customer Browse no longer shows a redundant external sort-button row and uses one compact Customer selector for browse/detail handoff.
 - Customer Add now uses a single Customer Name field with generated Customer ID preview/allocation and removes tenant-facing JSON controls from normal Knowledge screens.
@@ -51,8 +51,8 @@ This document tracks product-facing changes for Atlas Preview releases.
 ### Quality
 
 - full gates passing: `black --check .`, `ruff check .`, `mypy .`, `pytest`
-- full-suite validation: `1489 passed`
-- targeted navigation regression validation: `pytest tests/test_phase2_global_search_working_set.py tests/test_phase2_settings_navigation.py -q` -> `174 passed`
+- full-suite validation: `1492 passed`
+- targeted navigation regression validation: `pytest tests/test_phase2_global_search_working_set.py tests/test_phase2_settings_navigation.py -q` -> `177 passed`
 
 ### Scope Notes
 
