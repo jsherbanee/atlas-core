@@ -16,11 +16,14 @@ from atlas_core.domain import (
     parse_organization_role,
 )
 
-BUSINESS_ORGANIZATION_ROLES = {
-    OrganizationRole.CUSTOMER,
-    OrganizationRole.VENDOR,
-    OrganizationRole.MANUFACTURER,
-}
+BUSINESS_ORGANIZATION_ROLE_VALUES = ("customer", "vendor", "manufacturer")
+
+
+def business_organization_roles() -> set[OrganizationRole]:
+    return {
+        parse_organization_role(role_value)
+        for role_value in BUSINESS_ORGANIZATION_ROLE_VALUES
+    }
 
 
 class OrganizationDirectoryService:
@@ -160,7 +163,7 @@ class OrganizationDirectoryService:
         role: OrganizationRole,
         profile: dict[str, Any],
     ) -> Organization:
-        if role not in BUSINESS_ORGANIZATION_ROLES:
+        if role not in business_organization_roles():
             raise ValueError("only business organization roles can be profiled")
         organization = self.get_organization(organization_id)
         if organization is None:
@@ -485,7 +488,7 @@ def _coerce_business_role(value: Any) -> OrganizationRole | None:
         role = parse_organization_role(value)
     except ValueError:
         return None
-    if role in BUSINESS_ORGANIZATION_ROLES:
+    if role in business_organization_roles():
         return role
     return None
 

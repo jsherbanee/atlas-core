@@ -30,7 +30,7 @@ def test_merge_service_and_streamlit_app_import_safely() -> None:
     )
     app_module = importlib.import_module("apps.phase2_review_app")
 
-    assert merge_module.ROLE_ENTITY_TYPES["customer"] is OrganizationRole.CUSTOMER
+    assert merge_module.role_entity_types()["customer"] is OrganizationRole.CUSTOMER
     assert hasattr(app_module, "_render_organization_merge_controls")
 
 
@@ -142,9 +142,9 @@ def test_same_role_customer_merge_redirects_legacy_record_and_reassigns_relation
 
 
 def test_role_entity_type_mapping_uses_authoritative_enum_members() -> None:
-    from atlas_core.services.organization_merge_service import ROLE_ENTITY_TYPES
+    from atlas_core.services.organization_merge_service import role_entity_types
 
-    assert ROLE_ENTITY_TYPES == {
+    assert role_entity_types() == {
         "customer": OrganizationRole.CUSTOMER,
         "vendor": OrganizationRole.VENDOR,
         "manufacturer": OrganizationRole.MANUFACTURER,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from atlas_core.domain import Organization, OrganizationRole
+from atlas_core.domain import Organization, OrganizationRole, parse_organization_role
 from atlas_core.services.master_library.commercial_product_service import (
     CommercialProductService,
 )
@@ -13,11 +13,14 @@ from atlas_core.services.organization_directory_service import (
     OrganizationDirectoryService,
 )
 
-ROLE_ENTITY_TYPES = {
-    "customer": OrganizationRole.CUSTOMER,
-    "vendor": OrganizationRole.VENDOR,
-    "manufacturer": OrganizationRole.MANUFACTURER,
-}
+ROLE_ENTITY_TYPE_VALUES = ("customer", "vendor", "manufacturer")
+
+
+def role_entity_types() -> dict[str, OrganizationRole]:
+    return {
+        role_value: parse_organization_role(role_value)
+        for role_value in ROLE_ENTITY_TYPE_VALUES
+    }
 
 
 class OrganizationMergeService:
@@ -220,7 +223,7 @@ class OrganizationMergeService:
         if entity is None:
             raise ValueError("Knowledge role record not found")
         role = _safe_text(entity.get("entity_type"))
-        if role not in ROLE_ENTITY_TYPES:
+        if role not in role_entity_types():
             raise ValueError("Only Customer, Vendor, and Manufacturer records merge")
         attributes = dict(entity.get("attributes") or {})
         if _safe_text(attributes.get("merge_status")) == "redirected":
@@ -229,7 +232,7 @@ class OrganizationMergeService:
 
     @staticmethod
     def _role_for_entity(entity: dict[str, Any]) -> OrganizationRole:
-        role = ROLE_ENTITY_TYPES.get(_safe_text(entity.get("entity_type")))
+        role = role_entity_types().get(_safe_text(entity.get("entity_type")))
         if role is None:
             raise ValueError("Unsupported role entity type")
         return role
@@ -256,9 +259,9 @@ class OrganizationMergeService:
         role = self._role_for_entity(entity)
         attributes = dict(entity.get("attributes") or {})
         identifier_key = {
-            OrganizationRole.CUSTOMER: "customer_id",
-            OrganizationRole.VENDOR: "vendor_id",
-            OrganizationRole.MANUFACTURER: "manufacturer_id",
+            parse_organization_role("customer"): "customer_id",
+            parse_organization_role("vendor"): "vendor_id",
+            parse_organization_role("manufacturer"): "manufacturer_id",
         }[role]
         identifier = _safe_text(
             attributes.get(identifier_key),
