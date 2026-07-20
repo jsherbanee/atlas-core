@@ -118,9 +118,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1500 tests)
+- pytest: full suite passing (1503 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1500 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1503 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import importlib.util
 from pathlib import Path
 import sys
@@ -193,6 +194,14 @@ def test_settings_navigation_renders_tertiary_actions_as_left_accordion() -> Non
     assert "Tenant Manager" in label_tails
     assert "Error Log" in label_tails
     assert "   Tenant Manager" not in labels
+
+
+def test_settings_administration_source_uses_shared_framework_helpers() -> None:
+    source = inspect.getsource(app._render_application_administration_page)
+
+    assert "_shared_render_section_card" in source
+    assert "_shared_render_form_grid" in source
+    assert "_shared_render_report_table" in source
 
 
 def test_alpha_environment_marker_blocks_production_designation(

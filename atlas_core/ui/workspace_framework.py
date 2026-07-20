@@ -110,6 +110,75 @@ def render_metric_cards(st: Any, cards: Sequence[tuple[str, str]]) -> None:
         column.markdown(render_metric_card_html(label, value), unsafe_allow_html=True)
 
 
+def render_metric_strip(
+    st: Any,
+    metrics: Sequence[tuple[str, str]],
+    *,
+    columns_spec: Sequence[float] | int | None = None,
+) -> None:
+    if not metrics:
+        return
+    if columns_spec is None:
+        render_metric_cards(st, metrics)
+        return
+    columns = st.columns(columns_spec)
+    for column, (label, value) in zip(columns, metrics):
+        column.markdown(render_metric_card_html(label, value), unsafe_allow_html=True)
+
+
+def render_filter_bar(
+    st: Any,
+    controls: Sequence[Callable[[Any], Any]],
+    *,
+    columns_spec: Sequence[float] | int | None = None,
+) -> list[Any]:
+    return render_control_bar(st, controls, columns_spec=columns_spec)
+
+
+def render_section_card(
+    st: Any,
+    title: str,
+    *,
+    subtitle: str = "",
+    border: bool = True,
+) -> Any:
+    container = st.container(border=border)
+    with container:
+        render_section_title(st, title)
+        resolved_subtitle = _safe_text(subtitle, "")
+        if resolved_subtitle:
+            st.caption(resolved_subtitle)
+    return container
+
+
+def render_form_grid(
+    st: Any,
+    *,
+    columns_spec: Sequence[float] | int,
+) -> list[Any]:
+    return st.columns(columns_spec)
+
+
+def render_field_group(
+    st: Any,
+    title: str,
+    *,
+    description: str = "",
+    border: bool = True,
+) -> Any:
+    container = st.container(border=border)
+    with container:
+        render_section_title(st, title)
+        resolved_description = _safe_text(description, "")
+        if resolved_description:
+            st.caption(resolved_description)
+    return container
+
+
+def render_report_table(st: Any, rows: Sequence[dict[str, Any]]) -> None:
+    render_data_table(st, list(rows))
+
+
 def render_section_title(st: Any, title: str) -> None:
     st.markdown(f"### {escape(_safe_text(title, 'Section'))}")
 

@@ -31,7 +31,7 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ### Quality
 
-- full-suite validation: `1500 passed`
+- full-suite validation: `1503 passed`
 - touched-file checks: `black`, `ruff`, and `mypy` passing
 
 ### Scope Notes

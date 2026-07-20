@@ -2719,6 +2719,21 @@ def test_application_reports_remain_output_oriented() -> None:
     assert "Next Output" not in first_row
 
 
+def test_application_reports_source_uses_shared_framework_helpers() -> None:
+    source = inspect.getsource(app._render_application_reports_page)
+
+    assert "_shared_render_metric_strip" in source
+    assert "_shared_render_section_card" in source
+    assert "_shared_render_report_table" in source
+
+
+def test_workflow_reports_source_uses_shared_framework_helpers() -> None:
+    source = inspect.getsource(app._render_workflow_reports_page)
+
+    assert "_shared_render_section_card" in source
+    assert "_shared_render_report_table" in source
+
+
 def test_status_bar_shows_diagnostics_only_for_platform_admin() -> None:
     class _PermissionService:
         def __init__(self, allowed: bool) -> None:

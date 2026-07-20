@@ -116,8 +116,12 @@ from atlas_core.ui.workspace_framework import (
     render_data_table as _shared_render_data_table,
     render_control_bar as _shared_render_control_bar,
     render_guided_empty_state as _shared_render_guided_empty_state,
+    render_form_grid as _shared_render_form_grid,
+    render_metric_strip as _shared_render_metric_strip,
     render_object_header as _shared_render_object_header,
     render_object_inspector as _shared_render_object_inspector,
+    render_report_table as _shared_render_report_table,
+    render_section_card as _shared_render_section_card,
     render_page_header as _shared_render_page_header,
     render_section_title as _shared_render_section_title,
 )
@@ -18723,74 +18727,90 @@ def _render_application_reports_page(
         for item in rows
         if _safe_text(item.get("status"), "") in {"Blocked", "Needs Attention"}
     ]
-    cards = st.columns(4)
-    _metric_card(cards[0], "Deliverables Ready", str(len(ready_projects)))
-    _metric_card(cards[1], "Needs Attention", str(len(attention_projects)))
-    _metric_card(cards[2], "Projects Tracked", str(len(rows)))
-    _metric_card(
-        cards[3],
-        "Artifacts",
-        str(sum(int(item.get("review_artifacts", 0) or 0) for item in rows)),
-    )
-
-    _render_data_table(
+    _shared_render_metric_strip(
         st,
         [
-            {
-                "Project": item.get("project"),
-                "Deliverable Readiness": item.get("status"),
-                "Output Family": (
-                    "Project Summary"
-                    if _safe_text(item.get("review_artifacts"), "0") != "0"
-                    else "Deliverable Readiness"
-                ),
-                "Commercial Documents": "Available",
-                "Exports": (
-                    "Ready"
-                    if _safe_text(item.get("review_artifacts"), "0") != "0"
-                    else "Pending"
-                ),
-                "Processing": (
-                    "Attention Required"
-                    if _safe_text(item.get("status"), "")
-                    in {"Blocked", "Needs Attention"}
-                    else "Stable"
-                ),
-                "Updated": item.get("updated_at"),
-            }
-            for item in rows
+            ("Deliverables Ready", str(len(ready_projects))),
+            ("Needs Attention", str(len(attention_projects))),
+            ("Projects Tracked", str(len(rows))),
+            (
+                "Artifacts",
+                str(sum(int(item.get("review_artifacts", 0) or 0) for item in rows)),
+            ),
         ],
     )
 
-    if ready_projects:
-        _render_section_title(st, "Ready to Export")
-        _render_data_table(
+    with _shared_render_section_card(
+        st,
+        "Operational Overview",
+        subtitle="Project report readiness and export status across active reportable work.",
+    ):
+        _shared_render_report_table(
             st,
             [
                 {
                     "Project": item.get("project"),
-                    "Recommended Output": "Project Summary",
-                    "Artifacts": item.get("review_artifacts"),
+                    "Deliverable Readiness": item.get("status"),
+                    "Output Family": (
+                        "Project Summary"
+                        if _safe_text(item.get("review_artifacts"), "0") != "0"
+                        else "Deliverable Readiness"
+                    ),
+                    "Commercial Documents": "Available",
+                    "Exports": (
+                        "Ready"
+                        if _safe_text(item.get("review_artifacts"), "0") != "0"
+                        else "Pending"
+                    ),
+                    "Processing": (
+                        "Attention Required"
+                        if _safe_text(item.get("status"), "")
+                        in {"Blocked", "Needs Attention"}
+                        else "Stable"
+                    ),
                     "Updated": item.get("updated_at"),
                 }
-                for item in ready_projects[:8]
+                for item in rows
             ],
         )
 
-    if attention_projects:
-        _render_section_title(st, "Blocked or In Review")
-        _render_data_table(
+    if ready_projects:
+        with _shared_render_section_card(
             st,
-            [
-                {
-                    "Project": item.get("project"),
-                    "Status": item.get("status"),
-                    "Reason": item.get("reason"),
-                    "Next Location": "Processing",
-                }
-                for item in attention_projects[:8]
-            ],
-        )
+            "Ready to Export",
+            subtitle="Projects with report artifacts ready for output generation.",
+        ):
+            _shared_render_report_table(
+                st,
+                [
+                    {
+                        "Project": item.get("project"),
+                        "Recommended Output": "Project Summary",
+                        "Artifacts": item.get("review_artifacts"),
+                        "Updated": item.get("updated_at"),
+                    }
+                    for item in ready_projects[:8]
+                ],
+            )
+
+    if attention_projects:
+        with _shared_render_section_card(
+            st,
+            "Blocked or In Review",
+            subtitle="Projects that still need review attention before export.",
+        ):
+            _shared_render_report_table(
+                st,
+                [
+                    {
+                        "Project": item.get("project"),
+                        "Status": item.get("status"),
+                        "Reason": item.get("reason"),
+                        "Next Location": "Processing",
+                    }
+                    for item in attention_projects[:8]
+                ],
+            )
 
 
 def _render_compact_reference_list(
@@ -19068,30 +19088,34 @@ def _render_application_administration_page(
                 tenant_id=tenant_id,
                 organization_id=organization_id,
             )
-            st.dataframe(
-                [
-                    {
-                        "Document Family": policy.document_type.value,
-                        "Syntax": policy.syntax_template,
-                        "Prefix": policy.prefix,
-                        "Suffix": policy.suffix,
-                        "Separator": policy.separator,
-                        "Padding": policy.sequence_padding,
-                        "Reset": policy.reset_policy,
-                        "Next Sequence": policy.next_sequence,
-                        "Preview": settings_service.preview_number(
-                            tenant_id=tenant_id,
-                            organization_id=organization_id,
-                            document_type=policy.document_type,
-                            project_code="PRJ-001",
-                        ),
-                    }
-                    for policy in policies.values()
-                    if policy.document_type != CommercialDocumentType.PROPOSAL
-                ],
-                width="stretch",
-                hide_index=True,
-            )
+            with _shared_render_section_card(
+                st,
+                "Commercial Numbering Overview",
+                subtitle="Tenant-scoped numbering policies and deterministic previews.",
+            ):
+                _shared_render_report_table(
+                    st,
+                    [
+                        {
+                            "Document Family": policy.document_type.value,
+                            "Syntax": policy.syntax_template,
+                            "Prefix": policy.prefix,
+                            "Suffix": policy.suffix,
+                            "Separator": policy.separator,
+                            "Padding": policy.sequence_padding,
+                            "Reset": policy.reset_policy,
+                            "Next Sequence": policy.next_sequence,
+                            "Preview": settings_service.preview_number(
+                                tenant_id=tenant_id,
+                                organization_id=organization_id,
+                                document_type=policy.document_type,
+                                project_code="PRJ-001",
+                            ),
+                        }
+                        for policy in policies.values()
+                        if policy.document_type != CommercialDocumentType.PROPOSAL
+                    ],
+                )
             st.caption(
                 "Alpha operations diagnostics, known limitations, and seed-data controls are available in Platform Management."
             )
@@ -19101,70 +19125,75 @@ def _render_application_administration_page(
                 tenant_id=tenant_id,
                 organization_id=organization_id,
             )
-            with st.form("atlas_settings_organization_profile_form"):
-                identity_cols = st.columns(2)
-                legal_name = identity_cols[0].text_input(
-                    "Legal Name",
-                    value=profile.legal_name,
-                )
-                display_name = identity_cols[1].text_input(
-                    "Display Name",
-                    value=profile.display_name,
-                )
-                contact_cols = st.columns(3)
-                website = contact_cols[0].text_input(
-                    "Website",
-                    value=_safe_text(profile.website, ""),
-                    placeholder="https://example.com",
-                )
-                email = contact_cols[1].text_input(
-                    "Email",
-                    value=_safe_text(profile.email, ""),
-                )
-                phone = contact_cols[2].text_input(
-                    "Phone",
-                    value=_safe_text(profile.phone, ""),
-                )
-                ops_cols = st.columns(3)
-                default_currency = ops_cols[0].text_input(
-                    "Default Currency",
-                    value=profile.default_currency,
-                )
-                default_timezone = ops_cols[1].text_input(
-                    "Default Timezone",
-                    value=profile.default_timezone,
-                )
-                country = ops_cols[2].text_input(
-                    "Country",
-                    value=_safe_text(profile.country, ""),
-                )
-                address_cols = st.columns(2)
-                physical_address = address_cols[0].text_area(
-                    "Physical Address",
-                    value=_safe_text(profile.physical_address, ""),
-                    height=120,
-                )
-                mailing_address = address_cols[1].text_area(
-                    "Mailing Address",
-                    value=_safe_text(profile.mailing_address, ""),
-                    height=120,
-                )
-                security_cols = st.columns(2)
-                logo_reference = security_cols[0].text_input(
-                    "Logo Reference",
-                    value=_safe_text(profile.logo_reference, ""),
-                    placeholder="asset://branding/logo-primary",
-                )
-                tax_id_reference = security_cols[1].text_input(
-                    "Tax ID Secret Reference",
-                    value=_safe_text(profile.tax_identification_reference, ""),
-                    placeholder="secret://vault/organization/tax-id",
-                )
-                save_profile = st.form_submit_button(
-                    "Save Organization Profile",
-                    width="stretch",
-                    disabled=not settings_manage_access.allowed,
-                )
+            with _shared_render_section_card(
+                st,
+                "Organization Profile",
+                subtitle="Identity, contact, and branding details for the tenant.",
+            ):
+                with st.form("atlas_settings_organization_profile_form"):
+                    identity_cols = _shared_render_form_grid(st, columns_spec=2)
+                    legal_name = identity_cols[0].text_input(
+                        "Legal Name",
+                        value=profile.legal_name,
+                    )
+                    display_name = identity_cols[1].text_input(
+                        "Display Name",
+                        value=profile.display_name,
+                    )
+                    contact_cols = _shared_render_form_grid(st, columns_spec=3)
+                    website = contact_cols[0].text_input(
+                        "Website",
+                        value=_safe_text(profile.website, ""),
+                        placeholder="https://example.com",
+                    )
+                    email = contact_cols[1].text_input(
+                        "Email",
+                        value=_safe_text(profile.email, ""),
+                    )
+                    phone = contact_cols[2].text_input(
+                        "Phone",
+                        value=_safe_text(profile.phone, ""),
+                    )
+                    ops_cols = _shared_render_form_grid(st, columns_spec=3)
+                    default_currency = ops_cols[0].text_input(
+                        "Default Currency",
+                        value=profile.default_currency,
+                    )
+                    default_timezone = ops_cols[1].text_input(
+                        "Default Timezone",
+                        value=profile.default_timezone,
+                    )
+                    country = ops_cols[2].text_input(
+                        "Country",
+                        value=_safe_text(profile.country, ""),
+                    )
+                    address_cols = _shared_render_form_grid(st, columns_spec=2)
+                    physical_address = address_cols[0].text_area(
+                        "Physical Address",
+                        value=_safe_text(profile.physical_address, ""),
+                        height=120,
+                    )
+                    mailing_address = address_cols[1].text_area(
+                        "Mailing Address",
+                        value=_safe_text(profile.mailing_address, ""),
+                        height=120,
+                    )
+                    security_cols = _shared_render_form_grid(st, columns_spec=2)
+                    logo_reference = security_cols[0].text_input(
+                        "Logo Reference",
+                        value=_safe_text(profile.logo_reference, ""),
+                        placeholder="asset://branding/logo-primary",
+                    )
+                    tax_id_reference = security_cols[1].text_input(
+                        "Tax ID Secret Reference",
+                        value=_safe_text(profile.tax_identification_reference, ""),
+                        placeholder="secret://vault/organization/tax-id",
+                    )
+                    save_profile = st.form_submit_button(
+                        "Save Organization Profile",
+                        width="stretch",
+                        disabled=not settings_manage_access.allowed,
+                    )
             if not settings_manage_access.allowed:
                 st.caption(settings_manage_access.reason)
             if save_profile:
@@ -26718,61 +26747,73 @@ def _render_workflow_reports_page(
         "Summary and checklist tables are rendered through shared primitives for consistency.",
     )
 
-    _render_section_title(st, "Guided Review Progress")
-    st.progress(completed_steps / max(len(step_rows), 1))
-    _render_data_table(
+    with _shared_render_section_card(
         st,
-        [
-            {
-                "Step": row.get("step"),
-                "Status": _status_chip(_safe_text(row.get("status"), "").title()),
-                "Page": row.get("page"),
-                "Detail": row.get("detail"),
-            }
-            for row in step_rows
-        ],
-    )
-
-    _render_section_title(st, "Recommended Next Action")
-    _render_status_badge(
-        st,
-        _safe_text(next_action.get("step"), "Next Review Step"),
-        tone="success",
-    )
-    st.markdown(
-        "<div class='atlas-primary-action'>"
-        "<strong>Next Review Step</strong>"
-        f"{_safe_text(next_action.get('step'), 'Generate Summary Report')}"
-        "<br/>"
-        f"{_safe_text(next_action.get('detail'), _safe_text(summary.get('recommended_next_action'), 'Generate project summary report.'))}"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    action_cols = st.columns(2)
-    if action_cols[0].button(
-        f"Open {_safe_text(next_action.get('page'), 'Overview')}",
-        width="stretch",
-        type="primary",
+        "Guided Review Progress",
+        subtitle="Completion progress and review-step status for the active project.",
     ):
-        st.session_state["atlas_active_page"] = _safe_text(
-            next_action.get("page"),
-            "Overview",
+        st.progress(completed_steps / max(len(step_rows), 1))
+        _shared_render_report_table(
+            st,
+            [
+                {
+                    "Step": row.get("step"),
+                    "Status": _status_chip(_safe_text(row.get("status"), "").title()),
+                    "Page": row.get("page"),
+                    "Detail": row.get("detail"),
+                }
+                for row in step_rows
+            ],
         )
-        st.rerun()
-    action_cols[1].caption(_safe_text(next_action.get("why"), ""))
 
-    _render_section_title(st, "Project Review Checklist")
-    _render_data_table(
+    with _shared_render_section_card(
         st,
-        [
-            {
-                "Checklist": row.get("Checklist Item"),
-                "Status": _status_chip(_safe_text(row.get("Status"), "").title()),
-                "Detail": row.get("Detail"),
-            }
-            for row in checklist_rows
-        ],
-    )
+        "Recommended Next Action",
+        subtitle="The next review step stays compact and directly actionable.",
+    ):
+        _render_status_badge(
+            st,
+            _safe_text(next_action.get("step"), "Next Review Step"),
+            tone="success",
+        )
+        st.markdown(
+            "<div class='atlas-primary-action'>"
+            "<strong>Next Review Step</strong>"
+            f"{_safe_text(next_action.get('step'), 'Generate Summary Report')}"
+            "<br/>"
+            f"{_safe_text(next_action.get('detail'), _safe_text(summary.get('recommended_next_action'), 'Generate project summary report.'))}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        action_cols = st.columns(2)
+        if action_cols[0].button(
+            f"Open {_safe_text(next_action.get('page'), 'Overview')}",
+            width="stretch",
+            type="primary",
+        ):
+            st.session_state["atlas_active_page"] = _safe_text(
+                next_action.get("page"),
+                "Overview",
+            )
+            st.rerun()
+        action_cols[1].caption(_safe_text(next_action.get("why"), ""))
+
+    with _shared_render_section_card(
+        st,
+        "Project Review Checklist",
+        subtitle="The checklist stays separate from the progress table and next-step actions.",
+    ):
+        _shared_render_report_table(
+            st,
+            [
+                {
+                    "Checklist": row.get("Checklist Item"),
+                    "Status": _status_chip(_safe_text(row.get("Status"), "").title()),
+                    "Detail": row.get("Detail"),
+                }
+                for row in checklist_rows
+            ],
+        )
 
     report_views = [
         "Project Summary",
@@ -37301,161 +37342,170 @@ def _render_settings_page(
                 st.success("Project metadata updated.")
                 st.rerun()
 
-        st.markdown("### Stakeholder Directory")
-        stakeholder_rows: list[dict[str, Any]] = []
-        try:
-            stakeholder_rows = list(
-                workspace_service.list_project_stakeholders(record.workspace_id)
-            )
-        except Exception:
-            stakeholder_rows = []
-
-        if stakeholder_rows:
-            st.dataframe(
-                [
-                    {
-                        "Role": _safe_text(item.get("role"), "")
-                        .replace("_", " ")
-                        .title(),
-                        "Organization": _safe_text(
-                            item.get("organization_display_name"), ""
-                        ),
-                        "Primary": "Yes" if bool(item.get("is_primary")) else "No",
-                    }
-                    for item in stakeholder_rows
-                ],
-                width="stretch",
-                hide_index=True,
-            )
-        else:
-            st.caption("No stakeholder relationships linked yet.")
-
-        role_options = [item.value for item in OrganizationRole]
-        selected_role_value = st.selectbox(
-            "Stakeholder Role",
-            options=role_options,
-            key=f"atlas_settings_stakeholder_role_{record.workspace_id}",
-        )
-        selected_role = parse_organization_role(selected_role_value)
-        lookup_query = st.text_input(
-            "Search existing organizations",
-            key=f"atlas_settings_stakeholder_lookup_{record.workspace_id}",
-            placeholder="Type organization name or alias",
-        )
-        matches: list[dict[str, Any]] = []
-        if lookup_query.strip():
+        with _shared_render_section_card(
+            st,
+            "Stakeholder Directory",
+            subtitle="Linked organizations, direct search, and duplicate-safe stakeholder actions.",
+        ):
+            stakeholder_rows: list[dict[str, Any]] = []
             try:
-                matches = list(
-                    workspace_service.search_stakeholder_organizations(
-                        lookup_query,
-                        role=selected_role,
-                        include_inactive=False,
-                        limit=12,
-                    )
+                stakeholder_rows = list(
+                    workspace_service.list_project_stakeholders(record.workspace_id)
                 )
             except Exception:
-                matches = []
+                stakeholder_rows = []
 
-        match_labels = [
-            f"{_safe_text(item.get('display_name'), '')} · {_safe_text(item.get('organization_id'), '')}"
-            for item in matches
-        ]
-        selected_match = st.selectbox(
-            "Select existing Organization",
-            options=["None"] + match_labels,
-            key=f"atlas_settings_stakeholder_match_{record.workspace_id}",
-        )
-
-        create_new_name = st.text_input(
-            "Create new Organization (if no suitable match)",
-            key=f"atlas_settings_stakeholder_create_{record.workspace_id}",
-            placeholder="Organization Name",
-        )
-        duplicate_confirm = st.checkbox(
-            "I confirm this is not an accidental duplicate.",
-            key=f"atlas_settings_stakeholder_duplicate_confirm_{record.workspace_id}",
-        )
-
-        if st.button(
-            "Link Stakeholder",
-            key=f"atlas_settings_stakeholder_link_{record.workspace_id}",
-            width="stretch",
-        ):
-            organization_id = ""
-            if selected_match != "None":
-                selected_index = ["None", *match_labels].index(selected_match) - 1
-                organization_id = _safe_text(
-                    matches[selected_index].get("organization_id"),
-                    "",
+            if stakeholder_rows:
+                st.dataframe(
+                    [
+                        {
+                            "Role": _safe_text(item.get("role"), "")
+                            .replace("_", " ")
+                            .title(),
+                            "Organization": _safe_text(
+                                item.get("organization_display_name"), ""
+                            ),
+                            "Primary": "Yes" if bool(item.get("is_primary")) else "No",
+                        }
+                        for item in stakeholder_rows
+                    ],
+                    width="stretch",
+                    hide_index=True,
                 )
-            elif create_new_name.strip():
-                duplicates = workspace_service.find_likely_organization_duplicates(
-                    create_new_name
-                )
-                if duplicates and not duplicate_confirm:
-                    st.warning(
-                        "Likely duplicate organizations exist. Confirm duplicate check before creating a new organization."
-                    )
-                    return
-                created = workspace_service.create_stakeholder_organization(
-                    name=create_new_name.strip(),
-                    role=selected_role,
-                )
-                organization_id = _safe_text(created.get("organization_id"), "")
+            else:
+                st.caption("No stakeholder relationships linked yet.")
 
-            if not organization_id:
-                st.warning("Select an existing organization or provide a new one.")
-                return
-
-            workspace_service.link_project_stakeholder(
-                workspace_id=record.workspace_id,
-                organization_id=organization_id,
-                role=selected_role,
-                is_primary=selected_role == OrganizationRole.OWNER_CLIENT,
+            role_options = [item.value for item in OrganizationRole]
+            selected_role_value = st.selectbox(
+                "Stakeholder Role",
+                options=role_options,
+                key=f"atlas_settings_stakeholder_role_{record.workspace_id}",
             )
-            st.success("Stakeholder linked to project.")
-            st.rerun()
-
-        st.markdown("### Project Repository / Storage")
-        st.dataframe(
-            [
-                {
-                    "field": "Repository Location",
-                    "value": str(workspace_service.workspace_root),
-                },
-                {
-                    "field": "Project Count",
-                    "value": len(
-                        workspace_service.list_workspaces(
-                            include_archived=True,
-                            limit=2000,
+            selected_role = parse_organization_role(selected_role_value)
+            lookup_query = st.text_input(
+                "Search existing organizations",
+                key=f"atlas_settings_stakeholder_lookup_{record.workspace_id}",
+                placeholder="Type organization name or alias",
+            )
+            matches: list[dict[str, Any]] = []
+            if lookup_query.strip():
+                try:
+                    matches = list(
+                        workspace_service.search_stakeholder_organizations(
+                            lookup_query,
+                            role=selected_role,
+                            include_inactive=False,
+                            limit=12,
                         )
-                    ),
-                },
-                {
-                    "field": "Selected Project Storage Path",
-                    "value": workspace_service.project_location(record.workspace_id),
-                },
-                {
-                    "field": "Manifest Schema Version",
-                    "value": manifest.get("schema_version", "n/a"),
-                },
-                {
-                    "field": "Manifest Storage Version",
-                    "value": manifest.get("storage_version", "n/a"),
-                },
-                {
-                    "field": "Health Status",
-                    "value": health.get("status", "unknown"),
-                },
-                {
-                    "field": "Last Validation",
-                    "value": health.get("validated_at", "n/a"),
-                },
-            ],
-            width="stretch",
-            hide_index=True,
-        )
+                    )
+                except Exception:
+                    matches = []
+
+            match_labels = [
+                f"{_safe_text(item.get('display_name'), '')} · {_safe_text(item.get('organization_id'), '')}"
+                for item in matches
+            ]
+            selected_match = st.selectbox(
+                "Select existing Organization",
+                options=["None"] + match_labels,
+                key=f"atlas_settings_stakeholder_match_{record.workspace_id}",
+            )
+
+            create_new_name = st.text_input(
+                "Create new Organization (if no suitable match)",
+                key=f"atlas_settings_stakeholder_create_{record.workspace_id}",
+                placeholder="Organization Name",
+            )
+            duplicate_confirm = st.checkbox(
+                "I confirm this is not an accidental duplicate.",
+                key=f"atlas_settings_stakeholder_duplicate_confirm_{record.workspace_id}",
+            )
+
+            if st.button(
+                "Link Stakeholder",
+                key=f"atlas_settings_stakeholder_link_{record.workspace_id}",
+                width="stretch",
+            ):
+                organization_id = ""
+                if selected_match != "None":
+                    selected_index = ["None", *match_labels].index(selected_match) - 1
+                    organization_id = _safe_text(
+                        matches[selected_index].get("organization_id"),
+                        "",
+                    )
+                elif create_new_name.strip():
+                    duplicates = workspace_service.find_likely_organization_duplicates(
+                        create_new_name
+                    )
+                    if duplicates and not duplicate_confirm:
+                        st.warning(
+                            "Likely duplicate organizations exist. Confirm duplicate check before creating a new organization."
+                        )
+                        return
+                    created = workspace_service.create_stakeholder_organization(
+                        name=create_new_name.strip(),
+                        role=selected_role,
+                    )
+                    organization_id = _safe_text(created.get("organization_id"), "")
+
+                if not organization_id:
+                    st.warning("Select an existing organization or provide a new one.")
+                    return
+
+                workspace_service.link_project_stakeholder(
+                    workspace_id=record.workspace_id,
+                    organization_id=organization_id,
+                    role=selected_role,
+                    is_primary=selected_role == OrganizationRole.OWNER_CLIENT,
+                )
+                st.success("Stakeholder linked to project.")
+                st.rerun()
+
+        with _shared_render_section_card(
+            st,
+            "Project Repository / Storage",
+            subtitle="Repository location, manifest status, and export/import paths.",
+        ):
+            _shared_render_report_table(
+                st,
+                [
+                    {
+                        "field": "Repository Location",
+                        "value": str(workspace_service.workspace_root),
+                    },
+                    {
+                        "field": "Project Count",
+                        "value": len(
+                            workspace_service.list_workspaces(
+                                include_archived=True,
+                                limit=2000,
+                            )
+                        ),
+                    },
+                    {
+                        "field": "Selected Project Storage Path",
+                        "value": workspace_service.project_location(
+                            record.workspace_id
+                        ),
+                    },
+                    {
+                        "field": "Manifest Schema Version",
+                        "value": manifest.get("schema_version", "n/a"),
+                    },
+                    {
+                        "field": "Manifest Storage Version",
+                        "value": manifest.get("storage_version", "n/a"),
+                    },
+                    {
+                        "field": "Health Status",
+                        "value": health.get("status", "unknown"),
+                    },
+                    {
+                        "field": "Last Validation",
+                        "value": health.get("validated_at", "n/a"),
+                    },
+                ],
+            )
 
         st.markdown("Manifest Summary")
         st.dataframe(
