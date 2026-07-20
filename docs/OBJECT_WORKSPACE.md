@@ -59,6 +59,7 @@ Implemented in W-03:
 - controlled migration for Customer, Vendor, Manufacturer, Product, Service, Contact, Location, and Project object routes
 - read-only validation support for Drawing, Specification, and Equipment through the shared object workspace with direct open to authoritative engineering views
 - search and Working Set handoff into Universal Object Workspace for supported object types
+- shared helper primitives for object headers, page headers, and data tables are exposed through the reusable Universal Workspace Framework
 
 Explicitly not implemented in W-03:
 - migration of all object types

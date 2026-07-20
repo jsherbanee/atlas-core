@@ -210,6 +210,11 @@ Future releases should follow this structure.
 - Audience: Workspace, search, UI, and platform contributors.
 - When to reference: When changing navigation state, breadcrumbs, or search-to-workspace handoff behavior.
 
+### [UNIVERSAL_WORKSPACE_FRAMEWORK.md](UNIVERSAL_WORKSPACE_FRAMEWORK.md)
+- Purpose: Defines the shared workspace shell primitives, component catalog, and migration order for Atlas workspace surfaces.
+- Audience: Workspace, UI, search, and platform contributors.
+- When to reference: When adding shared headers, object summaries, shell framing, or workspace migration steps.
+
 ### [SETTINGS_ARCHITECTURE.md](SETTINGS_ARCHITECTURE.md)
 - Purpose: Defines the reusable Settings workspace contract, settings scope boundaries, and tenant/user settings behavior.
 - Audience: Workspace, product, platform, and commercial-operations contributors.

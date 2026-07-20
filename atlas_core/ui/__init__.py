@@ -10,3 +10,8 @@ from .design_system import (  # noqa: F401
     render_status_badge_html,
     render_workspace_context_html,
 )
+from .workspace_framework import (  # noqa: F401
+    render_data_table,
+    render_object_header,
+    render_page_header,
+)

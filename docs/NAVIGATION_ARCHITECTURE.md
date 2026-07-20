@@ -29,6 +29,7 @@ This document defines the reusable navigation contract used by the shell and wor
 - Knowledge is the first workspace using the reusable secondary/tertiary navigation framework
 - Knowledge search results restore the active secondary group and tertiary page selection context
 - The framework is intended to be extended to additional workspaces without changing the contract shape
+- Shared workspace headers and object summaries are now factored into the reusable Universal Workspace Framework so page shells can reuse the same navigation and presentation grammar
 
 ## Transactions Navigation Direction
 
