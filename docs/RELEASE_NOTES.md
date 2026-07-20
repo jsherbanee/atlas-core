@@ -34,7 +34,9 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Knowledge landing and summary/status-card surfaces are removed so the default landing view stays concise.
 - Knowledge secondary navigation is consolidated to Customers, Vendors, Manufacturers, and Catalog; Contacts, Addresses, Price Lists, Imports, and Assemblies now appear contextually under the relevant record or catalog surface.
 - Knowledge secondary and tertiary navigation now renders as a compact contextual accordion without literal disclosure markers or duplicate content headings.
-- Customer Browse now defaults to Customer Name ascending, supports sortable table headings, and opens selected rows into Customer Details context.
+- Knowledge navigation now uses native disclosure sections for Customers, Vendors, Manufacturers, and Catalog with compact links inside each section.
+- Customer Browse now defaults to Customer Name ascending and opens the selected compact Customer selector record into Customer Details context.
+- Customer Browse no longer shows a redundant external sort-button row and uses one compact Customer selector for browse/detail handoff.
 - Customer Add now uses a single Customer Name field with generated Customer ID preview/allocation and removes tenant-facing JSON controls from normal Knowledge screens.
 - Customer, Vendor, and Manufacturer records can now be consolidated into shared Organization records with explicit duplicate review, merge preview, role profiles, redirected legacy records, and merge history.
 - Catalog now exposes Products, Services, Fees, Assemblies, Browse, Add, Import, and Activity as contextual tertiary actions without adding procurement, inventory, or CRM workflows.
@@ -49,8 +51,8 @@ This document tracks product-facing changes for Atlas Preview releases.
 ### Quality
 
 - full gates passing: `black --check .`, `ruff check .`, `mypy .`, `pytest`
-- full-suite validation: `1452 passed`
-- targeted navigation regression validation: `pytest tests/test_phase2_global_search_working_set.py tests/test_phase2_settings_navigation.py -q` -> `140 passed`
+- full-suite validation: `1480 passed`
+- targeted navigation regression validation: `pytest tests/test_phase2_global_search_working_set.py tests/test_phase2_settings_navigation.py -q` -> `165 passed`
 
 ### Scope Notes
 

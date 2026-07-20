@@ -56,6 +56,7 @@ class _HomeContractStreamlit:
         self.captions: list[str] = []
         self.dataframes: list[Any] = []
         self.popover_labels: list[str] = []
+        self.expander_calls: list[dict[str, Any]] = []
         self.column_specs: list[Any] = []
         self.text_inputs: list[dict[str, Any]] = []
         self.selectbox_calls: list[dict[str, Any]] = []
@@ -116,7 +117,7 @@ class _HomeContractStreamlit:
             }
         )
         _ = (type, use_container_width, width, key, disabled)
-        return label in self._pressed
+        return label in self._pressed or (key is not None and key in self._pressed)
 
     def selectbox(
         self,
@@ -139,7 +140,7 @@ class _HomeContractStreamlit:
         return value
 
     def expander(self, _label: str, expanded: bool = False) -> _HomeContractStreamlit:
-        _ = expanded
+        self.expander_calls.append({"label": _label, "expanded": expanded})
         return self
 
     def warning(self, text: str) -> None:
@@ -972,13 +973,96 @@ def test_workspace_navigation_uses_compact_labels_without_literal_arrows() -> No
 
     app._render_workspace_navigation(st, record=None)
 
+    expander_labels = [call["label"] for call in st.expander_calls]
+    assert expander_labels[:4] == ["Customers", "Vendors", "Manufacturers", "Catalog"]
+    assert [call["expanded"] for call in st.expander_calls[:4]] == [
+        True,
+        False,
+        False,
+        False,
+    ]
     labels = [call["label"] for call in st.button_calls]
-    assert "Customers" in labels
-    assert "Vendors" in labels
-    assert "Manufacturers" in labels
-    assert "Catalog" in labels
     assert all("[v]" not in label and "[>]" not in label for label in labels)
-    assert "   Browse" in labels
+    assert "Browse" in labels
+    assert "   Browse" not in labels
+
+
+@pytest.mark.parametrize(
+    ("secondary", "expected_expanded"),
+    [
+        ("customers", "Customers"),
+        ("vendors", "Vendors"),
+        ("manufacturers", "Manufacturers"),
+        ("catalog", "Catalog"),
+    ],
+)
+def test_knowledge_expanders_keep_one_section_expanded(
+    secondary: str, expected_expanded: str
+) -> None:
+    st = _HomeContractStreamlit()
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): secondary,
+            app._navigation_tertiary_state_key(): "browse",
+        }
+    )
+
+    app._render_workspace_navigation(st, record=None)
+
+    expanded = [
+        call["label"] for call in st.expander_calls[:4] if bool(call["expanded"])
+    ]
+    assert expanded == [expected_expanded]
+
+
+@pytest.mark.parametrize(
+    ("button_key", "secondary", "tertiary"),
+    [
+        (
+            "atlas_knowledge_expander_Knowledge_application_customers_add",
+            "customers",
+            "add",
+        ),
+        (
+            "atlas_knowledge_expander_Knowledge_application_vendors_price_lists",
+            "vendors",
+            "price_lists",
+        ),
+        (
+            "atlas_knowledge_expander_Knowledge_application_manufacturers_default_vendor",
+            "manufacturers",
+            "default_vendor",
+        ),
+        (
+            "atlas_knowledge_expander_Knowledge_application_catalog_import",
+            "catalog",
+            "import",
+        ),
+    ],
+)
+def test_knowledge_expander_links_route_same_window(
+    button_key: str, secondary: str, tertiary: str
+) -> None:
+    st = _HomeContractStreamlit(pressed={button_key})
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "customers",
+            app._navigation_tertiary_state_key(): "browse",
+        }
+    )
+
+    app._render_workspace_navigation(st, record=None)
+
+    assert st.session_state[app._navigation_secondary_state_key()] == secondary
+    assert st.session_state[app._navigation_tertiary_state_key()] == tertiary
+    assert st.session_state["atlas_active_page"] == "Knowledge"
+    assert st.rerun_called is True
 
 
 def test_customer_sort_defaults_name_ascending_and_toggles_direction() -> None:
@@ -1170,6 +1254,37 @@ def test_customer_workspace_uses_single_name_field_and_no_json_controls() -> Non
     assert "Canonical Name" not in labels
     assert "Display Name" not in labels
     assert all("JSON" not in call["label"] for call in st.download_buttons)
+
+
+def test_customer_browse_uses_single_selector_and_no_sort_button_row() -> None:
+    st = _HomeContractStreamlit()
+    service = CommercialProductService()
+    service.create_customer(customer_id="CUST-0002", canonical_name="Beta Customer")
+    service.create_customer(customer_id="CUST-0001", canonical_name="Alpha Customer")
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "customers",
+            app._navigation_tertiary_state_key(): "browse",
+            "atlas_price_list_library": {"commercial_products": service.to_dict()},
+        }
+    )
+
+    app._render_application_knowledge_page(st, _FakeWorkspaceService([]))
+
+    labels = [call["label"] for call in st.button_calls]
+    assert "Customer Name (A-Z)" not in labels
+    assert "Customer ID" not in labels
+    selector_labels = [call["label"] for call in st.selectbox_calls]
+    assert selector_labels.count("Customer") == 1
+    assert "Open Customer" not in selector_labels
+    customer_selector = next(
+        call for call in st.selectbox_calls if call["label"] == "Customer"
+    )
+    assert customer_selector["options"][0].startswith("Alpha Customer")
+    assert any(call["label"] == "Browse All" for call in st.expander_calls)
 
 
 def test_transactions_workspace_source_omits_overview_status_cards() -> None:

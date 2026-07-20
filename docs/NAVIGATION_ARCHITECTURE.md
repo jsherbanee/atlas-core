@@ -122,16 +122,17 @@ W-01 implementation note:
 - settings deferred-section disable behavior and platform-diagnostic scoping are regression-covered
 - The implementation is covered by app-level regression tests and full-suite validation
 
-## Accordion Navigation Refinement
+## Native Disclosure Navigation Refinement
 
-The shared workspace shell now presents secondary and tertiary navigation as a
-left-column accordion.
+The Knowledge workspace now presents secondary and tertiary navigation as
+left-column native disclosure sections.
 
 Implemented behavior:
 - primary header navigation remains unchanged
-- the selected secondary section expands in the left column
-- tertiary actions render directly beneath the active secondary section
-- inactive secondary sections remain collapsed
+- Customers, Vendors, Manufacturers, and Catalog render as native expander rows
+- the selected Knowledge section expands in the left column on rerender
+- compact tertiary actions render directly beneath the related section
+- inactive Knowledge sections remain collapsed on rerender
 - secondary and tertiary labels render as compact navigation text without literal disclosure markers
 - the separate tertiary action row above main content is removed
 - stale secondary selections are reset to the current workspace contract when switching primary workspaces
@@ -148,8 +149,8 @@ Knowledge visible secondary navigation is now:
 Contacts, Locations, Price Lists, Imports, and Assemblies are removed from visible secondary navigation while their data remains reachable through contextual tertiary actions, vendor price-list surfaces, catalog import/provenance/activity, and Universal Object handoff.
 
 Knowledge repair note:
-- Knowledge keeps one expanded secondary section at a time: Customers, Vendors, Manufacturers, or Catalog
+- Knowledge keeps one expanded secondary section at a time on rerender: Customers, Vendors, Manufacturers, or Catalog
 - record-specific tertiary links stay contextual and only become useful once the related record is selected
-- Customer Browse defaults to Customer Name ascending, exposes sortable table headers, and opens the selected record into Details/current context
+- Customer Browse defaults to Customer Name ascending, uses one compact Customer selector as the primary selection mechanism, and keeps the full table behind Browse All
 - Customer Add uses a single Customer Name field with non-consuming Customer ID preview and consuming allocation on create
 - normal tenant-facing Knowledge surfaces avoid JSON controls; CSV export remains available in contextual/advanced areas

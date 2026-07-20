@@ -8332,6 +8332,77 @@ def _render_secondary_navigation_section(
             )
 
 
+def _knowledge_expander_action_keys(secondary_key: str) -> tuple[str, ...]:
+    return {
+        "customers": ("browse", "add", "activity"),
+        "vendors": ("browse", "add", "price_lists", "products", "activity"),
+        "manufacturers": (
+            "browse",
+            "add",
+            "default_vendor",
+            "products",
+            "activity",
+        ),
+        "catalog": (
+            "browse",
+            "products",
+            "services",
+            "fees",
+            "assemblies",
+            "add",
+            "import",
+            "activity",
+        ),
+    }.get(secondary_key, ("browse",))
+
+
+def _render_knowledge_expander_navigation_section(
+    st: Any,
+    *,
+    primary: str,
+    mode: str,
+    section: dict[str, Any],
+    record: ProjectWorkspaceRecord | None,
+) -> None:
+    secondary_key = _safe_text(section.get("secondary_key"), "")
+    section_label = _safe_text(section.get("label"), secondary_key)
+    is_active = secondary_key == _safe_text(
+        st.session_state.get(_navigation_secondary_state_key()),
+        "",
+    )
+    actions_by_key = {
+        _safe_text(action.get("tertiary_key"), ""): action
+        for action in list(section.get("supported_tertiary_actions") or [])
+        if bool(action.get("visibility", True))
+    }
+    with st.expander(section_label, expanded=is_active):
+        for action_key in _knowledge_expander_action_keys(secondary_key):
+            action = actions_by_key.get(action_key)
+            if not action:
+                continue
+            label = _safe_text(action.get("label"), action_key)
+            is_tertiary_active = is_active and action_key == _safe_text(
+                st.session_state.get(_navigation_tertiary_state_key()), ""
+            )
+            if st.button(
+                label,
+                key=f"atlas_knowledge_expander_{primary}_{mode}_{secondary_key}_{action_key}",
+                type="primary" if is_tertiary_active else "secondary",
+                disabled=not bool(action.get("enabled", True)),
+                width="content",
+            ):
+                if secondary_key != _safe_text(
+                    st.session_state.get(_navigation_secondary_state_key()), ""
+                ):
+                    st.session_state[_navigation_secondary_state_key()] = secondary_key
+                _open_tertiary_navigation_action(
+                    st,
+                    primary=primary,
+                    mode=mode,
+                    action=action,
+                )
+
+
 def _render_workspace_navigation(
     st: Any,
     record: ProjectWorkspaceRecord | None,
@@ -8358,13 +8429,22 @@ def _render_workspace_navigation(
             if group_name:
                 st.caption(group_name)
             for section in section_group:
-                _render_secondary_navigation_section(
-                    st,
-                    primary=primary,
-                    mode=mode,
-                    section=section,
-                    record=record,
-                )
+                if primary == "Knowledge":
+                    _render_knowledge_expander_navigation_section(
+                        st,
+                        primary=primary,
+                        mode=mode,
+                        section=section,
+                        record=record,
+                    )
+                else:
+                    _render_secondary_navigation_section(
+                        st,
+                        primary=primary,
+                        mode=mode,
+                        section=section,
+                        record=record,
+                    )
 
     with shell_cols[1]:
         section = next(
@@ -11957,7 +12037,7 @@ def _render_application_knowledge_page(
             if st.button(
                 "Create Customer",
                 key="atlas_ck_create_customer",
-                width="stretch",
+                width="content",
             ):
                 try:
                     if not _safe_text(customer_name, ""):
@@ -12073,37 +12153,22 @@ def _render_application_knowledge_page(
                 )
             ]
 
-        sort_columns = [
-            "Customer Name",
-            "Customer ID",
-            "City / State",
-            "Active Projects",
-            "Open Transactions",
-            "Status",
-            "Last Updated",
-        ]
-        sort_header_cols = st.columns(len(sort_columns))
-        for index, column in enumerate(sort_columns):
-            if sort_header_cols[index].button(
-                f"{column}{_customer_sort_indicator(st, column)}",
-                key=f"atlas_customer_sort_{column.lower().replace(' ', '_').replace('/', '')}",
-                width="stretch",
-            ):
-                _toggle_customer_sort(st, column)
-                st.rerun()
-
         sort_column, sort_direction = _customer_sort_state(st)
         customer_rows = _sort_customer_rows(
             customer_rows, column=sort_column, direction=sort_direction
         )
-        st.dataframe(
-            [
-                {key: value for key, value in item.items() if not key.startswith("_")}
-                for item in customer_rows
-            ],
-            width="stretch",
-            hide_index=True,
-        )
+        display_rows = [
+            {
+                (
+                    f"{key}{_customer_sort_indicator(st, key)}"
+                    if key == sort_column
+                    else key
+                ): value
+                for key, value in item.items()
+                if not key.startswith("_")
+            }
+            for item in customer_rows
+        ]
 
         selectable_rows = [
             item
@@ -12112,7 +12177,7 @@ def _render_application_knowledge_page(
         ]
         if selectable_rows:
             selected_label = st.selectbox(
-                "Open Customer",
+                "Customer",
                 options=[
                     f"{_safe_text(item.get('Customer Name'), '')} ({_safe_text(item.get('Customer ID'), '')})"
                     for item in selectable_rows
@@ -12131,9 +12196,6 @@ def _render_application_knowledge_page(
                 selected_customer_id
             )
             _set_context_selection(st, "customer", selected_customer)
-            if active_tertiary == "browse":
-                st.session_state[_navigation_tertiary_state_key()] = "details"
-                st.rerun()
 
             if active_tertiary in {
                 "details",
@@ -12230,6 +12292,12 @@ def _render_application_knowledge_page(
                     locations=location_entities,
                     key_prefix="atlas_ck_customer_context",
                 )
+        with st.expander("Browse All", expanded=False):
+            st.dataframe(
+                display_rows,
+                width="stretch",
+                hide_index=True,
+            )
 
         if active_tertiary in {"activity", "archive"}:
             events = [

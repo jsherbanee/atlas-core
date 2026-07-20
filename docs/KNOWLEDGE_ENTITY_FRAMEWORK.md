@@ -103,6 +103,7 @@ Knowledge consolidation note:
 - Catalog is the business workspace for reusable Products, Services, Fees, and Assemblies
 - Customer Add accepts one Customer Name, allocates tenant-scoped Customer IDs only on create, and stores duplicate canonical/display naming internally for compatibility
 - tenant-facing Knowledge screens avoid JSON import/export controls; CSV remains available in contextual and advanced entity workflows
+- Customers, Vendors, Manufacturers, and Catalog render through native disclosure navigation with compact tertiary controls and the existing workspace navigation state keys
 
 X-12 navigation note:
 - Knowledge is the first workspace to use the reusable three-level navigation contract while preserving the existing entity workflows and deterministic state model.

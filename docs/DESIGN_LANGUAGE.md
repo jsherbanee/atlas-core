@@ -473,6 +473,7 @@ Preferred examples include Browse, Add, Edit, Relationships, Import, Export, Dec
 
 Secondary/tertiary navigation should read as navigation, not as a form or diagnostic display.
 Use compact labels, quiet indentation for tertiary actions, one visible expanded context, and no literal text disclosure symbols.
+For Knowledge, use native disclosure rows for Customers, Vendors, Manufacturers, and Catalog, with compact action controls inside each disclosure instead of full-column secondary buttons.
 
 Navigation should remove implementation noise.
 Avoid exposing framework labels, diagnostic terms, duplicate workspace labels, development banners, or explanatory text that does not help the user act.
