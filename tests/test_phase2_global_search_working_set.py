@@ -205,20 +205,98 @@ class _FakeWorkspaceService:
     def __init__(self, records: list[ProjectWorkspaceRecord]) -> None:
         self._records = records
         self.saved_records: list[ProjectWorkspaceRecord] = []
+        self.renamed: list[tuple[str, str]] = []
+        self.duplicated: list[tuple[str, str, str | None]] = []
+        self.pinned: list[tuple[str, bool]] = []
+        self.archived: list[tuple[str, bool]] = []
+        self.deleted: list[str] = []
 
     def list_workspaces(
         self,
         include_archived: bool = True,
         limit: int = 1000,
     ) -> list[ProjectWorkspaceRecord]:
-        return list(self._records)[:limit]
+        records = [
+            item for item in self._records if include_archived or not item.archived
+        ]
+        return list(records)[:limit]
 
     def preview_next_bid_id(self) -> str:
         return "BID-2099-0001"
 
     def list_recent_workspaces(self, limit: int = 10) -> list[ProjectWorkspaceRecord]:
         _ = limit
-        return list(self._records)[:limit]
+        return [item for item in self._records if not item.archived][:limit]
+
+    def list_pinned_workspaces(self, limit: int = 20) -> list[ProjectWorkspaceRecord]:
+        return [item for item in self._records if item.pinned][:limit]
+
+    def list_reference_workspaces(
+        self,
+        include_archived: bool = False,
+    ) -> list[ProjectWorkspaceRecord]:
+        records = [item for item in self._records if item.is_reference]
+        return [item for item in records if include_archived or not item.archived]
+
+    def list_project_stakeholders(self, _workspace_id: str) -> list[dict[str, Any]]:
+        return []
+
+    def read_manifest(self, _workspace_id: str) -> dict[str, Any]:
+        return {"document_counts": {}}
+
+    def rename_project(
+        self, workspace_id: str, new_name: str
+    ) -> ProjectWorkspaceRecord:
+        self.renamed.append((workspace_id, new_name))
+        record = next(
+            item for item in self._records if item.workspace_id == workspace_id
+        )
+        record.project.name = new_name
+        return record
+
+    def duplicate_project(
+        self,
+        workspace_id: str,
+        new_workspace_id: str,
+        new_name: str | None = None,
+    ) -> ProjectWorkspaceRecord:
+        self.duplicated.append((workspace_id, new_workspace_id, new_name))
+        source = next(
+            item for item in self._records if item.workspace_id == workspace_id
+        )
+        duplicate = _project_record(
+            new_workspace_id, new_name or f"{source.project.name} Copy"
+        )
+        self._records.insert(0, duplicate)
+        return duplicate
+
+    def pin_project(
+        self, workspace_id: str, pinned: bool = True
+    ) -> ProjectWorkspaceRecord:
+        self.pinned.append((workspace_id, pinned))
+        record = next(
+            item for item in self._records if item.workspace_id == workspace_id
+        )
+        record.pinned = pinned
+        return record
+
+    def archive_project(
+        self,
+        workspace_id: str,
+        archived: bool = True,
+    ) -> ProjectWorkspaceRecord:
+        self.archived.append((workspace_id, archived))
+        record = next(
+            item for item in self._records if item.workspace_id == workspace_id
+        )
+        record.archived = archived
+        return record
+
+    def delete_project(self, workspace_id: str) -> None:
+        self.deleted.append(workspace_id)
+        self._records = [
+            item for item in self._records if item.workspace_id != workspace_id
+        ]
 
     def save_record(self, record: ProjectWorkspaceRecord) -> Path:
         self.saved_records.append(record)
@@ -362,7 +440,8 @@ class _CreatePageStreamlit:
     def success(self, text: str) -> None:
         self.successes.append(text)
 
-    def markdown(self, _text: str) -> None:
+    def markdown(self, _text: str, **kwargs: Any) -> None:
+        _ = kwargs
         return None
 
     def button(
@@ -2147,6 +2226,66 @@ def test_home_page_renders_operational_sections() -> None:
     assert "Action Center" in rendered_text
     assert "Notifications" in rendered_text
     assert "Favorites" in rendered_text
+
+
+def test_projects_library_page_uses_shared_workspace_sections() -> None:
+    records = [
+        _project_record("project-b", "Project B"),
+        _project_record("project-a", "Project A"),
+    ]
+    records[0].pinned = True
+    records[1].is_reference = True
+    st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService(records)
+
+    app._render_projects_page(st, service)
+
+    rendered_text = "\n".join([*st.subheaders, *st.markdowns, *st.captions])
+    assert "Project Library" in rendered_text
+    assert "### Filtered Projects" in st.markdowns
+    assert "### Selected Project" in st.markdowns
+    assert any(call["label"] == "Open Project" for call in st.button_calls)
+
+
+def test_pinned_projects_page_uses_shared_workspace_sections() -> None:
+    record = _project_record("project-a", "Project A")
+    record.pinned = True
+    st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService([record])
+
+    app._render_pinned_projects_page(st, service)
+
+    rendered_text = "\n".join([*st.subheaders, *st.markdowns, *st.captions])
+    assert "Pinned Projects" in rendered_text
+    assert "### Pinned Project List" in st.markdowns
+    assert "### Selected Pinned Project" in st.markdowns
+
+
+def test_reference_projects_page_uses_shared_workspace_sections() -> None:
+    record = _project_record("reference-a", "Reference A")
+    record.is_reference = True
+    st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService([record])
+
+    app._render_reference_projects_page(st, service)
+
+    rendered_text = "\n".join([*st.subheaders, *st.markdowns, *st.captions])
+    assert "Reference Projects" in rendered_text
+    assert "### Reference Project List" in st.markdowns
+    assert "### Selected Reference Project" in st.markdowns
+
+
+def test_recent_projects_page_uses_shared_workspace_sections() -> None:
+    record = _project_record("recent-a", "Recent A")
+    st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService([record])
+
+    app._render_recent_projects_page(st, service)
+
+    rendered_text = "\n".join([*st.subheaders, *st.markdowns, *st.captions])
+    assert "Recent Projects" in rendered_text
+    assert "### Recent Project List" in st.markdowns
+    assert "### Selected Recent Project" in st.markdowns
 
 
 def test_footer_renders_tenant_copyright_without_diagnostics() -> None:

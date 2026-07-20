@@ -278,6 +278,7 @@ Explicit non-goals:
 
 ## Projects Library
 Projects is the primary project library.
+Projects library surfaces now share the Universal Workspace Framework header, table, and selected-record inspector grammar so the list pages feel consistent with other workspace surfaces without changing repository-backed behavior.
 
 Primary actions:
 - Open Project

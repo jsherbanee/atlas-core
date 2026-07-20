@@ -7930,6 +7930,160 @@ def _project_library_rows(
     return rows
 
 
+def _project_library_detail_rows(
+    record: ProjectWorkspaceRecord,
+) -> list[dict[str, Any]]:
+    return [
+        {"Property": "Atlas Bid ID", "Value": _atlas_bid_id(record)},
+        {"Property": "Project Name", "Value": _safe_text(record.project.name, "")},
+        {"Property": "Owner / Client", "Value": _safe_text(record.project.client, "")},
+        {
+            "Property": "Lifecycle Stage",
+            "Value": _project_stage(record).replace("_", " ").title(),
+        },
+        {
+            "Property": "Status",
+            "Value": _safe_text(
+                record.metadata.get("status"), record.project.status.value
+            )
+            .replace("_", " ")
+            .title(),
+        },
+        {"Property": "Source", "Value": _safe_text(record.source_label, "")},
+        {"Property": "Last Opened", "Value": _safe_text(record.last_opened_at, "n/a")},
+        {"Property": "Last Modified", "Value": _safe_text(record.updated_at, "n/a")},
+        {"Property": "Reference", "Value": "Yes" if record.is_reference else "No"},
+        {"Property": "Archived", "Value": "Yes" if record.archived else "No"},
+        {"Property": "Pinned", "Value": "Yes" if record.pinned else "No"},
+    ]
+
+
+def _project_library_badges(record: ProjectWorkspaceRecord) -> list[str]:
+    return [
+        _project_stage(record).replace("_", " ").title(),
+        "Reference" if record.is_reference else "Standard",
+        "Archived" if record.archived else "Active",
+        "Pinned" if record.pinned else "Unpinned",
+    ]
+
+
+def _clear_active_project_workspace(st: Any, workspace_id: str) -> None:
+    if workspace_id == st.session_state.get("atlas_active_workspace_id"):
+        st.session_state["atlas_active_workspace_id"] = None
+        st.session_state["atlas_active_page"] = "Mission Control"
+
+
+def _render_project_library_selected_record(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+    *,
+    open_label: str,
+    primary_action_label: str = "Open Project",
+) -> None:
+    def _open_selected_project() -> None:
+        _open_project_record(st, record, workspace_service)
+
+    def _toggle_pin(should_pin: bool) -> None:
+        workspace_service.pin_project(record.workspace_id, pinned=should_pin)
+        st.rerun()
+
+    _shared_render_object_header(
+        st,
+        object_name=_safe_text(record.project.name, "Project"),
+        description=_safe_text(record.project.client, "Project workspace"),
+        badges=_project_library_badges(record),
+        recommended_action=_safe_text(open_label, "Open the project workspace"),
+        primary_action_label=primary_action_label,
+        primary_action_key=f"atlas_project_library_open_{record.workspace_id}",
+        add_pin_label="Pin Project",
+        remove_pin_label="Unpin Project",
+        toggle_pin_key=f"atlas_project_library_pin_{record.workspace_id}",
+        pinned=record.pinned,
+        on_primary_action=_open_selected_project,
+        on_toggle_pin=_toggle_pin,
+    )
+
+    _shared_render_section_title(st, "Project Details")
+    _shared_render_data_table(st, _project_library_detail_rows(record))
+
+    rename_name = st.text_input(
+        "Rename project",
+        value=record.project.name,
+        key=f"atlas_project_library_rename_{record.workspace_id}",
+    )
+    duplicate_name = st.text_input(
+        "Duplicate name",
+        value=f"{record.project.name} Copy",
+        key=f"atlas_project_library_duplicate_{record.workspace_id}",
+    )
+    delete_confirm = st.checkbox(
+        "Confirm Delete",
+        key=f"atlas_project_library_delete_confirm_{record.workspace_id}",
+    )
+
+    action_cols = _responsive_control_columns(st, 3)
+    if action_cols[0].button(
+        "Save Name",
+        key=f"atlas_project_library_save_name_{record.workspace_id}",
+        width="stretch",
+    ):
+        if rename_name.strip():
+            workspace_service.rename_project(record.workspace_id, rename_name.strip())
+            st.rerun()
+
+    if action_cols[1].button(
+        "Duplicate",
+        key=f"atlas_project_library_duplicate_btn_{record.workspace_id}",
+        width="stretch",
+    ):
+        workspace_service.duplicate_project(
+            record.workspace_id,
+            new_workspace_id=f"{record.workspace_id}-copy",
+            new_name=duplicate_name.strip() or None,
+        )
+        st.rerun()
+
+    archive_label = "Unarchive" if record.archived else "Archive"
+    if action_cols[2].button(
+        archive_label,
+        key=f"atlas_project_library_archive_{record.workspace_id}",
+        width="stretch",
+    ):
+        workspace_service.archive_project(
+            record.workspace_id,
+            archived=not record.archived,
+        )
+        _clear_active_project_workspace(st, record.workspace_id)
+        st.rerun()
+
+    destructive_cols = _responsive_control_columns(st, 1)
+    if destructive_cols[0].button(
+        "Delete",
+        key=f"atlas_project_library_delete_{record.workspace_id}",
+        width="stretch",
+        disabled=not delete_confirm,
+    ):
+        if not delete_confirm:
+            st.warning("Enable Confirm Delete before deleting a project.")
+        else:
+            workspace_service.delete_project(record.workspace_id)
+            _clear_active_project_workspace(st, record.workspace_id)
+            st.rerun()
+
+
+def _render_project_library_page_shell(
+    st: Any,
+    *,
+    title: str,
+    subtitle: str,
+    notice_title: str,
+    notice_body: str,
+) -> None:
+    _render_page_header(st, title, subtitle)
+    _render_notice_panel(st, notice_title, notice_body)
+
+
 def _open_project_from_local_path(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -22096,10 +22250,12 @@ def _render_application_administration_page(
 
 
 def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -> None:
-    _render_page_header(
+    _render_project_library_page_shell(
         st,
-        "Projects",
-        "",
+        title="Projects",
+        subtitle="Browse repository-backed projects, then open, pin, archive, duplicate, rename, or delete the selected workspace.",
+        notice_title="Project Library",
+        notice_body="The library keeps the existing repository contract and uses the shared workspace grammar for page structure, tables, and record actions.",
     )
 
     include_archived = st.checkbox("Show archived projects", value=False)
@@ -22109,7 +22265,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         limit=500,
     )
     if not rows:
-        _render_guided_empty_state(
+        _shared_render_guided_empty_state(
             st,
             why_empty="No projects are imported into the Atlas Project Repository.",
             action_to_populate="Create a new project or import a .atlaspkg bundle.",
@@ -22125,6 +22281,18 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
             st.session_state[_navigation_tertiary_state_key()] = "import"
             st.rerun()
         return
+
+    metrics_cols = _responsive_control_columns(st, 4)
+    _metric_card(metrics_cols[0], "Projects", str(len(rows)))
+    _metric_card(
+        metrics_cols[1], "Pinned", str(sum(1 for item in rows if item["pinned"]))
+    )
+    _metric_card(
+        metrics_cols[2], "Reference", str(sum(1 for item in rows if item["reference"]))
+    )
+    _metric_card(
+        metrics_cols[3], "Archived", str(sum(1 for item in rows if item["archived"]))
+    )
 
     filter_cols = _responsive_control_columns(st, 5)
     search = filter_cols[0].text_input("Search", value="")
@@ -22196,7 +22364,8 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
     ]
     filtered.sort(key=lambda item: _safe_text(item.get(sort_field), ""), reverse=True)
 
-    _render_data_table(
+    _shared_render_section_title(st, "Filtered Projects")
+    _shared_render_data_table(
         st,
         [
             {
@@ -22220,91 +22389,26 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
     )
 
     labels = [f"{item['project_name']} · {item['atlas_bid_id']}" for item in filtered]
-    if labels:
-        selected_label = st.selectbox("Open Project", options=labels)
-        selected_item = filtered[labels.index(selected_label)]
-        selected = selected_item["record"]
+    if not labels:
+        _shared_render_guided_empty_state(
+            st,
+            why_empty="No projects match the current filters.",
+            action_to_populate="Clear the search or narrow the status filters.",
+            next_location="Use the controls above to broaden the project list.",
+        )
+        return
 
-        action_cols = st.columns([1.5, 1.0, 1.0])
-        if action_cols[0].button("Open Project", type="primary", width="content"):
-            _open_project_record(st, selected, workspace_service)
+    selected_label = st.selectbox("Open Project", options=labels)
+    selected_item = filtered[labels.index(selected_label)]
+    selected = selected_item["record"]
 
-        pin_label = "Unpin" if selected.pinned else "Pin"
-        if action_cols[1].button(pin_label, width="content"):
-            workspace_service.pin_project(
-                selected.workspace_id, pinned=not selected.pinned
-            )
-            st.rerun()
-        with action_cols[2].popover("Project Actions"):
-            rename_name = st.text_input(
-                "Rename project",
-                value=selected.project.name,
-                key=f"atlas_rename_name_{selected.workspace_id}",
-            )
-            if st.button(
-                "Save Name",
-                key=f"atlas_rename_btn_{selected.workspace_id}",
-                width="content",
-            ):
-                if rename_name.strip():
-                    workspace_service.rename_project(
-                        selected.workspace_id, rename_name.strip()
-                    )
-                    st.rerun()
-
-            duplicate_name = st.text_input(
-                "Duplicate name",
-                value=f"{selected.project.name} Copy",
-                key=f"atlas_duplicate_name_{selected.workspace_id}",
-            )
-            if st.button(
-                "Duplicate",
-                key=f"atlas_duplicate_btn_{selected.workspace_id}",
-                width="content",
-            ):
-                workspace_service.duplicate_project(
-                    selected.workspace_id,
-                    new_workspace_id=f"{selected.workspace_id}-copy",
-                    new_name=duplicate_name.strip() or None,
-                )
-                st.rerun()
-
-            archive_label = "Unarchive" if selected.archived else "Archive"
-            if st.button(
-                archive_label,
-                key=f"atlas_archive_btn_{selected.workspace_id}",
-                width="content",
-            ):
-                workspace_service.archive_project(
-                    selected.workspace_id,
-                    archived=not selected.archived,
-                )
-                if selected.workspace_id == st.session_state.get(
-                    "atlas_active_workspace_id"
-                ):
-                    st.session_state["atlas_active_workspace_id"] = None
-                    st.session_state["atlas_active_page"] = "Mission Control"
-                st.rerun()
-
-            delete_confirm = st.checkbox(
-                "Confirm Delete",
-                key=f"atlas_confirm_delete_{selected.workspace_id}",
-            )
-            if st.button(
-                "Delete",
-                key=f"atlas_delete_btn_{selected.workspace_id}",
-                width="content",
-            ):
-                if not delete_confirm:
-                    st.warning("Enable Confirm Delete before deleting a project.")
-                else:
-                    workspace_service.delete_project(selected.workspace_id)
-                    if selected.workspace_id == st.session_state.get(
-                        "atlas_active_workspace_id"
-                    ):
-                        st.session_state["atlas_active_workspace_id"] = None
-                        st.session_state["atlas_active_page"] = "Mission Control"
-                    st.rerun()
+    _shared_render_section_title(st, "Selected Project")
+    _render_project_library_selected_record(
+        st,
+        workspace_service,
+        selected,
+        open_label="Open the selected project workspace.",
+    )
 
 
 def _render_project_folder_page(
@@ -23992,13 +24096,37 @@ def _render_pinned_projects_page(
     st: Any,
     workspace_service: ProjectWorkspaceService,
 ) -> None:
-    _render_page_header(st, "Pinned Projects", "Fast access to prioritized projects.")
+    _render_project_library_page_shell(
+        st,
+        title="Pinned Projects",
+        subtitle="Fast access to prioritized projects.",
+        notice_title="Pinned Projects",
+        notice_body="Pinned workspaces stay visible here and retain the same repository-backed controls as the main library.",
+    )
     records = workspace_service.list_pinned_workspaces(limit=200)
     if not records:
-        st.info("No pinned projects yet.")
+        _shared_render_guided_empty_state(
+            st,
+            why_empty="No pinned projects yet.",
+            action_to_populate="Pin a project from the main Projects library.",
+            next_location="Use the Projects page to pin a workspace.",
+        )
         return
 
-    st.dataframe(
+    metric_cols = _responsive_control_columns(st, 3)
+    _metric_card(metric_cols[0], "Pinned Projects", str(len(records)))
+    _metric_card(
+        metric_cols[1], "Archived", str(sum(1 for item in records if item.archived))
+    )
+    _metric_card(
+        metric_cols[2],
+        "Reference",
+        str(sum(1 for item in records if item.is_reference)),
+    )
+
+    _shared_render_section_title(st, "Pinned Project List")
+    _shared_render_data_table(
+        st,
         [
             {
                 "project": record.project.name,
@@ -24008,8 +24136,6 @@ def _render_pinned_projects_page(
             }
             for record in records
         ],
-        width="stretch",
-        hide_index=True,
     )
 
     labels = [
@@ -24017,24 +24143,42 @@ def _render_pinned_projects_page(
     ]
     selected_label = st.selectbox("Open Pinned Project", options=labels)
     selected = records[labels.index(selected_label)]
-    if st.button("Open Pinned Project", type="primary"):
-        st.session_state["atlas_active_workspace_id"] = selected.workspace_id
-        st.session_state["atlas_active_page"] = "Overview"
-        st.rerun()
+    _shared_render_section_title(st, "Selected Pinned Project")
+    _render_project_library_selected_record(
+        st,
+        workspace_service,
+        selected,
+        open_label="Open the selected pinned project.",
+    )
 
 
 def _render_reference_projects_page(
     st: Any,
     workspace_service: ProjectWorkspaceService,
 ) -> None:
-    _render_page_header(
+    _render_project_library_page_shell(
         st,
-        "Reference Projects",
-        "Load deterministic benchmark reference workspaces.",
+        title="Reference Projects",
+        subtitle="Load deterministic benchmark reference workspaces.",
+        notice_title="Reference Projects",
+        notice_body="Reference workspaces use the same repository contract, but are flagged for comparison and local validation.",
     )
     references = workspace_service.list_reference_workspaces(include_archived=False)
     if references:
-        st.dataframe(
+        metric_cols = _responsive_control_columns(st, 3)
+        _metric_card(metric_cols[0], "Reference Projects", str(len(references)))
+        _metric_card(
+            metric_cols[1], "Pinned", str(sum(1 for item in references if item.pinned))
+        )
+        _metric_card(
+            metric_cols[2],
+            "Archived",
+            str(sum(1 for item in references if item.archived)),
+        )
+
+        _shared_render_section_title(st, "Reference Project List")
+        _shared_render_data_table(
+            st,
             [
                 {
                     "project": record.project.name,
@@ -24044,18 +24188,19 @@ def _render_reference_projects_page(
                 }
                 for record in references
             ],
-            width="stretch",
-            hide_index=True,
         )
         labels = [
             f"{record.project.name} · {record.workspace_id}" for record in references
         ]
         selected_label = st.selectbox("Open Reference Project", options=labels)
         selected = references[labels.index(selected_label)]
-        if st.button("Open Selected Reference", type="primary"):
-            st.session_state["atlas_active_workspace_id"] = selected.workspace_id
-            st.session_state["atlas_active_page"] = "Overview"
-            st.rerun()
+        _shared_render_section_title(st, "Selected Reference Project")
+        _render_project_library_selected_record(
+            st,
+            workspace_service,
+            selected,
+            open_label="Open the selected reference project.",
+        )
 
     st.markdown(
         "<span class='atlas-chip'>Reference</span> Music Academy of the West",
@@ -24077,35 +24222,72 @@ def _render_reference_projects_page(
 def _render_recent_projects_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    _render_page_header(st, "Recent Projects", "Resume recent project investigations.")
+    _render_project_library_page_shell(
+        st,
+        title="Recent Projects",
+        subtitle="Resume recent project investigations.",
+        notice_title="Recent Projects",
+        notice_body="Recent items are sorted by their last opened timestamp, but still use the same open and maintenance controls as the main library.",
+    )
     records = workspace_service.list_recent_workspaces(limit=20)
     if not records:
-        st.info("No recent projects yet.")
+        _shared_render_guided_empty_state(
+            st,
+            why_empty="No recent projects yet.",
+            action_to_populate="Open a project from the main library.",
+            next_location="Use the Projects page to resume a workspace.",
+        )
         return
 
-    for record in records:
-        with st.container(border=True):
-            st.markdown(f"**{record.project.name}**")
-            st.caption(
-                f"{record.project.project_id} · {_project_stage(record)} · {record.source_label}"
-            )
-            if st.button(
-                "Open",
-                key=f"atlas_recent_open_{record.workspace_id}",
-                width="stretch",
-            ):
-                st.session_state["atlas_active_workspace_id"] = record.workspace_id
-                st.session_state["atlas_active_page"] = "Overview"
-                st.rerun()
+    metric_cols = _responsive_control_columns(st, 3)
+    _metric_card(metric_cols[0], "Recent Projects", str(len(records)))
+    _metric_card(
+        metric_cols[1], "Pinned", str(sum(1 for item in records if item.pinned))
+    )
+    _metric_card(
+        metric_cols[2],
+        "Reference",
+        str(sum(1 for item in records if item.is_reference)),
+    )
+
+    _shared_render_section_title(st, "Recent Project List")
+    _shared_render_data_table(
+        st,
+        [
+            {
+                "project": record.project.name,
+                "project_id": record.project.project_id,
+                "status": _project_stage(record),
+                "updated": record.updated_at,
+                "source": record.source_label,
+            }
+            for record in records
+        ],
+    )
+
+    labels = [
+        f"{record.project.name} · {record.project.project_id}" for record in records
+    ]
+    selected_label = st.selectbox("Open Recent Project", options=labels)
+    selected = records[labels.index(selected_label)]
+    _shared_render_section_title(st, "Selected Recent Project")
+    _render_project_library_selected_record(
+        st,
+        workspace_service,
+        selected,
+        open_label="Open the selected recent project.",
+    )
 
 
 def _render_create_project_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    _render_page_header(
+    _render_project_library_page_shell(
         st,
-        "Create New Project",
-        "Quick Start a bid workspace with deterministic identity.",
+        title="Create New Project",
+        subtitle="Quick Start a bid workspace with deterministic identity.",
+        notice_title="Create Project",
+        notice_body="This page preserves the existing bid workspace creation flow and adds the shared workspace header and section grammar.",
     )
     bid_id_preview = _preview_next_bid_id(workspace_service)
     if bid_id_preview:
@@ -24263,10 +24445,12 @@ def _render_create_project_page(
 def _render_open_existing_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    _render_page_header(
+    _render_project_library_page_shell(
         st,
-        "Open Existing Project",
-        "Open imported repository projects. Path-based opening is available in Advanced options.",
+        title="Open Existing Project",
+        subtitle="Open imported repository projects. Path-based opening is available in Advanced options.",
+        notice_title="Repository Projects",
+        notice_body="This page keeps the repository-backed open flow intact while presenting the list and selection controls through the shared workspace grammar.",
     )
 
     include_archived = st.checkbox("Show archived projects", value=False)
@@ -24276,7 +24460,7 @@ def _render_open_existing_page(
         limit=500,
     )
     if not rows:
-        _render_guided_empty_state(
+        _shared_render_guided_empty_state(
             st,
             why_empty="No repository projects are currently imported.",
             action_to_populate="Create a project or import a .atlaspkg bundle.",
@@ -24339,7 +24523,9 @@ def _render_open_existing_page(
             key=lambda item: _safe_text(item.get(sort_field), ""), reverse=True
         )
 
-        st.dataframe(
+        _shared_render_section_title(st, "Repository Project List")
+        _shared_render_data_table(
+            st,
             [
                 {
                     "Atlas Bid ID": item["atlas_bid_id"],
@@ -24353,8 +24539,6 @@ def _render_open_existing_page(
                 }
                 for item in filtered
             ],
-            width="stretch",
-            hide_index=True,
         )
 
         labels = [
@@ -24364,17 +24548,13 @@ def _render_open_existing_page(
             selected_label = st.selectbox("Select Project", options=labels)
             selected_item = filtered[labels.index(selected_label)]
             selected = selected_item["record"]
-
-            actions = st.columns(2)
-            if actions[0].button("Open Project", type="primary", width="stretch"):
-                _open_project_record(st, selected, workspace_service)
-            pin_label = "Unpin" if selected.pinned else "Pin"
-            if actions[1].button(pin_label, width="stretch"):
-                workspace_service.pin_project(
-                    selected.workspace_id,
-                    pinned=not selected.pinned,
-                )
-                st.rerun()
+            _shared_render_section_title(st, "Selected Repository Project")
+            _render_project_library_selected_record(
+                st,
+                workspace_service,
+                selected,
+                open_label="Open the selected repository project.",
+            )
 
     with st.expander("Advanced: Open from local path", expanded=False):
         path_text = st.text_input(
