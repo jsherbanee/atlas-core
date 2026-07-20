@@ -1303,6 +1303,8 @@ def _navigation_section_group(primary: str, mode: str, secondary_key: str) -> st
         return ""
     if primary == "Transactions":
         return ""
+    if primary == "Reports":
+        return ""
     if primary == "Settings":
         if secondary_key in {
             "organization_settings",
@@ -6490,6 +6492,15 @@ def _navigation_prior_route_key() -> str:
     return "atlas_prior_route_context"
 
 
+def _raw_session_text(st: Any, key: str, default: str = "") -> str:
+    value = st.session_state.get(key, default)
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip()
+    return str(value)
+
+
 def _selected_project_object_type_key() -> str:
     return "atlas_selected_project_object_type"
 
@@ -7717,6 +7728,63 @@ def _workspace_navigation_contract(primary: str, mode: str) -> list[dict[str, An
             )
         return built
 
+    if primary == "Reports":
+        report_sections: list[
+            tuple[str, str, str, list[tuple[str, str, str, None, str]]]
+        ] = [
+            (
+                "overview",
+                "Overview",
+                "Reports",
+                [("browse", "Browse", "collection_view", None, "Reports")],
+            ),
+            (
+                "readiness",
+                "Readiness",
+                "Reports",
+                [("browse", "Browse", "collection_view", None, "Reports")],
+            ),
+            (
+                "exports",
+                "Exports",
+                "Reports",
+                [("browse", "Browse", "export_action", None, "Reports")],
+            ),
+        ]
+        return [
+            {
+                "workspace": "Reports",
+                "workspace_mode": "application",
+                "secondary_key": secondary_key,
+                "label": label,
+                "icon": None,
+                "route": route,
+                "visibility": True,
+                "enabled": True,
+                "required_context": None,
+                "default_tertiary_action": actions[0][0],
+                "supported_tertiary_actions": [
+                    {
+                        "tertiary_key": key,
+                        "label": action_label,
+                        "route": action_route,
+                        "action_type": action_type,
+                        "visibility": True,
+                        "enabled": True,
+                        "required_selection": required_selection,
+                        "empty_state_behavior": "Use Reports to inspect readiness and export signals.",
+                        "permission_hook": "future_permission_check",
+                        "deterministic_fallback": actions[0][0],
+                    }
+                    for key, action_label, action_type, required_selection, action_route in actions
+                ],
+                "selected_record_requirement": False,
+                "selected_project_requirement": False,
+                "responsive_behavior": "persistent",
+            }
+            for secondary_key, label, route, actions in report_sections
+        ]
+
     if primary == "Settings":
         templates = _settings_secondary_templates()
         sections = [
@@ -8049,6 +8117,14 @@ def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
             if page == "Administration":
                 return "organization_settings"
             return None
+        if primary == "Reports":
+            page_map = {
+                "Reports": "overview",
+                "Readiness": "readiness",
+                "Estimator Brief": "overview",
+                "Exports": "exports",
+            }
+            return page_map.get(page, "overview")
         return None
     if mode == "library":
         page_map = {
@@ -8094,7 +8170,7 @@ def _active_primary_workspace(page: str, record: ProjectWorkspaceRecord | None) 
         return "Projects"
     if record is not None and page not in {"Mission Control", "Administration"}:
         return "Projects"
-    if page == "Reports":
+    if page in REPORT_PAGES:
         return "Reports"
     if page == "Administration":
         return "Settings"
@@ -8120,6 +8196,8 @@ def _sync_workspace_navigation_state(
     record: ProjectWorkspaceRecord | None,
 ) -> None:
     page = _safe_text(st.session_state.get("atlas_active_page"), "Mission Control")
+    previous_primary = _raw_session_text(st, _navigation_primary_state_key())
+    previous_mode = _raw_session_text(st, _navigation_mode_state_key())
     primary = _active_primary_workspace(page, record)
     mode = _active_workspace_mode(page, record)
     st.session_state[_navigation_primary_state_key()] = primary
@@ -8134,16 +8212,20 @@ def _sync_workspace_navigation_state(
         "",
     )
 
-    if primary not in {"Knowledge", "Projects", "Transactions", "Settings"}:
+    if primary not in {"Knowledge", "Projects", "Transactions", "Reports", "Settings"}:
         return
 
     sections = _workspace_navigation_contract(primary, mode)
     if not sections:
         return
 
-    active_secondary = _safe_text(
-        st.session_state.get(_navigation_secondary_state_key()),
-        _safe_text(sections[0].get("secondary_key"), ""),
+    secondary_state_key = _navigation_secondary_state_key()
+    has_secondary_state = secondary_state_key in st.session_state
+    workspace_changed = previous_primary != primary or previous_mode != mode
+    active_secondary = (
+        _raw_session_text(st, secondary_state_key)
+        if has_secondary_state and not workspace_changed
+        else _safe_text(sections[0].get("secondary_key"), "")
     )
     derived_secondary = _safe_text(_secondary_key_for_page(primary, mode, page), "")
     if (
@@ -8152,8 +8234,16 @@ def _sync_workspace_navigation_state(
         and selection_kind in _knowledge_selection_kinds()
     ):
         derived_secondary = _knowledge_secondary_key_for_kind(selection_kind)
-    if derived_secondary and not (primary == "Transactions" and page == "Transactions"):
+    if (
+        derived_secondary
+        and (workspace_changed or not has_secondary_state)
+        and not (primary == "Transactions" and page == "Transactions")
+    ):
         active_secondary = derived_secondary
+
+    if not active_secondary:
+        st.session_state[secondary_state_key] = ""
+        return
 
     section = next(
         (
@@ -8245,6 +8335,12 @@ def _open_secondary_navigation_section(
     mode: str,
     section: dict[str, Any],
 ) -> None:
+    secondary_key = _safe_text(section.get("secondary_key"), "")
+    if secondary_key == _raw_session_text(st, _navigation_secondary_state_key()):
+        st.session_state[_navigation_secondary_state_key()] = ""
+        _set_navigation_prior_route(st, primary=primary, mode=mode)
+        st.rerun()
+        return
     st.session_state[_navigation_secondary_state_key()] = _safe_text(
         section.get("secondary_key"), ""
     )
@@ -8291,7 +8387,7 @@ def _render_secondary_navigation_section(
         "",
     )
     is_enabled = bool(section.get("enabled", True))
-    actions = _visible_tertiary_actions(st, section, record)
+    actions = _navigation_actions_for_section(st, primary, section, record)
     context_marker = " *" if bool(section.get("selected_record_requirement")) else ""
     label = f"{section_label}{context_marker}".strip()
     if st.button(
@@ -8318,7 +8414,7 @@ def _render_secondary_navigation_section(
             st.session_state.get(_navigation_tertiary_state_key()), ""
         )
         if st.button(
-            f"   {label}",
+            label,
             key=f"atlas_accordion_tertiary_{primary}_{mode}_{secondary_key}_{key}",
             type="primary" if is_tertiary_active else "secondary",
             disabled=not bool(action.get("enabled", True)),
@@ -8356,51 +8452,25 @@ def _knowledge_expander_action_keys(secondary_key: str) -> tuple[str, ...]:
     }.get(secondary_key, ("browse",))
 
 
-def _render_knowledge_expander_navigation_section(
+def _navigation_actions_for_section(
     st: Any,
-    *,
     primary: str,
-    mode: str,
     section: dict[str, Any],
     record: ProjectWorkspaceRecord | None,
-) -> None:
+) -> list[dict[str, Any]]:
+    if primary != "Knowledge":
+        return _visible_tertiary_actions(st, section, record)
     secondary_key = _safe_text(section.get("secondary_key"), "")
-    section_label = _safe_text(section.get("label"), secondary_key)
-    is_active = secondary_key == _safe_text(
-        st.session_state.get(_navigation_secondary_state_key()),
-        "",
-    )
     actions_by_key = {
         _safe_text(action.get("tertiary_key"), ""): action
         for action in list(section.get("supported_tertiary_actions") or [])
         if bool(action.get("visibility", True))
     }
-    with st.expander(section_label, expanded=is_active):
-        for action_key in _knowledge_expander_action_keys(secondary_key):
-            action = actions_by_key.get(action_key)
-            if not action:
-                continue
-            label = _safe_text(action.get("label"), action_key)
-            is_tertiary_active = is_active and action_key == _safe_text(
-                st.session_state.get(_navigation_tertiary_state_key()), ""
-            )
-            if st.button(
-                label,
-                key=f"atlas_knowledge_expander_{primary}_{mode}_{secondary_key}_{action_key}",
-                type="primary" if is_tertiary_active else "secondary",
-                disabled=not bool(action.get("enabled", True)),
-                width="content",
-            ):
-                if secondary_key != _safe_text(
-                    st.session_state.get(_navigation_secondary_state_key()), ""
-                ):
-                    st.session_state[_navigation_secondary_state_key()] = secondary_key
-                _open_tertiary_navigation_action(
-                    st,
-                    primary=primary,
-                    mode=mode,
-                    action=action,
-                )
+    return [
+        action
+        for action_key in _knowledge_expander_action_keys(secondary_key)
+        if (action := actions_by_key.get(action_key))
+    ]
 
 
 def _render_workspace_navigation(
@@ -8429,22 +8499,13 @@ def _render_workspace_navigation(
             if group_name:
                 st.caption(group_name)
             for section in section_group:
-                if primary == "Knowledge":
-                    _render_knowledge_expander_navigation_section(
-                        st,
-                        primary=primary,
-                        mode=mode,
-                        section=section,
-                        record=record,
-                    )
-                else:
-                    _render_secondary_navigation_section(
-                        st,
-                        primary=primary,
-                        mode=mode,
-                        section=section,
-                        record=record,
-                    )
+                _render_secondary_navigation_section(
+                    st,
+                    primary=primary,
+                    mode=mode,
+                    section=section,
+                    record=record,
+                )
 
     with shell_cols[1]:
         section = next(

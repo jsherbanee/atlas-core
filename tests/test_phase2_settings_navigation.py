@@ -185,8 +185,9 @@ def test_settings_navigation_renders_tertiary_actions_as_left_accordion() -> Non
     labels = [str(item["label"]) for item in st.button_calls]
     assert "Platform Management" in labels
     assert all("[v]" not in label and "[>]" not in label for label in labels)
-    assert "   Tenant Manager" in labels
-    assert "   Error Log" in labels
+    assert "Tenant Manager" in labels
+    assert "Error Log" in labels
+    assert "   Tenant Manager" not in labels
 
 
 def test_alpha_environment_marker_blocks_production_designation(

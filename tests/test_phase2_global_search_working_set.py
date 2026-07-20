@@ -973,31 +973,36 @@ def test_workspace_navigation_uses_compact_labels_without_literal_arrows() -> No
 
     app._render_workspace_navigation(st, record=None)
 
-    expander_labels = [call["label"] for call in st.expander_calls]
-    assert expander_labels[:4] == ["Customers", "Vendors", "Manufacturers", "Catalog"]
-    assert [call["expanded"] for call in st.expander_calls[:4]] == [
-        True,
-        False,
-        False,
-        False,
-    ]
     labels = [call["label"] for call in st.button_calls]
+    assert labels[:4] == ["Customers", "Browse", "Add", "Activity"]
+    assert "Vendors" in labels
+    assert "Manufacturers" in labels
+    assert "Catalog" in labels
     assert all("[v]" not in label and "[>]" not in label for label in labels)
     assert "Browse" in labels
     assert "   Browse" not in labels
+    assert st.expander_calls == []
 
 
 @pytest.mark.parametrize(
-    ("secondary", "expected_expanded"),
+    ("secondary", "expected_present", "expected_absent"),
     [
-        ("customers", "Customers"),
-        ("vendors", "Vendors"),
-        ("manufacturers", "Manufacturers"),
-        ("catalog", "Catalog"),
+        (
+            "customers",
+            {"Browse", "Add", "Activity"},
+            {"Price Lists", "Default Vendor", "Import"},
+        ),
+        ("vendors", {"Price Lists", "Products"}, {"Default Vendor", "Import"}),
+        ("manufacturers", {"Default Vendor", "Products"}, {"Price Lists", "Import"}),
+        (
+            "catalog",
+            {"Services", "Fees", "Assemblies", "Import"},
+            {"Price Lists", "Default Vendor"},
+        ),
     ],
 )
-def test_knowledge_expanders_keep_one_section_expanded(
-    secondary: str, expected_expanded: str
+def test_knowledge_accordion_keeps_one_section_expanded(
+    secondary: str, expected_present: set[str], expected_absent: set[str]
 ) -> None:
     st = _HomeContractStreamlit()
     st.session_state.update(
@@ -1012,32 +1017,74 @@ def test_knowledge_expanders_keep_one_section_expanded(
 
     app._render_workspace_navigation(st, record=None)
 
-    expanded = [
-        call["label"] for call in st.expander_calls[:4] if bool(call["expanded"])
-    ]
-    assert expanded == [expected_expanded]
+    labels = [call["label"] for call in st.button_calls]
+    assert expected_present <= set(labels)
+    assert expected_absent.isdisjoint(labels)
+
+
+def test_knowledge_accordion_opening_new_section_closes_prior_section() -> None:
+    st = _HomeContractStreamlit(
+        pressed={"atlas_secondary_Knowledge_application_vendors"}
+    )
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "customers",
+            app._navigation_tertiary_state_key(): "browse",
+        }
+    )
+
+    app._render_workspace_navigation(st, record=None)
+
+    assert st.session_state[app._navigation_secondary_state_key()] == "vendors"
+    assert st.session_state[app._navigation_tertiary_state_key()] == "browse"
+    assert st.session_state["atlas_active_page"] == "Knowledge"
+    assert st.rerun_called is True
+
+
+def test_knowledge_accordion_clicking_active_section_collapses_it() -> None:
+    st = _HomeContractStreamlit(
+        pressed={"atlas_secondary_Knowledge_application_catalog"}
+    )
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "catalog",
+            app._navigation_tertiary_state_key(): "import",
+        }
+    )
+
+    app._render_workspace_navigation(st, record=None)
+
+    assert st.session_state[app._navigation_secondary_state_key()] == ""
+    assert st.session_state[app._navigation_tertiary_state_key()] == "import"
+    assert st.rerun_called is True
 
 
 @pytest.mark.parametrize(
     ("button_key", "secondary", "tertiary"),
     [
         (
-            "atlas_knowledge_expander_Knowledge_application_customers_add",
+            "atlas_accordion_tertiary_Knowledge_application_customers_add",
             "customers",
             "add",
         ),
         (
-            "atlas_knowledge_expander_Knowledge_application_vendors_price_lists",
+            "atlas_accordion_tertiary_Knowledge_application_vendors_price_lists",
             "vendors",
             "price_lists",
         ),
         (
-            "atlas_knowledge_expander_Knowledge_application_manufacturers_default_vendor",
+            "atlas_accordion_tertiary_Knowledge_application_manufacturers_default_vendor",
             "manufacturers",
             "default_vendor",
         ),
         (
-            "atlas_knowledge_expander_Knowledge_application_catalog_import",
+            "atlas_accordion_tertiary_Knowledge_application_catalog_import",
             "catalog",
             "import",
         ),
@@ -1052,7 +1099,7 @@ def test_knowledge_expander_links_route_same_window(
             "atlas_active_page": "Knowledge",
             app._navigation_primary_state_key(): "Knowledge",
             app._navigation_mode_state_key(): "application",
-            app._navigation_secondary_state_key(): "customers",
+            app._navigation_secondary_state_key(): secondary,
             app._navigation_tertiary_state_key(): "browse",
         }
     )
@@ -1063,6 +1110,124 @@ def test_knowledge_expander_links_route_same_window(
     assert st.session_state[app._navigation_tertiary_state_key()] == tertiary
     assert st.session_state["atlas_active_page"] == "Knowledge"
     assert st.rerun_called is True
+
+
+@pytest.mark.parametrize(
+    ("primary", "mode", "current", "pressed_key", "expected_secondary"),
+    [
+        (
+            "Projects",
+            "library",
+            "all_projects",
+            "atlas_secondary_Projects_library_archived_projects",
+            "archived_projects",
+        ),
+        (
+            "Transactions",
+            "application",
+            "estimates",
+            "atlas_secondary_Transactions_application_sales_orders",
+            "sales_orders",
+        ),
+        (
+            "Settings",
+            "application",
+            "organization_settings",
+            "atlas_secondary_Settings_application_personal_preferences",
+            "personal_preferences",
+        ),
+        (
+            "Reports",
+            "application",
+            "overview",
+            "atlas_secondary_Reports_application_exports",
+            "exports",
+        ),
+    ],
+)
+def test_shared_accordion_exclusive_behavior_across_workspaces(
+    primary: str,
+    mode: str,
+    current: str,
+    pressed_key: str,
+    expected_secondary: str,
+) -> None:
+    st = _HomeContractStreamlit(pressed={pressed_key})
+    st.session_state.update(
+        {
+            "atlas_active_page": {
+                "Projects": "Projects",
+                "Transactions": "Transactions",
+                "Settings": "Administration",
+                "Reports": "Reports",
+            }[primary],
+            app._navigation_primary_state_key(): primary,
+            app._navigation_mode_state_key(): mode,
+            app._navigation_secondary_state_key(): current,
+            app._navigation_tertiary_state_key(): "browse",
+        }
+    )
+
+    app._render_workspace_navigation(st, record=None)
+
+    assert st.session_state[app._navigation_secondary_state_key()] == expected_secondary
+    assert st.rerun_called is True
+
+
+def test_tertiary_action_keeps_parent_section_expanded() -> None:
+    st = _HomeContractStreamlit(
+        pressed={"atlas_accordion_tertiary_Transactions_application_sales_orders_add"}
+    )
+    st.session_state.update(
+        {
+            "atlas_active_page": "Transactions",
+            app._navigation_primary_state_key(): "Transactions",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "sales_orders",
+            app._navigation_tertiary_state_key(): "browse",
+        }
+    )
+
+    app._render_workspace_navigation(st, record=None)
+
+    assert st.session_state[app._navigation_secondary_state_key()] == "sales_orders"
+    assert st.session_state[app._navigation_tertiary_state_key()] == "add"
+    assert st.rerun_called is True
+
+
+def test_collapsed_secondary_state_survives_same_workspace_sync() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "",
+            app._navigation_tertiary_state_key(): "browse",
+        }
+    )
+
+    app._sync_workspace_navigation_state(st, record=None)
+
+    assert st.session_state[app._navigation_secondary_state_key()] == ""
+
+
+def test_expanded_secondary_state_survives_same_workspace_sync() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "vendors",
+            app._navigation_tertiary_state_key(): "price_lists",
+        }
+    )
+
+    app._sync_workspace_navigation_state(st, record=None)
+
+    assert st.session_state[app._navigation_secondary_state_key()] == "vendors"
+    assert st.session_state[app._navigation_tertiary_state_key()] == "price_lists"
 
 
 def test_customer_sort_defaults_name_ascending_and_toggles_direction() -> None:
