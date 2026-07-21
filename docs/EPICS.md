@@ -164,8 +164,9 @@ Explicitly out of scope:
 - expose durable Processing status, filters, retry, cancel, warnings, and
   failure diagnostics
 - keep bid-package upload limits and supported file types governed by one
-  shared policy: 200 MB per file, PDF/DOC/DOCX/XLS/XLSX/CSV/image/TXT/RTF/ZIP
-  formats, and no user-facing JSON intake
+  shared policy: 200 MiB per file, 1 GiB per batch, 50 files per batch,
+  PDF/DOC/DOCX/XLS/XLSX/CSV/image/TXT/RTF/ZIP formats, and no user-facing JSON
+  intake
 - preserve existing drawing intelligence and OCR behavior without adding new
   extraction rules, AI, cloud infrastructure, procurement, or accounting scope
 

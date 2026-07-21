@@ -344,10 +344,14 @@ existing project-open service path. MAW parsing is explicitly out of scope.
 
 Step 2 upload behavior (Documents):
 - Supported onboarding formats: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, JPEG, PNG, TIF, TIFF, TXT, RTF, ZIP.
-- Bid-package uploads use a single shared upload policy: 200 MB per file, interpreted as 200,000,000 bytes.
+- Bid-package uploads use a single shared upload policy: 200 MiB per file
+  (209,715,200 bytes), 1 GiB per batch (1,073,741,824 bytes), and 50 files per
+  batch.
 - JSON is not a supported user-facing bid-package upload format.
 - Selections append to a pending upload queue across multiple chooser interactions.
 - Pending queue uses deterministic dedupe identity (normalized filename + size + source hash).
+- Pending queue displays selected-file count, combined batch size, remaining
+  batch capacity, accepted files, rejected files, and exact rejection reasons.
 - Users can remove selected pending files or clear all pending files.
 - Upload execution is explicit through Upload Pending Files.
 - AV-00A upload execution persists accepted files into durable document-processing jobs and returns control without running OCR, PDF inspection, extraction, classification, or evidence generation inside the Streamlit callback.
@@ -357,9 +361,10 @@ Step 2 upload behavior (Documents):
 
 ZIP handling behavior:
 - ZIP is a supported container upload type, but ZIP files are not broadened into a standalone processed document type.
+- Displayed batch totals use uploaded compressed ZIP size.
 - Archive inspection occurs before extraction.
-- Unsafe paths, encrypted entries, duplicate entries, and system artifacts are rejected.
-- Entry count and expansion-size limits are enforced.
+- Unsafe paths, symbolic links, encrypted entries, duplicate entries, and system artifacts are rejected.
+- Entry count and expansion-size limits are enforced at 500 contained files and 2 GiB expanded size per ZIP.
 - Nested archive depth is bounded.
 - Contained relative paths are preserved in intake-source metadata.
 
@@ -435,7 +440,7 @@ Examples:
 System metadata (version/commit/stage/status) remains available in the status bar.
 
 - Drag your project here
-- Supported formats: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, JPEG, PNG, TIFF, TXT, RTF, JSON, ZIP
+- Supported formats: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, JPEG, PNG, TIF, TIFF, TXT, RTF, ZIP
 Files are automatically classified into:
 - drawings/
 - unsupported/
@@ -741,7 +746,7 @@ Responsive behavior:
 - XLSX/CSV: extract schedule-style rows.
 - XLS: unsupported in deterministic parser; warning requests XLSX/CSV.
 - Images (JPG/JPEG/PNG/TIFF): optional local OCR can be attempted; otherwise warning emitted when no extractable text is available.
-- ZIP: automatically unpacked recursively and classified.
+- ZIP: inspected with bounded expansion and then classified.
 
 ## Optional Local OCR
 - Local OCR is optional and disabled by default.

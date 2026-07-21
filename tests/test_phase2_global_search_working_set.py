@@ -50,7 +50,7 @@ def test_bid_package_basic_upload_diagnostic_rejects_json_and_oversize() -> None
     assert json_result[0] is False
     assert "Unsupported file type" in json_result[1]
     assert oversized_result.accepted is False
-    assert "File exceeds the upload limit." in oversized_result.message
+    assert "File exceeds the per-file upload limit." in oversized_result.message
     assert (
         f"{app.BID_PACKAGE_UPLOAD_POLICY.max_file_size_bytes + 1:,} bytes"
         in oversized_result.message
@@ -726,6 +726,34 @@ class _FakeUploadedFile:
 
     def getvalue(self) -> bytes:
         return self.data
+
+
+class _StreamingUploadedFile:
+    def __init__(self, *, name: str, data: bytes, chunk_size: int = 2) -> None:
+        self.name = name
+        self.data = data
+        self.size = len(data)
+        self.chunk_size = chunk_size
+        self.position = 0
+        self.read_calls = 0
+        self.getvalue_calls = 0
+
+    def seek(self, position: int) -> None:
+        self.position = position
+
+    def read(self, size: int = -1) -> bytes:
+        self.read_calls += 1
+        if self.position >= len(self.data):
+            return b""
+        active_size = self.chunk_size if size < 0 else min(size, self.chunk_size)
+        start = self.position
+        stop = min(len(self.data), start + active_size)
+        self.position = stop
+        return self.data[start:stop]
+
+    def getvalue(self) -> bytes:
+        self.getvalue_calls += 1
+        raise AssertionError("pending upload persistence should stream file chunks")
 
 
 def _reference(
@@ -4588,6 +4616,25 @@ def test_documents_pending_uploads_append_across_selections() -> None:
     assert [item["name"] for item in pending] == ["a.pdf", "b.csv"]
 
 
+def test_documents_pending_uploads_stream_file_without_getvalue() -> None:
+    st = _FakeStreamlit(session_state={})
+    uploaded = _StreamingUploadedFile(name="streamed.pdf", data=b"abcdef")
+
+    added, duplicates = app._append_pending_upload_selection(
+        st, "BID-STREAM", [uploaded]
+    )
+    pending = app._pending_upload_state(st, "BID-STREAM")
+
+    assert added == 1
+    assert duplicates == 0
+    assert uploaded.read_calls > 1
+    assert uploaded.getvalue_calls == 0
+    assert pending[0]["size"] == 6
+    assert Path(str(pending[0]["data_path"])).exists()
+
+    app._clear_pending_uploads(st, "BID-STREAM")
+
+
 def test_documents_pending_uploads_deduplicate_same_identity() -> None:
     st = _FakeStreamlit(session_state={})
     selection = [_FakeUploadedFile(name="a.pdf", data=b"same")]
@@ -4624,6 +4671,30 @@ def test_documents_pending_uploads_remove_and_clear() -> None:
 
     app._clear_pending_uploads(st, "BID-1")
     assert app._pending_upload_state(st, "BID-1") == []
+
+
+def test_documents_upload_panel_displays_batch_total_from_policy() -> None:
+    record = _project_record("BID-1", "Batch Display")
+    st = _HomeContractStreamlit()
+    st.session_state["atlas_documents_pending_uploads"] = {
+        "BID-1": [
+            {
+                "identity_key": "a",
+                "name": "drawings.pdf",
+                "size": 200 * 1024 * 1024,
+            },
+            {
+                "identity_key": "b",
+                "name": "specs.docx",
+                "size": 25 * 1024 * 1024,
+            },
+        ]
+    }
+    service = _AsyncUploadWorkspaceService()
+
+    app._render_upload_panel(st, service, record)  # type: ignore[arg-type]
+
+    assert any("2 files selected · 225 MiB of 1 GiB" in item for item in st.captions)
 
 
 def test_pending_identity_keys_to_remove_after_upload_keeps_rejected_pending() -> None:
@@ -4779,3 +4850,32 @@ def test_documents_upload_pending_files_enqueues_without_expensive_processing() 
     assert st.session_state["atlas_active_page"] == "Processing"
     assert app._pending_upload_state(st, "BID-1") == []
     assert st.rerun_called is True
+
+
+def test_documents_upload_pending_files_queues_only_accepted_files() -> None:
+    record = _project_record("BID-1", "Partial Batch Upload")
+    upload_key = (
+        "atlas_documents_upload_pending_BID-1_atlas_documents_upload_picker_BID-1_0"
+    )
+    valid = {
+        "identity_key": app._pending_upload_identity("valid.pdf", b"%PDF"),
+        "name": "valid.pdf",
+        "data": b"%PDF",
+        "size": 4,
+    }
+    invalid = {
+        "identity_key": app._pending_upload_identity("invalid.json", b"{}"),
+        "name": "invalid.json",
+        "data": b"{}",
+        "size": 2,
+    }
+    st = _HomeContractStreamlit(pressed={upload_key})
+    st.session_state["atlas_documents_pending_uploads"] = {"BID-1": [valid, invalid]}
+    service = _AsyncUploadWorkspaceService()
+
+    app._render_upload_panel(st, service, record)  # type: ignore[arg-type]
+
+    assert len(service.enqueued) == 1
+    assert service.enqueued[0]["uploaded_files"] == [("valid.pdf", b"%PDF")]
+    remaining = app._pending_upload_state(st, "BID-1")
+    assert [item["name"] for item in remaining] == ["invalid.json"]

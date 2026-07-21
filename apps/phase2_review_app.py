@@ -17,6 +17,7 @@ import platform
 import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -102,7 +103,11 @@ from atlas_core.services.universal_object_registry import (
 )
 from atlas_core.contracts.permissions_contracts import AccessRequest, PermissionEffect
 from atlas_core.contracts.tenant_manager_contracts import SandboxProvisioningRequest
-from atlas_core.contracts.upload_policy import bid_package_upload_policy
+from atlas_core.contracts.upload_policy import (
+    UploadBatchFile,
+    bid_package_upload_policy,
+    format_binary_size,
+)
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
@@ -5104,6 +5109,15 @@ def _pending_upload_identity(name: str, data: bytes) -> str:
     return f"{normalized_name}|{len(data)}|{source_hash}"
 
 
+def _pending_upload_identity_from_metadata(
+    name: str,
+    size_bytes: int,
+    source_hash: str,
+) -> str:
+    normalized_name = _safe_text(name, "").strip().lower()
+    return f"{normalized_name}|{int(size_bytes)}|{source_hash}"
+
+
 def _pending_upload_state(st: Any, workspace_id: str) -> list[dict[str, Any]]:
     state = dict(st.session_state.get("atlas_documents_pending_uploads") or {})
     rows = list(state.get(workspace_id) or [])
@@ -5181,6 +5195,73 @@ def _write_pending_upload_state(
     st.session_state["atlas_documents_pending_uploads"] = state
 
 
+def _pending_upload_storage_root(workspace_id: str) -> Path:
+    root = Path(tempfile.gettempdir()) / "atlas_pending_uploads" / workspace_id
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _cleanup_pending_upload_files(rows: list[dict[str, Any]]) -> None:
+    for item in rows:
+        data_path = _safe_text(item.get("data_path"), "")
+        if not data_path:
+            continue
+        try:
+            Path(data_path).unlink(missing_ok=True)
+        except OSError:
+            continue
+
+
+def _uploaded_file_chunks(file: Any, chunk_size: int = 1024 * 1024) -> Any:
+    if hasattr(file, "seek"):
+        try:
+            file.seek(0)
+        except OSError, ValueError, TypeError:
+            pass
+    if hasattr(file, "read"):
+        while True:
+            chunk = file.read(chunk_size)
+            if not chunk:
+                break
+            yield bytes(chunk)
+        if hasattr(file, "seek"):
+            try:
+                file.seek(0)
+            except OSError, ValueError, TypeError:
+                pass
+        return
+    yield bytes(file.getvalue())
+
+
+def _persist_pending_upload_file(
+    *,
+    workspace_id: str,
+    name: str,
+    file: Any,
+) -> dict[str, Any]:
+    digest = hashlib.sha1()
+    total_size = 0
+    token = hashlib.sha1(f"{name}|{time.time_ns()}".encode("utf-8")).hexdigest()[:16]
+    target = _pending_upload_storage_root(workspace_id) / f"{token}.upload"
+    with target.open("wb") as output:
+        for chunk in _uploaded_file_chunks(file):
+            digest.update(chunk)
+            total_size += len(chunk)
+            output.write(chunk)
+
+    source_hash = digest.hexdigest()
+    declared_size = int(getattr(file, "size", total_size) or total_size)
+    size = total_size if total_size else declared_size
+    identity_key = _pending_upload_identity_from_metadata(name, size, source_hash)
+    return {
+        "identity_key": identity_key,
+        "name": name,
+        "data_path": str(target),
+        "size": size,
+        "source_hash": source_hash,
+    }
+
+
 def _append_pending_upload_selection(
     st: Any,
     workspace_id: str,
@@ -5202,17 +5283,17 @@ def _append_pending_upload_selection(
     duplicates = 0
     for file in list(uploaded_files):
         name = str(getattr(file, "name", ""))
-        data = bytes(file.getvalue())
-        identity_key = _pending_upload_identity(name, data)
+        pending_item = _persist_pending_upload_file(
+            workspace_id=workspace_id,
+            name=name,
+            file=file,
+        )
+        identity_key = str(pending_item.get("identity_key") or "")
         if identity_key in by_identity:
+            _cleanup_pending_upload_files([pending_item])
             duplicates += 1
             continue
-        by_identity[identity_key] = {
-            "identity_key": identity_key,
-            "name": name,
-            "data": data,
-            "size": int(getattr(file, "size", len(data))),
-        }
+        by_identity[identity_key] = pending_item
         added += 1
 
     _write_pending_upload_state(st, workspace_id, list(by_identity.values()))
@@ -5226,24 +5307,42 @@ def _remove_pending_uploads(
     workspace_id: str,
     identity_keys: list[str],
 ) -> int:
+    current = _pending_upload_state(st, workspace_id)
+    removed_rows = [
+        item for item in current if str(item.get("identity_key")) in set(identity_keys)
+    ]
     keep = [
         item
-        for item in _pending_upload_state(st, workspace_id)
+        for item in current
         if str(item.get("identity_key")) not in set(identity_keys)
     ]
-    removed = len(_pending_upload_state(st, workspace_id)) - len(keep)
+    removed = len(current) - len(keep)
+    _cleanup_pending_upload_files(removed_rows)
     _write_pending_upload_state(st, workspace_id, keep)
     return removed
 
 
 def _clear_pending_uploads(st: Any, workspace_id: str) -> None:
+    _cleanup_pending_upload_files(_pending_upload_state(st, workspace_id))
     _write_pending_upload_state(st, workspace_id, [])
 
 
-def _basic_upload_diagnostic(name: str, data: bytes) -> tuple[bool, str]:
+def _read_pending_upload_bytes(item: dict[str, Any]) -> bytes:
+    data_path = _safe_text(item.get("data_path"), "")
+    if data_path:
+        return Path(data_path).read_bytes()
+    return _dict_bytes(item, "data")
+
+
+def _basic_upload_diagnostic(
+    name: str,
+    data: bytes | None = None,
+    *,
+    size_bytes: int | None = None,
+) -> tuple[bool, str]:
     result = BID_PACKAGE_UPLOAD_POLICY.validate_file(
         name=name,
-        size_bytes=len(data),
+        size_bytes=len(data or b"") if size_bytes is None else int(size_bytes),
     )
     return (result.accepted, result.message)
 
@@ -36092,29 +36191,48 @@ def _render_upload_panel(
         )
 
     pending = _pending_upload_state(st, record.workspace_id)
-    pending_payload = [
-        (str(item.get("name") or ""), bytes(item.get("data") or b""))
-        for item in pending
-    ]
-    basic_diagnostics = [
-        {
-            "identity_key": str(item.get("identity_key") or ""),
-            "name": str(item.get("name") or ""),
-            "data": bytes(item.get("data") or b""),
-            "size": int(item.get("size") or 0),
-            "accepted": _basic_upload_diagnostic(
+    batch_validation = BID_PACKAGE_UPLOAD_POLICY.validate_batch(
+        [
+            UploadBatchFile(
+                name=str(item.get("name") or ""),
+                size_bytes=int(item.get("size") or 0),
+                identity_key=str(item.get("identity_key") or ""),
+            )
+            for item in pending
+        ]
+    )
+    batch_by_identity = {
+        item.identity_key: item for item in batch_validation.files if item.identity_key
+    }
+    basic_diagnostics: list[dict[str, Any]] = []
+    for item in pending:
+        identity_key = str(item.get("identity_key") or "")
+        result = batch_by_identity.get(identity_key)
+        if result is None:
+            accepted, message = _basic_upload_diagnostic(
                 str(item.get("name") or ""),
-                bytes(item.get("data") or b""),
-            )[0],
-            "message": _basic_upload_diagnostic(
-                str(item.get("name") or ""),
-                bytes(item.get("data") or b""),
-            )[1],
-        }
-        for item in pending
-    ]
+                size_bytes=int(item.get("size") or 0),
+            )
+        else:
+            accepted = result.accepted
+            message = result.message
+        basic_diagnostics.append(
+            {
+                "identity_key": identity_key,
+                "name": str(item.get("name") or ""),
+                "size": int(item.get("size") or 0),
+                "accepted": accepted,
+                "message": message,
+                "data_path": _safe_text(item.get("data_path"), ""),
+                "data": item.get("data", b""),
+            }
+        )
 
     if pending:
+        st.caption(
+            f"{batch_validation.selected_summary_label} · "
+            f"{batch_validation.remaining_capacity_label}"
+        )
         remove_options: dict[str, str] = {}
         for index, item in enumerate(pending):
             identity_key = str(item.get("identity_key") or "")
@@ -36160,7 +36278,7 @@ def _render_upload_panel(
             [
                 {
                     "Name": _safe_text(item.get("name"), ""),
-                    "File Size": _bytes_label(int(item.get("size") or 0)),
+                    "File Size": format_binary_size(int(item.get("size") or 0)),
                 }
                 for item in pending
             ],
@@ -36173,7 +36291,7 @@ def _render_upload_panel(
             {
                 "Name": _safe_text(item.get("name"), ""),
                 "Source Type": "file",
-                "File Size": _bytes_label(_dict_int(item, "size")),
+                "File Size": format_binary_size(_dict_int(item, "size")),
                 "Validation": (
                     "accepted" if bool(item.get("accepted", False)) else "rejected"
                 ),
@@ -36184,18 +36302,10 @@ def _render_upload_panel(
         if diagnostics_rows:
             st.dataframe(diagnostics_rows, width="stretch", hide_index=True)
 
-    can_upload = bool(pending_payload)
     accepted_items = [
         item for item in basic_diagnostics if bool(item.get("accepted", False))
     ]
-    accepted_payload: list[tuple[str, bytes]] = [
-        (
-            _safe_text(item.get("name"), ""),
-            _dict_bytes(item, "data"),
-        )
-        for item in accepted_items
-    ]
-    can_upload = can_upload and bool(accepted_payload)
+    can_upload = bool(accepted_items)
 
     recent_jobs = [
         item
@@ -36229,7 +36339,9 @@ def _render_upload_panel(
         key=f"atlas_documents_upload_pending_{record.workspace_id}_{picker_key}",
     ):
         queued_jobs: list[dict[str, Any]] = []
-        for name, data in accepted_payload:
+        for item in accepted_items:
+            name = _safe_text(item.get("name"), "")
+            data = _read_pending_upload_bytes(item)
             queued_jobs.append(
                 workspace_service.enqueue_document_processing(
                     workspace_id=record.workspace_id,

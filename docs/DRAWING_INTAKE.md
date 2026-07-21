@@ -24,13 +24,18 @@ Bid-package intake uses one shared upload policy for the Streamlit uploader,
 pending-file validation, intake validation, queued background jobs, help text,
 and rejection diagnostics.
 
-- Maximum size: 200 MB per file, interpreted as 200,000,000 bytes.
+- Maximum file size: 200 MiB per file, interpreted as 209,715,200 bytes.
+- Maximum batch size: 1 GiB per batch, interpreted as 1,073,741,824 bytes.
+- Maximum files per batch: 50.
 - Supported formats: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, JPEG, PNG, TIF, TIFF, TXT, RTF, ZIP.
 - JSON is not a supported user-facing bid-package upload format.
-- Rejections include the observed file size and the maximum supported size.
-- ZIP remains a container boundary only; existing entry-count, expansion-size,
-  nested-depth, unsafe-path, encrypted-entry, duplicate-entry, and system-file
-  protections continue to govern archive contents.
+- Rejections include the observed file size, projected batch size where
+  relevant, and the maximum supported size.
+- ZIP remains a container boundary only; uploaded batch totals use the compressed
+  ZIP size. ZIP processing enforces a 2 GiB expanded-size limit, 500 contained
+  files, unsafe-path rejection, symbolic-link rejection, encrypted-entry
+  rejection, duplicate-entry rejection, system-file filtering, and bounded
+  nested-archive behavior.
 
 ## Status Lifecycle
 

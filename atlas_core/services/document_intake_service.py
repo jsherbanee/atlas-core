@@ -14,7 +14,7 @@ import zipfile
 from xml.etree import ElementTree
 
 from atlas_core.contracts import PlanReviewRequest
-from atlas_core.contracts.upload_policy import bid_package_upload_policy
+from atlas_core.contracts.upload_policy import GIB, bid_package_upload_policy
 from atlas_core.domain.document_intake import (
     DocumentIntakeSnapshot,
     IntakeSourceReference,
@@ -136,8 +136,8 @@ class DocumentIntakeService:
     _UPLOAD_POLICY = bid_package_upload_policy()
     _SUPPORTED_EXTENSIONS = _UPLOAD_POLICY.extensions_with_dot
     _MAX_UPLOAD_FILE_BYTES = _UPLOAD_POLICY.max_file_size_bytes
-    _MAX_ARCHIVE_ENTRY_COUNT = 2000
-    _MAX_ARCHIVE_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
+    _MAX_ARCHIVE_ENTRY_COUNT = 500
+    _MAX_ARCHIVE_UNCOMPRESSED_BYTES = 2 * GIB
     _MAX_ARCHIVE_DEPTH = 3
     _SYSTEM_ARTIFACT_NAMES = {".ds_store"}
     _SYSTEM_ARTIFACT_PREFIXES = {"__macosx/"}
@@ -984,6 +984,12 @@ class DocumentIntakeService:
                     if self._is_system_artifact(entry_name):
                         continue
 
+                    if self._is_zip_symlink(info):
+                        warnings.append(
+                            f"{name}: symbolic link archive entry rejected ({entry_name})."
+                        )
+                        continue
+
                     if info.flag_bits & 0x1:
                         warnings.append(
                             f"{name}: encrypted archive entry rejected ({entry_name})."
@@ -1044,6 +1050,10 @@ class DocumentIntakeService:
         if any(lowered.startswith(prefix) for prefix in cls._SYSTEM_ARTIFACT_PREFIXES):
             return True
         return Path(lowered).name in cls._SYSTEM_ARTIFACT_NAMES
+
+    @staticmethod
+    def _is_zip_symlink(info: zipfile.ZipInfo) -> bool:
+        return ((info.external_attr >> 16) & 0o170000) == 0o120000
 
     def _ensure_package_folders(self, package_root: Path) -> None:
         for folder_name in (

@@ -280,7 +280,7 @@ def test_document_intake_rejects_file_one_byte_over_configured_policy_limit() ->
         [
             UploadedIntakeFile(
                 name="too-large.pdf",
-                data=b"x" * 1_000_001,
+                data=b"x" * 1_048_577,
             )
         ]
     )
@@ -291,9 +291,9 @@ def test_document_intake_rejects_file_one_byte_over_configured_policy_limit() ->
         for item in inspected.diagnostics
         for message in list(item.get("messages") or [])
     )
-    assert "File exceeds the upload limit." in message
-    assert "1,000,001 bytes" in message
-    assert "1,000,000 bytes" in message
+    assert "File exceeds the per-file upload limit." in message
+    assert "1,048,577 bytes" in message
+    assert "1,048,576 bytes" in message
 
 
 def test_build_session_package_from_uploads_supports_partial_success(
@@ -390,6 +390,31 @@ def test_zip_upload_entry_and_expansion_limits_are_enforced() -> None:
         "archive entry limit exceeded" in warning
         or "archive expansion size limit exceeded" in warning
         for warning in inspected.warnings
+    )
+
+
+def test_zip_upload_policy_uses_production_entry_and_expansion_limits() -> None:
+    service = DocumentIntakeService()
+
+    assert service._MAX_ARCHIVE_ENTRY_COUNT == 500
+    assert service._MAX_ARCHIVE_UNCOMPRESSED_BYTES == 2_147_483_648
+
+
+def test_zip_upload_rejects_symbolic_links() -> None:
+    service = DocumentIntakeService()
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        info = zipfile.ZipInfo("linked.pdf")
+        info.external_attr = 0o120777 << 16
+        archive.writestr(info, b"target")
+
+    inspected = service.inspect_uploaded_files(
+        [UploadedIntakeFile(name="links.zip", data=buffer.getvalue())]
+    )
+
+    assert inspected.accepted_files == []
+    assert any(
+        "symbolic link archive entry rejected" in item for item in inspected.warnings
     )
 
 

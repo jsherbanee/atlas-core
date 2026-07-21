@@ -535,7 +535,7 @@ Guided steps should use explicit statuses: not started, ready, needs review, blo
 Recommended next action should target the next incomplete review step, explain why it matters, and provide direct navigation.
 
 Document upload controls should state the operational contract plainly:
-"Up to 200 MB per file • PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, JPEG, PNG, TIF, TIFF, TXT, RTF, ZIP".
+"Up to 200 MiB per file • 1 GiB per batch • 50 files maximum • PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, JPEG, PNG, TIF, TIFF, TXT, RTF, ZIP".
 Do not expose unsupported technical formats such as JSON in bid-package upload
 surfaces, and keep upload rejections specific enough for a user to correct the
 file selection without reading diagnostics elsewhere.
