@@ -4151,6 +4151,87 @@ def test_project_operations_center_renders_operational_sections() -> None:
     assert "manifest" not in rendered_text.lower()
 
 
+def test_project_section_failure_is_isolated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    st = _HomeContractStreamlit()
+    st.session_state.update(
+        {
+            "atlas_active_page": "Overview",
+            "atlas_transactions_workspace": {"tenant_id": "tenant-a"},
+        }
+    )
+    record = _project_record("maw-demo", "MAW")
+    captured: dict[str, Any] = {}
+
+    def _fake_log(*_args: Any, **kwargs: Any) -> str:
+        captured.update(kwargs)
+        return "ERR-SECTION"
+
+    monkeypatch.setattr(app, "_log_application_error", _fake_log)
+
+    app._render_project_section_safely(
+        st,
+        record=record,
+        context={"hydration_state": {"mode": "lightweight"}},
+        section="Project Inspector",
+        renderer=lambda: (_ for _ in ()).throw(RuntimeError("missing relation")),
+    )
+
+    assert "This section could not be loaded." in st.warnings
+    assert any("ERR-SECTION" in item for item in st.captions)
+    assert captured["related_object_id"] == "maw-demo"
+    assert captured["hydration_mode"] == "lightweight"
+    assert captured["section"] == "Project Inspector"
+    assert st.expander_calls == [{"label": "Technical detail", "expanded": False}]
+
+
+def test_application_error_reference_is_written_when_primary_logging_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    st = _HomeContractStreamlit()
+    log_path = tmp_path / "application_errors.jsonl"
+
+    def _raise_logging_error(_st: Any) -> Any:
+        _ = _st
+        raise RuntimeError("tenant manager unavailable")
+
+    monkeypatch.setattr(app, "_tenant_manager_workspace_service", _raise_logging_error)
+    monkeypatch.setattr(app, "_application_error_diagnostic_log_path", lambda: log_path)
+
+    error_id = app._log_application_error(
+        st,
+        summary="Unexpected application error",
+        exception=ValueError("bad lightweight payload"),
+        severity="critical",
+        tenant_id="tenant-a",
+        organization_id="org-a",
+        user_id="atlas-ui",
+        workspace="Projects",
+        route="Overview",
+        related_object_id="BID-2026-0002",
+        related_object_type="project",
+        request_or_session_ref="BID-2026-0002",
+        active_page="Overview",
+        hydration_mode="lightweight",
+        section="Project Timeline",
+        recent_action="render",
+    )
+
+    rows = [app.json.loads(line) for line in log_path.read_text().splitlines()]
+    assert error_id.startswith("ERR-")
+    assert rows[0]["error_id"] == error_id
+    assert rows[0]["tenant_id"] == "tenant-a"
+    assert rows[0]["project_id"] == "BID-2026-0002"
+    assert rows[0]["active_page"] == "Overview"
+    assert rows[0]["hydration_mode"] == "lightweight"
+    assert rows[0]["section"] == "Project Timeline"
+    assert rows[0]["exception_type"] == "ValueError"
+    assert "ValueError: bad lightweight payload" in rows[0]["stack_trace"]
+    assert rows[0]["logging_exception_type"] == "RuntimeError"
+
+
 def test_project_health_clear_state_is_actionable() -> None:
     conditions = app._project_operations_health_conditions(
         {

@@ -40,6 +40,11 @@ This document defines the reusable navigation contract used by the shell and wor
 - Project workspace opens use a lightweight bootstrap contract and must not
   synchronously hydrate full document/review context, process background jobs,
   or rebuild repository manifests before the route is visible
+- Project Overview, Documents, and Processing remain lightweight-safe browser
+  routes; full review, evidence, engineering, relationship, and commercial
+  detail hydration belongs behind the pages that explicitly require it
+- Project Operations Center secondary panels log contained section failures with
+  searchable error references while preserving the rest of the active route
 - Explicit URL page state continues to win after workspace-state restoration;
   project-open callbacks avoid duplicate reruns when the requested route is
   already active

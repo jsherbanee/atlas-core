@@ -35,6 +35,14 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Opening a project now renders the Project Operations Center from a lightweight workspace bootstrap instead of synchronously loading full document/review context.
 - Workspace-state persistence and project-open recency updates no longer rebuild the repository manifest during normal navigation.
 - The representative MAW project open path now measures about 0.04 seconds for lightweight bootstrap locally, compared with a measured 45.56 second full-context load before AV-00B.
+- Project Overview, Documents, and Processing now remain on the lightweight
+  hydration boundary during ordinary project navigation and browser refresh.
+- Project Operations Center secondary panels now fail independently with a
+  contained section message, retry action, administrator detail, and searchable
+  error reference instead of crashing the entire project route.
+- Unexpected application and section errors now write runtime diagnostics with
+  tenant, project, route, active page, hydration mode, section, exception type,
+  stack trace, and recent action context.
 
 ### Scope Notes
 

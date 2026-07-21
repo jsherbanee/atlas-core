@@ -8192,6 +8192,11 @@ def _log_application_error(
     background_job_id: str | None = None,
     request_or_session_ref: str | None = None,
     integration_hook: str | None = None,
+    active_page: str | None = None,
+    hydration_mode: str | None = None,
+    section: str | None = None,
+    recent_action: str | None = None,
+    diagnostic_context: dict[str, Any] | None = None,
 ) -> str:
     marker = _alpha_environment_marker()
     safe_summary = _safe_text(summary, "Unexpected application failure")
@@ -8206,6 +8211,31 @@ def _log_application_error(
         else ""
     )
     message = str(exception) if exception is not None else safe_summary
+    timestamp = datetime.now(UTC).isoformat()
+    diagnostic_payload: dict[str, Any] = {
+        "timestamp": timestamp,
+        "summary": safe_summary,
+        "tenant_id": _safe_text(tenant_id, "local"),
+        "organization_id": _safe_text(organization_id, "atlas"),
+        "user_id": _safe_text(user_id, "atlas-ui"),
+        "workspace": _safe_text(workspace, "Atlas"),
+        "route": _safe_text(route, "Unknown"),
+        "active_page": _safe_text(active_page, route),
+        "project_id": _safe_text(request_or_session_ref, ""),
+        "related_object_id": _safe_text(related_object_id, ""),
+        "related_object_type": _safe_text(related_object_type, ""),
+        "correlation_id": _safe_text(correlation_id, ""),
+        "background_job_id": _safe_text(background_job_id, ""),
+        "request_or_session_ref": _safe_text(request_or_session_ref, ""),
+        "integration_hook": _safe_text(integration_hook, ""),
+        "hydration_mode": _safe_text(hydration_mode, "unknown"),
+        "section": _safe_text(section, ""),
+        "recent_action": _safe_text(recent_action, ""),
+        "exception_type": exception_type,
+        "message": message,
+        "stack_trace": stack_trace,
+        "context": dict(diagnostic_context or {}),
+    }
     try:
         tenant_manager = _tenant_manager_workspace_service(st)
         logged = tenant_manager.log_application_error(
@@ -8227,9 +8257,51 @@ def _log_application_error(
             integration_hook=integration_hook,
         )
         _save_tenant_manager_workspace_state(st, tenant_manager)
-        return _safe_text(logged.get("error_id"), "ERR-UNAVAILABLE")
+        error_id = _safe_text(logged.get("error_id"), "ERR-UNAVAILABLE")
+        _write_application_error_diagnostic(error_id, diagnostic_payload)
+        return error_id
+    except Exception as logging_exception:
+        fallback_id = _fallback_application_error_id(diagnostic_payload)
+        diagnostic_payload["logging_exception_type"] = type(logging_exception).__name__
+        diagnostic_payload["logging_exception_message"] = str(logging_exception)
+        _write_application_error_diagnostic(fallback_id, diagnostic_payload)
+        return fallback_id
+
+
+def _fallback_application_error_id(payload: dict[str, Any]) -> str:
+    source = "|".join(
+        [
+            _safe_text(payload.get("tenant_id"), "local"),
+            _safe_text(payload.get("exception_type"), "Exception"),
+            _safe_text(payload.get("message"), ""),
+            _safe_text(payload.get("workspace"), "Atlas"),
+            _safe_text(payload.get("route"), "Unknown"),
+            _safe_text(payload.get("project_id"), ""),
+            _safe_text(payload.get("section"), ""),
+        ]
+    )
+    return f"ERR-{hashlib.sha1(source.encode('utf-8')).hexdigest()[:12].upper()}"
+
+
+def _application_error_diagnostic_log_path() -> Path:
+    return ensure_runtime_workspace_root().parent / "application_errors.jsonl"
+
+
+def _write_application_error_diagnostic(
+    error_id: str,
+    payload: dict[str, Any],
+) -> None:
+    try:
+        log_path = _application_error_diagnostic_log_path()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        serialized = {
+            **payload,
+            "error_id": _safe_text(error_id, "ERR-UNAVAILABLE"),
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(serialized, sort_keys=True, default=str) + "\n")
     except Exception:
-        return "ERR-UNAVAILABLE"
+        return
 
 
 def _render_logged_error_message(
@@ -8249,6 +8321,11 @@ def _render_logged_error_message(
     background_job_id: str | None = None,
     request_or_session_ref: str | None = None,
     integration_hook: str | None = None,
+    active_page: str | None = None,
+    hydration_mode: str | None = None,
+    section: str | None = None,
+    recent_action: str | None = None,
+    diagnostic_context: dict[str, Any] | None = None,
 ) -> None:
     error_id = _log_application_error(
         st,
@@ -8266,10 +8343,29 @@ def _render_logged_error_message(
         background_job_id=background_job_id,
         request_or_session_ref=request_or_session_ref,
         integration_hook=integration_hook,
+        active_page=active_page,
+        hydration_mode=hydration_mode,
+        section=section,
+        recent_action=recent_action,
+        diagnostic_context=diagnostic_context,
     )
     st.error(
         f"{_safe_text(summary, 'Unexpected application failure')}. Reference Error ID: {error_id}"
     )
+
+
+def _context_hydration_mode(context: dict[str, Any] | None) -> str:
+    if not context:
+        return "none"
+    hydration = context.get("hydration_state")
+    if isinstance(hydration, dict):
+        return _safe_text(hydration.get("mode"), "full")
+    return "full"
+
+
+def _stable_widget_suffix(value: str) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9_]+", "_", _safe_text(value, "section").lower())
+    return normalized.strip("_") or "section"
 
 
 def _init_session_state(st: Any) -> None:
@@ -29801,36 +29897,155 @@ def _render_overview_page(
         if st.button("Open Reports", key="atlas_project_ops_more_reports"):
             _open_page(st, "Reports")
 
-    top_cols = st.columns([1.0, 1.35])
-    with top_cols[0]:
-        _render_project_health_card(st, health_conditions)
-    with top_cols[1]:
+    def _render_current_work_section() -> None:
         _render_section_title(st, "Current Work")
         _render_project_current_work(st, current_work)
 
+    def _render_project_context_section() -> None:
+        _render_section_title(st, "Project Context")
+        _render_project_context_cards(st, context_rows)
+
+    def _render_project_inspector_section() -> None:
+        _render_section_title(st, "Project Inspector")
+        _render_project_inspector(
+            st,
+            record=record,
+            context_rows=context_rows,
+            timeline_rows=timeline_rows,
+            folders=folders,
+        )
+
+    top_cols = st.columns([1.0, 1.35])
+    with top_cols[0]:
+        _render_project_section_safely(
+            st,
+            record=record,
+            context=context,
+            section="Project Health",
+            renderer=lambda: _render_project_health_card(st, health_conditions),
+        )
+    with top_cols[1]:
+        _render_project_section_safely(
+            st,
+            record=record,
+            context=context,
+            section="Current Work",
+            renderer=_render_current_work_section,
+        )
+
+    _render_project_section_safely(
+        st,
+        record=record,
+        context=context,
+        section="Project Timeline",
+        renderer=lambda: _render_project_timeline_section(st, timeline_rows),
+    )
+
+    _render_project_section_safely(
+        st,
+        record=record,
+        context=context,
+        section="Project Context",
+        renderer=_render_project_context_section,
+    )
+
+    _render_project_section_safely(
+        st,
+        record=record,
+        context=context,
+        section="Project Inspector",
+        renderer=_render_project_inspector_section,
+    )
+
+    _render_project_section_safely(
+        st,
+        record=record,
+        context=context,
+        section="Object Navigation",
+        renderer=lambda: _render_overview_object_navigation(st),
+    )
+
+
+def _render_project_timeline_section(
+    st: Any,
+    timeline_rows: list[dict[str, Any]],
+) -> None:
     _render_section_title(st, "Project Timeline")
     if timeline_rows:
         _render_data_table(st, timeline_rows)
-    else:
-        _render_guided_empty_state(
-            st,
-            why_empty="No project activity is available because this workspace has no recorded business events yet.",
-            action_to_populate="Upload documents or run project analysis to create project activity.",
-            next_location="Open Documents to continue.",
-        )
-
-    _render_section_title(st, "Project Context")
-    _render_project_context_cards(st, context_rows)
-
-    _render_section_title(st, "Project Inspector")
-    _render_project_inspector(
+        return
+    _render_guided_empty_state(
         st,
-        record=record,
-        context_rows=context_rows,
-        timeline_rows=timeline_rows,
-        folders=folders,
+        why_empty="No project activity is available because this workspace has no recorded business events yet.",
+        action_to_populate="Upload documents or run project analysis to create project activity.",
+        next_location="Open Documents to continue.",
     )
 
+
+def _render_project_section_safely(
+    st: Any,
+    *,
+    record: ProjectWorkspaceRecord,
+    context: dict[str, Any] | None,
+    section: str,
+    renderer: Callable[[], Any],
+) -> None:
+    try:
+        renderer()
+    except Exception as exc:
+        error_id = _log_application_error(
+            st,
+            summary=f"{section} could not be loaded",
+            exception=exc,
+            severity="high",
+            tenant_id=_safe_text(
+                dict(st.session_state.get("atlas_transactions_workspace") or {}).get(
+                    "tenant_id"
+                ),
+                "local",
+            ),
+            organization_id=_safe_text(
+                dict(st.session_state.get("atlas_transactions_workspace") or {}).get(
+                    "organization_id"
+                ),
+                "atlas",
+            ),
+            user_id=_safe_text(
+                st.session_state.get("atlas_settings_user_id"), "atlas-ui"
+            ),
+            workspace="Projects",
+            route=_safe_text(st.session_state.get("atlas_active_page"), "Overview"),
+            related_object_id=record.workspace_id,
+            related_object_type="project",
+            request_or_session_ref=record.workspace_id,
+            active_page=_safe_text(
+                st.session_state.get("atlas_active_page"), "Overview"
+            ),
+            hydration_mode=_context_hydration_mode(context),
+            section=section,
+            recent_action=_safe_text(
+                st.session_state.get("atlas_workspace_action"), "render_section"
+            ),
+            diagnostic_context={
+                "project_name": record.project.name,
+                "source_mode": record.source_mode,
+            },
+        )
+        _render_section_title(st, section)
+        st.warning("This section could not be loaded.")
+        st.caption(
+            f"Atlas kept the rest of the project workspace available. Reference Error ID: {error_id}"
+        )
+        if st.button(
+            "Retry Section",
+            key=f"atlas_retry_section_{_stable_widget_suffix(section)}",
+        ):
+            st.rerun()
+        with st.expander("Technical detail", expanded=False):
+            st.caption(f"{type(exc).__name__}: {exc}")
+
+
+def _render_overview_object_navigation(st: Any) -> None:
     _render_section_title(st, "Object Navigation")
     nav_cols = _responsive_control_columns(st, 2)
     recent = list(st.session_state.get("atlas_recently_viewed_objects") or [])
@@ -41156,6 +41371,10 @@ def main() -> None:
             st.session_state.get(_navigation_primary_state_key()), "Atlas"
         )
         active_route = _safe_text(st.session_state.get("atlas_active_page"), "Unknown")
+        active_workspace_id = _safe_text(
+            st.session_state.get("atlas_active_workspace_id"),
+            "session",
+        )
         _render_logged_error_message(
             st,
             summary="Unexpected application error",
@@ -41168,9 +41387,25 @@ def main() -> None:
             ),
             workspace=active_primary,
             route=active_route,
-            request_or_session_ref=_safe_text(
-                st.session_state.get("atlas_active_workspace_id"), "session"
+            related_object_id=(
+                active_workspace_id if active_workspace_id != "session" else None
             ),
+            related_object_type="project" if active_workspace_id != "session" else None,
+            request_or_session_ref=active_workspace_id,
+            active_page=active_route,
+            hydration_mode=_context_hydration_mode(context),
+            section=_safe_text(
+                st.session_state.get("atlas_active_secondary_section"), ""
+            ),
+            recent_action=_safe_text(
+                st.session_state.get("atlas_workspace_action"), "render"
+            ),
+            diagnostic_context={
+                "query_params": dict(getattr(st, "query_params", {}) or {}),
+                "record_workspace_id": record.workspace_id if record else "",
+                "record_project_name": record.project.name if record else "",
+                "primary_workspace": active_primary,
+            },
         )
 
 

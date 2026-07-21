@@ -378,6 +378,14 @@ Project open behavior (AV-00B):
   engineering detail sections hydrate only when their sections are opened.
 - Opening a project does not run OCR, PDF inspection, text extraction,
   classification, evidence generation, job processing, or manifest repair.
+- Overview, Documents, and Processing remain lightweight-safe and render from
+  bootstrap data plus persisted processing summaries.
+- Secondary Project Operations Center panels are section-isolated: a failed
+  panel shows `This section could not be loaded.`, a retry action, a reference
+  ID, and administrator detail without crashing the entire project route.
+- Unexpected project route errors write searchable runtime diagnostic records
+  with tenant, project, page, route, hydration mode, section, exception type,
+  stack trace, and recent action context.
 - On the representative MAW runtime project, the measured blocking full-context
   load was 45.56 seconds before AV-00B; lightweight bootstrap now measures about
   0.04 seconds locally before rendering.

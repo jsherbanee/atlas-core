@@ -100,9 +100,27 @@ Project Operations Center render. Detail-heavy sections hydrate when users open
 those sections. If processing-job details are temporarily unavailable, the
 workspace opens and reports `Processing details are updating.`
 
+Overview, Documents, and Processing are lightweight-safe routes. They may use
+project identity, cached document counts, processing counts, navigation state,
+and simple recommended actions. Detail-heavy engineering, evidence, BOM,
+relationships, and commercial intelligence remain full-context boundaries and
+hydrate only when their pages require them.
+
 Repository reconciliation is not run implicitly during navigation. If a cached
 manifest is missing or stale, the project still opens and Atlas surfaces a
 maintenance-oriented diagnostic instead of blocking the route transition.
+
+## Section Failure Isolation
+
+Secondary Project Operations Center panels are isolated so one failed panel does
+not take down the entire project workspace. A contained section failure shows
+`This section could not be loaded.`, a concise explanation, a retry action, an
+error reference, and administrator technical detail while leaving the remaining
+workspace usable.
+
+Unexpected application and section errors write searchable diagnostic records to
+the runtime error log with timestamp, tenant, project, route, active page,
+hydration mode, section, exception type, stack trace, and recent action context.
 
 ## Boundaries
 
