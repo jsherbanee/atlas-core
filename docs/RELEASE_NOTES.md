@@ -32,6 +32,9 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Bid-package upload limits and supported file types now come from one shared policy across the Documents uploader, pending validation, intake validation, background jobs, help text, and rejection diagnostics.
 - Bid-package uploads now allow up to 200 MiB per file (209,715,200 bytes), 1 GiB per batch (1,073,741,824 bytes), and 50 files per batch while showing precise actual-versus-maximum size details when a file or batch is too large.
 - JSON is no longer advertised or accepted as a user-facing bid-package upload format; ZIP remains supported as a bounded archive-container with 2 GiB expanded-size, 500 contained-file, unsafe-path, symbolic-link, encrypted-entry, duplicate-entry, and system-file protections.
+- Opening a project now renders the Project Operations Center from a lightweight workspace bootstrap instead of synchronously loading full document/review context.
+- Workspace-state persistence and project-open recency updates no longer rebuild the repository manifest during normal navigation.
+- The representative MAW project open path now measures about 0.04 seconds for lightweight bootstrap locally, compared with a measured 45.56 second full-context load before AV-00B.
 
 ### Scope Notes
 
@@ -41,7 +44,7 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ### Quality
 
-- Full quality gate passing: `git diff --check`, `black --check .`, `ruff check .`, `mypy .`, and `pytest` (`1541 passed`).
+- Full quality gate passing: `git diff --check`, `black --check .`, `ruff check .`, `mypy .`, and `pytest` (`1568 passed`).
 
 ## Unreleased (PX-04A Interaction and Workflow Stabilization)
 

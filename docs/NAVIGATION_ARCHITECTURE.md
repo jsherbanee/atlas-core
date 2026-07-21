@@ -37,6 +37,12 @@ This document defines the reusable navigation contract used by the shell and wor
   the active primary workspace has no secondary accordion sections
 - Project workspace opens persist `atlas_workspace_id` alongside `atlas_page` so
   browser refreshes and validation links can restore the selected project context
+- Project workspace opens use a lightweight bootstrap contract and must not
+  synchronously hydrate full document/review context, process background jobs,
+  or rebuild repository manifests before the route is visible
+- Explicit URL page state continues to win after workspace-state restoration;
+  project-open callbacks avoid duplicate reruns when the requested route is
+  already active
 
 ## Transactions Navigation Direction
 

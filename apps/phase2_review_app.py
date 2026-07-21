@@ -8728,6 +8728,57 @@ def _load_context_for_record(record: ProjectWorkspaceRecord) -> dict[str, Any] |
     return None
 
 
+def _project_page_requires_full_context(page: str) -> bool:
+    return page in {
+        "BOM Review",
+        "Scope & Risk",
+        "Engineering Review",
+        "Product Resolution",
+        "Estimate",
+        "Notebook",
+        "Drawings",
+        "Specifications",
+        "Equipment",
+        "Schedules",
+        "Addenda",
+        "Relationships",
+        "Reports",
+        "Object Workspace",
+    }
+
+
+def _load_lightweight_context_for_record(
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+) -> dict[str, Any]:
+    bootstrap = workspace_service.load_workspace_bootstrap(record.workspace_id)
+    document_counts = dict(bootstrap.document_counts)
+    total_files = int(bootstrap.total_document_count)
+    return {
+        "data_source_mode": record.source_mode,
+        "data_source_label": record.source_label,
+        "sample_project_id": record.workspace_id,
+        "sample_project_name": record.project.name,
+        "package_location": record.package_location,
+        "warnings": list(record.warnings),
+        "bootstrap": bootstrap.to_dict(),
+        "import_summary": {
+            **dict(record.import_summary),
+            "total_files": int(
+                dict(record.import_summary).get("total_files", total_files)
+                or total_files
+            ),
+            "document_counts": document_counts,
+            "processing_counts": dict(bootstrap.processing_counts),
+        },
+        "hydration_state": {
+            "mode": "lightweight",
+            "full_context_loaded": False,
+            "diagnostics": list(bootstrap.diagnostics),
+        },
+    }
+
+
 def _ensure_active_workspace(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
@@ -9080,8 +9131,10 @@ def _navigate_to_project_page(
             query_params["atlas_page"] = page
         except Exception:
             pass
-    if workspace_service is not None and hasattr(workspace_service, "save_record"):
-        workspace_service.save_record(record)
+    if workspace_service is not None and hasattr(
+        workspace_service, "mark_workspace_opened"
+    ):
+        workspace_service.mark_workspace_opened(record.workspace_id)
     if page == "Documents":
         _clear_create_project_widget_state(st)
     st.rerun()
@@ -41035,8 +41088,22 @@ def main() -> None:
             _restore_workspace_state(st, workspace_service, record)
             _sync_active_page_from_query_params(st)
 
-        context = _load_context_for_record(record) if record is not None else None
-        if record is not None and context is not None:
+        current_page = _safe_text(
+            st.session_state.get("atlas_active_page"),
+            "Mission Control",
+        )
+        context = None
+        full_context_loaded = False
+        if record is not None:
+            if _project_page_requires_full_context(current_page):
+                context = _load_context_for_record(record)
+                full_context_loaded = context is not None
+            else:
+                context = _load_lightweight_context_for_record(
+                    workspace_service,
+                    record,
+                )
+        if record is not None and context is not None and full_context_loaded:
             record = _build_record_from_context(context, existing_record=record)
             record.workspace_state = workspace_service.load_workspace_state(
                 record.workspace_id
@@ -41046,13 +41113,6 @@ def main() -> None:
                 record.metadata.get("reference", record.is_reference)
             )
             record.archived = bool(record.metadata.get("archived", record.archived))
-            workspace_service.save_record(record)
-            _persist_repository_artifacts(workspace_service, record, context)
-            workspace_service.log_event(
-                record.workspace_id,
-                "review_executed",
-                {"source_mode": record.source_mode, "project_id": record.project_id},
-            )
 
         if st.session_state.get("atlas_active_page") not in ALL_ACTIVE_PAGES:
             st.session_state["atlas_active_page"] = "Mission Control"

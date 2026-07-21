@@ -81,6 +81,29 @@ Local limitation: the built-in worker is an in-process daemon. Jobs remain
 durable on disk, but processing only advances while a local Atlas worker process
 is running.
 
+## Lightweight Project Open
+
+AV-00B makes project opening a lightweight route transition.
+
+Opening a project loads only:
+
+- project identity and customer
+- tenant/local workspace scope
+- lifecycle/status metadata
+- current navigation state
+- cached manifest document counts
+- non-blocking processing job counts
+
+It does not load document contents, OCR results, extracted pages, evidence
+collections, drawing intelligence, or full review context before the first
+Project Operations Center render. Detail-heavy sections hydrate when users open
+those sections. If processing-job details are temporarily unavailable, the
+workspace opens and reports `Processing details are updating.`
+
+Repository reconciliation is not run implicitly during navigation. If a cached
+manifest is missing or stale, the project still opens and Atlas surfaces a
+maintenance-oriented diagnostic instead of blocking the route transition.
+
 ## Boundaries
 
 PX-02 does not add:

@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import re
+from typing import Any
 
 from atlas_core.contracts.background_job_contracts import (
     JobCategory,
@@ -203,6 +204,95 @@ def test_workspace_service_manifest_health_and_bundle(tmp_path: Path) -> None:
     imported = service.import_project_bundle(bundle_path)
     assert imported.workspace_id == "project-bundle"
     assert Path(service.project_location("project-bundle")).exists()
+
+
+def test_workspace_service_load_workspace_bootstrap_is_lightweight(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="bootstrap-project",
+        name="Bootstrap Project",
+        client="Client",
+    )
+    service.save_record(record)
+    documents_root = Path(service.project_location(record.workspace_id)) / "documents"
+    (documents_root / "drawings" / "a.pdf").write_bytes(b"%PDF")
+    service.manager.project_repository.refresh_manifest(record.workspace_id)
+    service.enqueue_document_processing(
+        workspace_id=record.workspace_id,
+        uploaded_files=[("queued.pdf", _blank_pdf_bytes())],
+        actor_id="user-1",
+    )
+
+    def _raise_processing() -> None:
+        raise AssertionError("bootstrap must not process queued document jobs")
+
+    service.process_next_document_job = _raise_processing  # type: ignore[method-assign]
+
+    bootstrap = service.load_workspace_bootstrap(record.workspace_id)
+
+    assert bootstrap.workspace_id == record.workspace_id
+    assert bootstrap.document_counts["drawings"] == 1
+    assert bootstrap.processing_counts["queued"] == 1
+    assert bootstrap.active_processing_count == 1
+
+
+def test_workspace_service_bootstrap_returns_processing_updating_diagnostic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="locked-processing-project",
+        name="Locked Processing Project",
+        client="Client",
+    )
+    service.save_record(record)
+
+    def _raise_locked_jobs(
+        _workspace_id: str, limit: int = 1000
+    ) -> list[dict[str, Any]]:
+        _ = limit
+        raise TimeoutError("job lock is held")
+
+    monkeypatch.setattr(service, "list_background_jobs", _raise_locked_jobs)
+
+    bootstrap = service.load_workspace_bootstrap(record.workspace_id)
+
+    assert bootstrap.processing_counts == {}
+    assert "Processing details are updating." in bootstrap.diagnostics
+
+
+def test_workspace_service_open_and_state_persistence_skip_manifest_rebuild(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="light-open-project",
+        name="Light Open Project",
+        client="Client",
+    )
+    service.save_record(record)
+
+    def _raise_refresh(_workspace_id: str) -> dict[str, Any]:
+        raise AssertionError("project open/state persistence must not refresh manifest")
+
+    monkeypatch.setattr(
+        service.manager.project_repository,
+        "refresh_manifest",
+        _raise_refresh,
+    )
+
+    opened = service.mark_workspace_opened(record.workspace_id)
+    service.save_workspace_state(record.workspace_id, {"last_open_page": "Overview"})
+
+    assert opened.workspace_id == record.workspace_id
+    assert (
+        service.load_workspace_state(record.workspace_id)["last_open_page"]
+        == "Overview"
+    )
 
 
 def test_workspace_service_runtime_wiring_exposes_preview_authority(

@@ -185,6 +185,47 @@ class ProjectWorkspaceRecord:
         return normalized or None
 
 
+@dataclass(frozen=True)
+class ProjectWorkspaceBootstrap:
+    workspace_id: str
+    project_name: str
+    customer: str
+    status: str
+    lifecycle_stage: str
+    document_counts: dict[str, int]
+    processing_counts: dict[str, int]
+    recent_activity: list[dict[str, Any]] = field(default_factory=list)
+    diagnostics: list[str] = field(default_factory=list)
+
+    @property
+    def total_document_count(self) -> int:
+        return sum(int(value or 0) for value in self.document_counts.values())
+
+    @property
+    def active_processing_count(self) -> int:
+        active_keys = {"queued", "running", "retry_scheduled"}
+        return sum(
+            int(value or 0)
+            for key, value in self.processing_counts.items()
+            if key in active_keys
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "workspace_id": self.workspace_id,
+            "project_name": self.project_name,
+            "customer": self.customer,
+            "status": self.status,
+            "lifecycle_stage": self.lifecycle_stage,
+            "document_counts": dict(self.document_counts),
+            "processing_counts": dict(self.processing_counts),
+            "recent_activity": [dict(item) for item in self.recent_activity],
+            "diagnostics": list(self.diagnostics),
+            "total_document_count": self.total_document_count,
+            "active_processing_count": self.active_processing_count,
+        }
+
+
 class ProjectWorkspaceService:
     def __init__(self, workspace_root: str | Path = "AtlasProjects") -> None:
         self.workspace_root = Path(workspace_root)
@@ -373,6 +414,80 @@ class ProjectWorkspaceService:
             workspace_payload,
             project_dir,
         )
+
+    def mark_workspace_opened(self, workspace_id: str) -> ProjectWorkspaceRecord:
+        record = self.load_record(workspace_id)
+        now = datetime.now(UTC).isoformat()
+        record.last_opened_at = now
+        record.updated_at = now
+        _project_payload, metadata_payload, workspace_payload, project_dir = (
+            self.manager.project_repository.load(workspace_id)
+        )
+        metadata_payload["last_opened"] = now
+        workspace_payload["last_opened_at"] = now
+        workspace_payload["updated_at"] = now
+        project_root = Path(project_dir)
+        self.manager.project_repository._write_metadata(  # type: ignore[attr-defined]
+            project_root,
+            metadata_payload,
+        )
+        self.manager.project_repository._write_workspace(  # type: ignore[attr-defined]
+            project_root,
+            workspace_payload,
+        )
+        return record
+
+    def load_workspace_bootstrap(self, workspace_id: str) -> ProjectWorkspaceBootstrap:
+        record = self.load_record(workspace_id)
+        diagnostics: list[str] = []
+        manifest = self._read_cached_manifest(workspace_id, diagnostics)
+        document_counts = {
+            str(key): int(value or 0)
+            for key, value in dict(manifest.get("document_counts") or {}).items()
+        }
+        processing_counts: dict[str, int] = {}
+        try:
+            for job in self.list_background_jobs(workspace_id, limit=1000):
+                status = str(job.get("status") or "unknown")
+                processing_counts[status] = processing_counts.get(status, 0) + 1
+        except Exception:
+            diagnostics.append("Processing details are updating.")
+
+        return ProjectWorkspaceBootstrap(
+            workspace_id=record.workspace_id,
+            project_name=record.project.name,
+            customer=record.project.client,
+            status=str(record.metadata.get("status") or record.project.status.value),
+            lifecycle_stage=str(
+                record.metadata.get("lifecycle_stage") or record.project.status.value
+            ),
+            document_counts=document_counts,
+            processing_counts=processing_counts,
+            recent_activity=[],
+            diagnostics=diagnostics,
+        )
+
+    def _read_cached_manifest(
+        self,
+        workspace_id: str,
+        diagnostics: list[str] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            location = self.manager.project_repository.project_location(workspace_id)
+            manifest_path = Path(location) / "project_manifest.json"
+            if not manifest_path.exists():
+                if diagnostics is not None:
+                    diagnostics.append("Project repository requires reconciliation.")
+                return {}
+            with manifest_path.open(encoding="utf-8") as file:
+                payload = json.load(file)
+            return dict(payload) if isinstance(payload, dict) else {}
+        except Exception:
+            if diagnostics is not None:
+                diagnostics.append(
+                    "Project repository summary is temporarily unavailable."
+                )
+            return {}
 
     def save_record(self, record: ProjectWorkspaceRecord) -> Path:
         is_new_project = False
@@ -854,21 +969,10 @@ class ProjectWorkspaceService:
         return self.manager.workspace_repository.load_state(workspace_id)
 
     def save_workspace_state(self, workspace_id: str, state: dict[str, Any]) -> None:
+        existing_state = self.load_workspace_state(workspace_id)
+        if existing_state == dict(state):
+            return
         self.manager.workspace_repository.save_state(workspace_id, state)
-        self.manager.log(
-            workspace_id,
-            "workspace_opened",
-            {"last_open_page": state.get("last_open_page")},
-        )
-        record = self.load_record(workspace_id)
-        self._record_audit(
-            record=record,
-            action="workspace.state.saved",
-            actor="atlas-ui",
-            target_type="workspace",
-            target_id=workspace_id,
-            after={"last_open_page": state.get("last_open_page")},
-        )
 
     def import_uploaded_documents(
         self,

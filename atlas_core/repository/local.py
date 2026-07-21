@@ -694,15 +694,11 @@ class LocalWorkspaceRepository(WorkspaceRepository):
         return {}
 
     def save_state(self, project_id: str, state: JsonDict) -> None:
-        project_payload, metadata_payload, workspace_payload, _ = (
-            self.project_repository.load(project_id)
-        )
+        _, _, workspace_payload, location = self.project_repository.load(project_id)
         workspace_payload["workspace_state"] = dict(state)
         workspace_payload["updated_at"] = _utc_now()
-        self.project_repository.save(
-            project_id,
-            project_payload,
-            metadata_payload,
+        self.project_repository._write_workspace(  # type: ignore[attr-defined]
+            Path(location),
             workspace_payload,
         )
 

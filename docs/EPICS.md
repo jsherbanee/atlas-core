@@ -167,6 +167,9 @@ Explicitly out of scope:
   shared policy: 200 MiB per file, 1 GiB per batch, 50 files per batch,
   PDF/DOC/DOCX/XLS/XLSX/CSV/image/TXT/RTF/ZIP formats, and no user-facing JSON
   intake
+- open project workspaces through a lightweight bootstrap that avoids full
+  document/review hydration, queued-job execution, and implicit manifest repair
+  during navigation
 - preserve existing drawing intelligence and OCR behavior without adding new
   extraction rules, AI, cloud infrastructure, procurement, or accounting scope
 

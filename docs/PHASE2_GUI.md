@@ -368,6 +368,20 @@ ZIP handling behavior:
 - Nested archive depth is bounded.
 - Contained relative paths are preserved in intake-source metadata.
 
+Project open behavior (AV-00B):
+- Repository `Open Project` updates `atlas_workspace_id` and `atlas_page`
+  immediately and routes to the Project Operations Center.
+- The first Project Operations Center render uses a lightweight workspace
+  bootstrap with identity, cached manifest document counts, processing counts,
+  and navigation state.
+- Full document/review context, extracted pages, evidence, and commercial or
+  engineering detail sections hydrate only when their sections are opened.
+- Opening a project does not run OCR, PDF inspection, text extraction,
+  classification, evidence generation, job processing, or manifest repair.
+- On the representative MAW runtime project, the measured blocking full-context
+  load was 45.56 seconds before AV-00B; lightweight bootstrap now measures about
+  0.04 seconds locally before rendering.
+
 ## Project Settings Identity Workflow (X-03)
 
 Project Settings now includes controlled metadata editing for identity fields:

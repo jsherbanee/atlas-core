@@ -240,6 +240,7 @@ class _FakeWorkspaceService:
     def __init__(self, records: list[ProjectWorkspaceRecord]) -> None:
         self._records = records
         self.saved_records: list[ProjectWorkspaceRecord] = []
+        self.opened_records: list[str] = []
         self.renamed: list[tuple[str, str]] = []
         self.duplicated: list[tuple[str, str, str | None]] = []
         self.pinned: list[tuple[str, bool]] = []
@@ -340,6 +341,10 @@ class _FakeWorkspaceService:
         ]
         self._records.insert(0, record)
         return Path("workspace.json")
+
+    def mark_workspace_opened(self, workspace_id: str) -> ProjectWorkspaceRecord:
+        self.opened_records.append(workspace_id)
+        return next(item for item in self._records if item.workspace_id == workspace_id)
 
     def import_project_bundle(self, import_path: str) -> ProjectWorkspaceRecord:
         name = Path(import_path).stem or "Imported Project"
@@ -2858,7 +2863,8 @@ def test_continue_working_resume_action_updates_recency() -> None:
 
     app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
 
-    assert service.saved_records[-1].workspace_id == "project-a"
+    assert service.opened_records == ["project-a"]
+    assert service.saved_records == []
     assert st.rerun_called is True
 
 
@@ -3495,7 +3501,8 @@ def test_open_search_reference_project_updates_recency() -> None:
 
     app._open_search_reference(st, service, reference)
 
-    assert service.saved_records[-1].workspace_id == "maw-demo"
+    assert service.opened_records == ["maw-demo"]
+    assert service.saved_records == []
     assert st.session_state["atlas_active_page"] == "Overview"
 
 
@@ -3670,8 +3677,46 @@ def test_open_project_record_updates_recency() -> None:
 
     app._open_project_record(st, record, service)
 
-    assert service.saved_records[-1].workspace_id == "maw-demo"
+    assert service.opened_records == ["maw-demo"]
+    assert service.saved_records == []
     assert st.session_state["atlas_active_page"] == "Overview"
+
+
+def test_project_open_pages_use_lightweight_context_by_default() -> None:
+    assert app._project_page_requires_full_context("Overview") is False
+    assert app._project_page_requires_full_context("Processing") is False
+    assert app._project_page_requires_full_context("Documents") is False
+    assert app._project_page_requires_full_context("BOM Review") is True
+
+
+def test_lightweight_project_context_uses_bootstrap_without_full_review() -> None:
+    record = _project_record("maw-demo", "MAW")
+
+    class _BootstrapService(_FakeWorkspaceService):
+        def load_workspace_bootstrap(self, _workspace_id: str) -> Any:
+            return SimpleNamespace(
+                document_counts={"drawings": 2, "specifications": 1},
+                processing_counts={"queued": 3, "failed": 1},
+                total_document_count=3,
+                diagnostics=[],
+                to_dict=lambda: {
+                    "document_counts": {"drawings": 2, "specifications": 1},
+                    "processing_counts": {"queued": 3, "failed": 1},
+                    "total_document_count": 3,
+                    "active_processing_count": 3,
+                    "diagnostics": [],
+                },
+            )
+
+    context = app._load_lightweight_context_for_record(
+        _BootstrapService([record]),
+        record,
+    )
+
+    assert context["hydration_state"]["mode"] == "lightweight"
+    assert "review" not in context
+    assert context["import_summary"]["total_files"] == 3
+    assert context["import_summary"]["processing_counts"] == {"queued": 3, "failed": 1}
 
 
 def test_recent_search_queries_are_deduplicated() -> None:

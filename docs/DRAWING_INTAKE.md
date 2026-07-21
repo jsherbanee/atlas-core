@@ -18,6 +18,11 @@ Each accepted file receives a persisted document-processing job. The current
 local worker consumes those jobs from the repository-backed queue and can be
 replaced later by Celery, RQ, Dramatiq, or AWS queue/worker infrastructure.
 
+AV-00B keeps project opening isolated from that worker. Opening a project reads
+cached document and processing counts only; it does not claim jobs, wait for job
+completion, inspect PDFs, run OCR, extract text, classify documents, or generate
+evidence during the Streamlit route transition.
+
 ## Upload Policy
 
 Bid-package intake uses one shared upload policy for the Streamlit uploader,
