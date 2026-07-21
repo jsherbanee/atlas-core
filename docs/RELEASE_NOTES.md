@@ -19,6 +19,27 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (AV-00A Asynchronous Document Intake)
+
+### Improved
+
+- Project document uploads now queue one persisted background-processing job per accepted file instead of running document import synchronously in the Streamlit upload callback.
+- Documents now performs only basic upload validation before durable queue creation; expensive PDF inspection, OCR, extraction, classification, and evidence generation run from the Processing queue.
+- Processing now presents document-oriented status rows with filename, folder, upload time, stage, progress, elapsed time, warnings, failure reason, retry, and cancel controls.
+- Processing filters now support Active, Ready, Needs Attention, Failed, and All.
+- Duplicate active upload submissions reuse an existing idempotent document job instead of creating duplicate processing work.
+- Failed document jobs schedule retry without blocking later queued files.
+
+### Scope Notes
+
+- local worker is an in-process daemon that consumes persisted jobs while Atlas is running
+- queued job records survive reruns, browser refresh, navigation, and application restart where local repository state is retained
+- no new OCR algorithms, drawing extraction rules, AI, cloud infrastructure, procurement, inventory, accounting, or production demo data
+
+### Quality
+
+- Full quality gate passing: `git diff --check`, `black --check .`, `ruff check .`, `mypy .`, and `pytest` (`1541 passed`).
+
 ## Unreleased (PX-04A Interaction and Workflow Stabilization)
 
 ### Improved

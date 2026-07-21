@@ -102,6 +102,7 @@ Sprint PX-02 transforms the active Project Overview into a Project Operations Ce
 Sprint PX-03 transforms selected Transactions records into a Commercial Transaction Workbench for supported customer-side commercial document families without adding commercial business logic.
 Sprint PX-04 transforms Knowledge browse/selected-record surfaces into operational workbenches for Customers, Vendors, Manufacturers, Products, Services, Fees, and Assemblies using service-backed presentation adapters, business-language relationships, deterministic findings, and one recommended next step.
 Sprint PX-04A stabilizes first-five-minutes workflow interactions by routing Projects Create/Import actions to visible workflows, preserving create/import feedback across reruns, explaining disabled import/delete prerequisites, and preventing generic source folders such as `documents` from becoming default project identity.
+Sprint AV-00A makes project document intake asynchronous by queueing one persisted document-processing job per accepted file, moving expensive import/inspection/extraction work out of Streamlit upload callbacks, and improving Processing status visibility with durable stage/filter/retry/cancel behavior.
 
 X-01 through X-13 are closed.
 
@@ -123,9 +124,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1536 tests)
+- pytest: full suite passing (1541 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1536 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1541 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 

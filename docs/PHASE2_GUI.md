@@ -348,8 +348,10 @@ Step 2 upload behavior (Documents):
 - Pending queue uses deterministic dedupe identity (normalized filename + size + source hash).
 - Users can remove selected pending files or clear all pending files.
 - Upload execution is explicit through Upload Pending Files.
-- Partial success is deterministic: accepted files import, rejected files remain visible via diagnostics/warnings.
-- Failed/rejected files can be retried through subsequent pending selections.
+- AV-00A upload execution persists accepted files into durable document-processing jobs and returns control without running OCR, PDF inspection, extraction, classification, or evidence generation inside the Streamlit callback.
+- Each accepted file receives its own Processing job with visible stage, progress, warnings, failure reason, retry, and cancel controls.
+- Rejected files remain pending with a basic upload-validation explanation.
+- Failed jobs can be retried from Processing without blocking other files.
 
 ZIP handling behavior:
 - Archive inspection occurs before extraction.

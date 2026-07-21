@@ -62,6 +62,7 @@ Status: Active
 - PX-03 Commercial Transaction Workbench
 - PX-04 Knowledge That Works
 - PX-04A Interaction and Workflow Stabilization
+- AV-00A Asynchronous Document Intake and Background Processing
 
 ### PX-01 Scope
 
@@ -151,6 +152,19 @@ Explicitly out of scope:
   identity fields
 - preserve PX-01 through PX-04 behavior without MAW parsing, new business
   logic, or persistence redesign
+
+### AV-00A Scope
+
+- persist and queue accepted project document uploads immediately
+- create one durable processing job per accepted file
+- move PDF inspection, OCR, extraction, classification, and evidence generation
+  out of Streamlit upload callbacks
+- consume persisted jobs through a local worker that is replaceable by a cloud
+  queue/worker architecture
+- expose durable Processing status, filters, retry, cancel, warnings, and
+  failure diagnostics
+- preserve existing drawing intelligence and OCR behavior without adding new
+  extraction rules, AI, cloud infrastructure, procurement, or accounting scope
 
 ### A-07 Scope
 

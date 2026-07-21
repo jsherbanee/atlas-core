@@ -630,6 +630,123 @@ def test_workspace_service_runs_document_import_as_background_job(
     assert service.load_record(record.workspace_id).workspace_id == record.workspace_id
 
 
+def test_workspace_service_enqueues_document_import_without_running(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="job-enqueue-1",
+        name="Queued Import",
+        client="Client",
+    )
+    service.save_record(record)
+
+    submitted = service.enqueue_document_processing(
+        workspace_id=record.workspace_id,
+        uploaded_files=[("bid-package.pdf", _blank_pdf_bytes())],
+        actor_id="user-1",
+    )
+    loaded = service.load_record(record.workspace_id)
+
+    assert submitted["status"] == "queued"
+    assert loaded.import_summary == {}
+    assert service.list_background_jobs(record.workspace_id)[0]["status"] == "queued"
+
+
+def test_workspace_service_prevents_duplicate_active_document_jobs(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="job-duplicate-1",
+        name="Duplicate Import",
+        client="Client",
+    )
+    service.save_record(record)
+    uploaded = [("bid-package.pdf", _blank_pdf_bytes())]
+
+    first = service.enqueue_document_processing(
+        workspace_id=record.workspace_id,
+        uploaded_files=uploaded,
+        actor_id="user-1",
+    )
+    second = service.enqueue_document_processing(
+        workspace_id=record.workspace_id,
+        uploaded_files=uploaded,
+        actor_id="user-1",
+    )
+
+    assert second["job_id"] == first["job_id"]
+    assert len(service.list_background_jobs(record.workspace_id)) == 1
+
+
+def test_workspace_service_claims_and_processes_next_document_job(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="job-process-1",
+        name="Process Import",
+        client="Client",
+    )
+    service.save_record(record)
+    submitted = service.enqueue_document_processing(
+        workspace_id=record.workspace_id,
+        uploaded_files=[("bid-package.pdf", _blank_pdf_bytes())],
+        actor_id="user-1",
+    )
+
+    claimed = service.claim_next_processing_job()
+    assert claimed is not None
+    assert claimed["job_id"] == submitted["job_id"]
+    assert claimed["status"] == "running"
+
+    processed = service.process_document_job(
+        workspace_id=record.workspace_id,
+        job_id=str(submitted["job_id"]),
+    )
+
+    assert processed["status"] == "succeeded"
+    assert service.load_record(record.workspace_id).import_summary
+
+
+def test_workspace_service_process_next_document_job_is_failure_isolated(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    first = service.create_manual_record(
+        project_id="job-fail-1",
+        name="Failure Import",
+        client="Client",
+    )
+    second = service.create_manual_record(
+        project_id="job-ok-1",
+        name="Successful Import",
+        client="Client",
+    )
+    service.save_record(first)
+    service.save_record(second)
+    service.enqueue_document_processing(
+        workspace_id=first.workspace_id,
+        uploaded_files=[("empty.pdf", b"")],
+        actor_id="user-1",
+    )
+    service.enqueue_document_processing(
+        workspace_id=second.workspace_id,
+        uploaded_files=[("bid-package.pdf", _blank_pdf_bytes())],
+        actor_id="user-1",
+    )
+
+    first_result = service.process_next_document_job()
+    second_result = service.process_next_document_job()
+
+    assert first_result is not None
+    assert second_result is not None
+    statuses = {str(first_result["status"]), str(second_result["status"])}
+    assert "retry_scheduled" in statuses
+    assert "succeeded" in statuses
+
+
 def test_workspace_service_runs_export_as_background_job(tmp_path: Path) -> None:
     service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
     record = service.create_manual_record(

@@ -4707,3 +4707,49 @@ def test_documents_upload_picker_reset_increments_token_and_clears_signature() -
         st.session_state["atlas_documents_pending_selection_signature"]["BID-2"]
         == "xyz"
     )
+
+
+class _AsyncUploadWorkspaceService:
+    def __init__(self) -> None:
+        self.enqueued: list[dict[str, Any]] = []
+
+    def inspect_uploaded_documents(self, _uploaded_files: Any) -> None:
+        raise AssertionError("upload rendering must not inspect files synchronously")
+
+    def run_document_import_job(self, **_kwargs: Any) -> None:
+        raise AssertionError("upload callback must not run document processing")
+
+    def list_background_jobs(self, _workspace_id: str) -> list[dict[str, Any]]:
+        return []
+
+    def enqueue_document_processing(self, **kwargs: Any) -> dict[str, Any]:
+        self.enqueued.append(dict(kwargs))
+        return {
+            "job_id": f"job-{len(self.enqueued)}",
+            "project_id": kwargs["workspace_id"],
+            "status": "queued",
+        }
+
+
+def test_documents_upload_pending_files_enqueues_without_expensive_processing() -> None:
+    record = _project_record("BID-1", "Async Upload")
+    upload_key = (
+        "atlas_documents_upload_pending_BID-1_atlas_documents_upload_picker_BID-1_0"
+    )
+    pending = {
+        "identity_key": app._pending_upload_identity("async.pdf", b"%PDF"),
+        "name": "async.pdf",
+        "data": b"%PDF",
+        "size": 4,
+    }
+    st = _HomeContractStreamlit(pressed={upload_key})
+    st.session_state["atlas_documents_pending_uploads"] = {"BID-1": [pending]}
+    service = _AsyncUploadWorkspaceService()
+
+    app._render_upload_panel(st, service, record)  # type: ignore[arg-type]
+
+    assert len(service.enqueued) == 1
+    assert service.enqueued[0]["uploaded_files"] == [("async.pdf", b"%PDF")]
+    assert st.session_state["atlas_active_page"] == "Processing"
+    assert app._pending_upload_state(st, "BID-1") == []
+    assert st.rerun_called is True

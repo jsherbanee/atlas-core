@@ -157,6 +157,12 @@ Architecture posture:
 - tenant-scoped lifecycle controls (submit/run/retry/cancel/list)
 - immutable audit integration for lifecycle events
 
+AV-00A extends this posture for project document intake:
+- Streamlit upload callbacks perform only basic type/size validation, durable job creation, and rerun-safe feedback.
+- Project document jobs are persisted before processing starts and are consumed by a local daemon worker that reads the same repository-backed queue.
+- The local worker is intentionally replaceable by Celery, RQ, Dramatiq, or AWS queue/worker infrastructure because job state and inputs are not stored in Streamlit session state.
+- Local development requires the Streamlit process to remain alive for the daemon worker to continue processing; queued jobs survive restart and resume when a worker is available.
+
 Explicitly out of scope in P-03:
 - AWS queue implementation
 - external worker deployment

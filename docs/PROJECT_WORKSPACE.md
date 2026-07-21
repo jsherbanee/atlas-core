@@ -67,6 +67,20 @@ Active project navigation is organized around work:
 Existing routes remain authoritative underneath those groupings. PX-02 does not
 remove project pages or change persistence contracts.
 
+## Documents And Processing
+
+AV-00A makes document intake asynchronous for local Atlas:
+
+- Documents accepts selected files into a pending list immediately.
+- Upload Pending Files performs basic filename/type/size validation, persists each accepted file into a durable processing job, and returns control to the UI.
+- Expensive document work such as PDF inspection, OCR, extraction, classification, drawing intelligence, and evidence generation runs from the persisted Processing queue, not inside the Streamlit button callback.
+- Processing displays filename, folder, upload time, current stage, progress, elapsed time, warnings, failure reason, retry, and cancel controls.
+- Active, Ready, Needs Attention, Failed, and All filters read persisted job state and survive reruns, refreshes, navigation, and local application restart where the queued job record is present.
+
+Local limitation: the built-in worker is an in-process daemon. Jobs remain
+durable on disk, but processing only advances while a local Atlas worker process
+is running.
+
 ## Boundaries
 
 PX-02 does not add:

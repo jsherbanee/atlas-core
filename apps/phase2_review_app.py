@@ -17,6 +17,8 @@ import platform
 import re
 import subprocess
 import sys
+import threading
+import time
 import traceback
 from typing import Any, Callable
 
@@ -5249,6 +5251,113 @@ def _remove_pending_uploads(
 
 def _clear_pending_uploads(st: Any, workspace_id: str) -> None:
     _write_pending_upload_state(st, workspace_id, [])
+
+
+def _basic_upload_diagnostic(name: str, data: bytes) -> tuple[bool, str]:
+    suffix = Path(name).suffix.lower().lstrip(".")
+    if suffix not in set(SUPPORTED_UPLOAD_TYPES):
+        return (False, f"Unsupported file type: .{suffix or 'unknown'}")
+    if not data:
+        return (False, "File is empty.")
+    return (True, "Queued for processing")
+
+
+def _dict_bytes(item: dict[str, Any], key: str) -> bytes:
+    value = item.get(key)
+    return bytes(value) if isinstance(value, (bytes, bytearray)) else b""
+
+
+def _dict_int(item: dict[str, Any], key: str) -> int:
+    value = item.get(key)
+    return int(value) if isinstance(value, int) else 0
+
+
+def _document_processing_status_label(job: dict[str, Any]) -> str:
+    status = _safe_text(job.get("status"), "queued")
+    progress = dict(job.get("progress") or {})
+    step = _safe_text(progress.get("step"), "")
+    if status == "queued":
+        return "Queued"
+    if status == "running" and step in {"claimed", "start"}:
+        return "Inspecting"
+    if status == "running" and step in {"prepare"}:
+        return "Extracting"
+    if status == "running":
+        return "Processing"
+    if status == "succeeded":
+        return "Ready"
+    if status == "retry_scheduled":
+        return "Needs Attention"
+    if status == "failed":
+        return "Failed"
+    if status == "cancelled":
+        return "Cancelled"
+    return status.replace("_", " ").title()
+
+
+def _document_processing_job_file_names(job: dict[str, Any]) -> list[str]:
+    request = dict(job.get("request") or {})
+    payload = dict(request.get("input_payload") or {})
+    names = [
+        _safe_text(item.get("name"), "")
+        for item in list(payload.get("uploaded_files") or [])
+        if isinstance(item, dict) and _safe_text(item.get("name"), "")
+    ]
+    return names or [_safe_text(job.get("job_id"), "Processing job")]
+
+
+def _document_processing_rows(jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for job in jobs:
+        diagnostics = list(job.get("diagnostics") or [])
+        progress = dict(job.get("progress") or {})
+        result = dict(job.get("result") or {})
+        for filename in _document_processing_job_file_names(job):
+            rows.append(
+                {
+                    "Job": _safe_text(job.get("job_id"), ""),
+                    "Filename": filename,
+                    "Folder": "Project Documents",
+                    "Upload Time": _safe_text(job.get("created_at"), ""),
+                    "Stage": _document_processing_status_label(job),
+                    "Progress": f"{int(progress.get('percent', 0) or 0)}%",
+                    "Elapsed": _elapsed_label(
+                        _safe_text(
+                            job.get("started_at"),
+                            _safe_text(job.get("created_at"), ""),
+                        ),
+                        _safe_text(job.get("completed_at"), ""),
+                    ),
+                    "Warnings": len(
+                        [
+                            item
+                            for item in diagnostics
+                            if dict(item).get("severity") == "warning"
+                        ]
+                    ),
+                    "Failure Reason": _safe_text(
+                        diagnostics[-1].get("message") if diagnostics else "", ""
+                    ),
+                    "Summary": _safe_text(result.get("summary"), ""),
+                    "Retry Available": bool(job.get("retry_available", False)),
+                }
+            )
+    return rows
+
+
+def _elapsed_label(started_at: str, completed_at: str = "") -> str:
+    try:
+        start = datetime.fromisoformat(started_at)
+        end = (
+            datetime.fromisoformat(completed_at) if completed_at else datetime.now(UTC)
+        )
+        seconds = max(int((end - start).total_seconds()), 0)
+    except Exception:
+        return ""
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, rem = divmod(seconds, 60)
+    return f"{minutes}m {rem}s"
 
 
 def _to_rows(items: list[Any]) -> list[dict[str, Any]]:
@@ -36003,11 +36112,23 @@ def _render_upload_panel(
         (str(item.get("name") or ""), bytes(item.get("data") or b""))
         for item in pending
     ]
-    inspection = (
-        workspace_service.inspect_uploaded_documents(pending_payload)
-        if pending_payload
-        else None
-    )
+    basic_diagnostics = [
+        {
+            "identity_key": str(item.get("identity_key") or ""),
+            "name": str(item.get("name") or ""),
+            "data": bytes(item.get("data") or b""),
+            "size": int(item.get("size") or 0),
+            "accepted": _basic_upload_diagnostic(
+                str(item.get("name") or ""),
+                bytes(item.get("data") or b""),
+            )[0],
+            "message": _basic_upload_diagnostic(
+                str(item.get("name") or ""),
+                bytes(item.get("data") or b""),
+            )[1],
+        }
+        for item in pending
+    ]
 
     if pending:
         remove_options: dict[str, str] = {}
@@ -36063,31 +36184,59 @@ def _render_upload_panel(
             hide_index=True,
         )
 
-    if inspection is not None:
+    if basic_diagnostics:
         diagnostics_rows = [
             {
                 "Name": _safe_text(item.get("name"), ""),
-                "Source Type": _safe_text(item.get("source_type"), "file"),
-                "File Size": _bytes_label(int(item.get("size_bytes") or 0)),
+                "Source Type": "file",
+                "File Size": _bytes_label(_dict_int(item, "size")),
                 "Validation": (
                     "accepted" if bool(item.get("accepted", False)) else "rejected"
                 ),
-                "Messages": ", ".join(list(item.get("messages") or [])),
+                "Messages": _safe_text(item.get("message"), ""),
             }
-            for item in list(inspection.diagnostics)
+            for item in basic_diagnostics
         ]
         if diagnostics_rows:
             st.dataframe(diagnostics_rows, width="stretch", hide_index=True)
-        if inspection.warnings:
-            st.info("Archive diagnostics: " + " | ".join(list(inspection.warnings)))
 
     can_upload = bool(pending_payload)
-    accepted_payload: list[tuple[str, bytes]] = []
-    if inspection is not None:
-        accepted_payload = [
-            (item.name, item.data) for item in list(inspection.accepted_files or [])
-        ]
-        can_upload = can_upload and bool(accepted_payload)
+    accepted_items = [
+        item for item in basic_diagnostics if bool(item.get("accepted", False))
+    ]
+    accepted_payload: list[tuple[str, bytes]] = [
+        (
+            _safe_text(item.get("name"), ""),
+            _dict_bytes(item, "data"),
+        )
+        for item in accepted_items
+    ]
+    can_upload = can_upload and bool(accepted_payload)
+
+    recent_jobs = [
+        item
+        for item in workspace_service.list_background_jobs(record.workspace_id)
+        if dict(item.get("request") or {}).get("category") == "document_import"
+    ][:20]
+    if recent_jobs:
+        st.markdown("#### Document Processing Status")
+        st.dataframe(
+            [
+                {
+                    "Filename": item["Filename"],
+                    "Stage": item["Stage"],
+                    "Progress": item["Progress"],
+                    "Warnings": item["Warnings"],
+                    "Failure Reason": item["Failure Reason"],
+                }
+                for item in _document_processing_rows(recent_jobs)
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+    if not can_upload and pending:
+        st.caption("No accepted pending files are ready to upload.")
 
     if st.button(
         "Upload Pending Files",
@@ -36095,43 +36244,44 @@ def _render_upload_panel(
         disabled=not can_upload,
         key=f"atlas_documents_upload_pending_{record.workspace_id}_{picker_key}",
     ):
-        removable_identity_keys = (
-            _pending_identity_keys_to_remove_after_upload(pending, inspection)
-            if inspection is not None
-            else set()
-        )
-        with st.spinner("Uploading files and running project analysis..."):
-            job_result = workspace_service.run_document_import_job(
-                workspace_id=record.workspace_id,
-                uploaded_files=accepted_payload,
-                actor_id=_safe_text(
-                    st.session_state.get("atlas_settings_user_id"),
-                    "atlas-ui",
-                ),
+        queued_jobs: list[dict[str, Any]] = []
+        for name, data in accepted_payload:
+            queued_jobs.append(
+                workspace_service.enqueue_document_processing(
+                    workspace_id=record.workspace_id,
+                    uploaded_files=[(name, data)],
+                    actor_id=_safe_text(
+                        st.session_state.get("atlas_settings_user_id"),
+                        "atlas-ui",
+                    ),
+                    idempotency_key=(
+                        "document_import:"
+                        f"{record.workspace_id}:"
+                        f"{_pending_upload_identity(name, data)}"
+                    ),
+                )
             )
-            job_payload = dict(job_result.get("result") or {}).get("payload") or {}
-            updated_record = workspace_service.load_record(
-                _safe_text(job_payload.get("workspace_id"), record.workspace_id)
-            )
-            st.session_state["atlas_active_workspace_id"] = updated_record.workspace_id
-            st.session_state["atlas_active_page"] = "Documents"
-
+        removable_identity_keys = {
+            str(item.get("identity_key") or "")
+            for item in accepted_items
+            if str(item.get("identity_key") or "")
+        }
         _remove_pending_uploads(
             st,
             record.workspace_id,
             sorted(removable_identity_keys),
         )
         _reset_documents_upload_picker(st, record.workspace_id)
-        remaining = _pending_upload_state(st, record.workspace_id)
-        if remaining:
+        rejected_count = len(pending) - len(removable_identity_keys)
+        st.success(
+            f"Queued {len(queued_jobs)} file(s) for background processing. "
+            "You can keep working while Atlas processes them."
+        )
+        if rejected_count:
             st.warning(
-                "Partial upload completed. Accepted files were imported and "
-                f"{len(remaining)} file(s) remain pending due to validation diagnostics."
+                f"{rejected_count} file(s) remain pending because they need upload validation attention."
             )
-        else:
-            st.success(
-                "File upload completed via Processing job. Project analysis artifacts refreshed."
-            )
+        st.session_state["atlas_active_page"] = "Processing"
         st.rerun()
 
 
@@ -38857,51 +39007,61 @@ def _render_processing_page(
         organization_id=organization_id,
         limit=200,
     )
+    jobs = [
+        item
+        for item in jobs
+        if dict(item.get("request") or {}).get("category") == "document_import"
+    ]
     if not jobs:
         _render_guided_empty_state(
             st,
-            why_empty="No processing jobs have been created for this project.",
-            action_to_populate="Run document import or project export operations.",
-            next_location="Use Documents or Repository actions to create jobs.",
+            why_empty="No document processing jobs have been created for this project.",
+            action_to_populate="Upload project documents to queue background processing.",
+            next_location="Use Documents to add files.",
         )
         return
 
-    rows = []
-    for item in jobs:
-        result_payload = dict(item.get("result") or {})
-        diagnostics = list(item.get("diagnostics") or [])
-        rows.append(
-            {
-                "Job": _safe_text(item.get("job_id"), ""),
-                "Category": _safe_text(
-                    dict(item.get("request") or {}).get("category"), "unknown"
-                ),
-                "Status": _safe_text(item.get("status"), "unknown"),
-                "Progress": f"{int(dict(item.get('progress') or {}).get('percent', 0))}%",
-                "Created": _safe_text(item.get("created_at"), ""),
-                "Started": _safe_text(item.get("started_at"), ""),
-                "Completed": _safe_text(item.get("completed_at"), ""),
-                "Result Summary": _safe_text(result_payload.get("summary"), ""),
-                "Failure Reason": _safe_text(
-                    diagnostics[-1].get("message") if diagnostics else "", ""
-                ),
-                "Retry Available": bool(item.get("retry_available", False)),
-                "Related Object": " ".join(
-                    part
-                    for part in [
-                        _safe_text(
-                            dict(item.get("request") or {}).get("related_object_type"),
-                            "",
-                        ),
-                        _safe_text(
-                            dict(item.get("request") or {}).get("related_object_id"),
-                            "",
-                        ),
-                    ]
-                    if part
-                ),
-            }
-        )
+    filter_value = st.selectbox(
+        "Processing Filter",
+        options=["Active", "Ready", "Needs Attention", "Failed", "All"],
+        key=f"atlas_processing_filter_{record.workspace_id}",
+    )
+    all_rows = _document_processing_rows(jobs)
+    if filter_value == "Active":
+        rows = [
+            item
+            for item in all_rows
+            if item["Stage"] in {"Queued", "Inspecting", "Extracting", "Processing"}
+        ]
+    elif filter_value == "Ready":
+        rows = [item for item in all_rows if item["Stage"] == "Ready"]
+    elif filter_value == "Needs Attention":
+        rows = [item for item in all_rows if item["Stage"] == "Needs Attention"]
+    elif filter_value == "Failed":
+        rows = [item for item in all_rows if item["Stage"] == "Failed"]
+    else:
+        rows = all_rows
+
+    active_count = sum(
+        1
+        for item in all_rows
+        if item["Stage"] in {"Queued", "Inspecting", "Extracting", "Processing"}
+    )
+    ready_count = sum(1 for item in all_rows if item["Stage"] == "Ready")
+    failed_count = sum(1 for item in all_rows if item["Stage"] == "Failed")
+    metrics = st.columns(4)
+    metrics[0].metric("Active", str(active_count))
+    metrics[1].metric("Ready", str(ready_count))
+    metrics[2].metric(
+        "Needs Attention",
+        str(sum(1 for item in all_rows if item["Stage"] == "Needs Attention")),
+    )
+    metrics[3].metric("Failed", str(failed_count))
+
+    if not rows:
+        st.info("No document processing jobs match the selected filter.")
+        return
+
     st.dataframe(rows, width="stretch", hide_index=True)
 
     selected_job = st.selectbox(
@@ -40731,6 +40891,37 @@ def _build_workspace_service() -> ProjectWorkspaceService:
     return ProjectWorkspaceService(runtime_root)
 
 
+_DOCUMENT_PROCESSING_WORKERS: set[str] = set()
+_DOCUMENT_PROCESSING_WORKERS_LOCK = threading.Lock()
+
+
+def _document_processing_worker_loop(workspace_root: str) -> None:
+    service = ProjectWorkspaceService(workspace_root)
+    while True:
+        try:
+            processed = service.process_next_document_job()
+            time.sleep(0.25 if processed else 2.0)
+        except Exception:
+            time.sleep(5.0)
+
+
+def _ensure_document_processing_worker(
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    root_key = str(workspace_service.workspace_root.resolve())
+    with _DOCUMENT_PROCESSING_WORKERS_LOCK:
+        if root_key in _DOCUMENT_PROCESSING_WORKERS:
+            return
+        worker = threading.Thread(
+            target=_document_processing_worker_loop,
+            args=(root_key,),
+            name="atlas-document-processing-worker",
+            daemon=True,
+        )
+        worker.start()
+        _DOCUMENT_PROCESSING_WORKERS.add(root_key)
+
+
 def main() -> None:
     st = _load_streamlit()
     st.set_page_config(page_title="Atlas Workspace", layout="wide")
@@ -40739,6 +40930,7 @@ def main() -> None:
     _sync_active_page_from_query_params(st)
     try:
         workspace_service = _build_workspace_service()
+        _ensure_document_processing_worker(workspace_service)
         _sync_active_workspace_from_query_params(st, workspace_service)
         _ensure_active_workspace(st, workspace_service)
 

@@ -1220,6 +1220,37 @@ class ProjectWorkspaceService:
         idempotency_key: str | None = None,
         correlation_id: str | None = None,
     ) -> dict[str, Any]:
+        submitted = self.enqueue_document_processing(
+            workspace_id=workspace_id,
+            uploaded_files=uploaded_files,
+            actor_id=actor_id,
+            idempotency_key=idempotency_key,
+            correlation_id=correlation_id,
+        )
+        record = self.load_record(workspace_id)
+        tenant_id, organization_id = self._tenant_scope_for_record(record)
+        if JobStatus(str(submitted.get("status") or JobStatus.QUEUED.value)) not in {
+            JobStatus.QUEUED,
+            JobStatus.RETRY_SCHEDULED,
+            JobStatus.RUNNING,
+        }:
+            return submitted
+        return self.manager.background_job_service.run_job(
+            project_id=workspace_id,
+            job_id=str(submitted.get("job_id") or ""),
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+
+    def enqueue_document_processing(
+        self,
+        *,
+        workspace_id: str,
+        uploaded_files: list[tuple[str, bytes]],
+        actor_id: str = "atlas-ui",
+        idempotency_key: str | None = None,
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
         record = self.load_record(workspace_id)
         tenant_id, organization_id = self._tenant_scope_for_record(record)
         encoded_uploads = self._encode_uploaded_files(uploaded_files)
@@ -1243,23 +1274,51 @@ class ProjectWorkspaceService:
             idempotency_key=idempotency_key
             or f"document_import:{self._canonical_payload_hash({'files': [{'name': item['name'], 'sha1': item['sha1']} for item in encoded_uploads]})}",
             correlation_id=correlation_id,
-            retry_policy=JobRetryPolicy(max_attempts=2, retry_delay_seconds=0),
+            retry_policy=JobRetryPolicy(max_attempts=2, retry_delay_seconds=300),
         )
         submitted = self.manager.background_job_service.submit_job(
             project_id=workspace_id,
             request=job_request,
         )
-        if JobStatus(str(submitted.get("status") or JobStatus.QUEUED.value)) not in {
-            JobStatus.QUEUED,
-            JobStatus.RETRY_SCHEDULED,
-            JobStatus.RUNNING,
-        }:
-            return submitted
+        self.manager.log(
+            workspace_id,
+            "documents_processing_queued",
+            {
+                "uploaded_file_count": len(uploaded_files),
+                "job_id": str(submitted.get("job_id") or ""),
+            },
+        )
+        return submitted
+
+    def claim_next_processing_job(self) -> dict[str, Any] | None:
+        project_ids = [
+            record.workspace_id
+            for record in self.list_workspaces(include_archived=True, limit=2000)
+        ]
+        return self.manager.background_job_service.claim_next_job(
+            project_ids=project_ids,
+            tenant_id="local",
+            organization_id="atlas",
+            categories={JobCategory.DOCUMENT_IMPORT},
+        )
+
+    def process_document_job(self, *, workspace_id: str, job_id: str) -> dict[str, Any]:
+        record = self.load_record(workspace_id)
+        tenant_id, organization_id = self._tenant_scope_for_record(record)
         return self.manager.background_job_service.run_job(
             project_id=workspace_id,
-            job_id=str(submitted.get("job_id") or ""),
+            job_id=job_id,
             tenant_id=tenant_id,
             organization_id=organization_id,
+        )
+
+    def process_next_document_job(self) -> dict[str, Any] | None:
+        claimed = self.claim_next_processing_job()
+        if not isinstance(claimed, dict):
+            return None
+        return self.process_document_job(
+            workspace_id=str(claimed.get("project_id") or ""),
+            job_id=str(claimed.get("job_id") or ""),
         )
 
     def run_export_generation_job(

@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from enum import Enum
 import hashlib
 import json
+import threading
 from typing import Any, Callable, Protocol
 
 from atlas_core.contracts.background_job_contracts import (
@@ -82,6 +83,7 @@ class BackgroundJobService:
         self._handlers: dict[
             JobCategory, Callable[[JobExecutionContext], dict[str, Any]]
         ] = {}
+        self._claim_lock = threading.Lock()
 
     @staticmethod
     def _active_statuses() -> set[JobStatus]:
@@ -156,6 +158,61 @@ class BackgroundJobService:
         ]
         scoped.sort(key=lambda item: (item.created_at, item.job_id))
         return [item.to_dict() for item in scoped]
+
+    def claim_next_job(
+        self,
+        *,
+        project_ids: list[str],
+        tenant_id: str,
+        organization_id: str,
+        categories: set[JobCategory] | None = None,
+    ) -> dict[str, Any] | None:
+        with self._claim_lock:
+            candidates: list[JobRecord] = []
+            now_text = now_iso()
+            for project_id in project_ids:
+                for item in self.repository.list_jobs(project_id, limit=1000):
+                    if not isinstance(item, dict):
+                        continue
+                    record = JobRecord.from_dict(item)
+                    if (
+                        record.request.tenant_id != tenant_id
+                        or record.request.organization_id != organization_id
+                    ):
+                        continue
+                    if (
+                        categories is not None
+                        and record.request.category not in categories
+                    ):
+                        continue
+                    if record.status == JobStatus.QUEUED:
+                        candidates.append(record)
+                    elif record.status == JobStatus.RETRY_SCHEDULED and (
+                        record.next_retry_at is None or record.next_retry_at <= now_text
+                    ):
+                        candidates.append(record)
+
+            if not candidates:
+                return None
+
+            candidates.sort(key=lambda item: (item.created_at, item.job_id))
+            record = candidates[0]
+            claimed = self._replace_record(
+                record,
+                status=JobStatus.RUNNING,
+                started_at=record.started_at or now_text,
+                completed_at=None,
+                progress=JobProgress(
+                    percent=max(record.progress.percent, 1),
+                    message="Claimed by local worker",
+                    step="claimed",
+                    updated_at=now_text,
+                ),
+                next_retry_at=None,
+            )
+            self._save(claimed)
+            self._audit(claimed, "background_job.claimed")
+            return claimed.to_dict()
 
     def run_job(
         self,
