@@ -21,6 +21,30 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Atlas Alpha UI Cleanup Navigation Simplification and Functional Knowledge Links)
 
+## Unreleased (PX-01 Mission Control Tenant Operations Center)
+
+### Improved
+
+- Mission Control is now the application home and tenant operations starting point.
+- The landing surface now focuses on My Work, Recent Activity, Business Risks, Continue Working, and Company Snapshot.
+- My Work shows actionable items only, with affected project, owner, age, and one primary action.
+- Recent Activity groups meaningful business events and avoids audit-log noise.
+- Business Risks shows exceptions only, with an explicit clear-state message when no significant operational risks are detected.
+- Continue Working presents recently active projects with customer, progress signal, phase, last activity, next recommended action, and Resume Project.
+- Company Snapshot is limited to six authoritative KPIs and avoids charts, gauges, decorative graphics, duplicated metrics, and technical metadata.
+
+### Quality
+
+- full gates passing: `black --check .`, `ruff check .`, `mypy .`, `pytest`
+- full-suite validation: `1511 passed`
+- targeted Mission Control regression validation added for rendering, empty/populated tenants, responsive layout, card ordering, risks, activity, Continue Working, company snapshot, and Streamlit state stability.
+
+### Scope Notes
+
+- no new business logic
+- no new workflow automation
+- existing global search, Working Set, tenant isolation, permissions, navigation state, return context, and responsive shell behavior are preserved
+
 ## Unreleased (Atlas Epic X-14 Transactions Workspace Migration)
 
 ### Improved

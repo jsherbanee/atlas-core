@@ -13356,7 +13356,8 @@ def _render_home_page(
     mission_control_payload: dict[str, Any] | None = None,
 ) -> None:
     _ = (record, context)
-    _render_page_header(st, "Home", "")
+    _render_page_header(st, "Tenant Operations Center", "")
+    st.caption(date.today().strftime("%B %d, %Y"))
 
     action_cols = _responsive_control_columns(st, [1.0, 1.0, 1.0])
     if action_cols[0].button(
@@ -18847,159 +18848,374 @@ def _render_home_workspace_panels(
     mission_control_payload: dict[str, Any] | None,
 ) -> None:
     payload = mission_control_payload or {}
-    actions = list(payload.get("actions") or [])
-    signals = list(payload.get("signals") or [])
-    high_priority_actions: list[dict[str, Any]] = []
-    seen_actions: set[str] = set()
-    for item in actions:
-        if _safe_text(item.get("priority"), "").lower() not in {
-            "critical",
-            "high",
-        }:
+    records = workspace_service.list_recent_workspaces(limit=20)
+    all_records = workspace_service.list_workspaces(include_archived=True, limit=500)
+    records_by_project = {
+        _normalize_recommendation_text(record.project.name): record
+        for record in all_records
+    }
+    records_by_project.update(
+        {
+            _normalize_recommendation_text(record.workspace_id): record
+            for record in all_records
+        }
+    )
+
+    work_items = _mission_control_work_items(
+        list(payload.get("actions") or []),
+        records_by_project,
+    )
+    risks = _mission_control_risks(
+        list(payload.get("signals") or []),
+        work_items,
+    )
+    activity = _mission_control_activity(
+        list(payload.get("timeline") or []),
+        records,
+    )
+
+    main_cols = st.columns([2.15, 1.0])
+    with main_cols[0]:
+        _render_section_title(st, "My Work")
+        if work_items:
+            for index, item in enumerate(work_items[:8]):
+                _render_mission_control_work_card(st, workspace_service, item, index)
+        else:
+            st.caption("No actionable work items.")
+
+        _render_section_title(st, "Recent Activity")
+        if activity:
+            _render_data_table(st, activity[:8])
+        else:
+            st.caption("No meaningful recent activity.")
+
+        _render_section_title(st, "Business Risks")
+        if risks:
+            _render_data_table(st, risks[:8])
+        else:
+            st.caption("No significant operational risks detected.")
+
+        _render_section_title(st, "Continue Working")
+        _render_mission_control_continue_working(st, workspace_service, records[:5])
+
+    with main_cols[1]:
+        _render_section_title(st, "Company Snapshot")
+        _render_data_table(
+            st,
+            _mission_control_company_snapshot(
+                records=all_records,
+                work_items=work_items,
+                risks=risks,
+                activity=activity,
+            ),
+        )
+
+
+def _mission_control_record_for_item(
+    item: dict[str, Any],
+    records_by_project: dict[str, ProjectWorkspaceRecord],
+) -> ProjectWorkspaceRecord | None:
+    project_key = _normalize_recommendation_text(item.get("project"))
+    workspace_key = _normalize_recommendation_text(item.get("workspace_id"))
+    return records_by_project.get(project_key) or records_by_project.get(workspace_key)
+
+
+def _mission_control_age(
+    item: dict[str, Any], record: ProjectWorkspaceRecord | None
+) -> str:
+    explicit = _safe_text(item.get("age"), "")
+    if explicit:
+        return explicit
+    timestamp = _safe_text(item.get("timestamp") or item.get("created_at"), "")
+    if not timestamp and record is not None:
+        timestamp = _safe_text(record.updated_at or record.created_at, "")
+    return _format_recent_opened_at(timestamp)
+
+
+def _mission_control_work_items(
+    actions: list[dict[str, Any]],
+    records_by_project: dict[str, ProjectWorkspaceRecord],
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for action in actions:
+        title = _safe_text(action.get("title"), "")
+        if not title:
             continue
-        dedupe_key = "|".join(
+        destination = _safe_text(action.get("destination"), "Overview")
+        project = _safe_text(action.get("project"), "Company")
+        key = "|".join(
             [
-                _normalize_recommendation_text(item.get("title")),
-                _normalize_recommendation_text(item.get("project")),
-                _normalize_recommendation_text(item.get("destination")),
+                _normalize_recommendation_text(title),
+                _normalize_recommendation_text(project),
+                _normalize_recommendation_text(destination),
             ]
         )
-        if dedupe_key in seen_actions:
+        if key in seen:
             continue
-        seen_actions.add(dedupe_key)
-        high_priority_actions.append(item)
-    notifications = [
-        item
-        for item in signals
-        if _safe_text(item.get("status"), "") in {"Blocked", "Needs Attention"}
-    ]
-    recent_projects = workspace_service.list_recent_workspaces(limit=5)
-    continue_items = []
-    recent_opened_results = list(
-        st.session_state.get("atlas_recent_opened_results") or []
-    )
-    recent_records_by_id = {
-        item.workspace_id: item
-        for item in workspace_service.list_recent_workspaces(limit=20)
-    }
-    for recent_result in recent_opened_results[:3]:
-        workspace_id = _safe_text(recent_result.get("workspace_id"), "")
-        recent = recent_records_by_id.get(workspace_id)
-        if recent is None:
-            continue
-        continue_items.append(
+        seen.add(key)
+        record = _mission_control_record_for_item(action, records_by_project)
+        owner = _safe_text(action.get("owner"), "")
+        if not owner and record is not None:
+            owner = _safe_text(
+                record.metadata.get("owner")
+                or record.project.client
+                or record.project.consultant,
+                "",
+            )
+        items.append(
             {
-                "title": _safe_text(recent.project.name, "Project"),
-                "detail": f"Resume in {_safe_text(recent.workspace_state.get('last_open_page') if isinstance(recent.workspace_state, dict) else '', 'Overview')}",
-                "subdetail": f"Last opened {_format_recent_opened_at(recent.last_opened_at or recent.updated_at)}",
-                "key": f"atlas_continue_{recent.workspace_id}",
-                "on_open": lambda record=recent: _open_project_record(
-                    st,
-                    record,
-                    workspace_service,
-                ),
+                "title": title,
+                "project": project,
+                "owner": owner or "Unassigned",
+                "age": _mission_control_age(action, record),
+                "priority": _safe_text(action.get("priority"), "Medium"),
+                "destination": destination,
+                "record": record,
             }
         )
+    return sorted(
+        items,
+        key=lambda item: (
+            _priority_rank(_safe_text(item.get("priority"), "Medium")),
+            _safe_text(item.get("age"), ""),
+            _safe_text(item.get("title"), ""),
+        ),
+    )
 
-    pinned = list(st.session_state.get("atlas_pinned_objects") or [])
-    favorite_items = [
-        {
-            "title": _safe_text(item.get("display_name"), "Saved item"),
-            "detail": _safe_text(item.get("object_type"), "Object"),
-            "subdetail": _safe_text(item.get("secondary_label"), ""),
-            "key": f"atlas_favorite_{index}",
-            "on_open": lambda reference=item: _open_search_reference(
-                st,
-                workspace_service,
-                reference,
-            ),
-        }
-        for index, item in enumerate(pinned[:6])
-        if isinstance(item, dict)
-    ]
 
-    top_cols = st.columns(2)
-    with top_cols[0]:
-        _render_section_title(st, "Continue Working")
-        _render_compact_reference_list(
-            st,
-            continue_items,
-            empty_message="Open a project to build a working session history.",
-            open_label="Resume",
+def _mission_control_risks(
+    signals: list[dict[str, Any]],
+    work_items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    risks: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for signal in signals:
+        status = _safe_text(signal.get("status"), "")
+        if status not in {"Blocked", "Needs Attention"}:
+            continue
+        project = _safe_text(signal.get("project"), "Project")
+        risk = _safe_text(signal.get("reason"), status)
+        key = f"{project}|{risk}"
+        if key in seen:
+            continue
+        seen.add(key)
+        risks.append(
+            {
+                "Risk": risk,
+                "Project": project,
+                "Severity": "Critical" if status == "Blocked" else "High",
+                "Action": _safe_text(signal.get("destination"), "Open Project"),
+            }
         )
-    with top_cols[1]:
-        _render_section_title(st, "Notifications")
-        if notifications:
-            _render_data_table(
-                st,
-                [
-                    {
-                        "Project": item.get("project"),
-                        "Status": item.get("status"),
-                        "Next": item.get("destination"),
-                    }
-                    for item in notifications[:6]
-                ],
-            )
-        else:
-            st.caption("No active portfolio notifications.")
-
-    lower_cols = st.columns(2)
-    with lower_cols[0]:
-        _render_section_title(st, "Action Center")
-        if high_priority_actions:
-            _render_data_table(
-                st,
-                [
-                    {
-                        "Priority": item.get("priority"),
-                        "Action": item.get("title"),
-                        "Project": item.get("project"),
-                        "Destination": item.get("destination"),
-                    }
-                    for item in high_priority_actions[:8]
-                ],
-            )
-        else:
-            st.caption("No high-priority actions detected.")
-    with lower_cols[1]:
-        _render_section_title(st, "Favorites")
-        _render_compact_reference_list(
-            st,
-            favorite_items,
-            empty_message="Add items to the Working Set to keep them close at hand.",
-            open_label="Open",
+    for item in work_items:
+        priority = _safe_text(item.get("priority"), "")
+        if priority.lower() not in {"critical", "high"}:
+            continue
+        project = _safe_text(item.get("project"), "Project")
+        risk = _safe_text(item.get("title"), "")
+        key = f"{project}|{risk}"
+        if key in seen:
+            continue
+        seen.add(key)
+        risks.append(
+            {
+                "Risk": risk,
+                "Project": project,
+                "Severity": priority,
+                "Action": _safe_text(item.get("destination"), "Open Project"),
+            }
         )
+    return sorted(
+        risks,
+        key=lambda item: (
+            _priority_rank(_safe_text(item.get("Severity"), "Medium")),
+            _safe_text(item.get("Project"), ""),
+        ),
+    )
 
-    _render_section_title(st, "Recent Projects")
-    if recent_projects:
-        project_cols = st.columns(min(3, len(recent_projects)))
-        for index, recent in enumerate(recent_projects[:5]):
-            with project_cols[index % len(project_cols)]:
-                with st.container(border=True):
-                    st.markdown(f"**{_safe_text(recent.project.name, 'Project')}**")
-                    details = [
-                        f"Atlas Bid ID: {_safe_text(recent.project.project_id, 'n/a')}"
-                    ]
-                    internal_number = _safe_text(
-                        recent.project.internal_project_number
-                        or recent.metadata.get("internal_project_number"),
-                        "",
-                    )
-                    if internal_number:
-                        details.append(f"Internal Project Number: {internal_number}")
-                    st.caption(" · ".join(details))
-                    st.caption(
-                        f"Last opened: {_format_recent_opened_at(recent.last_opened_at or recent.updated_at)}"
-                    )
-                    if st.button(
-                        "Open Project",
-                        key=f"atlas_recent_open_card_{recent.workspace_id}",
-                        width="stretch",
-                    ):
-                        _open_project_record(st, recent, workspace_service)
-    else:
+
+def _mission_control_activity(
+    timeline: list[dict[str, Any]],
+    records: list[ProjectWorkspaceRecord],
+) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str], dict[str, Any]] = {}
+    for item in timeline:
+        title = _safe_text(
+            item.get("event") or item.get("title") or item.get("label"),
+            "",
+        )
+        if not title:
+            continue
+        project = _safe_text(item.get("project"), "Workspace")
+        key = (title, project)
+        row = grouped.setdefault(
+            key,
+            {
+                "Activity": title,
+                "Project": project,
+                "Count": 0,
+                "Latest": _safe_text(item.get("timestamp"), ""),
+            },
+        )
+        row["Count"] = int(row.get("Count", 0) or 0) + 1
+        latest = _safe_text(item.get("timestamp"), "")
+        if latest > _safe_text(row.get("Latest"), ""):
+            row["Latest"] = latest
+    if not grouped:
+        for record in records[:6]:
+            grouped[("Project updated", record.project.name)] = {
+                "Activity": "Project updated",
+                "Project": record.project.name,
+                "Count": 1,
+                "Latest": _format_recent_opened_at(
+                    record.last_opened_at or record.updated_at
+                ),
+            }
+    rows = list(grouped.values())
+    rows.sort(key=lambda item: _safe_text(item.get("Latest"), ""), reverse=True)
+    return rows
+
+
+def _mission_control_completion_label(record: ProjectWorkspaceRecord) -> str:
+    summary = dict(record.review_summary or {})
+    completion = summary.get("completion") or summary.get("completion_percent")
+    if isinstance(completion, (int, float)):
+        return f"{int(completion)}%"
+    status = _safe_text(
+        getattr(record.project.status, "value", record.project.status), ""
+    )
+    return status.replace("_", " ").title() if status else "In Progress"
+
+
+def _mission_control_next_action(record: ProjectWorkspaceRecord) -> str:
+    last_page = ""
+    if isinstance(record.workspace_state, dict):
+        last_page = _safe_text(record.workspace_state.get("last_open_page"), "")
+    if last_page and last_page != "Mission Control":
+        return f"Resume {last_page}"
+    status = _safe_text(
+        getattr(record.project.status, "value", record.project.status), ""
+    )
+    if status in {"intake", "opportunity"}:
+        return "Complete Setup"
+    if status == "estimating":
+        return "Review Estimate"
+    return "Resume Project"
+
+
+def _render_mission_control_work_card(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    item: dict[str, Any],
+    index: int,
+) -> None:
+    with st.container(border=True):
+        st.markdown(f"**{_safe_text(item.get('title'), 'Work item')}**")
+        details = [
+            f"Project: {_safe_text(item.get('project'), 'Project')}",
+            f"Owner: {_safe_text(item.get('owner'), 'Unassigned')}",
+            f"Age: {_safe_text(item.get('age'), 'n/a')}",
+        ]
+        st.caption(" · ".join(details))
+        record = item.get("record")
+        if st.button(
+            _safe_text(item.get("destination"), "Open"),
+            key=f"atlas_mission_work_{index}",
+            width="stretch",
+        ):
+            destination = _recommendation_destination_page(item.get("destination"))
+            if isinstance(record, ProjectWorkspaceRecord):
+                _navigate_to_project_page(
+                    st,
+                    record=record,
+                    page=destination,
+                    workspace_service=workspace_service,
+                )
+            else:
+                _open_page(st, destination)
+
+
+def _render_mission_control_continue_working(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    records: list[ProjectWorkspaceRecord],
+) -> None:
+    if not records:
         st.caption("No recent projects.")
+        return
+    for index, record in enumerate(records[:5]):
+        with st.container(border=True):
+            st.markdown(f"**{_safe_text(record.project.name, 'Project')}**")
+            identifiers = [
+                f"Atlas Bid ID: {_safe_text(record.project.project_id, 'n/a')}"
+            ]
+            internal_number = _safe_text(
+                record.project.internal_project_number
+                or record.metadata.get("internal_project_number"),
+                "",
+            )
+            if internal_number:
+                identifiers.append(f"Internal Project Number: {internal_number}")
+            st.caption(" · ".join(identifiers))
+            st.caption(
+                " · ".join(
+                    [
+                        f"Customer: {_safe_text(record.project.client, 'n/a')}",
+                        f"Completion: {_mission_control_completion_label(record)}",
+                        f"Phase: {_safe_text(getattr(record.project.status, 'value', record.project.status), 'n/a').replace('_', ' ').title()}",
+                    ]
+                )
+            )
+            st.caption(
+                " · ".join(
+                    [
+                        f"Last activity: {_format_recent_opened_at(record.last_opened_at or record.updated_at)}",
+                        f"Next: {_mission_control_next_action(record)}",
+                    ]
+                )
+            )
+            if st.button(
+                "Resume Project",
+                key=f"atlas_mission_resume_{index}_{record.workspace_id}",
+                width="stretch",
+            ):
+                _open_project_record(st, record, workspace_service)
+
+
+def _mission_control_company_snapshot(
+    *,
+    records: list[ProjectWorkspaceRecord],
+    work_items: list[dict[str, Any]],
+    risks: list[dict[str, Any]],
+    activity: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    active_records = [record for record in records if not record.archived]
+    estimating = [
+        record
+        for record in active_records
+        if _safe_text(
+            getattr(record.project.status, "value", record.project.status), ""
+        )
+        == "estimating"
+    ]
+    setup_needed = [
+        record
+        for record in active_records
+        if not _safe_text(record.project.internal_project_number, "")
+        and _safe_text(
+            getattr(record.project.status, "value", record.project.status), ""
+        )
+        in {"awarded", "engineering", "procurement", "active"}
+    ]
+    return [
+        {"KPI": "Active projects", "Value": len(active_records)},
+        {"KPI": "Open work items", "Value": len(work_items)},
+        {"KPI": "Operational risks", "Value": len(risks)},
+        {"KPI": "Recent changes", "Value": len(activity)},
+        {"KPI": "Projects in estimating", "Value": len(estimating)},
+        {"KPI": "Setup incomplete", "Value": len(setup_needed)},
+    ]
 
 
 def _render_application_administration_page(

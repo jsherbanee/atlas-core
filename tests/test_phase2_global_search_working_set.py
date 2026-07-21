@@ -2083,7 +2083,7 @@ def test_working_set_supports_project_and_knowledge_records() -> None:
     ]
 
 
-def test_home_content_contract_headings_and_removed_sections() -> None:
+def test_mission_control_rendering_uses_operations_center_sections() -> None:
     st = _HomeContractStreamlit()
     service = _FakeWorkspaceService(
         [
@@ -2100,17 +2100,22 @@ def test_home_content_contract_headings_and_removed_sections() -> None:
         mission_control_payload={},
     )
 
-    assert st.subheaders == ["Home"]
-    assert "### Action Center" in st.markdowns
-    assert "### Recent Projects" in st.markdowns
-    assert "Recent Activity" not in " ".join(st.markdowns)
+    assert st.subheaders == ["Tenant Operations Center"]
+    assert "### My Work" in st.markdowns
+    assert "### Recent Activity" in st.markdowns
+    assert "### Business Risks" in st.markdowns
+    assert "### Continue Working" in st.markdowns
+    assert "### Company Snapshot" in st.markdowns
     removed_titles = {
         "### Application Areas",
         "### Portfolio Signals",
         "### Upcoming Timeline",
         "### Projects Requiring Attention",
         "### Workspace Recommendations",
-        "Mission Control",
+        "### Action Center",
+        "### Notifications",
+        "### Favorites",
+        "### Recent Projects",
     }
     assert all(title not in st.markdowns for title in removed_titles)
 
@@ -2228,11 +2233,12 @@ def test_home_page_renders_operational_sections() -> None:
     app._render_home_page(st, _FakeWorkspaceService([]), None, None, {})
 
     rendered_text = "\n".join([*st.subheaders, *st.markdowns, *st.captions])
+    assert "Tenant Operations Center" in rendered_text
+    assert "My Work" in rendered_text
+    assert "Recent Activity" in rendered_text
+    assert "Business Risks" in rendered_text
     assert "Continue Working" in rendered_text
-    assert "Recent Projects" in rendered_text
-    assert "Action Center" in rendered_text
-    assert "Notifications" in rendered_text
-    assert "Favorites" in rendered_text
+    assert "Company Snapshot" in rendered_text
 
 
 def test_projects_library_page_uses_shared_workspace_sections() -> None:
@@ -2305,7 +2311,7 @@ def test_footer_renders_tenant_copyright_without_diagnostics() -> None:
     assert len(st.captions) >= 2
 
 
-def test_action_center_filters_to_high_priority_and_deduplicates() -> None:
+def test_mission_control_my_work_renders_only_actionable_deduplicated_items() -> None:
     st = _HomeContractStreamlit()
     service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
 
@@ -2337,21 +2343,21 @@ def test_action_center_filters_to_high_priority_and_deduplicates() -> None:
         },
     )
 
-    assert "### Action Center" in st.markdowns
-    assert "### Recent Projects" in st.markdowns
-    assert len(st.dataframes) == 1
-    rows = st.dataframes[0]
-    assert isinstance(rows, list)
-    assert len(rows) == 1
-    assert rows[0]["Priority"] == "High"
-    assert rows[0]["Destination"] == "Documents"
+    assert "### My Work" in st.markdowns
+    rendered_cards = [
+        item
+        for item in st.markdowns
+        if item.startswith("**") and "Project A" not in item
+    ]
+    assert rendered_cards == ["**Resolve missing docs**", "**Optional review**"]
+    assert any("Project: P1" in item for item in st.captions)
 
 
-def test_recent_projects_section_renders_cards_and_open_actions() -> None:
+def test_continue_working_renders_project_cards_and_resume_actions() -> None:
     record = _project_record("project-a", "Project A")
     record.project.internal_project_number = "INT-42"
     record.last_opened_at = "2024-01-02T12:00:00+00:00"
-    st = _HomeContractStreamlit(pressed={"Open Project"})
+    st = _HomeContractStreamlit(pressed={"Resume Project"})
     service = _FakeWorkspaceService([record])
 
     app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
@@ -2361,7 +2367,7 @@ def test_recent_projects_section_renders_cards_and_open_actions() -> None:
     assert st.rerun_called is True
 
 
-def test_recent_projects_section_limits_to_five_items() -> None:
+def test_continue_working_section_limits_to_five_items() -> None:
     records = []
     for index in range(6):
         record = _project_record(f"project-{index}", f"Project {index}")
@@ -2376,9 +2382,9 @@ def test_recent_projects_section_limits_to_five_items() -> None:
     assert len(card_markdowns) == 5
 
 
-def test_recent_projects_open_action_updates_recency() -> None:
+def test_continue_working_resume_action_updates_recency() -> None:
     record = _project_record("project-a", "Project A")
-    st = _HomeContractStreamlit(pressed={"Open Project"})
+    st = _HomeContractStreamlit(pressed={"Resume Project"})
     service = _FakeWorkspaceService([record])
 
     app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
@@ -2394,6 +2400,234 @@ def test_recent_projects_empty_state_message_is_concise() -> None:
     app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
 
     assert "No recent projects." in st.captions
+
+
+def test_mission_control_empty_tenant_has_no_placeholder_cards() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_home_page(st, _FakeWorkspaceService([]), None, None, {})
+
+    assert not [item for item in st.markdowns if item.startswith("**")]
+    assert "No actionable work items." in st.captions
+    assert "No significant operational risks detected." in st.captions
+
+
+def test_mission_control_populated_tenant_renders_all_operational_sections() -> None:
+    record = _project_record("project-a", "Project A")
+    record.last_opened_at = "2026-07-18T12:00:00+00:00"
+    st = _HomeContractStreamlit()
+
+    app._render_home_page(
+        st,
+        _FakeWorkspaceService([record]),
+        None,
+        None,
+        {
+            "actions": [
+                {
+                    "priority": "High",
+                    "title": "Refresh stale pricing",
+                    "project": "Project A",
+                    "destination": "Estimate",
+                }
+            ],
+            "timeline": [
+                {
+                    "event": "Estimate revised",
+                    "project": "Project A",
+                    "timestamp": "2026-07-19T12:00:00+00:00",
+                }
+            ],
+            "signals": [
+                {
+                    "status": "Needs Attention",
+                    "project": "Project A",
+                    "reason": "Pricing requires refresh",
+                    "destination": "Estimate",
+                }
+            ],
+        },
+    )
+
+    rendered_text = "\n".join([*st.markdowns, *st.captions])
+    assert "Refresh stale pricing" in rendered_text
+    assert "Project A" in rendered_text
+    assert any(
+        row.get("Activity") == "Estimate revised"
+        for table in st.dataframes
+        for row in table
+    )
+    assert any(
+        row.get("Risk") == "Pricing requires refresh"
+        for table in st.dataframes
+        for row in table
+    )
+
+
+def test_mission_control_responsive_layout_uses_main_and_snapshot_columns() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_home_page(st, _FakeWorkspaceService([]), None, None, {})
+
+    assert [1.0, 1.0, 1.0] in st.column_specs
+    assert [2.15, 1.0] in st.column_specs
+
+
+def test_mission_control_card_ordering_prioritizes_critical_work() -> None:
+    st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
+
+    app._render_mission_control_panels(
+        st,
+        service,
+        {
+            "actions": [
+                {
+                    "priority": "Medium",
+                    "title": "Review project setup",
+                    "project": "Project A",
+                    "destination": "Projects",
+                },
+                {
+                    "priority": "Critical",
+                    "title": "Resolve blocked estimate",
+                    "project": "Project A",
+                    "destination": "Estimate",
+                },
+            ],
+            "timeline": [],
+        },
+    )
+
+    cards = [item for item in st.markdowns if item.startswith("**")]
+    assert cards[:2] == ["**Resolve blocked estimate**", "**Review project setup**"]
+
+
+def test_mission_control_my_work_action_opens_project_destination() -> None:
+    record = _project_record("project-a", "Project A")
+    st = _HomeContractStreamlit(pressed={"Estimate"})
+
+    app._render_mission_control_panels(
+        st,
+        _FakeWorkspaceService([record]),
+        {
+            "actions": [
+                {
+                    "priority": "High",
+                    "title": "Review estimate",
+                    "project": "Project A",
+                    "destination": "Estimate",
+                }
+            ],
+            "timeline": [],
+        },
+    )
+
+    assert st.session_state["atlas_active_workspace_id"] == "project-a"
+    assert st.session_state["atlas_active_page"] == "Estimate"
+    assert st.rerun_called is True
+
+
+def test_mission_control_risk_section_reports_exceptions_and_clear_state() -> None:
+    clear = _HomeContractStreamlit()
+    service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
+
+    app._render_mission_control_panels(clear, service, {"actions": [], "signals": []})
+
+    assert "No significant operational risks detected." in clear.captions
+
+    populated = _HomeContractStreamlit()
+    app._render_mission_control_panels(
+        populated,
+        service,
+        {
+            "actions": [],
+            "signals": [
+                {
+                    "status": "Blocked",
+                    "project": "Project A",
+                    "reason": "Unresolved RFI",
+                    "destination": "Scope & Risk",
+                }
+            ],
+        },
+    )
+
+    assert any(
+        row.get("Risk") == "Unresolved RFI" and row.get("Severity") == "Critical"
+        for table in populated.dataframes
+        for row in table
+    )
+
+
+def test_mission_control_activity_section_groups_similar_events() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_mission_control_panels(
+        st,
+        _FakeWorkspaceService([]),
+        {
+            "timeline": [
+                {
+                    "event": "Estimate revised",
+                    "project": "Project A",
+                    "timestamp": "2026-07-19T12:00:00+00:00",
+                },
+                {
+                    "event": "Estimate revised",
+                    "project": "Project A",
+                    "timestamp": "2026-07-20T12:00:00+00:00",
+                },
+            ]
+        },
+    )
+
+    activity_rows = [
+        row
+        for table in st.dataframes
+        for row in table
+        if row.get("Activity") == "Estimate revised"
+    ]
+    assert activity_rows == [
+        {
+            "Activity": "Estimate revised",
+            "Project": "Project A",
+            "Count": 2,
+            "Latest": "2026-07-20T12:00:00+00:00",
+        }
+    ]
+
+
+def test_mission_control_company_snapshot_limits_to_six_kpis() -> None:
+    st = _HomeContractStreamlit()
+    service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
+
+    app._render_mission_control_panels(
+        st,
+        service,
+        {
+            "actions": [
+                {
+                    "priority": "High",
+                    "title": "Review estimate",
+                    "project": "Project A",
+                    "destination": "Estimate",
+                }
+            ],
+            "timeline": [],
+        },
+    )
+
+    snapshot = st.dataframes[-1]
+    assert len(snapshot) == 6
+    assert [row["KPI"] for row in snapshot] == [
+        "Active projects",
+        "Open work items",
+        "Operational risks",
+        "Recent changes",
+        "Projects in estimating",
+        "Setup incomplete",
+    ]
 
 
 def test_footer_shows_tenant_neutral_branding_without_diagnostics() -> None:

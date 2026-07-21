@@ -79,16 +79,17 @@ Atlas now operates in two navigation modes:
 - Application Workspace
 - Project Workspace
 
-Application Workspace is used for Home and cross-project operations.
+Application Workspace is used for Mission Control and cross-project operations.
 Project Workspace is entered only after opening a specific project.
 
-Home remains application-level.
+Mission Control remains application-level.
 Opening a project switches Atlas into project-specific navigation.
 
 Primary navigation is header-based in both workspace modes.
 Administration remains an internal route name only and appears publicly as Settings.
-Home now shows deterministic Recent Projects instead of Recent Activity.
-Atlas is the sole Home action.
+Mission Control shows tenant operations priorities instead of decorative
+dashboard sections.
+Atlas is the sole application-home action.
 The header uses a compact centered content width so it does not stretch edge-to-edge on large monitors.
 Clear Search exits focused search mode and returns to the current page context without mutating an already-instantiated widget-owned session key.
 
@@ -98,7 +99,8 @@ Sprint X-13 refines navigation clarity and information architecture without chan
 - secondary navigation is contextual to the active workspace
 - tertiary navigation is presented as task-oriented actions rather than page-name repetition
 - development-only labels, diagnostic phrasing, and redundant explanatory copy are removed where they do not create direct user value
-- Home is treated as an operational landing page centered on continue-working context, recent projects, action triage, notifications, and favorites
+- Mission Control is treated as an operational landing page centered on work,
+  activity, risk, project resumption, and company performance
 - Reports is treated as an output-oriented workspace organized around deliverables and readiness
 
 W-02 defines the Universal Object contract layer only.
@@ -440,38 +442,53 @@ If expected folders are missing, Atlas shows a warning and still attempts determ
    - streamlit run apps/phase2_review_app.py
 3. Open `Reference Project` to verify MAW source mode.
 
-## Home Content
-Home is a simple landing page that provides immediate access to:
+## Mission Control Tenant Operations Center
+Mission Control is the application home and tenant operations starting point.
+Selecting Atlas in the header returns here while preserving existing route and
+return-context compatibility.
+
+The top area provides immediate access to:
 - Create New Project
 - Open Existing Project
 - Manage Projects
 
 Application navigation groups:
-- Home
+- Mission Control
 - Projects
 - Knowledge
 - Reports
 - Administration
 
-Home also shows:
-- Continue Working
-- Recent Projects
-- Action Center
-- Notifications
-- Favorites
+Mission Control answers five operational questions only:
+- What needs my attention?
+- What changed since my last visit?
+- Where is the business at risk?
+- What should I work on next?
+- How is the company performing?
+
+Mission Control shows:
+- My Work: actionable items only, with project, owner, age, and one primary action.
+- Recent Activity: grouped meaningful business events, not audit-log noise.
+- Business Risks: exceptions only, with an explicit no-risk message when clear.
+- Continue Working: recently active projects with customer, progress signal, phase,
+  last activity, next action, and Resume Project.
+- Company Snapshot: six or fewer authoritative KPIs, without charts or decorative
+  dashboard graphics.
 
 Project-specific engineering pages are not shown while no project is open.
 
-Sprint X-04 home/search refinement notes:
-- Home is the only user-facing landing-page term.
-- Mission Control is retained only as an internal compatibility route key.
+PX-01 Mission Control refinement notes:
+- Mission Control remains backed by the existing compatibility route key.
+- Atlas in the global header is the sole application-home action.
 - Global search submits directly on Enter from the header input.
 - Empty/whitespace-only search does not execute and does not render results.
 - Search results are grouped by user-facing object type with deterministic preferred ordering.
 - Unknown object types are rendered after preferred groups in alphabetical order.
 - Removed Home sections: Application Areas, Portfolio Signals, Upcoming Timeline, Projects Requiring Attention, and Workspace Recommendations.
-- Action Center is limited to critical/high-priority deduplicated actions.
-- Home remains operational with compact Continue Working, Recent Projects, Action Center, Notifications, and Favorites sections.
+- Removed decorative landing sections: Action Center, Notifications, Favorites, and
+  Recent Projects as a standalone card group.
+- Tenant-facing content avoids technical metadata, repository language, empty
+  placeholder cards, charts, gauges, and duplicated metrics.
 
 Transactions alpha navigation posture:
 

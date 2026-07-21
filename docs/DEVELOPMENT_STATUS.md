@@ -97,6 +97,7 @@ Sprint A-04 (Alpha Operations) implements controlled alpha launch and stabilizat
 Sprint C-03 implements the Commercial Catalog Foundation with unified catalog item types (product/service/fee/assembly), tenant-scoped pricing policy defaults, nexus-based tax rule selection with effective-date/priority/compound behavior, deterministic PDF catalog price-list inspection/preview/finalization with diagnostics and partial-success reporting, CSV/XLSX catalog imports (including assemblies and component rows), assembly versioning/nested expansion/cycle prevention/rollups, and transaction-level catalog line integration for Estimates, Sales Orders, Return Orders, Credit Memos, and Customer Invoices while preserving manual line workflows and issued-document immutability.
 Sprint C-04 implements deterministic seed catalog import and alpha validation data operations, including repeatable tenant-scoped seed loading/reset controls, explicit seed provenance tagging, representative CSV/XLSX/PDF import validation scenarios, and scripted catalog-to-transaction flow validation through Estimate -> Sales Order -> Customer Invoice, additive/deductive change-order tracking, and Return Order -> Credit Memo paths with PDF artifact generation.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
+Sprint PX-01 replaces the prior Home composition with a true Mission Control Tenant Operations Center, using existing project/workspace signals to present My Work, Recent Activity, Business Risks, Continue Working, and a six-KPI Company Snapshot without adding business logic or decorative dashboard elements.
 
 X-01 through X-13 are closed.
 
@@ -118,9 +119,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1503 tests)
+- pytest: full suite passing (1511 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1503 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1511 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 
@@ -242,7 +243,7 @@ Current MAW reference-project behavior:
 - GUI labels explicitly indicate whether Reference Project is using Real package intake or Seed fixture fallback.
 
 Current workspace behavior:
-- Atlas uses an Application Workspace for Home, project management, knowledge, reports, and administration.
+- Atlas uses an Application Workspace for Mission Control, project management, knowledge, reports, and administration.
 - Opening a project switches Atlas into a dedicated Project Workspace with project-specific navigation.
 - Local project records are stored under AtlasProjects/.
 - Project Workspace emphasizes Overview, Documents, BOM Review, Scope & Risk, Engineering Review, Estimate (deterministic foundation), Notebook, Reports, and project details/settings pages.
@@ -293,8 +294,9 @@ Current workspace behavior:
 - Universal Object Workspace now provides a shared UI shell for migrated object families while preserving existing authoritative domain workflows.
 - Active project identity is surfaced through a compact project header with lifecycle/status badges and recommended next action.
 - Project Workspace desktop layout is two-column (navigation + working content), with inline/on-demand object detail.
-- Home now contains primary project actions plus Action Center (critical/high deduplicated actions) and Recent Activity only.
-- Mission Control naming remains internal-only for compatibility route/state keys.
+- Mission Control is now the application home and tenant operations starting point.
+- Mission Control presents actionable work, grouped recent activity, exception-only business risks, relevant project resumption, and a six-KPI company snapshot using existing authoritative workspace data.
+- Mission Control route/state keys remain backward compatible with prior Home navigation contracts.
 - Global search executes directly on Enter and renders deterministic grouped result sections by user-facing type labels.
 
 ## Latest Completed Feature

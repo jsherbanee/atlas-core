@@ -353,7 +353,8 @@ Copy and metadata rules:
 Continuity rule:
 
 - preserve meaningful object-level breadcrumbs used for cross-workspace continuity
-- keep Home operational and compact with Continue Working, Recent Projects, Action Center, Notifications, and Favorites
+- keep Mission Control as the tenant operations starting point, focused on My Work,
+  Recent Activity, Business Risks, Continue Working, and Company Snapshot
 - keep Knowledge summary language user-facing (data health and next actions), not implementation-status phrasing
 - keep Transactions limited to active families and treat change orders as a Sales Order/Return Order convention
 - keep deferred transaction families visibly deferred/disabled so they cannot be mistaken for active workflows
@@ -453,11 +454,17 @@ Cards should be used only when they improve comprehension. Tables should remain 
 Atlas is lifecycle-centric, not document-centric and not estimate-centric.
 
 Atlas navigation uses two explicit workspace layers:
-- Application Workspace for Home, project management, portfolio reporting, and administration.
+- Application Workspace for Mission Control, project management, portfolio reporting, and administration.
 - Project Workspace for project-specific review and decision pages after a project is opened.
 
-Home remains the public application-level landing page even when a project is active.
-Mission Control remains an internal compatibility route name only.
+Mission Control is the public application-level landing page even when a project
+is active. The existing route/state key remains compatible with prior Home
+navigation contracts.
+
+Mission Control is not a decorative dashboard. Every visible element should
+answer attention, change, risk, next-work, or company-performance questions. It
+must avoid charts, gauges, repeated metrics, technical metadata, and placeholder
+cards that do not prompt a business decision.
 
 Primary navigation should stay global and stable.
 It should answer where the user can go across Atlas without changing meaning between application and project modes.

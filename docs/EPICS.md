@@ -57,6 +57,23 @@ Status: Active
 - A-03 Alpha Tester Onboarding and Controlled Rollout
 - A-04 Alpha Launch, Feedback Triage, and Stabilization Loop
 - K-04 Unified Organization Records and Entity Merge
+- PX-01 Mission Control Tenant Operations Center
+
+### PX-01 Scope
+
+- replace the prior Home composition with Mission Control as the application home
+- present actionable tenant operations sections: My Work, Recent Activity,
+  Business Risks, Continue Working, and Company Snapshot
+- reuse existing workspace/project signals and services without adding business
+  logic or new domain ownership
+- preserve global search, Working Set, tenant isolation, permissions,
+  navigation state, return context, and responsive shell behavior
+
+Explicitly out of scope:
+- decorative dashboard charts, gauges, and large metric tiles
+- new workflow automation
+- new commercial, procurement, accounting, or ERP behavior
+- implementation-facing metadata on tenant surfaces
 
 ### A-07 Scope
 
