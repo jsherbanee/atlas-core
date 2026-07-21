@@ -29,6 +29,9 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Processing filters now support Active, Ready, Needs Attention, Failed, and All.
 - Duplicate active upload submissions reuse an existing idempotent document job instead of creating duplicate processing work.
 - Failed document jobs schedule retry without blocking later queued files.
+- Bid-package upload limits and supported file types now come from one shared policy across the Documents uploader, pending validation, intake validation, background jobs, help text, and rejection diagnostics.
+- Bid-package uploads now allow up to 200 MB per file (200,000,000 bytes) and show precise actual-versus-maximum size details when a file is too large.
+- JSON is no longer advertised or accepted as a user-facing bid-package upload format; ZIP remains supported only under the existing bounded archive-container behavior.
 
 ### Scope Notes
 

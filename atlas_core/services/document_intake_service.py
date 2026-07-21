@@ -14,6 +14,7 @@ import zipfile
 from xml.etree import ElementTree
 
 from atlas_core.contracts import PlanReviewRequest
+from atlas_core.contracts.upload_policy import bid_package_upload_policy
 from atlas_core.domain.document_intake import (
     DocumentIntakeSnapshot,
     IntakeSourceReference,
@@ -132,13 +133,9 @@ class DocumentIntakeService:
     _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tiff", ".tif"}
     _SCHEDULE_EXTENSIONS = {".xlsx", ".xls", ".csv"}
     _DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".doc", ".txt", ".rtf"}
-    _SUPPORTED_EXTENSIONS = (
-        _IMAGE_EXTENSIONS
-        | _SCHEDULE_EXTENSIONS
-        | _DOCUMENT_EXTENSIONS
-        | {".json", ".zip"}
-    )
-    _MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024
+    _UPLOAD_POLICY = bid_package_upload_policy()
+    _SUPPORTED_EXTENSIONS = _UPLOAD_POLICY.extensions_with_dot
+    _MAX_UPLOAD_FILE_BYTES = _UPLOAD_POLICY.max_file_size_bytes
     _MAX_ARCHIVE_ENTRY_COUNT = 2000
     _MAX_ARCHIVE_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
     _MAX_ARCHIVE_DEPTH = 3
@@ -288,16 +285,24 @@ class DocumentIntakeService:
             duplicate_hash = source_hash in seen_hashes
             file_size = len(data)
             unsupported = suffix not in self._SUPPORTED_EXTENSIONS or suffix == ".zip"
-            empty = file_size <= 0
-            too_large = file_size > self._MAX_UPLOAD_FILE_BYTES
+            policy_result = self._UPLOAD_POLICY.validate_file(
+                name=name,
+                size_bytes=file_size,
+            )
 
             errors: list[str] = []
-            if unsupported:
+            for message in policy_result.messages:
+                if message == "Queued for processing":
+                    continue
+                if message.startswith("Unsupported file type:"):
+                    errors.append("unsupported extension")
+                    continue
+                if message == "File is empty.":
+                    errors.append("empty file")
+                    continue
+                errors.append(message)
+            if unsupported and "unsupported extension" not in errors:
                 errors.append("unsupported extension")
-            if empty:
-                errors.append("empty file")
-            if too_large:
-                errors.append("file exceeds size limit")
             if duplicate_name:
                 errors.append("duplicate filename")
             if duplicate_hash:

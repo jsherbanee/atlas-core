@@ -10,6 +10,7 @@ import sys
 from typing import Any, Literal
 
 from atlas_core.domain import Project, ProjectStatus
+from atlas_core.contracts.upload_policy import bid_package_upload_policy
 from atlas_core.services.master_library import CommercialProductService
 from atlas_core.services.project_workspace_service import (
     ProjectWorkspaceRecord,
@@ -29,6 +30,31 @@ _SPEC.loader.exec_module(app)
 
 def _label_tail(label: str) -> str:
     return label[2:] if label.startswith(("⌄ ", "› ")) else label
+
+
+def test_bid_package_uploader_config_matches_shared_policy() -> None:
+    policy = bid_package_upload_policy()
+
+    assert app.SUPPORTED_UPLOAD_TYPES == policy.streamlit_types
+    assert "json" not in app.SUPPORTED_UPLOAD_TYPES
+    assert app.BID_PACKAGE_UPLOAD_POLICY.help_text == policy.help_text
+
+
+def test_bid_package_basic_upload_diagnostic_rejects_json_and_oversize() -> None:
+    json_result = app._basic_upload_diagnostic("metadata.json", b"{}")
+    oversized_result = app.BID_PACKAGE_UPLOAD_POLICY.validate_file(
+        name="too-large.pdf",
+        size_bytes=app.BID_PACKAGE_UPLOAD_POLICY.max_file_size_bytes + 1,
+    )
+
+    assert json_result[0] is False
+    assert "Unsupported file type" in json_result[1]
+    assert oversized_result.accepted is False
+    assert "File exceeds the upload limit." in oversized_result.message
+    assert (
+        f"{app.BID_PACKAGE_UPLOAD_POLICY.max_file_size_bytes + 1:,} bytes"
+        in oversized_result.message
+    )
 
 
 def _button_label_tails(st: Any) -> list[str]:

@@ -102,6 +102,7 @@ from atlas_core.services.universal_object_registry import (
 )
 from atlas_core.contracts.permissions_contracts import AccessRequest, PermissionEffect
 from atlas_core.contracts.tenant_manager_contracts import SandboxProvisioningRequest
+from atlas_core.contracts.upload_policy import bid_package_upload_policy
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
@@ -1079,22 +1080,8 @@ PROJECTS_ACTIVE_NAVIGATION_CONTRACT: list[dict[str, Any]] = [
     },
 ]
 
-SUPPORTED_UPLOAD_TYPES = [
-    "pdf",
-    "docx",
-    "doc",
-    "xlsx",
-    "xls",
-    "csv",
-    "jpg",
-    "jpeg",
-    "png",
-    "tiff",
-    "txt",
-    "rtf",
-    "json",
-    "zip",
-]
+BID_PACKAGE_UPLOAD_POLICY = bid_package_upload_policy(os.environ)
+SUPPORTED_UPLOAD_TYPES = BID_PACKAGE_UPLOAD_POLICY.streamlit_types
 
 CREATE_PROJECT_UPLOAD_TYPES = [
     "pdf",
@@ -5254,12 +5241,11 @@ def _clear_pending_uploads(st: Any, workspace_id: str) -> None:
 
 
 def _basic_upload_diagnostic(name: str, data: bytes) -> tuple[bool, str]:
-    suffix = Path(name).suffix.lower().lstrip(".")
-    if suffix not in set(SUPPORTED_UPLOAD_TYPES):
-        return (False, f"Unsupported file type: .{suffix or 'unknown'}")
-    if not data:
-        return (False, "File is empty.")
-    return (True, "Queued for processing")
+    result = BID_PACKAGE_UPLOAD_POLICY.validate_file(
+        name=name,
+        size_bytes=len(data),
+    )
+    return (result.accepted, result.message)
 
 
 def _dict_bytes(item: dict[str, Any], key: str) -> bytes:
@@ -36083,9 +36069,7 @@ def _render_upload_panel(
     record: ProjectWorkspaceRecord,
 ) -> None:
     st.markdown("#### Add Bid Documents")
-    st.caption(
-        "Upload drawings, specifications, schedules, spreadsheets, photographs, and bid packages. Supported: PDF, CSV, XLS, XLSX, DOC, DOCX, ZIP, JPG, JPEG."
-    )
+    st.caption(BID_PACKAGE_UPLOAD_POLICY.help_text)
 
     picker_key = _documents_upload_picker_key(st, record.workspace_id)
     uploaded_files = st.file_uploader(
@@ -36093,7 +36077,7 @@ def _render_upload_panel(
         type=SUPPORTED_UPLOAD_TYPES,
         accept_multiple_files=True,
         key=picker_key,
-        help="Select one or more files. New selections append to the pending upload list.",
+        help=BID_PACKAGE_UPLOAD_POLICY.help_text,
     )
     appended_count, duplicate_count = _append_pending_upload_selection(
         st,

@@ -163,6 +163,9 @@ Explicitly out of scope:
   queue/worker architecture
 - expose durable Processing status, filters, retry, cancel, warnings, and
   failure diagnostics
+- keep bid-package upload limits and supported file types governed by one
+  shared policy: 200 MB per file, PDF/DOC/DOCX/XLS/XLSX/CSV/image/TXT/RTF/ZIP
+  formats, and no user-facing JSON intake
 - preserve existing drawing intelligence and OCR behavior without adding new
   extraction rules, AI, cloud infrastructure, procurement, or accounting scope
 

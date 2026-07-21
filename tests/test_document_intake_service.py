@@ -6,6 +6,10 @@ import json
 from pathlib import Path
 import zipfile
 
+from atlas_core.contracts.upload_policy import (
+    BID_PACKAGE_UPLOAD_ENV_VAR,
+    bid_package_upload_policy,
+)
 from atlas_core.services.pdf_text_extraction_service import (
     ExtractedPdfPage,
     PdfTextExtractionService,
@@ -241,6 +245,55 @@ def test_inspect_uploaded_files_detects_duplicates_empty_and_unsupported() -> No
     assert any(item["name"].endswith(".docx") for item in accepted)
     assert any(item["name"].endswith(".xls") for item in accepted)
     assert any(item["name"].endswith(".xlsx") for item in accepted)
+
+
+def test_document_intake_upload_policy_matches_shared_contract() -> None:
+    service = DocumentIntakeService()
+    policy = bid_package_upload_policy()
+
+    assert service._MAX_UPLOAD_FILE_BYTES == policy.max_file_size_bytes
+    assert service._SUPPORTED_EXTENSIONS == policy.extensions_with_dot
+
+
+def test_document_intake_rejects_json_uploads() -> None:
+    service = DocumentIntakeService()
+
+    inspected = service.inspect_uploaded_files(
+        [UploadedIntakeFile(name="metadata.json", data=b"{}")]
+    )
+
+    assert inspected.accepted_files == []
+    assert any(
+        "unsupported extension" in ",".join(item["messages"])
+        for item in inspected.diagnostics
+    )
+
+
+def test_document_intake_rejects_file_one_byte_over_configured_policy_limit() -> None:
+    service = DocumentIntakeService()
+    service._UPLOAD_POLICY = bid_package_upload_policy(
+        {BID_PACKAGE_UPLOAD_ENV_VAR: "1"}
+    )
+    service._MAX_UPLOAD_FILE_BYTES = service._UPLOAD_POLICY.max_file_size_bytes
+
+    inspected = service.inspect_uploaded_files(
+        [
+            UploadedIntakeFile(
+                name="too-large.pdf",
+                data=b"x" * 1_000_001,
+            )
+        ]
+    )
+
+    assert inspected.accepted_files == []
+    message = " ".join(
+        str(message)
+        for item in inspected.diagnostics
+        for message in list(item.get("messages") or [])
+    )
+    assert "File exceeds the upload limit." in message
+    assert "1,000,001 bytes" in message
+    assert "1,000,000 bytes" in message
 
 
 def test_build_session_package_from_uploads_supports_partial_success(

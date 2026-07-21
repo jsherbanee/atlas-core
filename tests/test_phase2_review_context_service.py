@@ -136,8 +136,13 @@ def test_build_uploaded_review_context_returns_uploaded_labels(tmp_path: Path) -
 
     assert context["data_source_mode"] == "uploaded_project"
     assert context["data_source_label"] == "Uploaded Project"
-    assert context["sample_project_name"] == "Uploaded Context Project"
+    assert str(context["sample_project_name"]).startswith("session-")
     assert context["import_summary"]["drawing_count"] == 1
+    assert context["import_summary"]["rejected_file_count"] == 1
+    rejected = list(context["import_summary"].get("rejected_file_diagnostics") or [])
+    assert any(
+        str(item.get("name", "")).endswith("project_metadata.json") for item in rejected
+    )
 
 
 def test_build_reference_project_context_uses_real_intake_when_available(

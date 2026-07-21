@@ -343,7 +343,9 @@ with success feedback. Supported metadata and folder opens continue through the
 existing project-open service path. MAW parsing is explicitly out of scope.
 
 Step 2 upload behavior (Documents):
-- Supported onboarding formats: PDF, CSV, XLS, XLSX, DOC, DOCX, ZIP, JPG, JPEG.
+- Supported onboarding formats: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, JPEG, PNG, TIF, TIFF, TXT, RTF, ZIP.
+- Bid-package uploads use a single shared upload policy: 200 MB per file, interpreted as 200,000,000 bytes.
+- JSON is not a supported user-facing bid-package upload format.
 - Selections append to a pending upload queue across multiple chooser interactions.
 - Pending queue uses deterministic dedupe identity (normalized filename + size + source hash).
 - Users can remove selected pending files or clear all pending files.
@@ -354,6 +356,7 @@ Step 2 upload behavior (Documents):
 - Failed jobs can be retried from Processing without blocking other files.
 
 ZIP handling behavior:
+- ZIP is a supported container upload type, but ZIP files are not broadened into a standalone processed document type.
 - Archive inspection occurs before extraction.
 - Unsafe paths, encrypted entries, duplicate entries, and system artifacts are rejected.
 - Entry count and expansion-size limits are enforced.

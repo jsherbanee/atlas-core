@@ -653,6 +653,34 @@ def test_workspace_service_enqueues_document_import_without_running(
     assert service.list_background_jobs(record.workspace_id)[0]["status"] == "queued"
 
 
+def test_workspace_service_enqueues_observed_maw_plan_check_size_without_running(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="job-large-upload-1",
+        name="Large Upload",
+        client="Client",
+    )
+    service.save_record(record)
+    filename = "09_Theater Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf"
+
+    submitted = service.enqueue_document_processing(
+        workspace_id=record.workspace_id,
+        uploaded_files=[(filename, b"x" * 54_830_000)],
+        actor_id="user-1",
+    )
+
+    assert submitted["status"] == "queued"
+    assert service.load_record(record.workspace_id).import_summary == {}
+    queued_uploads = service.list_background_jobs(record.workspace_id)[0]["request"][
+        "input_payload"
+    ]["uploaded_files"]
+    assert len(queued_uploads) == 1
+    assert queued_uploads[0]["name"] == filename
+    assert queued_uploads[0]["size_bytes"] == 54_830_000
+
+
 def test_workspace_service_prevents_duplicate_active_document_jobs(
     tmp_path: Path,
 ) -> None:
