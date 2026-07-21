@@ -119,7 +119,6 @@ from atlas_core.ui.workspace_framework import (
     render_form_grid as _shared_render_form_grid,
     render_metric_strip as _shared_render_metric_strip,
     render_object_header as _shared_render_object_header,
-    render_object_inspector as _shared_render_object_inspector,
     render_report_table as _shared_render_report_table,
     render_section_card as _shared_render_section_card,
     render_page_header as _shared_render_page_header,
@@ -16087,23 +16086,748 @@ def _transaction_kind_for_document_type(document_type: CommercialDocumentType) -
     return TRANSACTION_TYPE_TO_KIND.get(document_type, "commercial_document")
 
 
+def _set_transaction_query_params(
+    st: Any,
+    *,
+    secondary: str,
+    tertiary: str,
+    document_id: str = "",
+) -> None:
+    query_params = getattr(st, "query_params", None)
+    if query_params is None:
+        return
+    try:
+        query_params["atlas_page"] = "Transactions"
+        query_params["atlas_transaction_family"] = secondary
+        query_params["atlas_transaction_action"] = tertiary
+        if document_id:
+            query_params["atlas_transaction_id"] = document_id
+    except Exception:
+        return
+
+
+def _sync_transaction_route_from_query_params(
+    st: Any,
+    service: TransactionsWorkspaceService,
+) -> None:
+    if _safe_text(st.session_state.get("atlas_active_page"), "") != "Transactions":
+        return
+    family = _query_param_text(st, "atlas_transaction_family")
+    if family and family in TRANSACTION_SECONDARY_TO_DOCUMENT_TYPE:
+        st.session_state[_navigation_secondary_state_key()] = family
+    action = _query_param_text(st, "atlas_transaction_action")
+    if action:
+        st.session_state[_navigation_tertiary_state_key()] = action
+    document_id = _query_param_text(st, "atlas_transaction_id")
+    if not document_id:
+        return
+    exists = any(
+        item.document_id == document_id
+        for item in service.list_documents(include_archived=True)
+    )
+    if exists:
+        st.session_state["atlas_transactions_selected_document_id"] = document_id
+
+
 def _transaction_row(document: Any) -> dict[str, Any]:
     metadata = dict(document.document_metadata or {})
     change_order_number = _safe_text(metadata.get("change_order_number"), "")
+    presentation = _commercial_transaction_presentation(document, [])
     return {
         "Document Number": _safe_text(document.document_number, "n/a"),
-        "Type": _safe_text(document.document_type.value, "n/a"),
+        "Family": _transaction_family_label(document.document_type),
         "CO": change_order_number,
-        "Lifecycle": _safe_text(document.lifecycle_state.value, "n/a"),
-        "Approval": _safe_text(document.approval_state.value, "n/a"),
-        "Sync": _safe_text(document.sync_metadata.status.value, "n/a"),
+        "Status": _format_commercial_state(document.lifecycle_state.value),
         "Project": _safe_text(
             document.project_code, _safe_text(document.project_id, "")
         ),
         "Customer": _safe_text(document.customer_id, ""),
-        "Vendor": _safe_text(document.vendor_id, ""),
+        "Total": presentation["summary"]["total"],
+        "Margin": presentation["summary"]["margin"],
+        "Readiness": presentation["readiness_state"],
+        "Next Action": presentation["recommendation"]["action"],
         "Updated": _safe_text(document.updated_at, "n/a"),
     }
+
+
+def _format_commercial_state(value: Any) -> str:
+    return _safe_text(value, "n/a").replace("_", " ").title()
+
+
+def _transaction_family_label(document_type: CommercialDocumentType | Any) -> str:
+    value = _safe_text(getattr(document_type, "value", document_type), "")
+    labels = {
+        "estimate": "Estimate",
+        "sales_order": "Sales Order",
+        "return_order": "Return Order",
+        "customer_invoice": "Invoice",
+        "credit_memo": "Credit Memo",
+    }
+    return labels.get(value, value.replace("_", " ").title() or "Transaction")
+
+
+def _commercial_money(value: Any, currency: str = "USD") -> str:
+    amount = Decimal(str(value or "0"))
+    return f"{currency} {amount:,.2f}"
+
+
+def _commercial_line_type(line: Any) -> str:
+    metadata = dict(line.line_metadata or {})
+    catalog = dict(metadata.get("catalog") or {})
+    line_type = (
+        _safe_text(metadata.get("line_type"), "")
+        or _safe_text(catalog.get("catalog_item_type"), "")
+        or _safe_text(getattr(line, "presentation_line_type", ""), "")
+        or "item"
+    )
+    normalized = line_type.replace("_", " ").strip().lower()
+    if normalized in {"product", "item"}:
+        return "Products"
+    if normalized == "service":
+        return "Services"
+    if normalized == "labor":
+        return "Labor"
+    if normalized == "fee":
+        return "Fees"
+    if normalized == "freight":
+        return "Freight"
+    if normalized == "tax":
+        return "Taxes"
+    if normalized == "assembly":
+        return "Assemblies"
+    if bool(metadata.get("assembly_component")):
+        return "Assemblies"
+    if normalized in {"comment", "blank spacer", "group header", "subtotal"}:
+        return "Presentation"
+    return normalized.title() or "Items"
+
+
+def _commercial_cost_total(document: CommercialDocument) -> Decimal:
+    return sum(
+        (
+            line.quantity * line.unit_cost
+            for line in list(document.lines or [])
+            if line.contributes_to_totals
+        ),
+        Decimal("0"),
+    )
+
+
+def _commercial_margin(document: CommercialDocument) -> tuple[Decimal, str]:
+    currency = document.totals.currency
+    cost_total = _commercial_cost_total(document)
+    margin = document.totals.grand_total - cost_total
+    if document.totals.grand_total > Decimal("0"):
+        percent = (margin / document.totals.grand_total) * Decimal("100")
+        return margin, f"{_commercial_money(margin, currency)} ({percent:.1f}%)"
+    return margin, "Not available"
+
+
+def _commercial_downstream_documents(
+    document: CommercialDocument,
+    all_documents: list[CommercialDocument],
+) -> list[CommercialDocument]:
+    downstream: list[CommercialDocument] = []
+    for candidate in all_documents:
+        if candidate.document_id == document.document_id:
+            continue
+        if _safe_text(candidate.source_document_id, "") == document.document_id:
+            downstream.append(candidate)
+            continue
+        if _safe_text(candidate.source_sales_order_id, "") == document.document_id:
+            downstream.append(candidate)
+            continue
+        if _safe_text(candidate.source_invoice_id, "") == document.document_id:
+            downstream.append(candidate)
+            continue
+        if any(
+            _safe_text(rel.related_document_id, "") == document.document_id
+            for rel in list(candidate.relationships or [])
+        ):
+            downstream.append(candidate)
+    return downstream
+
+
+def _commercial_health_findings(
+    document: CommercialDocument,
+    all_documents: list[CommercialDocument],
+) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
+    if not _safe_text(document.customer_id, "") and document.document_type in {
+        CommercialDocumentType.ESTIMATE,
+        CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.RETURN_ORDER,
+        CommercialDocumentType.CUSTOMER_INVOICE,
+        CommercialDocumentType.CREDIT_MEMO,
+    }:
+        findings.append(
+            {
+                "severity": "Blocked",
+                "title": "Customer missing",
+                "explanation": "A customer is required before commercial review can proceed.",
+                "area": "Document Summary",
+                "action": "Continue Editing",
+            }
+        )
+    if not list(document.lines or []):
+        findings.append(
+            {
+                "severity": "Blocked",
+                "title": "No line items",
+                "explanation": "The document has no commercial lines to review or issue.",
+                "area": "Line Item Workspace",
+                "action": "Add First Item",
+            }
+        )
+    if any(
+        line.contributes_to_totals
+        and _commercial_line_type(line) in {"Products", "Assemblies"}
+        and line.unit_cost == Decimal("0")
+        for line in list(document.lines or [])
+    ):
+        findings.append(
+            {
+                "severity": "Needs Attention",
+                "title": "Material cost unresolved",
+                "explanation": "One or more material lines do not carry an acquisition cost.",
+                "area": "Line Item Workspace",
+                "action": "Review Lines",
+            }
+        )
+    if any(
+        line.contributes_to_totals
+        and _commercial_line_type(line) == "Labor"
+        and line.unit_cost == Decimal("0")
+        for line in list(document.lines or [])
+    ):
+        findings.append(
+            {
+                "severity": "Needs Attention",
+                "title": "Labor incomplete",
+                "explanation": "Labor lines are present without a cost basis.",
+                "area": "Line Item Workspace",
+                "action": "Review Lines",
+            }
+        )
+    if (
+        list(document.lines or [])
+        and document.totals.tax_total == Decimal("0")
+        and document.document_type
+        in {
+            CommercialDocumentType.SALES_ORDER,
+            CommercialDocumentType.CUSTOMER_INVOICE,
+        }
+    ):
+        findings.append(
+            {
+                "severity": "Review",
+                "title": "Taxes not configured",
+                "explanation": "No tax amount is present on this customer-facing document.",
+                "area": "Commercial Totals",
+                "action": "Review Taxes",
+            }
+        )
+    for diagnostic in list(document.diagnostics or []):
+        severity = _safe_text(getattr(diagnostic.severity, "value", ""), "info")
+        if severity not in {"warning", "error"}:
+            continue
+        findings.append(
+            {
+                "severity": "Blocked" if severity == "error" else "Needs Attention",
+                "title": _format_commercial_state(diagnostic.code),
+                "explanation": _safe_text(diagnostic.message, "Review diagnostic."),
+                "area": "Commercial Health",
+                "action": "Review Document",
+            }
+        )
+    downstream = _commercial_downstream_documents(document, all_documents)
+    if downstream:
+        findings.append(
+            {
+                "severity": "Info",
+                "title": "Downstream document exists",
+                "explanation": (
+                    f"{_transaction_family_label(downstream[0].document_type)} "
+                    "already exists for this commercial chain."
+                ),
+                "area": "Related Documents",
+                "action": "Review Related",
+            }
+        )
+    rank = {"Blocked": 0, "Needs Attention": 1, "Review": 2, "Info": 3}
+    findings.sort(
+        key=lambda item: (
+            rank.get(_safe_text(item.get("severity"), "Info"), 9),
+            _safe_text(item.get("title"), ""),
+        )
+    )
+    return findings
+
+
+def _commercial_readiness_checks(
+    document: CommercialDocument,
+    findings: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    blocked_titles = {_safe_text(item.get("title"), "") for item in findings}
+
+    def _state(complete: bool, blocked: bool = False, applicable: bool = True) -> str:
+        if not applicable:
+            return "Not Applicable"
+        if blocked:
+            return "Blocked"
+        return "Complete" if complete else "Needs Attention"
+
+    has_lines = bool(list(document.lines or []))
+    has_priced_lines = bool(
+        has_lines
+        and all(
+            not line.contributes_to_totals
+            or line.unit_price > Decimal("0")
+            or line.extended_amount == Decimal("0")
+            for line in list(document.lines or [])
+        )
+    )
+    has_material_cost = "Material cost unresolved" not in blocked_titles
+    has_labor = any(_commercial_line_type(line) == "Labor" for line in document.lines)
+    has_labor_cost = "Labor incomplete" not in blocked_titles
+    taxes_applicable = document.document_type in {
+        CommercialDocumentType.SALES_ORDER,
+        CommercialDocumentType.CUSTOMER_INVOICE,
+    }
+    has_blocking_diagnostics = any(
+        _safe_text(item.get("severity"), "") == "Blocked" for item in findings
+    )
+    return [
+        {
+            "Check": "Customer assigned",
+            "State": _state(bool(_safe_text(document.customer_id, ""))),
+            "Detail": _safe_text(document.customer_id, "Missing"),
+        },
+        {
+            "Check": "Project assigned",
+            "State": _state(
+                bool(_safe_text(document.project_id or document.project_code, "")),
+                applicable=bool(
+                    _safe_text(document.project_id or document.project_code, "")
+                ),
+            ),
+            "Detail": _safe_text(
+                document.project_code or document.project_id, "Standalone"
+            ),
+        },
+        {
+            "Check": "Document has line items",
+            "State": _state(has_lines, blocked=not has_lines),
+            "Detail": f"{len(list(document.lines or []))} line(s)",
+        },
+        {
+            "Check": "Material pricing resolved",
+            "State": _state(
+                has_priced_lines and has_material_cost, blocked=not has_material_cost
+            ),
+            "Detail": "Uses current document line pricing.",
+        },
+        {
+            "Check": "Labor complete",
+            "State": _state(has_labor_cost, applicable=has_labor),
+            "Detail": (
+                "No labor lines" if not has_labor else "Labor cost basis present."
+            ),
+        },
+        {
+            "Check": "Taxes configured",
+            "State": _state(
+                document.totals.tax_total > Decimal("0"),
+                applicable=taxes_applicable,
+            ),
+            "Detail": _commercial_money(
+                document.totals.tax_total, document.totals.currency
+            ),
+        },
+        {
+            "Check": "Required dates present",
+            "State": _state(bool(document.updated_at)),
+            "Detail": _safe_text(document.updated_at, "Missing"),
+        },
+        {
+            "Check": "No blocking diagnostics",
+            "State": _state(
+                not has_blocking_diagnostics, blocked=has_blocking_diagnostics
+            ),
+            "Detail": (
+                "Review health findings." if has_blocking_diagnostics else "Clear"
+            ),
+        },
+    ]
+
+
+def _commercial_relationship_rows(
+    document: CommercialDocument,
+    all_documents: list[CommercialDocument],
+) -> list[dict[str, str]]:
+    documents_by_id = {item.document_id: item for item in all_documents}
+
+    def _document_label(document_id: str) -> str:
+        related = documents_by_id.get(document_id)
+        if related is None:
+            return document_id
+        return _safe_text(related.document_number, related.document_id)
+
+    rows: list[dict[str, str]] = []
+    if document.customer_id:
+        rows.append({"Relationship": "Customer", "Reference": document.customer_id})
+    if document.project_code or document.project_id:
+        rows.append(
+            {
+                "Relationship": "Project",
+                "Reference": _safe_text(
+                    document.project_code, _safe_text(document.project_id, "")
+                ),
+            }
+        )
+    if document.source_document_id:
+        rows.append(
+            {
+                "Relationship": "Created from",
+                "Reference": _document_label(document.source_document_id),
+            }
+        )
+    if document.source_sales_order_id:
+        rows.append(
+            {
+                "Relationship": "Source sales order",
+                "Reference": _document_label(document.source_sales_order_id),
+            }
+        )
+    if document.source_invoice_id:
+        rows.append(
+            {
+                "Relationship": "Source invoice",
+                "Reference": _document_label(document.source_invoice_id),
+            }
+        )
+    for related in _commercial_downstream_documents(document, all_documents):
+        rows.append(
+            {
+                "Relationship": f"Converted to {_transaction_family_label(related.document_type)}",
+                "Reference": _safe_text(related.document_number, related.document_id),
+            }
+        )
+    metadata = dict(document.document_metadata or {})
+    if metadata.get("change_order_number"):
+        rows.append(
+            {
+                "Relationship": "Change order",
+                "Reference": _safe_text(metadata.get("change_order_number"), ""),
+            }
+        )
+    for relationship in list(document.relationships or []):
+        rows.append(
+            {
+                "Relationship": _format_commercial_state(
+                    relationship.relationship_type
+                ),
+                "Reference": _document_label(relationship.related_document_id),
+            }
+        )
+    return rows
+
+
+def _commercial_line_rows(document: CommercialDocument) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for line in sorted(
+        list(document.lines or []),
+        key=lambda item: (item.display_sequence, item.sequence),
+    ):
+        source = (
+            "Generated" if line.source_document_id or line.source_line_id else "Manual"
+        )
+        metadata = dict(line.line_metadata or {})
+        if metadata.get("catalog") or metadata.get("assembly_component"):
+            source = "Catalog"
+        rows.append(
+            {
+                "Group": _commercial_line_type(line),
+                "Line": str(line.sequence),
+                "Description": line.description,
+                "Qty": str(line.quantity),
+                "Unit Cost": _commercial_money(
+                    line.unit_cost, document.totals.currency
+                ),
+                "Sell Price": _commercial_money(
+                    line.unit_price, document.totals.currency
+                ),
+                "Extension": _commercial_money(
+                    line.extended_amount, document.totals.currency
+                ),
+                "Source": source,
+            }
+        )
+    return rows
+
+
+def _commercial_totals_rows(document: CommercialDocument) -> list[dict[str, str]]:
+    currency = document.totals.currency
+    cost_total = _commercial_cost_total(document)
+    margin, margin_text = _commercial_margin(document)
+    type_totals: dict[str, Decimal] = defaultdict(Decimal)
+    for line in list(document.lines or []):
+        if line.contributes_to_totals:
+            type_totals[_commercial_line_type(line)] += line.extended_amount
+    rows = [
+        {
+            "Measure": "Material and line cost",
+            "Value": _commercial_money(cost_total, currency),
+        },
+        {
+            "Measure": "Subtotal",
+            "Value": _commercial_money(document.totals.subtotal, currency),
+        },
+        {
+            "Measure": "Discount",
+            "Value": _commercial_money(document.totals.discount_total, currency),
+        },
+        {
+            "Measure": "Taxes",
+            "Value": _commercial_money(document.totals.tax_total, currency),
+        },
+        {
+            "Measure": "Sell total",
+            "Value": _commercial_money(document.totals.grand_total, currency),
+        },
+        {"Measure": "Gross margin", "Value": margin_text},
+    ]
+    for group in ["Assemblies", "Products", "Services", "Labor", "Fees", "Freight"]:
+        if type_totals.get(group, Decimal("0")):
+            rows.insert(
+                1,
+                {
+                    "Measure": group,
+                    "Value": _commercial_money(type_totals[group], currency),
+                },
+            )
+    _ = margin
+    return rows
+
+
+def _commercial_recommendation(
+    document: CommercialDocument,
+    findings: list[dict[str, str]],
+    all_documents: list[CommercialDocument],
+) -> dict[str, str]:
+    titles = {_safe_text(item.get("title"), "") for item in findings}
+    if any(_safe_text(item.get("severity"), "") == "Blocked" for item in findings):
+        first = next(item for item in findings if item.get("severity") == "Blocked")
+        return {
+            "title": _safe_text(first.get("title"), "Resolve blocking issue"),
+            "detail": _safe_text(
+                first.get("explanation"), "Resolve blocking issues before review."
+            ),
+            "action": _safe_text(first.get("action"), "Continue Editing"),
+        }
+    if "Material cost unresolved" in titles:
+        return {
+            "title": "Resolve material pricing",
+            "detail": "Resolve material costs before commercial review.",
+            "action": "Review Lines",
+        }
+    if "Labor incomplete" in titles:
+        return {
+            "title": "Complete labor",
+            "detail": "Complete labor cost basis before internal review.",
+            "action": "Review Lines",
+        }
+    downstream = _commercial_downstream_documents(document, all_documents)
+    if downstream and document.document_type == CommercialDocumentType.ESTIMATE:
+        return {
+            "title": "Sales order already exists",
+            "detail": "A downstream sales order is already linked to this estimate.",
+            "action": "Review Related",
+        }
+    if (
+        document.approval_state == ApprovalState.APPROVED
+        and document.can_transition_to(CommercialDocumentLifecycleState.ISSUED)
+    ):
+        return {
+            "title": "Ready to issue",
+            "detail": "Approval is complete and the document can move to issue controls.",
+            "action": "Issue Document",
+        }
+    if document.lifecycle_state == CommercialDocumentLifecycleState.DRAFT:
+        return {
+            "title": "Ready for internal review",
+            "detail": "No blocking commercial issues were detected in the current draft.",
+            "action": "Review Document",
+        }
+    return {
+        "title": "Continue commercial workflow",
+        "detail": "Use the available document actions to move the transaction forward.",
+        "action": "Continue Editing",
+    }
+
+
+def _commercial_transaction_presentation(
+    document: CommercialDocument,
+    all_documents: list[CommercialDocument],
+) -> dict[str, Any]:
+    margin, margin_text = _commercial_margin(document)
+    findings = _commercial_health_findings(document, all_documents)
+    checks = _commercial_readiness_checks(document, findings)
+    recommendation = _commercial_recommendation(document, findings, all_documents)
+    blocked = any(item["State"] == "Blocked" for item in checks)
+    needs_attention = any(item["State"] == "Needs Attention" for item in checks)
+    readiness_state = (
+        "Blocked" if blocked else "Needs Attention" if needs_attention else "Ready"
+    )
+    _ = margin
+    return {
+        "summary": {
+            "document": _safe_text(document.document_number, "Draft"),
+            "family": _transaction_family_label(document.document_type),
+            "customer": _safe_text(document.customer_id, "Not assigned"),
+            "project": _safe_text(
+                document.project_code or document.project_id, "Standalone"
+            ),
+            "revision": f"R{document.revision_number}",
+            "status": _format_commercial_state(document.lifecycle_state.value),
+            "owner": _safe_text(
+                (document.document_metadata or {}).get("owner"), "Unassigned"
+            ),
+            "updated": _safe_text(document.updated_at, "n/a"),
+            "total": _commercial_money(
+                document.totals.grand_total, document.totals.currency
+            ),
+            "margin": margin_text,
+        },
+        "findings": findings,
+        "readiness": checks,
+        "readiness_state": readiness_state,
+        "line_rows": _commercial_line_rows(document),
+        "totals": _commercial_totals_rows(document),
+        "relationships": _commercial_relationship_rows(document, all_documents),
+        "recommendation": recommendation,
+    }
+
+
+def _render_commercial_transaction_workbench(
+    st: Any,
+    *,
+    document: CommercialDocument,
+    all_documents: list[CommercialDocument],
+    prefix: str,
+    primary_action: Callable[[], None] | None = None,
+) -> None:
+    presentation = _commercial_transaction_presentation(document, all_documents)
+    summary = dict(presentation["summary"])
+    recommendation = dict(presentation["recommendation"])
+
+    _render_section_title(st, "Document Summary")
+    with st.container(border=True):
+        st.markdown(f"### {_safe_text(summary.get('document'), 'Draft')}")
+        st.caption(
+            " · ".join(
+                [
+                    _safe_text(summary.get("family"), "Transaction"),
+                    f"Customer: {_safe_text(summary.get('customer'), 'Not assigned')}",
+                    f"Project: {_safe_text(summary.get('project'), 'Standalone')}",
+                    f"Revision: {_safe_text(summary.get('revision'), 'R1')}",
+                    f"Status: {_safe_text(summary.get('status'), 'Draft')}",
+                ]
+            )
+        )
+        st.caption(
+            " · ".join(
+                [
+                    f"Owner: {_safe_text(summary.get('owner'), 'Unassigned')}",
+                    f"Last updated: {_safe_text(summary.get('updated'), 'n/a')}",
+                    f"Total: {_safe_text(summary.get('total'), 'USD 0.00')}",
+                    f"Margin: {_safe_text(summary.get('margin'), 'Not available')}",
+                ]
+            )
+        )
+        if primary_action is not None:
+            if st.button(
+                _safe_text(recommendation.get("action"), "Continue Editing"),
+                key=f"{prefix}_workbench_primary_action",
+                type="primary",
+                width="stretch",
+            ):
+                primary_action()
+
+    workbench_cols = st.columns([1.25, 1.0], gap="small")
+    with workbench_cols[0]:
+        _render_section_title(st, "Commercial Health")
+        findings = list(presentation["findings"] or [])
+        if findings:
+            _render_data_table(
+                st,
+                [
+                    {
+                        "Severity": _safe_text(item.get("severity"), "Review"),
+                        "Finding": _safe_text(item.get("title"), ""),
+                        "Business Impact": _safe_text(item.get("explanation"), ""),
+                        "Area": _safe_text(item.get("area"), ""),
+                        "Action": _safe_text(item.get("action"), ""),
+                    }
+                    for item in findings
+                ],
+            )
+        else:
+            st.caption("No significant commercial issues detected.")
+
+        _render_section_title(st, "Commercial Readiness")
+        _render_data_table(st, list(presentation["readiness"] or []))
+
+    with workbench_cols[1]:
+        _render_section_title(st, "Decision Panel")
+        with st.container(border=True):
+            st.markdown(f"**{_safe_text(recommendation.get('title'), 'Next Step')}**")
+            st.caption(_safe_text(recommendation.get("detail"), "Continue review."))
+        _render_data_table(st, list(presentation["totals"] or []))
+
+    _render_section_title(st, "Line Item Workspace")
+    line_rows = list(presentation["line_rows"] or [])
+    if line_rows:
+        _render_data_table(st, line_rows)
+    else:
+        _render_guided_empty_state(
+            st,
+            why_empty="This document has no commercial line items yet.",
+            action_to_populate="Add the first item before commercial review.",
+            next_location="Use the Lines or Add controls for this transaction family.",
+        )
+
+    _render_section_title(st, "Commercial Relationships")
+    relationship_rows = list(presentation["relationships"] or [])
+    if relationship_rows:
+        _render_data_table(st, relationship_rows)
+    else:
+        st.caption("No related commercial documents are linked yet.")
+
+    with st.expander("Administration and History", expanded=False):
+        _render_data_table(
+            st,
+            [
+                {
+                    "Field": "Document ID",
+                    "Value": document.document_id,
+                },
+                {
+                    "Field": "Sync Status",
+                    "Value": _format_commercial_state(
+                        document.sync_metadata.status.value
+                    ),
+                },
+                {
+                    "Field": "Approval",
+                    "Value": _format_commercial_state(document.approval_state.value),
+                },
+                {
+                    "Field": "Created",
+                    "Value": _safe_text(document.created_at, "n/a"),
+                },
+            ],
+        )
 
 
 def _render_transaction_line_presentation_controls(
@@ -16355,6 +17079,7 @@ def _render_transactions_workspace_page(
     _ = workspace_service
     _render_page_header(st, "Transactions", "")
     service = _transactions_workspace_service(st)
+    _sync_transaction_route_from_query_params(st, service)
 
     secondary = _safe_text(
         st.session_state.get(_navigation_secondary_state_key()),
@@ -16865,11 +17590,25 @@ def _render_transactions_workspace_page(
                     st.error(f"Unable to create draft: {exc}")
 
     if not rows:
+        if search_query:
+            why_empty = "No transactions match the current filters."
+            action_to_populate = "Clear the search or include archived documents."
+            next_location = "Use Browse to review all records in this family."
+        else:
+            why_empty = (
+                f"No {_transaction_family_label(document_type).lower()} records "
+                "have been created for this tenant."
+            )
+            action_to_populate = (
+                f"Create {_transaction_family_label(document_type).lower()} "
+                "when a commercial document is needed."
+            )
+            next_location = "Use Add to start a supported draft."
         _render_guided_empty_state(
             st,
-            why_empty="No transactions match the current filter.",
-            action_to_populate="Use Add to create a draft or broaden filters.",
-            next_location="Use Browse in this section to review transaction documents.",
+            why_empty=why_empty,
+            action_to_populate=action_to_populate,
+            next_location=next_location,
         )
         add_label_map = {
             CommercialDocumentType.ESTIMATE: "Add Estimate",
@@ -16885,25 +17624,53 @@ def _render_transactions_workspace_page(
             width="content",
         ):
             st.session_state[_navigation_tertiary_state_key()] = "add"
+            _set_transaction_query_params(
+                st,
+                secondary=secondary,
+                tertiary="add",
+            )
             st.rerun()
         return
 
+    _render_section_title(st, f"{_transaction_family_label(document_type)} Work Queue")
     st.dataframe(
         [_transaction_row(item) for item in rows], width="stretch", hide_index=True
     )
 
     labels = [
-        f"{_safe_text(item.document_number, item.document_id)} · {_safe_text(item.document_id, '')}"
+        (
+            f"{_safe_text(item.document_number, 'Draft')} · "
+            f"{_transaction_family_label(item.document_type)} · "
+            f"{_safe_text(item.customer_id, 'No customer')}"
+        )
         for item in rows
     ]
+    selected_document_id = _safe_text(
+        st.session_state.get("atlas_transactions_selected_document_id"), ""
+    )
+    selected_index = next(
+        (
+            index
+            for index, item in enumerate(rows)
+            if item.document_id == selected_document_id
+        ),
+        0,
+    )
     selected_label = st.selectbox(
         "Selected Document",
         options=labels,
+        index=selected_index,
         key=f"{prefix}_selected_document",
     )
     selected_document = rows[labels.index(selected_label)]
     st.session_state["atlas_transactions_selected_document_id"] = (
         selected_document.document_id
+    )
+    _set_transaction_query_params(
+        st,
+        secondary=secondary,
+        tertiary=tertiary,
+        document_id=selected_document.document_id,
     )
     selected_kind = _transaction_kind_for_document_type(selected_document.document_type)
     selection_payload = {
@@ -16911,41 +17678,6 @@ def _render_transactions_workspace_page(
         "sync_status": selected_document.sync_metadata.status.value,
     }
     _set_context_selection(st, selected_kind, selection_payload)
-
-    object_header_title = _safe_text(
-        selected_document.document_number or selected_document.document_id,
-        "Transaction",
-    )
-    selected_rows = [
-        {
-            "Field": "Document Number",
-            "Value": _safe_text(selected_document.document_number, "-"),
-        },
-        {
-            "Field": "Document Type",
-            "Value": _safe_text(selected_document.document_type.value, "-"),
-        },
-        {
-            "Field": "Customer",
-            "Value": _safe_text(selected_document.customer_id, "-"),
-        },
-        {
-            "Field": "Project",
-            "Value": _safe_text(selected_document.project_code, "-"),
-        },
-        {
-            "Field": "Status",
-            "Value": _safe_text(selected_document.lifecycle_state.value, "-"),
-        },
-        {
-            "Field": "Approval",
-            "Value": _safe_text(selected_document.approval_state.value, "-"),
-        },
-        {
-            "Field": "Sync",
-            "Value": _safe_text(selected_document.sync_metadata.status.value, "-"),
-        },
-    ]
 
     estimate_engine: EstimateEngineService | None = None
     estimate_row: dict[str, Any] = {}
@@ -17036,63 +17768,86 @@ def _render_transactions_workspace_page(
         except Exception as exc:
             st.error(f"Unable to create sales order from estimate: {exc}")
 
-    _shared_render_object_inspector(
+    def _apply_workbench_primary_action() -> None:
+        action = _safe_text(
+            _commercial_transaction_presentation(
+                selected_document,
+                service.list_documents(include_archived=True),
+            )["recommendation"].get("action"),
+            "Continue Editing",
+        )
+        target = {
+            "Add First Item": "lines",
+            "Review Lines": "lines",
+            "Review Taxes": "lines",
+            "Review Related": "related_documents",
+            "Issue Document": "issue",
+            "Review Document": "approvals",
+            "Continue Editing": "edit",
+        }.get(action, "edit")
+        st.session_state[_navigation_tertiary_state_key()] = target
+        _set_transaction_query_params(
+            st,
+            secondary=secondary,
+            tertiary=target,
+            document_id=selected_document.document_id,
+        )
+        st.rerun()
+
+    all_transaction_documents = service.list_documents(include_archived=True)
+    _render_commercial_transaction_workbench(
         st,
-        object_name=object_header_title,
-        description=_safe_text(
-            selected_document.document_type.value.replace("_", " "),
-            "Transaction document",
-        ),
-        badges=[
-            _safe_text(selected_document.document_type.value, ""),
-            _safe_text(selected_document.lifecycle_state.value, ""),
-            _safe_text(selected_document.approval_state.value, ""),
-        ],
-        summary_rows=selected_rows,
-        actions=[
-            {
-                "label": "Open Object Workspace",
-                "action_key": "open_workspace",
-                "on_click": _open_object_workspace,
-            },
-            {
-                "label": (
-                    "Archive"
-                    if selected_document.lifecycle_state
-                    != CommercialDocumentLifecycleState.ARCHIVED
-                    else "Restore"
-                ),
-                "action_key": "archive_restore",
-                "on_click": _toggle_archive_state,
-            },
-            {
-                "label": "Refresh Terms Snapshot",
-                "action_key": "refresh_terms",
-                "enabled": (
-                    selected_document.is_mutable
-                    and selected_document.document_type
-                    in {
-                        CommercialDocumentType.ESTIMATE,
-                        CommercialDocumentType.SALES_ORDER,
-                    }
-                ),
-                "disabled_reason": (
-                    "Only mutable estimate and sales order drafts can refresh terms."
-                ),
-                "on_click": _refresh_terms_snapshot,
-            },
-            {
-                "label": "Create Sales Order",
-                "action_key": "create_sales_order",
-                "visible": (
-                    selected_document.document_type == CommercialDocumentType.ESTIMATE
-                ),
-                "on_click": _create_sales_order_from_estimate,
-            },
-        ],
-        key_prefix=f"transaction_{selected_document.document_id}",
-        summary_title="Selected Record",
+        document=selected_document,
+        all_documents=all_transaction_documents,
+        prefix=prefix,
+        primary_action=_apply_workbench_primary_action,
     )
+
+    with st.expander("Document Actions", expanded=False):
+        action_cols = st.columns(4)
+        if action_cols[0].button(
+            "Open Object Workspace",
+            key=f"{prefix}_open_object_workspace",
+            width="stretch",
+        ):
+            _open_object_workspace()
+            st.rerun()
+        archive_label = (
+            "Archive"
+            if selected_document.lifecycle_state
+            != CommercialDocumentLifecycleState.ARCHIVED
+            else "Restore"
+        )
+        if action_cols[1].button(
+            archive_label,
+            key=f"{prefix}_archive_restore_inline",
+            width="stretch",
+        ):
+            _toggle_archive_state()
+        refresh_enabled = (
+            selected_document.is_mutable
+            and selected_document.document_type
+            in {
+                CommercialDocumentType.ESTIMATE,
+                CommercialDocumentType.SALES_ORDER,
+            }
+        )
+        if action_cols[2].button(
+            "Refresh Terms",
+            key=f"{prefix}_refresh_terms_inline",
+            disabled=not refresh_enabled,
+            width="stretch",
+        ):
+            _refresh_terms_snapshot()
+        if (
+            selected_document.document_type == CommercialDocumentType.ESTIMATE
+            and action_cols[3].button(
+                "Create Sales Order",
+                key=f"{prefix}_create_sales_order_inline",
+                width="stretch",
+            )
+        ):
+            _create_sales_order_from_estimate()
 
     if selected_document.document_type == CommercialDocumentType.ESTIMATE:
         st.checkbox(

@@ -169,3 +169,29 @@ Knowledge repair note:
 - Customer Browse defaults to Customer Name ascending, uses one compact Customer selector as the primary selection mechanism, and keeps the full table behind Browse All
 - Customer Add uses a single Customer Name field with non-consuming Customer ID preview and consuming allocation on create
 - normal tenant-facing Knowledge surfaces avoid JSON controls; CSV export remains available in contextual/advanced areas
+
+## Transactions Workbench Routing
+
+PX-03 keeps Transactions inside the shared primary/secondary/tertiary
+workspace contract and adds browser-visible selected-document state.
+
+Supported query parameters:
+- `atlas_page=Transactions`
+- `atlas_transaction_family`
+- `atlas_transaction_action`
+- `atlas_transaction_id`
+
+`atlas_transaction_family` maps to the active commercial family:
+- `estimates`
+- `sales_orders`
+- `return_orders`
+- `customer_invoices`
+- `credit_memos`
+
+`atlas_transaction_action` maps to the active tertiary action for the selected
+family. `atlas_transaction_id` selects the commercial document when the
+document exists in the current tenant transaction service state.
+
+Explicit URL state wins after workspace-state restoration so refreshed,
+shared, or browser-authored Transactions links can reopen the intended family,
+action, and selected document without breaking the shared return-context model.

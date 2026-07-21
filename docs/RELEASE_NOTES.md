@@ -19,6 +19,26 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (PX-03 Commercial Transaction Workbench)
+
+### Improved
+
+- Transactions now presents selected Estimates, Sales Orders, Return Orders, Invoices, and Credit Memos through a Commercial Transaction Workbench.
+- Selected commercial documents now show document summary, commercial health, readiness checklist, decision panel, line item workspace, commercial totals, and relationship/lineage context.
+- Transaction browse rows now emphasize operational fields such as family, status, project, customer, total, margin, readiness, next action, and updated date.
+- Transactions now preserves browser-visible family, action, and selected-document state through query parameters.
+
+### Quality
+
+- Added focused regression coverage for workbench presentation, health precedence, downstream relationship display, operational row columns, and transaction URL state restoration.
+
+### Scope Notes
+
+- no new commercial business logic
+- no persistence redesign
+- no accounting, payment, procurement, inventory, or QuickBooks transport behavior
+- no decorative dashboard charts, gauges, or duplicate financial metrics
+
 ## Unreleased (Atlas Alpha UI Cleanup Navigation Simplification and Functional Knowledge Links)
 
 ## Unreleased (PX-02 Project Operations Center)

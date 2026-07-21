@@ -45,6 +45,7 @@ Atlas Workspace Knowledge Cleanup replaces the custom Knowledge accordion with c
 Atlas Workspace App-Wide Navigation Refactor replaces widget-owned first-column expanders with a shared controlled accordion so Projects, active Project workspaces, Transactions, Knowledge, Reports, and Settings allow only one expanded secondary section at a time.
 Atlas Workspace App-Wide Navigation Hotfix makes that accordion an application-shell capability with controlled chevron headers, indented tertiary links, collapse-cleared tertiary state, and no page-specific navigation expander implementations.
 Atlas Workspace Organization Merge adds permission-gated Organization Merge controls to Customer, Vendor, and Manufacturer details, supports possible-duplicate review, source selection, preview, actor/reason capture, irreversible confirmation, and Organization Object Workspace role-profile/merge-history visibility.
+Atlas PX-03 replaces the generic selected-record transaction inspector with a Commercial Transaction Workbench for Estimates, Sales Orders, Return Orders, Invoices, and Credit Memos. The workbench presents document summary, commercial health, readiness checklist, decision panel, line item workspace, and commercial relationships using existing commercial-document services.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.
@@ -1356,6 +1357,27 @@ The status bar is always visible and shows:
 - Scanned/image-only PDFs can produce warnings when no embedded text is extractable.
 - Atlas does not fabricate sheet/spec/equipment extraction when text is unavailable.
 - Lifecycle modules beyond Phase 2 remain visible as disabled `Coming Soon` navigation only.
+
+## Transactions Workbench
+
+Transactions is a commercial operations workspace, not a decorative dashboard.
+
+Supported families:
+- Estimates
+- Sales Orders
+- Return Orders
+- Invoices
+- Credit Memos
+
+When a document is selected, Atlas shows:
+- Document Summary with family, customer, project, revision, status, owner, updated date, sell total, margin, and the primary recommended action
+- Commercial Health with exception findings only, or an explicit clear state when no significant commercial issues are detected
+- Commercial Readiness with deterministic checklist state derived from the selected document and existing diagnostics
+- Decision Panel with one recommended next action and commercial totals
+- Line Item Workspace grouped by commercial line type with quantity, cost, sell price, extension, and source context
+- Commercial Relationships with customer, project, source, downstream, change-order, and linked-document context where supported
+
+The workbench does not add persistence, accounting behavior, procurement execution, QuickBooks transport, or new commercial rules. Administration, sync, approval, and internal identifiers remain available only in collapsed record detail areas.
 
 ## Extraction Diagnostics
 Atlas Intake surfaces the following diagnostics in the Import Summary:

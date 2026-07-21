@@ -557,3 +557,28 @@ The following remain intentionally unresolved:
 - final relationship rules between Change Orders, Sales Orders, and Invoices
 - final sync granularity between Atlas transaction lines and QuickBooks line structures
 - final approval-policy model by tenant and transaction type
+
+## PX-03 Implementation: Commercial Transaction Workbench
+
+Transactions now presents supported customer-side commercial documents through
+a workbench-oriented selected-document view.
+
+Supported workbench families:
+- Estimates
+- Sales Orders
+- Return Orders
+- Invoices
+- Credit Memos
+
+The workbench organizes existing authoritative transaction data into:
+- document summary
+- commercial health findings
+- readiness checklist
+- deterministic recommendation
+- line item workspace
+- commercial totals
+- relationship and lineage summary
+
+PX-03 does not change commercial-document persistence, numbering, lifecycle
+rules, totals calculation, approval behavior, sync semantics, QuickBooks
+ownership boundaries, procurement execution, or accounting authority.

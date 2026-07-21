@@ -1029,6 +1029,178 @@ def test_transactions_navigation_contract_uses_expected_order_and_labels() -> No
     )
 
 
+def _transaction_service_with_catalog() -> Any:
+    return app.TransactionsWorkspaceService(
+        active_tenant_id="local",
+        active_organization_id="atlas",
+        serialized_catalog_state={
+            "catalog_items": {
+                "product:sku-a": {
+                    "catalog_item_id": "product:sku-a",
+                    "item_type": "product",
+                    "code": "SKU-A",
+                    "name": "Product A",
+                    "description": "Product line",
+                    "status": "active",
+                    "cost": 6.0,
+                    "default_sales_price": 10.0,
+                    "taxable": False,
+                    "archived": False,
+                },
+                "service:svc-a": {
+                    "catalog_item_id": "service:svc-a",
+                    "item_type": "service",
+                    "code": "SVC-A",
+                    "name": "Service A",
+                    "description": "Service line",
+                    "status": "active",
+                    "cost": 40.0,
+                    "default_sales_price": 75.0,
+                    "taxable": False,
+                    "archived": False,
+                },
+            }
+        },
+    )
+
+
+def _draft_estimate_with_line() -> tuple[Any, Any]:
+    service = _transaction_service_with_catalog()
+    document = service.create_draft(
+        tenant_id="local",
+        organization_id="atlas",
+        document_type=app.CommercialDocumentType.ESTIMATE,
+        customer_id="cust-1",
+        project_id="project-1",
+        project_code="PRJ-1",
+    )
+    service.add_catalog_line(
+        document_id=document.document_id,
+        catalog_item_id="product:sku-a",
+        quantity=Decimal("2"),
+    )
+    return service, service.get_document(document.document_id)
+
+
+def test_commercial_transaction_presentation_builds_summary_health_and_totals() -> None:
+    _service, document = _draft_estimate_with_line()
+    assert document is not None
+
+    presentation = app._commercial_transaction_presentation(document, [document])
+
+    assert presentation["summary"]["family"] == "Estimate"
+    assert presentation["summary"]["customer"] == "cust-1"
+    assert presentation["summary"]["project"] == "PRJ-1"
+    assert presentation["summary"]["total"] == "USD 20.00"
+    assert presentation["readiness_state"] == "Ready"
+    assert presentation["recommendation"]["title"] == "Ready for internal review"
+    assert any(row["Group"] == "Products" for row in presentation["line_rows"])
+    assert any(row["Measure"] == "Gross margin" for row in presentation["totals"])
+
+
+def test_commercial_transaction_workbench_renders_supported_sections() -> None:
+    _service, document = _draft_estimate_with_line()
+    assert document is not None
+    st = _HomeContractStreamlit()
+
+    app._render_commercial_transaction_workbench(
+        st,
+        document=document,
+        all_documents=[document],
+        prefix="commercial_workbench_test",
+    )
+
+    rendered_text = "\n".join([*st.markdowns, *st.captions])
+    assert "Document Summary" in rendered_text
+    assert "Commercial Health" in rendered_text
+    assert "Commercial Readiness" in rendered_text
+    assert "Decision Panel" in rendered_text
+    assert "Line Item Workspace" in rendered_text
+    assert "Commercial Relationships" in rendered_text
+    assert "No significant commercial issues detected." in rendered_text
+    assert st.expander_calls == [
+        {"label": "Administration and History", "expanded": False}
+    ]
+    assert not st.errors
+
+
+def test_commercial_health_finding_precedence_blocks_missing_customer_before_lines() -> (
+    None
+):
+    service = app.TransactionsWorkspaceService(
+        active_tenant_id="local",
+        active_organization_id="atlas",
+    )
+    document = service.create_draft(
+        tenant_id="local",
+        organization_id="atlas",
+        document_type=app.CommercialDocumentType.SALES_ORDER,
+    )
+
+    presentation = app._commercial_transaction_presentation(document, [document])
+
+    assert presentation["readiness_state"] == "Blocked"
+    assert presentation["findings"][0]["title"] == "Customer missing"
+    assert presentation["recommendation"]["action"] == "Continue Editing"
+
+
+def test_commercial_transaction_relationships_show_downstream_document() -> None:
+    service, estimate = _draft_estimate_with_line()
+    assert estimate is not None
+    service._commercial_service.set_approval_state(estimate, app.ApprovalState.APPROVED)
+    sales_order = service.create_sales_order_from_estimate(
+        estimate_document_id=estimate.document_id,
+        inherit_terms_from_estimate=True,
+    )
+
+    presentation = app._commercial_transaction_presentation(
+        estimate,
+        service.list_documents(include_archived=True),
+    )
+
+    relationships = presentation["relationships"]
+    assert any(
+        row["Relationship"] == "Converted to Sales Order"
+        and row["Reference"]
+        == app._safe_text(sales_order.document_number, sales_order.document_id)
+        for row in relationships
+    )
+    assert presentation["recommendation"]["title"] == "Sales order already exists"
+
+
+def test_transaction_row_uses_operational_columns_without_internal_id() -> None:
+    _service, document = _draft_estimate_with_line()
+    assert document is not None
+
+    row = app._transaction_row(document)
+
+    assert "Document Number" in row
+    assert "Document ID" not in row
+    assert row["Family"] == "Estimate"
+    assert row["Readiness"] == "Ready"
+    assert row["Next Action"] == "Review Document"
+
+
+def test_transaction_query_params_restore_family_action_and_document() -> None:
+    service, document = _draft_estimate_with_line()
+    assert document is not None
+    st = _FakeStreamlit(session_state={"atlas_active_page": "Transactions"})
+    st.query_params = {
+        "atlas_transaction_family": "estimates",
+        "atlas_transaction_action": "lines",
+        "atlas_transaction_id": document.document_id,
+    }
+
+    app._sync_transaction_route_from_query_params(st, service)
+
+    assert st.session_state[app._navigation_secondary_state_key()] == "estimates"
+    assert st.session_state[app._navigation_tertiary_state_key()] == "lines"
+    assert (
+        st.session_state["atlas_transactions_selected_document_id"]
+        == document.document_id
+    )
+
+
 def test_knowledge_navigation_contract_is_flat_and_ordered() -> None:
     contract = app._workspace_navigation_contract("Knowledge", "application")
 
@@ -1630,7 +1802,7 @@ def test_transactions_workspace_source_uses_shared_framework_helpers() -> None:
     source = inspect.getsource(app._render_transactions_workspace_page)
 
     assert "_shared_render_control_bar" in source
-    assert "_shared_render_object_inspector" in source
+    assert "_render_commercial_transaction_workbench" in source
 
 
 def test_knowledge_workspace_source_omits_summary_tables_and_health_cards() -> None:

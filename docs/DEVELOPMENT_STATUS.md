@@ -301,9 +301,12 @@ Current workspace behavior:
 - Mission Control presents actionable work, grouped recent activity, exception-only business risks, relevant project resumption, and a six-KPI company snapshot using existing authoritative workspace data.
 - Mission Control route/state keys remain backward compatible with prior Home navigation contracts.
 - Global search executes directly on Enter and renders deterministic grouped result sections by user-facing type labels.
+- Transactions now presents selected Estimates, Sales Orders, Return Orders, Invoices, and Credit Memos through a Commercial Transaction Workbench.
+- The transaction workbench surfaces document summary, commercial health findings, readiness checks, deterministic recommendation, line item workspace, commercial totals, and relationship/lineage context from existing commercial-document services.
+- Transactions URL state now supports selected family/action/document context through `atlas_transaction_family`, `atlas_transaction_action`, and `atlas_transaction_id` alongside the primary `atlas_page=Transactions` route.
 
 ## Latest Completed Feature
-- Estimator Brief Enhancements (deterministic executive summary, prioritized reviewer actions, and evidence traceability)
+- PX-03 Commercial Transaction Workbench
 
 ## Baseline Candidate Notes
 - Conceptual label: phase-2-bid-intelligence-baseline-candidate (not a Git tag yet).

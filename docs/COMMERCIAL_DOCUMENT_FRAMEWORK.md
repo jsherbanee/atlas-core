@@ -651,3 +651,25 @@ Still intentionally unresolved:
 - final approval-policy configuration model by tenant and document type
 - final QuickBooks sync granularity for line-level versus document-level linkage
 - final representation of partially fulfilled states across customer-side and vendor-side documents
+
+## PX-03 Presentation Contract
+
+Commercial documents may be presented in the Transactions workspace as an
+operational workbench. The workbench is a presentation and deterministic
+decision-support layer over the existing document model.
+
+Workbench presentation may derive:
+- family label and document status from document type and lifecycle state
+- commercial health from missing required document context, line presence,
+  document diagnostics, and known downstream relationships
+- readiness from existing document fields, line items, totals, taxes, dates,
+  and diagnostics
+- line grouping from line metadata, catalog metadata, and presentation line
+  type
+- totals and margin from authoritative document totals and line cost fields
+- relationship summary from source, downstream, change-order, project, customer,
+  and explicit commercial-document relationships
+
+Workbench presentation must not mutate authoritative commercial-document data
+or introduce new lifecycle, accounting, sync, procurement, inventory, tax, or
+approval rules.

@@ -59,6 +59,7 @@ Status: Active
 - K-04 Unified Organization Records and Entity Merge
 - PX-01 Mission Control Tenant Operations Center
 - PX-02 Project Operations Center
+- PX-03 Commercial Transaction Workbench
 
 ### PX-01 Scope
 
@@ -94,6 +95,24 @@ Explicitly out of scope:
 - inventory
 - procurement implementation
 - accounting integration
+
+### PX-03 Scope
+
+- transform the selected-record Transactions experience into a Commercial
+  Transaction Workbench for Estimates, Sales Orders, Return Orders, Invoices,
+  and Credit Memos
+- present document summary, commercial health, readiness checklist, decision
+  panel, line item workspace, and relationship/lineage summary from existing
+  commercial-document services
+- preserve transaction family/action/document URL state for browser refresh,
+  direct links, and workspace restoration
+- keep deferred transaction families visible only as deferred scope
+
+Explicitly out of scope:
+- new commercial business logic
+- persistence redesign
+- accounting, payment, procurement, inventory, or QuickBooks transport behavior
+- decorative dashboards, charts, gauges, and duplicate financial metrics
 
 ### A-07 Scope
 
