@@ -21,6 +21,32 @@ This document tracks product-facing changes for Atlas Preview releases.
 
 ## Unreleased (Atlas Alpha UI Cleanup Navigation Simplification and Functional Knowledge Links)
 
+## Unreleased (PX-02 Project Operations Center)
+
+### Improved
+
+- Active Project Overview is now a Project Operations Center focused on what the team needs to know and do to move the project forward.
+- The active project header now presents operational context: project name, customer, phase, overall status, project manager, last activity, current revision, current health, and primary actions.
+- Project Health now shows actionable conditions only, or `Project is progressing normally.` when no supported issues are open.
+- Current Work now uses existing guided review/project signals to show supported next work with owner, age, and recommended action.
+- Project Timeline groups meaningful completed activity and avoids pending/audit-log noise.
+- Project Context summarizes customer, location, contacts, documents, estimate, transactions, outstanding issues, and decisions.
+- Project Inspector now defaults to Overview, Activity, Relationships, Documents, History, and Administration, with implementation details kept out of the main operational view.
+- Active project navigation is grouped around work areas: Overview, Engineering, Commercial, Documents, Construction, Reporting, and Settings.
+
+### Quality
+
+- full gates passing: `black --check .`, `ruff check .`, `mypy .`, `pytest`
+- full-suite validation: `1517 passed`
+- targeted Project Operations Center regression validation added for header, project health, current work queue, timeline grouping, context cards, inspector, navigation grouping, empty states, and Streamlit state stability.
+
+### Scope Notes
+
+- no new project business logic
+- no persistence redesign
+- no workflow redesign
+- no AI, inventory, procurement implementation, or accounting integration
+
 ## Unreleased (PX-01 Mission Control Tenant Operations Center)
 
 ### Improved

@@ -98,6 +98,7 @@ Sprint C-03 implements the Commercial Catalog Foundation with unified catalog it
 Sprint C-04 implements deterministic seed catalog import and alpha validation data operations, including repeatable tenant-scoped seed loading/reset controls, explicit seed provenance tagging, representative CSV/XLSX/PDF import validation scenarios, and scripted catalog-to-transaction flow validation through Estimate -> Sales Order -> Customer Invoice, additive/deductive change-order tracking, and Return Order -> Credit Memo paths with PDF artifact generation.
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 Sprint PX-01 replaces the prior Home composition with a true Mission Control Tenant Operations Center, using existing project/workspace signals to present My Work, Recent Activity, Business Risks, Continue Working, and a six-KPI Company Snapshot without adding business logic or decorative dashboard elements.
+Sprint PX-02 transforms the active Project Overview into a Project Operations Center, using existing project review, timeline, document, lifecycle, and workspace signals to present operational header context, project health, current work, grouped activity, project context, and a quieter inspector without adding business logic or redesigning persistence.
 
 X-01 through X-13 are closed.
 
@@ -119,9 +120,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1511 tests)
+- pytest: full suite passing (1517 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1511 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1517 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 
@@ -294,6 +295,8 @@ Current workspace behavior:
 - Universal Object Workspace now provides a shared UI shell for migrated object families while preserving existing authoritative domain workflows.
 - Active project identity is surfaced through a compact project header with lifecycle/status badges and recommended next action.
 - Project Workspace desktop layout is two-column (navigation + working content), with inline/on-demand object detail.
+- Active Project Overview is now a Project Operations Center focused on project phase/status, current health, current work, grouped timeline activity, operational context, and inspector tabs.
+- Active project navigation is grouped around work areas: Overview, Engineering, Commercial, Documents, Construction, Reporting, and Settings.
 - Mission Control is now the application home and tenant operations starting point.
 - Mission Control presents actionable work, grouped recent activity, exception-only business risks, relevant project resumption, and a six-KPI company snapshot using existing authoritative workspace data.
 - Mission Control route/state keys remain backward compatible with prior Home navigation contracts.

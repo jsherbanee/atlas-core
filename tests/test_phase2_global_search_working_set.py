@@ -151,6 +151,10 @@ class _HomeContractStreamlit:
         self.expander_calls.append({"label": _label, "expanded": expanded})
         return self
 
+    def tabs(self, labels: list[str]) -> list[_HomeContractStreamlit]:
+        self.markdowns.append("Tabs: " + ", ".join(labels))
+        return [self for _ in labels]
+
     def warning(self, text: str) -> None:
         self.warnings.append(text)
 
@@ -3561,8 +3565,161 @@ def test_project_context_header_builder_returns_expected_fields() -> None:
 
     assert header.project_name == "MAW"
     assert header.customer == "Music Academy of the West"
-    assert header.confidence == "84%"
+    assert header.current_phase == "Intake"
+    assert header.project_manager == "Client"
+    assert header.current_revision == "Current"
+    assert header.current_health == "Needs Attention"
     assert header.recommended_next_action == "Review Documents"
+
+
+def test_project_context_header_renders_operational_summary_without_metadata() -> None:
+    st = _HomeContractStreamlit()
+    header = app.ProjectContextHeader(
+        project_name="MAW",
+        customer="Music Academy",
+        current_phase="Estimating",
+        overall_status="Needs Review",
+        project_manager="Alex",
+        last_activity="Jul 20, 2026 10:00",
+        current_revision="Rev 2",
+        current_health="Normal",
+        recommended_next_action="Review Estimate",
+    )
+
+    app._render_project_context_header(st, header)
+
+    rendered = "\n".join(st.markdowns)
+    assert "Project Manager: Alex" in rendered
+    assert "Current Revision: Rev 2" in rendered
+    assert "Normal" in rendered
+    assert "repository" not in rendered.lower()
+    assert "manifest" not in rendered.lower()
+
+
+def test_project_operations_center_renders_operational_sections() -> None:
+    st = _HomeContractStreamlit()
+    record = _project_record("project-a", "Project A")
+
+    app._render_overview_page(st, record, context=None)
+
+    rendered_text = "\n".join([*st.subheaders, *st.markdowns, *st.captions])
+    assert "Project Operations Center" in rendered_text
+    assert "Next Step" in rendered_text
+    assert "Project Health" in rendered_text
+    assert "Current Work" in rendered_text
+    assert "Project Timeline" in rendered_text
+    assert "Project Context" in rendered_text
+    assert "Project Inspector" in rendered_text
+    assert (
+        "Tabs: Overview, Activity, Relationships, Documents, History, Administration"
+        in rendered_text
+    )
+    assert "repository" not in rendered_text.lower()
+    assert "manifest" not in rendered_text.lower()
+
+
+def test_project_health_clear_state_is_actionable() -> None:
+    conditions = app._project_operations_health_conditions(
+        {
+            "documents_requiring_ocr": 0,
+            "missing_specifications": 0,
+        },
+        [
+            {
+                "step": "Review Documents",
+                "status": "complete",
+                "page": "Documents",
+                "detail": "Documents reviewed.",
+            }
+        ],
+    )
+    st = _HomeContractStreamlit()
+
+    app._render_project_health_card(st, conditions)
+
+    assert conditions == []
+    assert "Project is progressing normally." in st.captions
+
+
+def test_project_current_work_queue_uses_supported_review_steps() -> None:
+    rows = app._project_operations_current_work(
+        [
+            {
+                "step": "Review Documents",
+                "status": "complete",
+                "page": "Documents",
+            },
+            {
+                "step": "Review Estimate Coverage",
+                "status": "needs review",
+                "page": "Estimate",
+            },
+        ],
+        {"step": "Review Estimate Coverage"},
+    )
+
+    assert rows == [
+        {
+            "Title": "Review Estimate Coverage",
+            "Owner": "Project Team",
+            "Age": "Needs Review",
+            "Recommended Action": "Estimate",
+            "Priority": "Primary",
+        }
+    ]
+
+
+def test_project_timeline_groups_meaningful_completed_events() -> None:
+    rows = app._project_operations_timeline_rows(
+        [
+            {
+                "event": "Review Executed",
+                "status": "Completed",
+                "timestamp": "2026-07-20T10:00:00+00:00",
+                "details": "A",
+            },
+            {
+                "event": "Review Executed",
+                "status": "Completed",
+                "timestamp": "2026-07-21T10:00:00+00:00",
+                "details": "B",
+            },
+            {
+                "event": "Estimator Brief Generated",
+                "status": "Pending",
+                "timestamp": "2026-07-21T11:00:00+00:00",
+                "details": "n/a",
+            },
+        ]
+    )
+
+    assert rows == [
+        {
+            "Event": "Review Executed",
+            "Count": 2,
+            "Latest": "2026-07-21T10:00:00+00:00",
+            "Details": "B",
+        }
+    ]
+
+
+def test_project_navigation_groups_are_operations_oriented() -> None:
+    assert app._navigation_section_group("Projects", "active", "overview") == "Overview"
+    assert (
+        app._navigation_section_group("Projects", "active", "engineering_review")
+        == "Engineering"
+    )
+    assert (
+        app._navigation_section_group("Projects", "active", "estimate") == "Commercial"
+    )
+    assert (
+        app._navigation_section_group("Projects", "active", "documents") == "Documents"
+    )
+    assert app._navigation_section_group("Projects", "active", "reports") == "Reporting"
+    assert (
+        app._navigation_section_group("Projects", "active", "project_settings")
+        == "Settings"
+    )
 
 
 def test_project_navigation_contains_disabled_future_lifecycle_group() -> None:

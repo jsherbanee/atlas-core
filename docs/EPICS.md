@@ -58,6 +58,7 @@ Status: Active
 - A-04 Alpha Launch, Feedback Triage, and Stabilization Loop
 - K-04 Unified Organization Records and Entity Merge
 - PX-01 Mission Control Tenant Operations Center
+- PX-02 Project Operations Center
 
 ### PX-01 Scope
 
@@ -74,6 +75,25 @@ Explicitly out of scope:
 - new workflow automation
 - new commercial, procurement, accounting, or ERP behavior
 - implementation-facing metadata on tenant surfaces
+
+### PX-02 Scope
+
+- transform active Project Overview into a Project Operations Center
+- present operational project header, Project Health, Current Work, Project
+  Timeline, Project Context, and Project Inspector
+- organize active project navigation around work areas while preserving existing
+  route targets and state compatibility
+- reuse existing project review, document, timeline, lifecycle, and workspace
+  services without adding business logic
+
+Explicitly out of scope:
+- new project business logic
+- persistence redesign
+- workflow redesign
+- AI
+- inventory
+- procurement implementation
+- accounting integration
 
 ### A-07 Scope
 

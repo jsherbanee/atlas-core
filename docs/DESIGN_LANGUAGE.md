@@ -355,6 +355,9 @@ Continuity rule:
 - preserve meaningful object-level breadcrumbs used for cross-workspace continuity
 - keep Mission Control as the tenant operations starting point, focused on My Work,
   Recent Activity, Business Risks, Continue Working, and Company Snapshot
+- keep active Project Overview as a Project Operations Center focused on where
+  the project is, what changed, what is blocked, what should happen next, and
+  what decisions need to be made
 - keep Knowledge summary language user-facing (data health and next actions), not implementation-status phrasing
 - keep Transactions limited to active families and treat change orders as a Sales Order/Return Order convention
 - keep deferred transaction families visibly deferred/disabled so they cannot be mistaken for active workflows
@@ -508,10 +511,15 @@ The interface should also feel configurable, tenant-aware, and consistent across
 
 Project Workspace pages should follow an action-first hierarchy:
 - Recommended next action
-- Primary actions
-- Critical issues and blockers
-- Summary metrics
-- Drill-down evidence
+- Project health
+- Current work
+- Meaningful activity
+- Operational context
+- Inspector tabs with Administration collapsed or secondary by default
+
+Project Workspace pages should not expose repository, manifest, schema,
+storage-version, internal identifier, diagnostic, or implementation metadata in
+the default operational view.
 
 Object detail hierarchy should follow:
 - object identity and confidence context

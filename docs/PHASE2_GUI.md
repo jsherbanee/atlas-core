@@ -507,21 +507,35 @@ When a project is opened, Atlas switches to project navigation.
 Secondary navigation changes with workspace context:
 
 - no active project: project-library navigation for create/open/manage flows
-- active project: project-workspace navigation for review, detail, estimate, notebook, reports, and settings
+- active project: project-workspace navigation organized around work: Overview,
+  Engineering, Commercial, Documents, Construction, Reporting, and Settings
 
 Tertiary navigation is action-oriented and contextual.
 It should present what the user can do in the current area, such as Browse, Add, Edit, Relationships, Import, Export, Summary, Decisions, Timeline, Equipment, or Labor.
 It should not merely mirror page titles.
 
-Project:
-- Overview
-- Documents
-- BOM Review
-- Scope & Risk
-- Engineering Review
-- Estimate
-- Notebook
-- Reports
+## PX-02 Project Operations Center
+
+The active Project Overview is now a Project Operations Center.
+
+It answers one question:
+- What does the team need to know and do to move this project forward?
+
+The default project surface shows:
+- concise operational project header with project name, customer, current phase,
+  overall status, project manager, last activity, current revision, current
+  health, and primary actions
+- Project Health, showing actionable conditions only or `Project is progressing normally.`
+- Current Work, derived from existing guided review steps and supported project data
+- Project Timeline, grouped to meaningful completed business events
+- Project Context, summarizing customer, location, contacts, documents, estimate,
+  transactions, issues, and decisions
+- Project Inspector with Overview, Activity, Relationships, Documents, History,
+  and Administration tabs
+
+Default project surfaces hide repository, manifest, storage version, schema
+version, internal identifiers, and diagnostic metadata. Those details remain
+available only through Administration, Settings, or platform diagnostics paths.
 
 Estimate Workspace (Sprint 8 deterministic foundation):
 - Overview
@@ -1231,7 +1245,10 @@ Each insight includes:
 - created_by_engine_version
 
 ## Project Health Model
-Project Health is separate from readiness and scores engineering package quality from 0 to 100.
+Project Health is separate from readiness. Historical engineering health
+diagnostics can retain weighted rationale for deeper review, but the PX-02
+Project Operations Center does not show an arbitrary score in the default
+project view.
 
 Weighted categories:
 - engineering completeness
@@ -1240,7 +1257,9 @@ Weighted categories:
 - estimating confidence
 - revision stability
 
-The dashboard shows weighted rationale for score traceability.
+Detailed diagnostic views may show weighted rationale for traceability. The
+default Project Health card shows actionable conditions only, or confirms that
+the project is progressing normally.
 
 ## Systems Health
 Systems Workspace now includes deterministic system health metrics:

@@ -408,39 +408,59 @@ APPLICATION_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
 
 PROJECT_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
     (
-        "Project",
+        "Overview",
         [
             ("Overview", "Overview"),
-            ("Documents", "Documents"),
-            ("Price List Library", "Price List Library"),
-            ("Import History", "Import History"),
-            ("BOM Review", "BOM Review"),
-            ("Scope & Risk", "Scope & Risk"),
-            ("Engineering Review", "Engineering Review"),
-            ("Product Resolution", "Product Resolution"),
-            ("Estimate", "Estimate"),
-            ("Notebook", "Notebook"),
-            ("Reports", "Reports"),
         ],
     ),
     (
-        "Project Details",
+        "Engineering",
         [
-            ("Drawings", "Drawings"),
-            ("Specifications", "Specifications"),
-            ("Equipment", "Equipment"),
-            ("Schedules", "Schedules"),
-            ("Addenda", "Addenda"),
-            ("Evidence", "Evidence"),
-            ("Timeline", "Timeline"),
+            ("Engineering Review", "Engineering Review"),
+            ("BOM Review", "BOM Review"),
+            ("Scope & Risk", "Scope & Risk"),
+            ("Product Resolution", "Product Resolution"),
+            ("Notebook", "Notebook"),
             ("Relationships", "Relationships"),
         ],
     ),
     (
-        "Project Settings",
+        "Commercial",
+        [
+            ("Price List Library", "Price List Library"),
+            ("Import History", "Import History"),
+            ("Estimate", "Estimate"),
+        ],
+    ),
+    (
+        "Documents",
+        [
+            ("Documents", "Documents"),
+            ("Drawings", "Drawings"),
+            ("Specifications", "Specifications"),
+            ("Schedules", "Schedules"),
+            ("Addenda", "Addenda"),
+            ("Evidence", "Evidence"),
+        ],
+    ),
+    (
+        "Construction",
+        [
+            ("Timeline", "Timeline"),
+            ("Equipment", "Equipment"),
+        ],
+    ),
+    (
+        "Reporting",
+        [
+            ("Reports", "Reports"),
+        ],
+    ),
+    (
+        "Settings",
         [
             ("Project Metadata", "Project Metadata"),
-            ("Repository", "Repository"),
+            ("Administration", "Repository"),
             ("Workspace Settings", "Workspace Settings"),
         ],
     ),
@@ -1097,10 +1117,12 @@ class SelectorOption:
 class ProjectContextHeader:
     project_name: str
     customer: str
-    lifecycle_stage: str
-    current_status: str
-    last_analysis: str
-    confidence: str
+    current_phase: str
+    overall_status: str
+    project_manager: str
+    last_activity: str
+    current_revision: str
+    current_health: str
     recommended_next_action: str
 
 
@@ -1334,19 +1356,18 @@ def _navigation_section_group(primary: str, mode: str, secondary_key: str) -> st
         }:
             return "Library"
         return "Actions"
-    if secondary_key in {
-        "overview",
-        "documents",
-        "bom_review",
-        "scope_risk",
-        "engineering_review",
-        "estimate",
-        "notebook",
-        "reports",
-    }:
-        return "Review"
-    if secondary_key == "project_details":
-        return "Details"
+    if secondary_key == "overview":
+        return "Overview"
+    if secondary_key in {"bom_review", "scope_risk", "engineering_review", "notebook"}:
+        return "Engineering"
+    if secondary_key in {"estimate"}:
+        return "Commercial"
+    if secondary_key in {"documents", "project_details"}:
+        return "Documents"
+    if secondary_key == "processing":
+        return "Construction"
+    if secondary_key == "reports":
+        return "Reporting"
     return "Settings"
 
 
@@ -7750,16 +7771,50 @@ def _build_project_context_header(
     customer: str,
     confidence: str,
     recommended_next_action: str,
+    context: dict[str, Any] | None = None,
 ) -> ProjectContextHeader:
+    _ = confidence
+    revision = context.get("revision_comparison") if context else None
+    current_revision = _safe_text(
+        _first_text(
+            getattr(revision, "comparison_revision_id", None),
+            getattr(revision, "baseline_revision_id", None),
+            record.metadata.get("current_revision"),
+            "Current",
+        ),
+        "Current",
+    )
+    current_health = "Needs Attention"
+    if context is not None:
+        summary = _build_project_analysis_summary(record, context)
+        if (
+            int(summary.get("high_risk_issue_count", 0) or 0) == 0
+            and int(summary.get("unresolved_scope_issue_count", 0) or 0) == 0
+        ):
+            current_health = "Normal"
+    project_manager = _safe_text(
+        _first_text(
+            record.metadata.get("project_manager"),
+            record.metadata.get("owner"),
+            record.project.consultant,
+            record.project.client,
+            "Unassigned",
+        ),
+        "Unassigned",
+    )
     return ProjectContextHeader(
         project_name=record.project.name,
         customer=customer,
-        lifecycle_stage=_project_stage(record),
-        current_status=_safe_text(record.metadata.get("status"), "needs review")
+        current_phase=_project_stage(record),
+        overall_status=_safe_text(record.metadata.get("status"), "needs review")
         .replace("_", " ")
         .title(),
-        last_analysis=_safe_text(record.updated_at, "Not available"),
-        confidence=confidence,
+        project_manager=project_manager,
+        last_activity=_format_recent_opened_at(
+            record.last_opened_at or record.updated_at
+        ),
+        current_revision=current_revision,
+        current_health=current_health,
         recommended_next_action=recommended_next_action,
     )
 
@@ -7769,10 +7824,11 @@ def _render_project_context_header(st: Any, header: ProjectContextHeader) -> Non
         "<div class='atlas-project-header'>"
         f"<div class='atlas-project-name'>{header.project_name}</div>"
         f"<div class='atlas-project-customer'>{header.customer}</div>"
-        f"<span class='atlas-chip'>{header.lifecycle_stage}</span>"
-        f"<span class='atlas-chip'>{header.current_status}</span>"
-        f"<div class='atlas-project-meta'>Last analysis: {header.last_analysis} · Confidence: {header.confidence}</div>"
-        f"<div class='atlas-project-meta'>Recommended next action: {header.recommended_next_action}</div>"
+        f"<span class='atlas-chip'>{header.current_phase}</span>"
+        f"<span class='atlas-chip'>{header.overall_status}</span>"
+        f"<span class='atlas-chip'>{header.current_health}</span>"
+        f"<div class='atlas-project-meta'>Project Manager: {header.project_manager} · Last Activity: {header.last_activity} · Current Revision: {header.current_revision}</div>"
+        f"<div class='atlas-project-meta'>Next: {header.recommended_next_action}</div>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -27510,90 +27566,88 @@ def _render_overview_page(
 ) -> None:
     _render_page_header(
         st,
-        "Overview",
-        "Concise project workspace landing page with status, readiness, and next actions.",
-    )
-    _render_workspace_section_header(
-        st,
-        workspace="Overview",
-        objective="Run a guided, deterministic project review.",
-        current_focus="Complete guided steps and keep decision-critical objects in Working Set.",
+        "Project Operations Center",
+        "",
     )
 
     summary = _build_project_analysis_summary(record, context)
-    import_summary = dict(context.get("import_summary") or {}) if context else {}
-    bom_rows = _enriched_bom_rows(st, _canonical_bom_items(context))
-    bom_metrics = _canonical_bom_metrics(bom_rows)
     scope_rows = _scope_risk_findings(context)
-    engineering_review = _sales_design_review(st, record, context)
     timeline = _timeline_events(record, context)
     step_rows = _review_step_status_rows(st, record, context)
-    checklist_rows = _review_checklist_rows(st, record, context, step_rows)
     next_action = _next_review_action(step_rows)
-    completed_steps = sum(
-        1 for row in step_rows if _safe_text(row.get("status"), "") == "complete"
+    folders = _files_by_folder(context)
+    health_conditions = _project_operations_health_conditions(summary, step_rows)
+    current_work = _project_operations_current_work(step_rows, next_action)
+    timeline_rows = _project_operations_timeline_rows(timeline)
+    critical_scope = [
+        item
+        for item in scope_rows
+        if _safe_text(item.get("severity"), "").lower() in {"critical", "high"}
+    ]
+    context_rows = _project_operations_context_rows(
+        record,
+        summary,
+        folders,
+        critical_scope,
+        current_work,
     )
 
-    _render_notice_panel(
-        st,
-        "Overview Workspace",
-        "Guided review sections, navigation actions, and status tables are aligned to shared layout and spacing wrappers.",
-    )
-    _render_section_title(st, "Recommended Next Action")
+    _render_section_title(st, "Next Step")
     st.markdown(
         "<div class='atlas-primary-action'>"
-        "<strong>Do This Next</strong>"
+        "<strong>Move This Project Forward</strong>"
         f"{_safe_text(next_action.get('step'), 'Review Documents')}"
         "<br/>"
         f"{_safe_text(next_action.get('detail'), _safe_text(summary.get('recommended_next_action'), 'Open Documents and run project analysis.'))}"
         "</div>",
         unsafe_allow_html=True,
     )
-    link_cols = _responsive_control_columns(st, 2)
-    if link_cols[0].button(
+    next_cols = _responsive_control_columns(st, [1.2, 1.0, 1.0, 1.0])
+    if next_cols[0].button(
         f"Open {_safe_text(next_action.get('page'), 'Documents')}",
         width="stretch",
         type="primary",
     ):
-        st.session_state["atlas_active_page"] = _safe_text(
-            next_action.get("page"),
-            "Documents",
+        _open_page(st, _safe_text(next_action.get("page"), "Documents"))
+    if next_cols[1].button("Open Estimate", width="stretch"):
+        _open_page(st, "Estimate")
+    if next_cols[2].button("View Drawings", width="stretch"):
+        _open_page(st, "Drawings")
+    with next_cols[3].popover("More Actions"):
+        if st.button("Open Documents", key="atlas_project_ops_more_documents"):
+            _open_page(st, "Documents")
+        if st.button("Open Reports", key="atlas_project_ops_more_reports"):
+            _open_page(st, "Reports")
+
+    top_cols = st.columns([1.0, 1.35])
+    with top_cols[0]:
+        _render_project_health_card(st, health_conditions)
+    with top_cols[1]:
+        _render_section_title(st, "Current Work")
+        _render_project_current_work(st, current_work)
+
+    _render_section_title(st, "Project Timeline")
+    if timeline_rows:
+        _render_data_table(st, timeline_rows)
+    else:
+        _render_guided_empty_state(
+            st,
+            why_empty="No project activity is available because this workspace has no recorded business events yet.",
+            action_to_populate="Upload documents or run project analysis to create project activity.",
+            next_location="Open Documents to continue.",
         )
-        st.rerun()
-    link_cols[1].caption(_safe_text(next_action.get("why"), ""))
 
-    _render_section_title(st, "Guided Project Review")
-    st.progress(completed_steps / max(len(step_rows), 1))
-    st.caption(f"{completed_steps} of {len(step_rows)} steps complete")
-    _render_data_table(
+    _render_section_title(st, "Project Context")
+    _render_project_context_cards(st, context_rows)
+
+    _render_section_title(st, "Project Inspector")
+    _render_project_inspector(
         st,
-        [
-            {
-                "Step": row.get("step"),
-                "Status": _status_chip(_safe_text(row.get("status"), "").title()),
-                "Page": row.get("page"),
-                "Detail": row.get("detail"),
-            }
-            for row in step_rows
-        ],
+        record=record,
+        context_rows=context_rows,
+        timeline_rows=timeline_rows,
+        folders=folders,
     )
-
-    primary_actions = _responsive_control_columns(st, 5)
-    if primary_actions[0].button("Open Documents", width="stretch"):
-        st.session_state["atlas_active_page"] = "Documents"
-        st.rerun()
-    if primary_actions[1].button("Open BOM Review", width="stretch"):
-        st.session_state["atlas_active_page"] = "BOM Review"
-        st.rerun()
-    if primary_actions[2].button("Open Scope & Risk", width="stretch"):
-        st.session_state["atlas_active_page"] = "Scope & Risk"
-        st.rerun()
-    if primary_actions[3].button("Open Engineering Review", width="stretch"):
-        st.session_state["atlas_active_page"] = "Engineering Review"
-        st.rerun()
-    if primary_actions[4].button("Open Notebook", width="stretch"):
-        st.session_state["atlas_active_page"] = "Notebook"
-        st.rerun()
 
     _render_section_title(st, "Object Navigation")
     nav_cols = _responsive_control_columns(st, 2)
@@ -27739,97 +27793,6 @@ def _render_overview_page(
                 action_to_populate="Add important objects from search or object detail pages.",
                 next_location="Use Add to Working Set on object cards and detail headers.",
             )
-
-    _render_section_title(st, "Project Review Checklist")
-    _render_data_table(
-        st,
-        [
-            {
-                "Checklist": row.get("Checklist Item"),
-                "Status": _status_chip(_safe_text(row.get("Status"), "").title()),
-                "Detail": row.get("Detail"),
-            }
-            for row in checklist_rows
-        ],
-    )
-
-    _render_section_title(st, "Critical Issues")
-    critical_scope = [
-        item
-        for item in scope_rows
-        if _safe_text(item.get("severity"), "").lower() in {"critical", "high"}
-    ]
-    if critical_scope:
-        _render_data_table(
-            st,
-            [
-                {
-                    "Severity": item.get("severity"),
-                    "Issue": item.get("title"),
-                    "Impact": item.get("estimating_impact"),
-                    "Recommended Action": item.get("recommended_action"),
-                }
-                for item in critical_scope[:10]
-            ],
-        )
-    else:
-        st.caption("No critical issues are currently open.")
-
-    _render_section_title(st, "Project Summary")
-    _render_data_table(
-        st,
-        [
-            {
-                "Project": summary["project_name"],
-                "Customer": summary["customer"],
-                "Project Type": summary["project_type"],
-                "Current Status": summary["analysis_status"],
-                "Recommended Next Action": summary["recommended_next_action"],
-            }
-        ],
-    )
-
-    cards = _responsive_control_columns(st, 4)
-    _metric_card(cards[0], "BOM Status", str(bom_metrics["total_candidate_bom_lines"]))
-    _metric_card(cards[1], "Scope & Risk", str(len(scope_rows)))
-    _metric_card(cards[2], "Document Health", str(summary["document_count"]))
-    _metric_card(
-        cards[3],
-        "Engineering Review Status",
-        "Ready" if engineering_review else "Needs Review",
-    )
-
-    _render_section_title(st, "Estimate Status")
-    known_cost_lines = sum(1 for row in bom_rows if row.get("known_cost") is not None)
-    _render_data_table(
-        st,
-        [
-            {
-                "Lines With Known Cost": known_cost_lines,
-                "Preliminary Cost Coverage": (
-                    f"{int((known_cost_lines / max(len(bom_rows), 1)) * 100)}%"
-                    if bom_rows
-                    else "0%"
-                ),
-                "Advisory Mode": "Enabled",
-            }
-        ],
-    )
-
-    _render_section_title(st, "Project Timeline")
-    if timeline:
-        _render_data_table(st, timeline[:10])
-    else:
-        _render_guided_empty_state(
-            st,
-            why_empty="Project timeline is empty because this workspace has no recorded events yet.",
-            action_to_populate="Upload documents or run project analysis to generate activity.",
-            next_location="Go to Documents and run project analysis.",
-        )
-
-    st.caption(
-        f"Document status snapshot: total files={import_summary.get('total_files', 0)}, drawings={import_summary.get('drawing_count', 0)}, specifications={import_summary.get('specification_count', 0)}, schedules={import_summary.get('schedule_count', 0)}."
-    )
 
 
 def _render_executive_summary_page(st: Any, context: dict[str, Any] | None) -> None:
@@ -29902,6 +29865,271 @@ def _timeline_events(
 
     events.sort(key=lambda item: _safe_text(item.get("timestamp"), ""), reverse=True)
     return events[:80]
+
+
+def _project_operations_health_conditions(
+    summary: dict[str, Any],
+    step_rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    conditions: list[dict[str, str]] = []
+    for row in step_rows:
+        status = _safe_text(row.get("status"), "").lower()
+        if status not in {"blocked", "needs review", "not started"}:
+            continue
+        conditions.append(
+            {
+                "Condition": _safe_text(
+                    row.get("detail"), _safe_text(row.get("step"), "Project work")
+                ),
+                "Area": _safe_text(row.get("step"), "Project"),
+                "Action": _safe_text(row.get("page"), "Overview"),
+            }
+        )
+
+    if int(summary.get("documents_requiring_ocr", 0) or 0) > 0:
+        conditions.append(
+            {
+                "Condition": "Some documents require OCR review.",
+                "Area": "Documents",
+                "Action": "Documents",
+            }
+        )
+    if int(summary.get("missing_specifications", 0) or 0) > 0:
+        conditions.append(
+            {
+                "Condition": "Equipment is missing specification references.",
+                "Area": "Engineering",
+                "Action": "Engineering Review",
+            }
+        )
+    return conditions[:8]
+
+
+def _project_operations_current_work(
+    step_rows: list[dict[str, str]],
+    next_action: dict[str, str],
+) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    next_step = _safe_text(next_action.get("step"), "")
+    for row in step_rows:
+        status = _safe_text(row.get("status"), "").lower()
+        if status == "complete":
+            continue
+        title = _safe_text(row.get("step"), "Project work")
+        if title in seen:
+            continue
+        seen.add(title)
+        rows.append(
+            {
+                "Title": title,
+                "Owner": "Project Team",
+                "Age": _safe_text(row.get("status"), "Open").replace("_", " ").title(),
+                "Recommended Action": _safe_text(row.get("page"), "Overview"),
+                "Priority": "Primary" if title == next_step else "Open",
+            }
+        )
+    return rows[:6]
+
+
+def _project_operations_timeline_rows(
+    timeline: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for item in timeline:
+        status = _safe_text(item.get("status"), "")
+        if status.lower() in {"pending", "not available"}:
+            continue
+        event = _safe_text(item.get("event"), "")
+        if not event:
+            continue
+        row = grouped.setdefault(
+            event,
+            {
+                "Event": event,
+                "Count": 0,
+                "Latest": _safe_text(item.get("timestamp"), ""),
+                "Details": _safe_text(item.get("details"), ""),
+            },
+        )
+        row["Count"] = int(row.get("Count", 0) or 0) + 1
+        latest = _safe_text(item.get("timestamp"), "")
+        if latest > _safe_text(row.get("Latest"), ""):
+            row["Latest"] = latest
+            row["Details"] = _safe_text(item.get("details"), "")
+    rows = list(grouped.values())
+    rows.sort(key=lambda item: _safe_text(item.get("Latest"), ""), reverse=True)
+    return rows[:8]
+
+
+def _project_operations_context_rows(
+    record: ProjectWorkspaceRecord,
+    summary: dict[str, Any],
+    folders: dict[str, list[dict[str, Any]]],
+    critical_scope: list[dict[str, Any]],
+    current_work: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    primary_contacts = _safe_text(
+        _first_text(
+            record.metadata.get("project_manager"),
+            record.metadata.get("owner"),
+            record.project.consultant,
+            record.project.client,
+            "No primary contact is set.",
+        ),
+        "No primary contact is set.",
+    )
+    estimate_state = (
+        "Estimate coverage is ready for review."
+        if int(summary.get("possible_bom_items", 0) or 0) > 0
+        else "Estimate needs project analysis output."
+    )
+    return [
+        {"Context": "Customer", "Current": _safe_text(summary.get("customer"), "n/a")},
+        {
+            "Context": "Location",
+            "Current": _safe_text(
+                _first_text(record.project.location, "No project location set."),
+                "No project location set.",
+            ),
+        },
+        {"Context": "Primary contacts", "Current": primary_contacts},
+        {
+            "Context": "Current documents",
+            "Current": f"{sum(len(items) for items in folders.values())} classified files",
+        },
+        {"Context": "Current estimate", "Current": estimate_state},
+        {
+            "Context": "Current transactions",
+            "Current": "No linked project transactions in current workspace data.",
+        },
+        {
+            "Context": "Outstanding issues",
+            "Current": (
+                f"{len(critical_scope)} critical items"
+                if critical_scope
+                else "No critical issues are currently open."
+            ),
+        },
+        {
+            "Context": "Decisions",
+            "Current": (
+                f"{len(current_work)} open project decisions"
+                if current_work
+                else "No open project decisions in the current review queue."
+            ),
+        },
+    ]
+
+
+def _render_project_health_card(
+    st: Any,
+    conditions: list[dict[str, str]],
+) -> None:
+    with st.container(border=True):
+        st.markdown("**Project Health**")
+        if not conditions:
+            st.caption("Project is progressing normally.")
+            return
+        _render_data_table(st, conditions)
+
+
+def _render_project_current_work(
+    st: Any,
+    current_work: list[dict[str, str]],
+) -> None:
+    if not current_work:
+        st.caption(
+            "No current work is open because all supported review steps are complete."
+        )
+        return
+    for index, item in enumerate(current_work):
+        with st.container(border=True):
+            st.markdown(f"**{_safe_text(item.get('Title'), 'Project work')}**")
+            st.caption(
+                " · ".join(
+                    [
+                        f"Owner: {_safe_text(item.get('Owner'), 'Project Team')}",
+                        f"Age: {_safe_text(item.get('Age'), 'Open')}",
+                    ]
+                )
+            )
+            action = _safe_text(item.get("Recommended Action"), "Overview")
+            if st.button(
+                action,
+                key=f"atlas_project_work_action_{index}",
+                type="primary" if index == 0 else "secondary",
+                width="stretch",
+            ):
+                _open_page(st, action)
+
+
+def _render_project_context_cards(
+    st: Any,
+    context_rows: list[dict[str, str]],
+) -> None:
+    _render_data_table(st, context_rows)
+    with st.expander("More Project Context", expanded=False):
+        st.caption(
+            "Additional project context is available in Documents, Engineering, Commercial, Reporting, and Settings."
+        )
+
+
+def _render_project_inspector(
+    st: Any,
+    *,
+    record: ProjectWorkspaceRecord,
+    context_rows: list[dict[str, str]],
+    timeline_rows: list[dict[str, Any]],
+    folders: dict[str, list[dict[str, Any]]],
+) -> None:
+    tabs = st.tabs(
+        [
+            "Overview",
+            "Activity",
+            "Relationships",
+            "Documents",
+            "History",
+            "Administration",
+        ]
+    )
+    with tabs[0]:
+        _render_data_table(st, context_rows[:4])
+    with tabs[1]:
+        if timeline_rows:
+            _render_data_table(st, timeline_rows)
+        else:
+            st.caption(
+                "No activity is available because no meaningful project events have been recorded."
+            )
+    with tabs[2]:
+        st.caption(
+            "Open Relationships to inspect connected drawings, specifications, equipment, risks, and evidence."
+        )
+    with tabs[3]:
+        document_rows = [
+            {"Folder": folder, "Files": len(items)}
+            for folder, items in folders.items()
+            if items
+        ]
+        if document_rows:
+            _render_data_table(st, document_rows)
+        else:
+            st.caption("No current documents are classified for this project.")
+    with tabs[4]:
+        st.caption(
+            f"Last activity: {_format_recent_opened_at(record.last_opened_at or record.updated_at)}"
+        )
+    with tabs[5]:
+        with st.expander("Administration", expanded=False):
+            _render_data_table(
+                st,
+                [
+                    {"Field": "Workspace ID", "Value": record.workspace_id},
+                    {"Field": "Project ID", "Value": record.project.project_id},
+                    {"Field": "Archived", "Value": "Yes" if record.archived else "No"},
+                ],
+            )
 
 
 def _build_knowledge_graph(
@@ -38489,14 +38717,12 @@ def _render_shell(
                 next_action.get("step"),
                 "Review project overview",
             ),
+            context=context,
         )
         _render_project_context_header(st, project_header)
 
-        if st.button(
-            f"Recommended Next: {_safe_text(next_action.get('step'), 'Review project overview')}",
-            type="primary",
-            width="stretch",
-        ):
+        header_action_cols = _responsive_control_columns(st, [1, 1, 1, 1])
+        if header_action_cols[0].button("Resume Work", type="primary", width="stretch"):
             _open_page(
                 st,
                 _safe_text(
@@ -38504,6 +38730,17 @@ def _render_shell(
                     "Overview",
                 ),
             )
+        if header_action_cols[1].button("Open Estimate", width="stretch"):
+            _open_page(st, "Estimate")
+        if header_action_cols[2].button("View Drawings", width="stretch"):
+            _open_page(st, "Drawings")
+        with header_action_cols[3].popover("More Actions"):
+            if st.button("Open Documents", key="atlas_project_header_more_documents"):
+                _open_page(st, "Documents")
+            if st.button("Open Reports", key="atlas_project_header_more_reports"):
+                _open_page(st, "Reports")
+            if st.button("Open Settings", key="atlas_project_header_more_settings"):
+                _open_page(st, "Project Metadata")
 
     _render_return_context_action(st, workspace_service)
 
