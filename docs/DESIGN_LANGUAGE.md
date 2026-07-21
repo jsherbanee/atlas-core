@@ -146,6 +146,7 @@ Hardening priorities:
 - recommendation clarity, prioritization, and direct navigation affordances
 - table/form consistency and reduced click depth for common workflows
 - explicit preview/apply/dismiss semantics where deterministic write actions are involved
+- visible primary actions must complete, navigate, open a usable workflow, or be disabled with a business-language explanation
 
 Remaining non-blocking UX debt:
 

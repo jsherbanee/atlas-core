@@ -192,7 +192,12 @@ class _HomeContractStreamlit:
 
     def text_input(self, label: str, **kwargs: Any) -> str:
         self.text_inputs.append({"label": label, **kwargs})
-        return ""
+        key = kwargs.get("key")
+        if isinstance(key, str):
+            state_value = self.session_state.get(key)
+            if isinstance(state_value, str):
+                return state_value
+        return str(kwargs.get("value") or "")
 
     def caption(self, text: str) -> None:
         self.captions.append(text)
@@ -309,6 +314,12 @@ class _FakeWorkspaceService:
         ]
         self._records.insert(0, record)
         return Path("workspace.json")
+
+    def import_project_bundle(self, import_path: str) -> ProjectWorkspaceRecord:
+        name = Path(import_path).stem or "Imported Project"
+        record = _project_record(f"imported-{len(self._records) + 1}", name)
+        self.save_record(record)
+        return record
 
 
 def _seed_knowledge_service(entity_type: str) -> CommercialProductService:
@@ -451,14 +462,21 @@ class _CreatePageStreamlit:
     def button(
         self,
         label: str,
+        type: str = "secondary",
         disabled: bool = False,
         use_container_width: bool = False,
         width: str | None = None,
+        key: str | None = None,
     ) -> bool:
         if width is not None:
             use_container_width = width == "stretch"
-        _ = (disabled, use_container_width, width)
-        return bool(self.button_presses.get(label, False))
+        _ = (type, disabled, use_container_width, width, key)
+        if disabled:
+            return False
+        return bool(
+            self.button_presses.get(label, False)
+            or (key is not None and self.button_presses.get(key, False))
+        )
 
     def form(self, _key: str, clear_on_submit: bool = False) -> _NullContext:
         _ = clear_on_submit
@@ -2607,10 +2625,54 @@ def test_projects_library_page_uses_shared_workspace_sections() -> None:
     app._render_projects_page(st, service)
 
     rendered_text = "\n".join([*st.subheaders, *st.markdowns, *st.captions])
-    assert "Project Library" in rendered_text
-    assert "### Filtered Projects" in st.markdowns
+    assert "Project Operations" in rendered_text
+    assert "### Projects" in st.markdowns
     assert "### Selected Project" in st.markdowns
     assert any(call["label"] == "Open Project" for call in st.button_calls)
+    assert any(
+        call["label"] == "Delete" and call["disabled"] for call in st.button_calls
+    )
+
+
+def test_projects_import_secondary_route_renders_import_workflow() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state["atlas_active_page"] = "Import Project"
+    service = _FakeWorkspaceService([])
+
+    app._render_main_content(st, service, None, None)
+
+    rendered_text = "\n".join([*st.markdowns, *st.captions])
+    assert "Import Project" in rendered_text
+    assert "Supported paths" in rendered_text
+    assert any(
+        call["label"] == "Import Project" and call["disabled"]
+        for call in st.button_calls
+    )
+    assert "Enter a supported project path before importing." in st.captions
+
+
+def test_import_project_page_maps_to_projects_import_navigation() -> None:
+    assert (
+        app._secondary_key_for_page("Projects", "library", "Import Project")
+        == "import_project"
+    )
+    assert "Import Project" in app.ALL_ACTIVE_PAGES
+
+
+def test_project_import_bundle_returns_to_projects_with_feedback() -> None:
+    st = _HomeContractStreamlit(pressed={"atlas_import_project_primary"})
+    st.session_state["atlas_active_page"] = "Import Project"
+    st.session_state["atlas_project_import_path"] = "/tmp/Northstar.atlaspkg"
+    service = _FakeWorkspaceService([])
+
+    app._render_main_content(st, service, None, None)
+
+    assert service.list_workspaces()[0].project.name == "Northstar"
+    assert st.session_state["atlas_active_page"] == "Projects"
+    assert st.session_state[app._navigation_secondary_state_key()] == "all_projects"
+    assert st.rerun_called is True
+    assert st.session_state["atlas_project_action_feedback"]["level"] == "success"
+    assert not st.errors
 
 
 def test_pinned_projects_page_uses_shared_workspace_sections() -> None:
@@ -4304,6 +4366,7 @@ def test_create_project_page_creation_still_works_without_preview() -> None:
     assert st.session_state["atlas_active_workspace_id"] == "BID-2099-0001"
     assert "atlas_header_project_selector" not in st.session_state
     assert st.session_state["atlas_active_page"] == "Documents"
+    assert st.session_state["atlas_project_action_feedback"]["level"] == "success"
     assert st.rerun_called is True
 
 
@@ -4376,6 +4439,27 @@ def test_build_record_from_context_preserves_existing_identity_fields() -> None:
     assert rebuilt.metadata["owner"] == "Northstar Owner Group"
     assert rebuilt.metadata["owner_client"] == "Northstar Owner Group"
     assert rebuilt.metadata["atlas_bid_id"] == "BID-2026-0005"
+
+
+def test_build_record_from_context_rejects_generic_folder_identity() -> None:
+    context = {
+        "sample_project_id": "documents",
+        "sample_project_name": "documents",
+        "intake_snapshot": SimpleNamespace(
+            metadata={
+                "project_name": "documents",
+                "atlas_bid_id": "documents",
+                "owner": "documents",
+            }
+        ),
+    }
+
+    rebuilt = app._build_record_from_context(context)
+
+    assert rebuilt.project.project_id == "atlas-project"
+    assert rebuilt.project.name == "atlas-project"
+    assert rebuilt.project.atlas_bid_id == "atlas-project"
+    assert rebuilt.project.client == "atlas-project"
 
 
 def test_create_project_upload_inspection_helper_uses_service_public_api() -> None:

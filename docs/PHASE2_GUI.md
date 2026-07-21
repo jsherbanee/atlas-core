@@ -47,6 +47,7 @@ Atlas Workspace App-Wide Navigation Hotfix makes that accordion an application-s
 Atlas Workspace Organization Merge adds permission-gated Organization Merge controls to Customer, Vendor, and Manufacturer details, supports possible-duplicate review, source selection, preview, actor/reason capture, irreversible confirmation, and Organization Object Workspace role-profile/merge-history visibility.
 Atlas PX-03 replaces the generic selected-record transaction inspector with a Commercial Transaction Workbench for Estimates, Sales Orders, Return Orders, Invoices, and Credit Memos. The workbench presents document summary, commercial health, readiness checklist, decision panel, line item workspace, and commercial relationships using existing commercial-document services.
 Atlas PX-04 replaces Knowledge record-directory default views with operational workbenches for Customers, Vendors, Manufacturers, Products, Services, Fees, and Assemblies. Knowledge now presents business summary, operational health, relationships, activity, one next step, and supporting details using existing services and records.
+Atlas PX-04A stabilizes core primary actions and workflow routing. Projects Create and Import now resolve to visible workflows, successful create/import actions preserve user-facing feedback across reruns, and disabled actions explain the missing prerequisite.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.
@@ -286,11 +287,16 @@ Projects library surfaces now share the Universal Workspace Framework header, ta
 
 Primary actions:
 - Open Project
-- Create New Project
-- Import Project Package
+- Create Project
+- Import Project
+- Pin or unpin Project
+
+Project administration actions remain supported but are intentionally grouped
+under Project Administration:
+- Rename Project
 - Archive/Unarchive Project
 - Duplicate Project
-- Delete Project with explicit confirmation
+- Delete Project with explicit confirmation and disabled-action guidance
 
 Project persistence remains repository-backed through ProjectWorkspaceService.
 
@@ -314,6 +320,27 @@ Create workflow behavior in X-03:
 - Owner / Client lookup-first selection is available before create.
 - Primary action remains Create Bid Workspace.
 - Successful create routes directly to Documents (Step 2).
+- PX-04A preserves success feedback after the rerun that opens the new project
+  workspace.
+- Cancel returns to Projects without creating a record.
+
+## Import Project (PX-04A)
+
+Import Project is a dedicated Projects action route, not a hidden state inside
+the Projects list.
+
+Supported inputs use existing services only:
+- `.atlaspkg`
+- `project.json`
+- `workspace.json`
+- `metadata.json`
+- `intake_snapshot.json`
+- supported local project folders
+
+The primary import action is disabled until a path is entered and explains the
+missing prerequisite. Completed `.atlaspkg` imports return to the Projects list
+with success feedback. Supported metadata and folder opens continue through the
+existing project-open service path. MAW parsing is explicitly out of scope.
 
 Step 2 upload behavior (Documents):
 - Supported onboarding formats: PDF, CSV, XLS, XLSX, DOC, DOCX, ZIP, JPG, JPEG.

@@ -61,6 +61,7 @@ Status: Active
 - PX-02 Project Operations Center
 - PX-03 Commercial Transaction Workbench
 - PX-04 Knowledge That Works
+- PX-04A Interaction and Workflow Stabilization
 
 ### PX-01 Scope
 
@@ -138,6 +139,18 @@ Explicitly out of scope:
 - persistence redesign
 - AI or predictive scoring
 - production demo data
+
+### PX-04A Scope
+
+- stabilize visible primary actions so they complete, navigate, open a usable
+  workflow, or show a clear disabled reason
+- route Projects Create and Import actions to dedicated workflow surfaces
+- preserve create/import feedback across Streamlit reruns and clean cancel
+  returns
+- prevent generic source-directory names from defaulting multiple project
+  identity fields
+- preserve PX-01 through PX-04 behavior without MAW parsing, new business
+  logic, or persistence redesign
 
 ### A-07 Scope
 

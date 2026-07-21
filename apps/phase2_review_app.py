@@ -132,6 +132,7 @@ PROJECT_MANAGER_PAGES = [
     "Reference Projects",
     "Recent Projects",
     "Create New Project",
+    "Import Project",
     "Open Existing Project",
 ]
 
@@ -551,6 +552,7 @@ PROJECTS_LIBRARY_PAGES = {
     "Reference Projects",
     "Recent Projects",
     "Create New Project",
+    "Import Project",
     "Open Existing Project",
 }
 
@@ -889,7 +891,7 @@ PROJECTS_LIBRARY_NAVIGATION_CONTRACT: list[dict[str, Any]] = [
         "secondary_key": "import_project",
         "label": "Import Project",
         "icon": "import",
-        "route": "Projects",
+        "route": "Import Project",
         "visibility": True,
         "enabled": True,
         "required_context": None,
@@ -901,7 +903,7 @@ PROJECTS_LIBRARY_NAVIGATION_CONTRACT: list[dict[str, Any]] = [
             {
                 "tertiary_key": "import",
                 "label": "Import",
-                "route": "Projects",
+                "route": "Import Project",
                 "action_type": "import_action",
                 "visibility": True,
                 "enabled": True,
@@ -4934,6 +4936,35 @@ def _first_text(*values: Any) -> str | None:
     return None
 
 
+_GENERIC_PROJECT_SOURCE_NAMES = {
+    "document",
+    "documents",
+    "drawing",
+    "drawings",
+    "file",
+    "files",
+    "project",
+    "projects",
+    "sample",
+    "samples",
+}
+
+
+def _is_generic_project_source_name(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = re.sub(r"[^a-z0-9]+", " ", value.strip().lower()).strip()
+    return normalized in _GENERIC_PROJECT_SOURCE_NAMES
+
+
+def _first_business_identity_text(*values: Any) -> str | None:
+    for value in values:
+        text = _first_text(value)
+        if text and not _is_generic_project_source_name(text):
+            return text
+    return None
+
+
 def _uploaded_file_signature(uploaded_files: list[Any]) -> str:
     digest = hashlib.sha1()
     for file in uploaded_files:
@@ -8366,7 +8397,7 @@ def _build_record_from_context(
         existing_record.project_id
         if existing_record is not None
         else (
-            _first_text(
+            _first_business_identity_text(
                 metadata.get("project_id"),
                 getattr(review, "project_id", None),
                 context.get("sample_project_id"),
@@ -8376,7 +8407,7 @@ def _build_record_from_context(
     )
 
     context_name = (
-        _first_text(
+        _first_business_identity_text(
             metadata.get("project_name"),
             metadata.get("name"),
             getattr(review, "name", None),
@@ -8385,7 +8416,9 @@ def _build_record_from_context(
         or project_id
     )
     context_client = (
-        _first_text(metadata.get("client"), metadata.get("owner"), context_name)
+        _first_business_identity_text(
+            metadata.get("client"), metadata.get("owner"), context_name
+        )
         or context_name
     )
 
@@ -8398,7 +8431,7 @@ def _build_record_from_context(
     atlas_bid_id = (
         existing_record.project.atlas_bid_id
         if existing_record is not None
-        else _first_text(metadata.get("atlas_bid_id"), project_id)
+        else _first_business_identity_text(metadata.get("atlas_bid_id"), project_id)
     ) or project_id
     client_project_number = (
         existing_record.project.client_project_number
@@ -9019,6 +9052,34 @@ def _clear_active_project_workspace(st: Any, workspace_id: str) -> None:
         st.session_state["atlas_active_page"] = "Mission Control"
 
 
+def _set_project_action_feedback(st: Any, level: str, message: str) -> None:
+    st.session_state["atlas_project_action_feedback"] = {
+        "level": _safe_text(level, "info"),
+        "message": _safe_text(message, ""),
+    }
+
+
+def _render_project_action_feedback(st: Any) -> None:
+    feedback = st.session_state.pop("atlas_project_action_feedback", None)
+    if not isinstance(feedback, dict):
+        return
+    message = _safe_text(feedback.get("message"), "")
+    if not message:
+        return
+    level = _safe_text(feedback.get("level"), "info").lower()
+    renderer = getattr(st, level, None)
+    if callable(renderer):
+        renderer(message)
+    else:
+        st.info(message)
+
+
+def _project_import_path_action_reason(import_path: str) -> str:
+    if not import_path.strip():
+        return "Enter a supported project path before importing."
+    return ""
+
+
 def _render_project_library_selected_record(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -9053,69 +9114,75 @@ def _render_project_library_selected_record(
     _shared_render_section_title(st, "Project Details")
     _shared_render_data_table(st, _project_library_detail_rows(record))
 
-    rename_name = st.text_input(
-        "Rename project",
-        value=record.project.name,
-        key=f"atlas_project_library_rename_{record.workspace_id}",
-    )
-    duplicate_name = st.text_input(
-        "Duplicate name",
-        value=f"{record.project.name} Copy",
-        key=f"atlas_project_library_duplicate_{record.workspace_id}",
-    )
-    delete_confirm = st.checkbox(
-        "Confirm Delete",
-        key=f"atlas_project_library_delete_confirm_{record.workspace_id}",
-    )
+    with st.expander("Project Administration", expanded=False):
+        rename_name = st.text_input(
+            "Rename project",
+            value=record.project.name,
+            key=f"atlas_project_library_rename_{record.workspace_id}",
+        )
+        duplicate_name = st.text_input(
+            "Duplicate name",
+            value=f"{record.project.name} Copy",
+            key=f"atlas_project_library_duplicate_{record.workspace_id}",
+        )
+        delete_confirm = st.checkbox(
+            "Confirm Delete",
+            key=f"atlas_project_library_delete_confirm_{record.workspace_id}",
+        )
 
-    action_cols = _responsive_control_columns(st, 3)
-    if action_cols[0].button(
-        "Save Name",
-        key=f"atlas_project_library_save_name_{record.workspace_id}",
-        width="stretch",
-    ):
-        if rename_name.strip():
-            workspace_service.rename_project(record.workspace_id, rename_name.strip())
+        action_cols = _responsive_control_columns(st, 3)
+        if action_cols[0].button(
+            "Save Name",
+            key=f"atlas_project_library_save_name_{record.workspace_id}",
+            width="stretch",
+        ):
+            if rename_name.strip():
+                workspace_service.rename_project(
+                    record.workspace_id, rename_name.strip()
+                )
+                st.rerun()
+
+        if action_cols[1].button(
+            "Duplicate",
+            key=f"atlas_project_library_duplicate_btn_{record.workspace_id}",
+            width="stretch",
+        ):
+            workspace_service.duplicate_project(
+                record.workspace_id,
+                new_workspace_id=f"{record.workspace_id}-copy",
+                new_name=duplicate_name.strip() or None,
+            )
             st.rerun()
 
-    if action_cols[1].button(
-        "Duplicate",
-        key=f"atlas_project_library_duplicate_btn_{record.workspace_id}",
-        width="stretch",
-    ):
-        workspace_service.duplicate_project(
-            record.workspace_id,
-            new_workspace_id=f"{record.workspace_id}-copy",
-            new_name=duplicate_name.strip() or None,
-        )
-        st.rerun()
-
-    archive_label = "Unarchive" if record.archived else "Archive"
-    if action_cols[2].button(
-        archive_label,
-        key=f"atlas_project_library_archive_{record.workspace_id}",
-        width="stretch",
-    ):
-        workspace_service.archive_project(
-            record.workspace_id,
-            archived=not record.archived,
-        )
-        _clear_active_project_workspace(st, record.workspace_id)
-        st.rerun()
-
-    destructive_cols = _responsive_control_columns(st, 1)
-    if destructive_cols[0].button(
-        "Delete",
-        key=f"atlas_project_library_delete_{record.workspace_id}",
-        width="stretch",
-        disabled=not delete_confirm,
-    ):
-        if not delete_confirm:
-            st.warning("Enable Confirm Delete before deleting a project.")
-        else:
-            workspace_service.delete_project(record.workspace_id)
+        archive_label = "Unarchive" if record.archived else "Archive"
+        if action_cols[2].button(
+            archive_label,
+            key=f"atlas_project_library_archive_{record.workspace_id}",
+            width="stretch",
+        ):
+            workspace_service.archive_project(
+                record.workspace_id,
+                archived=not record.archived,
+            )
             _clear_active_project_workspace(st, record.workspace_id)
             st.rerun()
+
+        delete_reason = "" if delete_confirm else "Confirm Delete before deleting."
+        if delete_reason:
+            st.caption(delete_reason)
+        destructive_cols = _responsive_control_columns(st, 1)
+        if destructive_cols[0].button(
+            "Delete",
+            key=f"atlas_project_library_delete_{record.workspace_id}",
+            width="stretch",
+            disabled=bool(delete_reason),
+        ):
+            if delete_reason:
+                st.warning(delete_reason)
+            else:
+                workspace_service.delete_project(record.workspace_id)
+                _clear_active_project_workspace(st, record.workspace_id)
+                st.rerun()
 
 
 def _render_project_library_page_shell(
@@ -11146,6 +11213,7 @@ def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
             "Reference Projects": "repository",
             "Recent Projects": "recent_projects",
             "Create New Project": "create_project",
+            "Import Project": "import_project",
             "Open Existing Project": "repository",
         }
         return page_map.get(page, "overview")
@@ -24400,10 +24468,11 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
     _render_project_library_page_shell(
         st,
         title="Projects",
-        subtitle="Browse repository-backed projects, then open, pin, archive, duplicate, rename, or delete the selected workspace.",
-        notice_title="Project Library",
-        notice_body="The library keeps the existing repository contract and uses the shared workspace grammar for page structure, tables, and record actions.",
+        subtitle="Create, import, open, and resume bid workspaces.",
+        notice_title="Project Operations",
+        notice_body="Choose a project to continue work, or start from a new project or supported import.",
     )
+    _render_project_action_feedback(st)
 
     include_archived = st.checkbox("Show archived projects", value=False)
     rows = _project_library_rows(
@@ -24414,16 +24483,16 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
     if not rows:
         _shared_render_guided_empty_state(
             st,
-            why_empty="No projects are imported into the Atlas Project Repository.",
-            action_to_populate="Create a new project or import a .atlaspkg bundle.",
-            next_location="Use Create New Project or Import Project Package below.",
+            why_empty="No projects are available for this tenant.",
+            action_to_populate="Create a new project or import a supported project package.",
+            next_location="Use Create Project or Import Project below.",
         )
         empty_cols = st.columns(2)
-        if empty_cols[0].button("Create New Project", type="primary", width="content"):
+        if empty_cols[0].button("Create Project", type="primary", width="content"):
             st.session_state["atlas_active_page"] = "Create New Project"
             st.rerun()
-        if empty_cols[1].button("Import Project Package", width="content"):
-            st.session_state["atlas_active_page"] = "Projects"
+        if empty_cols[1].button("Import Project", width="content"):
+            st.session_state["atlas_active_page"] = "Import Project"
             st.session_state[_navigation_secondary_state_key()] = "import_project"
             st.session_state[_navigation_tertiary_state_key()] = "import"
             st.rerun()
@@ -24511,7 +24580,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
     ]
     filtered.sort(key=lambda item: _safe_text(item.get(sort_field), ""), reverse=True)
 
-    _shared_render_section_title(st, "Filtered Projects")
+    _shared_render_section_title(st, "Projects")
     _shared_render_data_table(
         st,
         [
@@ -24556,6 +24625,87 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         selected,
         open_label="Open the selected project workspace.",
     )
+
+
+def _return_to_projects_library(st: Any) -> None:
+    st.session_state["atlas_active_page"] = "Projects"
+    st.session_state[_navigation_secondary_state_key()] = "all_projects"
+    st.session_state[_navigation_tertiary_state_key()] = "browse"
+    query_params = getattr(st, "query_params", None)
+    if query_params is not None:
+        try:
+            query_params["atlas_page"] = "Projects"
+        except Exception:
+            pass
+    st.rerun()
+
+
+def _render_import_project_page(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    _render_project_library_page_shell(
+        st,
+        title="Import Project",
+        subtitle="Import an Atlas project package or open a supported local project folder.",
+        notice_title="Import Project",
+        notice_body="Use an existing .atlaspkg, project metadata file, intake snapshot, or project folder. MAW parsing is not part of this workflow.",
+    )
+    _render_project_action_feedback(st)
+    st.caption(
+        "Supported paths: .atlaspkg, project.json, workspace.json, metadata.json, intake_snapshot.json, or a project folder."
+    )
+
+    import_path = st.text_input(
+        "Import path",
+        key="atlas_project_import_path",
+        placeholder="/path/to/project.atlaspkg",
+    )
+    disabled_reason = _project_import_path_action_reason(import_path)
+    if disabled_reason:
+        st.caption(disabled_reason)
+
+    action_cols = _responsive_control_columns(st, 2)
+    import_clicked = action_cols[0].button(
+        "Import Project",
+        key="atlas_import_project_primary",
+        type="secondary" if disabled_reason else "primary",
+        width="stretch",
+        disabled=bool(disabled_reason),
+    )
+    if action_cols[1].button(
+        "Cancel",
+        key="atlas_import_project_cancel",
+        width="stretch",
+    ):
+        _set_project_action_feedback(st, "info", "Project import canceled.")
+        _return_to_projects_library(st)
+        return
+
+    if not import_clicked:
+        return
+
+    if disabled_reason:
+        st.warning(disabled_reason)
+        return
+
+    normalized_path = import_path.strip()
+    if Path(normalized_path).suffix.lower() == ".atlaspkg":
+        try:
+            imported = workspace_service.import_project_bundle(normalized_path)
+        except Exception as exc:
+            st.error(f"Project import failed: {exc}")
+            return
+        _set_project_action_feedback(
+            st,
+            "success",
+            f"Imported project {imported.project.name}.",
+        )
+        _return_to_projects_library(st)
+        return
+
+    _set_project_action_feedback(st, "success", "Opened imported project.")
+    _open_project_from_local_path(st, workspace_service, normalized_path)
 
 
 def _render_project_folder_page(
@@ -26520,6 +26670,13 @@ def _render_create_project_page(
         )
 
     if not submitted:
+        if st.button(
+            "Cancel",
+            key="atlas_create_project_cancel",
+            width="content",
+        ):
+            _set_project_action_feedback(st, "info", "Project creation canceled.")
+            _return_to_projects_library(st)
         return
 
     owner_for_create = selected_owner_name or client.strip()
@@ -26565,9 +26722,11 @@ def _render_create_project_page(
                 is_primary=True,
             )
 
-    st.success(
-        f"Created bid workspace {record.project.name} with Atlas Bid ID {_atlas_bid_id(record)}."
+    created_message = (
+        f"Created bid workspace {record.project.name} with Atlas Bid ID "
+        f"{_atlas_bid_id(record)}."
     )
+    st.success(created_message)
     st.dataframe(
         [
             {
@@ -26582,6 +26741,7 @@ def _render_create_project_page(
         width="stretch",
         hide_index=True,
     )
+    _set_project_action_feedback(st, "success", created_message)
     _navigate_to_project_page(
         st,
         record=record,
@@ -40290,6 +40450,7 @@ def _render_main_content(
     mission_control_payload: dict[str, Any] | None = None,
 ) -> None:
     page = st.session_state.get("atlas_active_page", "Mission Control")
+    _render_project_action_feedback(st)
 
     if page == "Mission Control":
         _render_home_page(
@@ -40332,6 +40493,7 @@ def _render_main_content(
         "Reference Projects",
         "Recent Projects",
         "Create New Project",
+        "Import Project",
         "Open Existing Project",
     }:
         if page == "Projects":
@@ -40344,6 +40506,8 @@ def _render_main_content(
             _render_recent_projects_page(st, workspace_service)
         elif page == "Create New Project":
             _render_create_project_page(st, workspace_service)
+        elif page == "Import Project":
+            _render_import_project_page(st, workspace_service)
         else:
             _render_open_existing_page(st, workspace_service)
         return
@@ -40612,6 +40776,7 @@ def main() -> None:
             "Reference Projects",
             "Recent Projects",
             "Create New Project",
+            "Import Project",
             "Open Existing Project",
             "Knowledge",
             "Transactions",

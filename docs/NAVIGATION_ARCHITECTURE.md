@@ -221,3 +221,21 @@ Explicit URL family state updates the shared secondary/tertiary navigation
 keys. `atlas_knowledge_record` selects a matching row when that record exists
 in the current tenant-visible Knowledge state. URL state does not create,
 seed, or mutate Knowledge records.
+
+## Projects Action Routing
+
+PX-04A stabilizes Projects secondary actions so visible create/import actions
+resolve to their intended workflow surfaces instead of being shadowed by the
+default Projects list route.
+
+Supported project action routes:
+- `atlas_page=Projects` opens the tenant project list.
+- `atlas_page=Create New Project` opens the project creation workflow.
+- `atlas_page=Import Project` opens the supported project import workflow.
+
+Create and import actions update the same primary page state used by normal
+navigation, preserve browser-visible `atlas_page` where available, and return
+to the Projects list through the shared project-library state keys. Successful
+project opens continue to persist both `atlas_workspace_id` and `atlas_page`.
+Explicit URL page state remains authoritative after workspace-state
+restoration.

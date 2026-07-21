@@ -52,6 +52,12 @@ operational workbench structure:
 Supporting Details is the home for edit/archive/import/export/admin mechanics
 and is collapsed by default.
 
+PX-04A adds an action-availability expectation for migrated surfaces: every
+visible primary action must complete, navigate, open a usable workflow, or be
+disabled with a clear business-language reason. Framework adopters should
+preserve success, validation, cancel, and disabled-action feedback across
+Streamlit reruns instead of relying on silent session-state changes.
+
 ## Compatibility Boundaries
 
 The framework intentionally stays below the business-domain layer. It should not:

@@ -19,6 +19,28 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (PX-04A Interaction and Workflow Stabilization)
+
+### Improved
+
+- Projects Create and Import actions now route to visible workflow surfaces instead of being shadowed by the Projects list route.
+- Create Project now preserves success feedback after the rerun that opens the new project workspace and supports a clean cancel return to Projects.
+- Import Project now explains supported input paths, disables the primary action until a path is entered, supports existing `.atlaspkg` import, and returns completed imports to the Projects list with feedback.
+- Project maintenance actions are grouped under Project Administration, with delete disabled until explicitly confirmed.
+- Generic source-directory labels such as `documents` are no longer accepted as default project identity when no business metadata exists.
+
+### Quality
+
+- Added focused regression coverage for project import routing, disabled import explanation, bundle import return behavior, create feedback preservation, and generic folder identity fallback.
+- Full quality gate passing: `git diff --check`, `black --check .`, `ruff check .`, `mypy .`, and `pytest` (`1536 passed`).
+
+### Scope Notes
+
+- no MAW parsing
+- no new business logic
+- no persistence redesign
+- no new OCR, drawing parsing, commercial rules, procurement, inventory, accounting, AI, or production demo data
+
 ## Unreleased (PX-04 Knowledge That Works)
 
 ### Improved
