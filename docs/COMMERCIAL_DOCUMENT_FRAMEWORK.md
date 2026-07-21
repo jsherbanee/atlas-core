@@ -673,3 +673,10 @@ Workbench presentation may derive:
 Workbench presentation must not mutate authoritative commercial-document data
 or introduce new lifecycle, accounting, sync, procurement, inventory, tax, or
 approval rules.
+
+## PX-04 Knowledge Usage Boundary
+
+Knowledge workbenches may show commercial-document usage context, such as open
+estimates or transaction references, when existing transaction services expose
+that data. Knowledge presentation does not own commercial-document lifecycle,
+totals, approvals, numbering, sync, or accounting behavior.

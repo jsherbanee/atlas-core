@@ -99,6 +99,8 @@ Sprint C-04 implements deterministic seed catalog import and alpha validation da
 Sprint G-01 is documentation-only and codifies product governance, Scrum process discipline, roadmap responsibility boundaries, and progressive refinement without changing production code.
 Sprint PX-01 replaces the prior Home composition with a true Mission Control Tenant Operations Center, using existing project/workspace signals to present My Work, Recent Activity, Business Risks, Continue Working, and a six-KPI Company Snapshot without adding business logic or decorative dashboard elements.
 Sprint PX-02 transforms the active Project Overview into a Project Operations Center, using existing project review, timeline, document, lifecycle, and workspace signals to present operational header context, project health, current work, grouped activity, project context, and a quieter inspector without adding business logic or redesigning persistence.
+Sprint PX-03 transforms selected Transactions records into a Commercial Transaction Workbench for supported customer-side commercial document families without adding commercial business logic.
+Sprint PX-04 transforms Knowledge browse/selected-record surfaces into operational workbenches for Customers, Vendors, Manufacturers, Products, Services, Fees, and Assemblies using service-backed presentation adapters, business-language relationships, deterministic findings, and one recommended next step.
 
 X-01 through X-13 are closed.
 
@@ -120,9 +122,9 @@ X-06/X-07/X-08/X-09/X-10/X-11 closeout status: completed.
 - black --check .: passing
 - ruff check .: passing
 - mypy .: passing
-- pytest: full suite passing (1517 tests)
+- pytest: full suite passing (1527 tests)
 
-Latest validated full-suite baseline in active sprint sequence: 1517 passing tests.
+Latest validated full-suite baseline in active sprint sequence: 1527 passing tests.
 
 Latest A-03 targeted validation baseline: 22 passing tests (`tests/test_tenant_manager_service.py`, `tests/test_phase2_settings_navigation.py`).
 

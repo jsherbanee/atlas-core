@@ -1648,8 +1648,8 @@ def test_customer_id_preview_uses_settings_numbering_policy() -> None:
         (
             "products",
             {
-                "Create Product and Vendor Offering",
-                "Save Product Edits",
+                "Create Product",
+                "Save Product",
                 "Archive Product",
                 "Restore Product",
             },
@@ -1658,7 +1658,7 @@ def test_customer_id_preview_uses_settings_numbering_policy() -> None:
             "services",
             {
                 "Create Service",
-                "Save Service Edits",
+                "Save Service",
                 "Archive Service",
                 "Restore Service",
             },
@@ -1784,7 +1784,148 @@ def test_customer_browse_uses_single_selector_and_no_sort_button_row() -> None:
         call for call in st.selectbox_calls if call["label"] == "Customer"
     )
     assert customer_selector["options"][0].startswith("Alpha Customer")
-    assert any(call["label"] == "Browse All" for call in st.expander_calls)
+    assert not any(call["label"] == "Browse All" for call in st.expander_calls)
+    assert any(call["label"] == "Supporting Details" for call in st.expander_calls)
+    rendered_text = "\n".join([*st.markdowns, *st.captions])
+    assert "Business Summary" in rendered_text
+    assert "Operational Health" in rendered_text
+    assert "Recommended Next Step" in rendered_text
+
+
+def test_customer_knowledge_adapter_prioritizes_missing_contact() -> None:
+    service = CommercialProductService()
+    customer = service.create_customer(
+        customer_id="CUST-1000",
+        canonical_name="No Contact Customer",
+        display_name="No Contact Customer",
+    )
+    row = {
+        "Customer Name": "No Contact Customer",
+        "Customer ID": "CUST-1000",
+        "Primary Contact": "",
+        "Location": "",
+        "Active Projects": 0,
+        "Open Commercial Documents": 0,
+        "Status": "Active",
+        "Last Activity": customer["updated_at"],
+        "_entity": customer,
+        "_record_key": "CUST-1000",
+    }
+
+    presentation = app._customer_knowledge_presentation(row, service)
+
+    assert presentation.findings[0].title == "Primary contact missing"
+    assert presentation.recommendation.action == "Add a primary customer contact."
+    assert app._knowledge_issue_state(presentation.findings) == "Needs Attention"
+
+
+def test_vendor_knowledge_adapter_uses_stored_purchasing_path() -> None:
+    service = _seed_knowledge_service("product")
+    vendor = service.get_vendor("vendor-avp")
+    assert vendor is not None
+    product = service.product_rows(include_project_only=True)[0]
+    offering = service.list_vendor_offerings_by_product(product["atlas_product_uuid"])[
+        0
+    ]
+    row = {
+        "Vendor": "AV Partner",
+        "Vendor ID": "vendor-avp",
+        "Type": "Not defined",
+        "Purchasing Channel": app._knowledge_channel_label(
+            offering["purchasing_channel"],
+            direct=bool(offering.get("direct_from_manufacturer", False)),
+        ),
+        "Primary Contact": "",
+        "Active Offerings": 1,
+        "Current Pricing": "Current",
+        "Status": "Active",
+        "Last Activity": vendor["updated_at"],
+        "_entity": vendor,
+        "_record_key": "vendor-avp",
+    }
+
+    presentation = app._vendor_knowledge_presentation(row, service)
+
+    assert presentation.summary.facts[3]["Value"] == "Through distributor"
+    assert any(item.label == "Purchasing path" for item in presentation.usage)
+
+
+def test_catalog_product_adapter_reports_missing_cost_and_vendor() -> None:
+    row = {
+        "Item Type": "Product",
+        "Name": "Unpriced SKU",
+        "Manufacturer": "Maker",
+        "Code": "SKU-1",
+        "Family": "audio",
+        "Status": "Active",
+        "Preferred Vendor": "Not available",
+        "Current Cost": "Not available",
+        "Pricing Age": "Not available",
+        "Recent Use": "No recent use",
+        "Validation State": "Active",
+        "Last Activity": "2026-01-01T00:00:00+00:00",
+        "_record_key": "product-1",
+    }
+
+    presentation = app._catalog_knowledge_presentation(row)
+
+    assert [item.title for item in presentation.findings][:2] == [
+        "No approved vendor",
+        "No current cost",
+    ]
+    assert presentation.recommendation.action == (
+        "Select an approved vendor for this product."
+    )
+
+
+def test_knowledge_url_state_restores_selected_customer_record() -> None:
+    st = _HomeContractStreamlit()
+    service = _seed_knowledge_service("customer")
+    st.query_params = {
+        "atlas_knowledge_family": "customers",
+        "atlas_knowledge_record": "CUST-0002",
+    }
+    st.session_state.update(
+        {
+            "atlas_active_page": "Knowledge",
+            app._navigation_primary_state_key(): "Knowledge",
+            app._navigation_mode_state_key(): "application",
+            app._navigation_secondary_state_key(): "customers",
+            app._navigation_tertiary_state_key(): "browse",
+            "atlas_price_list_library": {"commercial_products": service.to_dict()},
+        }
+    )
+
+    app._render_application_knowledge_page(st, _FakeWorkspaceService([]))
+
+    assert st.session_state["atlas_ck_customer_selected_record_key"] == "CUST-0002"
+    assert st.query_params["atlas_page"] == "Knowledge"
+    assert st.query_params["atlas_knowledge_family"] == "customers"
+    assert st.query_params["atlas_knowledge_record"] == "CUST-0002"
+
+
+def test_quick_created_product_rows_ignore_compatibility_aliases() -> None:
+    service = CommercialProductService()
+    service.create_manufacturer(
+        manufacturer_id="mfr-quick",
+        canonical_name="Quick Maker",
+        display_name="Quick Maker",
+        manufacturer_code="QM",
+    )
+    created = service.create_product(
+        manufacturer_id="mfr-quick",
+        manufacturer="Quick Maker",
+        manufacturer_part_number="SKU-QUICK",
+        product_name="Quick SKU",
+        product_description="Single SKU",
+        category="audio",
+        lifecycle_status="active",
+    )
+
+    rows = service.product_rows(include_project_only=True)
+
+    assert rows[0]["atlas_product_uuid"] == created["atlas_product_uuid"]
+    assert rows[0]["product_name"] == "Quick SKU"
 
 
 def test_transactions_workspace_source_omits_overview_status_cards() -> None:

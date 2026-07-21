@@ -4557,11 +4557,34 @@ class CommercialProductService:
         )
 
         enriched: list[dict[str, Any]] = []
+        canonical_fields = set(CanonicalProduct.__dataclass_fields__)
         for row in rows:
-            product = CanonicalProduct(**row)
+            source_row = dict(row)
+            product = CanonicalProduct(
+                **{
+                    key: value
+                    for key, value in source_row.items()
+                    if key in canonical_fields
+                }
+            )
             enriched.append(
                 {
                     **product.to_dict(),
+                    "manufacturer_id": self._safe(
+                        source_row.get("manufacturer_id"), ""
+                    ),
+                    "manufacturer_part_number": self._safe(
+                        source_row.get("manufacturer_part_number"),
+                        product.manufacturer_sku,
+                    ),
+                    "product_name": self._safe(
+                        source_row.get("product_name"), product.canonical_sku
+                    ),
+                    "product_description": self._safe(
+                        source_row.get("product_description"), product.description
+                    ),
+                    "discontinued": bool(source_row.get("discontinued", False)),
+                    "notes": self._safe(source_row.get("notes"), ""),
                     "commercial_health": self._commercial_health(product),
                     "product_intelligence": self._product_intelligence(product),
                     "confidence": self._confidence(product),

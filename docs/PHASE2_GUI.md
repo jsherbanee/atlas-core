@@ -46,6 +46,7 @@ Atlas Workspace App-Wide Navigation Refactor replaces widget-owned first-column 
 Atlas Workspace App-Wide Navigation Hotfix makes that accordion an application-shell capability with controlled chevron headers, indented tertiary links, collapse-cleared tertiary state, and no page-specific navigation expander implementations.
 Atlas Workspace Organization Merge adds permission-gated Organization Merge controls to Customer, Vendor, and Manufacturer details, supports possible-duplicate review, source selection, preview, actor/reason capture, irreversible confirmation, and Organization Object Workspace role-profile/merge-history visibility.
 Atlas PX-03 replaces the generic selected-record transaction inspector with a Commercial Transaction Workbench for Estimates, Sales Orders, Return Orders, Invoices, and Credit Memos. The workbench presents document summary, commercial health, readiness checklist, decision panel, line item workspace, and commercial relationships using existing commercial-document services.
+Atlas PX-04 replaces Knowledge record-directory default views with operational workbenches for Customers, Vendors, Manufacturers, Products, Services, Fees, and Assemblies. Knowledge now presents business summary, operational health, relationships, activity, one next step, and supporting details using existing services and records.
 X-09 closeout status: complete and closed.
 X-10 closeout status: complete and closed.
 X-13 closeout status: complete and closed.
@@ -1378,6 +1379,53 @@ When a document is selected, Atlas shows:
 - Commercial Relationships with customer, project, source, downstream, change-order, and linked-document context where supported
 
 The workbench does not add persistence, accounting behavior, procurement execution, QuickBooks transport, or new commercial rules. Administration, sync, approval, and internal identifiers remain available only in collapsed record detail areas.
+
+## Knowledge Workbench
+
+Knowledge browse pages prioritize business relevance over record mechanics.
+
+Supported PX-04 families:
+- Customers
+- Vendors
+- Manufacturers
+- Products
+- Services
+- Fees
+- Assemblies
+
+Selected records use a shared structure:
+- Business Summary
+- Operational Health
+- Current Relationships
+- Recent Activity
+- Recommended Next Step
+- Supporting Details
+
+Operational health is deterministic and source-backed. Examples include missing
+customer contact, missing customer location, no active vendor offering, no
+current vendor price sheet, missing manufacturer purchasing path, product with
+no approved vendor, product with no current cost, missing service/fee amount,
+and assembly validation/component gaps where existing data exposes them.
+
+Purchasing path terminology:
+- Direct from manufacturer
+- Through distributor
+- Through dealer/reseller
+- Other vendor channel
+- Not defined
+
+Supporting Details remains collapsed by default and contains edit/archive,
+merge, import/export, provenance, and other record-maintenance mechanics.
+
+Development/test representative fixture:
+
+```bash
+python3 scripts/px04_representative_knowledge_fixture.py
+```
+
+The fixture writes a deterministic JSON artifact to
+`/private/tmp/atlas_px04_representative_knowledge_fixture.json`. It does not
+seed production data and does not mutate a running Streamlit session.
 
 ## Extraction Diagnostics
 Atlas Intake surfaces the following diagnostics in the Import Summary:

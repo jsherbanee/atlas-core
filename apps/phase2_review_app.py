@@ -1523,6 +1523,733 @@ def _render_vendor_price_lists(
             st.dataframe(offers[:300], width="stretch", hide_index=True)
 
 
+@dataclass(frozen=True)
+class KnowledgeSummary:
+    title: str
+    subtitle: str
+    status: str
+    facts: list[dict[str, str]]
+
+
+@dataclass(frozen=True)
+class KnowledgeFinding:
+    severity: str
+    title: str
+    detail: str
+    action: str
+
+
+@dataclass(frozen=True)
+class KnowledgeRelationship:
+    relationship: str
+    detail: str
+    destination: str = ""
+
+
+@dataclass(frozen=True)
+class KnowledgeActivity:
+    event: str
+    detail: str
+    when: str
+
+
+@dataclass(frozen=True)
+class KnowledgeRecommendation:
+    action: str
+    detail: str
+
+
+@dataclass(frozen=True)
+class KnowledgeUsageSummary:
+    label: str
+    value: str
+
+
+@dataclass(frozen=True)
+class KnowledgePresentation:
+    family: str
+    record_key: str
+    summary: KnowledgeSummary
+    findings: list[KnowledgeFinding]
+    relationships: list[KnowledgeRelationship]
+    activity: list[KnowledgeActivity]
+    recommendation: KnowledgeRecommendation
+    usage: list[KnowledgeUsageSummary]
+
+
+def _knowledge_query_family_map() -> dict[str, tuple[str, str]]:
+    return {
+        "customers": ("customers", "browse"),
+        "vendors": ("vendors", "browse"),
+        "manufacturers": ("manufacturers", "browse"),
+        "products": ("catalog", "products"),
+        "services": ("catalog", "services"),
+        "fees": ("catalog", "fees"),
+        "assemblies": ("catalog", "assemblies"),
+        "catalog": ("catalog", "browse"),
+    }
+
+
+def _set_knowledge_query_params(
+    st: Any,
+    *,
+    family: str,
+    record_key: str = "",
+) -> None:
+    query_params = getattr(st, "query_params", None)
+    if query_params is None:
+        return
+    try:
+        query_params["atlas_page"] = "Knowledge"
+        query_params["atlas_knowledge_family"] = family
+        if record_key:
+            query_params["atlas_knowledge_record"] = record_key
+    except Exception:
+        return
+
+
+def _sync_knowledge_route_from_query_params(st: Any) -> None:
+    if _safe_text(st.session_state.get("atlas_active_page"), "") != "Knowledge":
+        return
+    family = _query_param_text(st, "atlas_knowledge_family")
+    if not family:
+        return
+    route = _knowledge_query_family_map().get(family)
+    if route is None:
+        return
+    secondary, tertiary = route
+    st.session_state[_navigation_secondary_state_key()] = secondary
+    st.session_state[_navigation_tertiary_state_key()] = tertiary
+
+
+def _format_knowledge_state(value: Any, default: str = "Not available") -> str:
+    text = _safe_text(value, default)
+    return text.replace("_", " ").replace("-", " ").title()
+
+
+def _knowledge_money(value: Any, currency: str = "USD") -> str:
+    if value in {None, ""}:
+        return "Not available"
+    try:
+        return f"{currency} {Decimal(str(value)):,.2f}"
+    except Exception:
+        return _safe_text(value, "Not available")
+
+
+def _knowledge_channel_label(value: Any, *, direct: bool = False) -> str:
+    channel = _safe_text(value, "")
+    if direct or channel == "direct_from_manufacturer":
+        return "Direct from manufacturer"
+    labels = {
+        "distributor": "Through distributor",
+        "dealer_reseller": "Through dealer/reseller",
+        "other": "Other vendor channel",
+    }
+    return labels.get(channel, _format_knowledge_state(channel, "Not defined"))
+
+
+def _knowledge_issue_state(findings: list[KnowledgeFinding]) -> str:
+    if any(item.severity == "Blocked" for item in findings):
+        return "Blocked"
+    if any(item.severity == "Needs Attention" for item in findings):
+        return "Needs Attention"
+    if any(item.severity == "Review" for item in findings):
+        return "Review"
+    return "Clear"
+
+
+def _knowledge_recommendation(
+    findings: list[KnowledgeFinding],
+) -> KnowledgeRecommendation:
+    rank = {"Blocked": 0, "Needs Attention": 1, "Review": 2}
+    actionable = [
+        item
+        for item in findings
+        if item.severity in rank and _safe_text(item.action, "")
+    ]
+    actionable.sort(key=lambda item: (rank.get(item.severity, 9), item.title))
+    if actionable:
+        first = actionable[0]
+        return KnowledgeRecommendation(action=first.action, detail=first.detail)
+    return KnowledgeRecommendation(
+        action="No immediate action is required.",
+        detail="No significant knowledge issues detected.",
+    )
+
+
+def _knowledge_activity_from_events(
+    events: list[dict[str, Any]],
+    *,
+    fallback_label: str,
+    fallback_when: str,
+) -> list[KnowledgeActivity]:
+    rows: list[KnowledgeActivity] = []
+    for event in list(events)[-5:]:
+        event_type = _format_knowledge_state(event.get("event_type"), "Activity")
+        rows.append(
+            KnowledgeActivity(
+                event=event_type,
+                detail=_safe_text(event.get("entity_id"), fallback_label),
+                when=_safe_text(event.get("timestamp"), "n/a"),
+            )
+        )
+    if not rows and fallback_when:
+        rows.append(
+            KnowledgeActivity(
+                event="Record Updated",
+                detail=fallback_label,
+                when=fallback_when,
+            )
+        )
+    return rows
+
+
+def _knowledge_relationship_rows(
+    relationships: list[KnowledgeRelationship],
+) -> list[dict[str, str]]:
+    return [
+        {
+            "Relationship": item.relationship,
+            "Business Context": item.detail,
+            "Destination": item.destination,
+        }
+        for item in relationships
+    ]
+
+
+def _knowledge_finding_rows(findings: list[KnowledgeFinding]) -> list[dict[str, str]]:
+    return [
+        {
+            "Severity": item.severity,
+            "Finding": item.title,
+            "Business Impact": item.detail,
+            "Action": item.action,
+        }
+        for item in findings
+    ]
+
+
+def _knowledge_activity_rows(activity: list[KnowledgeActivity]) -> list[dict[str, str]]:
+    return [
+        {"Event": item.event, "Detail": item.detail, "When": item.when}
+        for item in activity
+    ]
+
+
+def _knowledge_usage_rows(usage: list[KnowledgeUsageSummary]) -> list[dict[str, str]]:
+    return [{"Signal": item.label, "Value": item.value} for item in usage]
+
+
+def _render_knowledge_record_workbench(
+    st: Any,
+    presentation: KnowledgePresentation,
+    *,
+    key_prefix: str,
+    supporting_details: Callable[[], None] | None = None,
+) -> None:
+    summary = presentation.summary
+    reference = {
+        "object_id": presentation.record_key,
+        "object_type": presentation.family,
+        "display_name": summary.title,
+        "status": summary.status,
+        "confidence": "n/a",
+    }
+    _shared_render_object_header(
+        st,
+        object_name=summary.title,
+        description=summary.subtitle,
+        badges=[
+            presentation.family,
+            summary.status,
+            _knowledge_issue_state(presentation.findings),
+        ],
+        recommended_action=presentation.recommendation.action,
+        primary_action_label=presentation.recommendation.action,
+        primary_action_key=f"{key_prefix}_knowledge_primary_action",
+        add_pin_label="Add to Working Set",
+        remove_pin_label="Remove from Working Set",
+        toggle_pin_key=f"{key_prefix}_knowledge_pin",
+        pinned=_is_reference_pinned(st, reference),
+        on_primary_action=lambda: st.session_state.__setitem__(
+            f"{key_prefix}_focus", "supporting_details"
+        ),
+        on_toggle_pin=lambda should_pin: _toggle_pin_reference(
+            st,
+            {
+                **reference,
+                "secondary_label": summary.subtitle,
+            },
+            should_pin=should_pin,
+        ),
+    )
+
+    _shared_render_section_title(st, "Business Summary")
+    _shared_render_data_table(st, summary.facts)
+
+    health_cols = st.columns([1.2, 1.0], gap="small")
+    with health_cols[0]:
+        _shared_render_section_title(st, "Operational Health")
+        if presentation.findings:
+            _shared_render_data_table(
+                st, _knowledge_finding_rows(presentation.findings)
+            )
+        else:
+            st.caption("No significant knowledge issues detected.")
+    with health_cols[1]:
+        _shared_render_section_title(st, "Recommended Next Step")
+        with st.container(border=True):
+            st.markdown(f"**{presentation.recommendation.action}**")
+            st.caption(presentation.recommendation.detail)
+        if presentation.usage:
+            _shared_render_data_table(st, _knowledge_usage_rows(presentation.usage))
+
+    _shared_render_section_title(st, "Current Relationships")
+    if presentation.relationships:
+        _shared_render_data_table(
+            st, _knowledge_relationship_rows(presentation.relationships)
+        )
+    else:
+        st.caption("No supported relationships are linked yet.")
+
+    _shared_render_section_title(st, "Recent Activity")
+    if presentation.activity:
+        _shared_render_data_table(st, _knowledge_activity_rows(presentation.activity))
+    else:
+        st.caption("No meaningful activity has been recorded yet.")
+
+    if supporting_details is not None:
+        with st.expander("Supporting Details", expanded=False):
+            supporting_details()
+
+
+def _knowledge_selected_index(
+    st: Any,
+    *,
+    key_prefix: str,
+    rows: list[dict[str, Any]],
+) -> int:
+    query_record = _query_param_text(st, "atlas_knowledge_record")
+    selected_record = query_record or _safe_text(
+        st.session_state.get(f"{key_prefix}_selected_record_key"), ""
+    )
+    if not selected_record:
+        return 0
+    for index, item in enumerate(rows):
+        if _safe_text(item.get("_record_key"), "") == selected_record:
+            return index
+    return 0
+
+
+def _knowledge_entity_events(
+    product_service: CommercialProductService,
+    entity_id: str,
+) -> list[dict[str, Any]]:
+    return product_service.list_knowledge_audit_events(
+        entity_id=entity_id,
+        limit=50,
+    )
+
+
+def _customer_knowledge_presentation(
+    row: dict[str, Any],
+    product_service: CommercialProductService,
+) -> KnowledgePresentation:
+    entity = dict(row.get("_entity") or {})
+    attributes = dict(entity.get("attributes") or {})
+    customer_name = _safe_text(row.get("Customer Name"), "Customer")
+    customer_id = _safe_text(row.get("Customer ID"), "")
+    contact = _safe_text(row.get("Primary Contact"), "")
+    location = _safe_text(row.get("Location"), "")
+    active_projects = int(row.get("Active Projects") or 0)
+    open_transactions = int(row.get("Open Commercial Documents") or 0)
+    findings: list[KnowledgeFinding] = []
+    if not contact:
+        findings.append(
+            KnowledgeFinding(
+                "Needs Attention",
+                "Primary contact missing",
+                "Customer follow-up has no default contact on this record.",
+                "Add a primary customer contact.",
+            )
+        )
+    if not location:
+        findings.append(
+            KnowledgeFinding(
+                "Review",
+                "Location missing",
+                "No billing or project location is available on the customer record.",
+                "Add a customer location.",
+            )
+        )
+    relationships = [
+        KnowledgeRelationship(
+            "Active projects",
+            f"Customer has {active_projects} active project(s).",
+            "Projects" if active_projects else "",
+        ),
+        KnowledgeRelationship(
+            "Open commercial documents",
+            f"{open_transactions} open commercial document(s) reference this customer.",
+            "Transactions" if open_transactions else "",
+        ),
+    ]
+    events = _knowledge_entity_events(product_service, f"customer:{customer_id}")
+    activity = _knowledge_activity_from_events(
+        events,
+        fallback_label=customer_name,
+        fallback_when=_safe_text(row.get("Last Activity"), ""),
+    )
+    return KnowledgePresentation(
+        family="Customer",
+        record_key=customer_id,
+        summary=KnowledgeSummary(
+            title=customer_name,
+            subtitle="Customer account and project context.",
+            status=_safe_text(row.get("Status"), "Active"),
+            facts=[
+                {"Field": "Customer", "Value": customer_name},
+                {"Field": "Account Status", "Value": _safe_text(row.get("Status"), "")},
+                {"Field": "Primary Location", "Value": location or "Not available"},
+                {"Field": "Primary Contact", "Value": contact or "Not available"},
+                {"Field": "Active Projects", "Value": str(active_projects)},
+                {
+                    "Field": "Owner",
+                    "Value": _safe_text(attributes.get("owner"), "Not assigned"),
+                },
+            ],
+        ),
+        findings=findings,
+        relationships=relationships,
+        activity=activity,
+        recommendation=_knowledge_recommendation(findings),
+        usage=[
+            KnowledgeUsageSummary("Active projects", str(active_projects)),
+            KnowledgeUsageSummary("Open commercial documents", str(open_transactions)),
+        ],
+    )
+
+
+def _vendor_knowledge_presentation(
+    row: dict[str, Any],
+    product_service: CommercialProductService,
+) -> KnowledgePresentation:
+    entity = dict(row.get("_entity") or {})
+    attributes = dict(entity.get("attributes") or {})
+    vendor_name = _safe_text(row.get("Vendor"), "Vendor")
+    vendor_id = _safe_text(row.get("Vendor ID"), "")
+    offerings = int(row.get("Active Offerings") or 0)
+    pricing_state = _safe_text(row.get("Current Pricing"), "Not available")
+    channel = _safe_text(row.get("Purchasing Channel"), "Not defined")
+    contact = _safe_text(row.get("Primary Contact"), "")
+    findings: list[KnowledgeFinding] = []
+    if not contact:
+        findings.append(
+            KnowledgeFinding(
+                "Needs Attention",
+                "Primary contact missing",
+                "Vendor purchasing coordination has no default contact.",
+                "Add a vendor contact.",
+            )
+        )
+    if offerings == 0:
+        findings.append(
+            KnowledgeFinding(
+                "Needs Attention",
+                "No active offering",
+                "This vendor is not currently linked to active product availability.",
+                "Review vendor offerings.",
+            )
+        )
+    if pricing_state != "Current":
+        findings.append(
+            KnowledgeFinding(
+                "Review",
+                "No current price sheet",
+                "No current price sheet is linked to this vendor.",
+                "Import or finalize a current price sheet.",
+            )
+        )
+    if channel == "Not defined":
+        findings.append(
+            KnowledgeFinding(
+                "Review",
+                "Purchasing channel not defined",
+                "Atlas cannot distinguish direct, distributor, or other vendor path.",
+                "Define the purchasing channel for this vendor.",
+            )
+        )
+    events = _knowledge_entity_events(product_service, f"vendor:{vendor_id}")
+    relationships = [
+        KnowledgeRelationship(
+            "Vendor offerings",
+            f"Vendor supplies {offerings} active product offering(s).",
+            "Catalog" if offerings else "",
+        ),
+        KnowledgeRelationship(
+            "Pricing",
+            pricing_state,
+            "Price Lists" if pricing_state == "Current" else "",
+        ),
+    ]
+    return KnowledgePresentation(
+        family="Vendor",
+        record_key=vendor_id,
+        summary=KnowledgeSummary(
+            title=vendor_name,
+            subtitle="Vendor availability and purchasing context.",
+            status=_safe_text(row.get("Status"), "Active"),
+            facts=[
+                {"Field": "Vendor", "Value": vendor_name},
+                {
+                    "Field": "Vendor Type",
+                    "Value": _safe_text(attributes.get("vendor_type"), "Not defined"),
+                },
+                {"Field": "Account Status", "Value": _safe_text(row.get("Status"), "")},
+                {"Field": "Purchasing Channel", "Value": channel},
+                {"Field": "Primary Contact", "Value": contact or "Not available"},
+                {"Field": "Current Price Sheets", "Value": pricing_state},
+            ],
+        ),
+        findings=findings,
+        relationships=relationships,
+        activity=_knowledge_activity_from_events(
+            events,
+            fallback_label=vendor_name,
+            fallback_when=_safe_text(row.get("Last Activity"), ""),
+        ),
+        recommendation=_knowledge_recommendation(findings),
+        usage=[
+            KnowledgeUsageSummary("Active offerings", str(offerings)),
+            KnowledgeUsageSummary("Purchasing path", channel),
+        ],
+    )
+
+
+def _manufacturer_knowledge_presentation(
+    row: dict[str, Any],
+    product_service: CommercialProductService,
+) -> KnowledgePresentation:
+    manufacturer_name = _safe_text(row.get("Manufacturer"), "Manufacturer")
+    manufacturer_id = _safe_text(row.get("Manufacturer ID"), "")
+    linked_vendors = int(row.get("Linked Vendors") or 0)
+    active_products = int(row.get("Active Products") or 0)
+    pricing_coverage = _safe_text(row.get("Pricing Coverage"), "Not available")
+    purchasing_path = _safe_text(row.get("Purchasing Path"), "Not defined")
+    findings: list[KnowledgeFinding] = []
+    if purchasing_path == "Not defined":
+        findings.append(
+            KnowledgeFinding(
+                "Needs Attention",
+                "No purchasing path",
+                "No stored path explains how this manufacturer is purchased.",
+                "Link a vendor purchasing path.",
+            )
+        )
+    if linked_vendors == 0:
+        findings.append(
+            KnowledgeFinding(
+                "Needs Attention",
+                "No linked vendor",
+                "Products from this manufacturer have no vendor source.",
+                "Link Vendor",
+            )
+        )
+    if active_products == 0:
+        findings.append(
+            KnowledgeFinding(
+                "Review",
+                "No active products",
+                "No active products are currently associated with this manufacturer.",
+                "Add or review products.",
+            )
+        )
+    relationships = [
+        KnowledgeRelationship(
+            "Linked vendors",
+            f"{linked_vendors} vendor(s) currently supply this manufacturer.",
+            "Vendors" if linked_vendors else "",
+        ),
+        KnowledgeRelationship(
+            "Active products",
+            f"{active_products} active product(s) are linked.",
+            "Catalog" if active_products else "",
+        ),
+    ]
+    events = _knowledge_entity_events(
+        product_service, f"manufacturer:{manufacturer_id}"
+    )
+    return KnowledgePresentation(
+        family="Manufacturer",
+        record_key=manufacturer_id,
+        summary=KnowledgeSummary(
+            title=manufacturer_name,
+            subtitle="Manufacturer purchasing and product context.",
+            status=_safe_text(row.get("Status"), "Active"),
+            facts=[
+                {"Field": "Manufacturer", "Value": manufacturer_name},
+                {"Field": "Status", "Value": _safe_text(row.get("Status"), "")},
+                {"Field": "Preferred Purchasing Path", "Value": purchasing_path},
+                {"Field": "Linked Vendors", "Value": str(linked_vendors)},
+                {"Field": "Active Products", "Value": str(active_products)},
+                {"Field": "Current Pricing Coverage", "Value": pricing_coverage},
+            ],
+        ),
+        findings=findings,
+        relationships=relationships,
+        activity=_knowledge_activity_from_events(
+            events,
+            fallback_label=manufacturer_name,
+            fallback_when=_safe_text(row.get("Last Activity"), ""),
+        ),
+        recommendation=_knowledge_recommendation(findings),
+        usage=[
+            KnowledgeUsageSummary("Purchasing path", purchasing_path),
+            KnowledgeUsageSummary("Pricing coverage", pricing_coverage),
+        ],
+    )
+
+
+def _catalog_knowledge_presentation(row: dict[str, Any]) -> KnowledgePresentation:
+    item_type = _safe_text(row.get("Item Type"), "Catalog Item")
+    name = _safe_text(row.get("Name"), item_type)
+    record_key = _safe_text(
+        row.get("_record_key"), _safe_text(row.get("_entity_key"), "")
+    )
+    status = _safe_text(row.get("Status"), "Active")
+    current_cost = _safe_text(row.get("Current Cost"), "Not available")
+    preferred_vendor = _safe_text(row.get("Preferred Vendor"), "Not available")
+    pricing_age = _safe_text(row.get("Pricing Age"), "Not available")
+    material_count = int(row.get("Material Count") or 0)
+    labor_count = int(row.get("Labor Count") or 0)
+    recent_use = _safe_text(row.get("Recent Use"), "No recent use")
+    findings: list[KnowledgeFinding] = []
+    if item_type == "Product":
+        if preferred_vendor == "Not available":
+            findings.append(
+                KnowledgeFinding(
+                    "Needs Attention",
+                    "No approved vendor",
+                    "No preferred vendor or offering is available for this product.",
+                    "Select an approved vendor for this product.",
+                )
+            )
+        if current_cost == "Not available":
+            findings.append(
+                KnowledgeFinding(
+                    "Needs Attention",
+                    "No current cost",
+                    "This product cannot support cost-backed estimating yet.",
+                    "Resolve product pricing.",
+                )
+            )
+        if status.lower() in {"inactive", "discontinued", "obsolete", "end of life"}:
+            findings.append(
+                KnowledgeFinding(
+                    "Review",
+                    "Inactive lifecycle",
+                    "This product is inactive or discontinued.",
+                    "Review projects using this inactive record.",
+                )
+            )
+    if item_type in {"Service", "Fee"} and current_cost == "Not available":
+        findings.append(
+            KnowledgeFinding(
+                "Review",
+                "Rate or amount missing",
+                "No current rate or amount is visible for this catalog item.",
+                "Review catalog pricing.",
+            )
+        )
+    if item_type == "Assembly":
+        if status.lower() not in {"active", "validated"}:
+            findings.append(
+                KnowledgeFinding(
+                    "Needs Attention",
+                    "Assembly not active",
+                    "The selected assembly is not currently active.",
+                    "Activate a valid assembly version.",
+                )
+            )
+        if material_count == 0:
+            findings.append(
+                KnowledgeFinding(
+                    "Review",
+                    "No material components",
+                    "No material components are currently visible for this assembly.",
+                    "Review assembly components.",
+                )
+            )
+        if labor_count == 0:
+            findings.append(
+                KnowledgeFinding(
+                    "Review",
+                    "Missing labor",
+                    "No labor components are currently visible for this assembly.",
+                    "Review assembly labor.",
+                )
+            )
+    relationships = [
+        KnowledgeRelationship(
+            "Usage", recent_use, "Projects" if "No recent" not in recent_use else ""
+        ),
+    ]
+    if preferred_vendor != "Not available":
+        relationships.append(
+            KnowledgeRelationship(
+                "Purchasing",
+                f"Current purchasing path uses {preferred_vendor}.",
+                "Vendors",
+            )
+        )
+    return KnowledgePresentation(
+        family=item_type,
+        record_key=record_key,
+        summary=KnowledgeSummary(
+            title=name,
+            subtitle=f"{item_type} commercial knowledge record.",
+            status=status,
+            facts=[
+                {"Field": "Name", "Value": name},
+                {
+                    "Field": "Manufacturer",
+                    "Value": _safe_text(row.get("Manufacturer"), "Not available"),
+                },
+                {
+                    "Field": "Model / Code",
+                    "Value": _safe_text(row.get("Code"), "Not available"),
+                },
+                {
+                    "Field": "Category",
+                    "Value": _safe_text(row.get("Family"), "Not available"),
+                },
+                {"Field": "Lifecycle Status", "Value": status},
+                {"Field": "Preferred Vendor", "Value": preferred_vendor},
+                {"Field": "Current Selected Cost", "Value": current_cost},
+                {"Field": "Pricing Age", "Value": pricing_age},
+            ],
+        ),
+        findings=findings,
+        relationships=relationships,
+        activity=[
+            KnowledgeActivity(
+                event="Record Updated",
+                detail=name,
+                when=_safe_text(
+                    row.get("Last Activity"), _safe_text(row.get("Updated"), "n/a")
+                ),
+            )
+        ],
+        recommendation=_knowledge_recommendation(findings),
+        usage=[
+            KnowledgeUsageSummary("Recent use", recent_use),
+            KnowledgeUsageSummary(
+                "Validation", _safe_text(row.get("Validation State"), status)
+            ),
+        ],
+    )
+
+
 def _knowledge_sort_value(row: dict[str, Any], column: str) -> Any:
     value = row.get(column)
     if column in {"Active Projects", "Open Transactions", "Relationships"}:
@@ -1562,6 +2289,8 @@ def _knowledge_browser_layout(
     empty_location: str,
     add_form_renderer: Callable[[], None] | None,
     inspector_renderer: Callable[[dict[str, Any]], None],
+    family_key: str,
+    presentation_adapter: Callable[[dict[str, Any]], KnowledgePresentation],
 ) -> None:
     _shared_render_section_title(st, title)
     if add_form_renderer is not None:
@@ -1603,6 +2332,10 @@ def _knowledge_browser_layout(
     )
 
     if not filtered_rows:
+        if search_query.strip():
+            empty_why = f"No {title.lower()} match the current search."
+            empty_action = "Clear the search or adjust the filters."
+            empty_location = f"Use {title} Browse to review available records."
         _shared_render_guided_empty_state(
             st,
             why_empty=empty_why,
@@ -1611,54 +2344,44 @@ def _knowledge_browser_layout(
         )
         return
 
-    with st.expander("Browse All", expanded=True):
-        panel_cols = st.columns([3.2, 2.2])
-        with panel_cols[0]:
-            _shared_render_data_table(
-                st,
-                [
-                    {
-                        key: value
-                        for key, value in item.items()
-                        if not key.startswith("_")
-                    }
-                    for item in filtered_rows
-                ],
-            )
-            selectable_labels = [
-                selection_label_fn(item)
-                for item in selectable_rows
-                if item in filtered_rows
-            ]
-            if selectable_labels:
-                selected_label = st.selectbox(
-                    selector_label,
-                    options=selectable_labels,
-                    index=0,
-                    key=f"{key_prefix}_selected_record",
-                )
-            else:
-                selected_label = st.selectbox(
-                    selector_label,
-                    options=[""],
-                    key=f"{key_prefix}_selected_record",
-                )
-            selected_row = next(
-                (
-                    item
-                    for item in selectable_rows
-                    if item in filtered_rows
-                    and selection_label_fn(item) == selected_label
-                ),
-                None,
-            )
-            st.caption(f"{len(filtered_rows)} records shown")
+    _shared_render_data_table(
+        st,
+        [
+            {key: value for key, value in item.items() if not key.startswith("_")}
+            for item in filtered_rows
+        ],
+    )
+    selectable_filtered_rows = [
+        item for item in selectable_rows if item in filtered_rows
+    ]
+    selection_rows = selectable_filtered_rows or list(filtered_rows)
+    selectable_labels = [selection_label_fn(item) for item in selection_rows]
+    selected_index = _knowledge_selected_index(
+        st, key_prefix=key_prefix, rows=selection_rows
+    )
+    selected_label = st.selectbox(
+        selector_label,
+        options=selectable_labels,
+        index=selected_index,
+        key=f"{key_prefix}_selected_record",
+    )
+    selected_row = selection_rows[selectable_labels.index(selected_label)]
+    selected_record_key = _safe_text(selected_row.get("_record_key"), "")
+    st.session_state[f"{key_prefix}_selected_record_key"] = selected_record_key
+    _set_knowledge_query_params(st, family=family_key, record_key=selected_record_key)
+    st.caption(f"{len(filtered_rows)} records shown")
 
-        with panel_cols[1]:
-            if selected_row is None:
-                st.caption("Select a row to inspect details.")
-                return
-            inspector_renderer(selected_row)
+    presentation = presentation_adapter(selected_row)
+    _render_knowledge_record_workbench(
+        st,
+        presentation,
+        key_prefix=f"{key_prefix}_{selected_record_key}",
+        supporting_details=(
+            (lambda: inspector_renderer(selected_row))
+            if selected_row in selectable_filtered_rows
+            else None
+        ),
+    )
 
 
 def _render_customer_workspace(
@@ -1942,15 +2665,16 @@ def _render_customer_workspace(
                     attributes.get("primary_email"),
                     _safe_text(attributes.get("primary_phone"), ""),
                 ),
-                "City / State": city_state,
+                "Location": city_state,
                 "Active Projects": project_customer_counts.get(display_name, 0),
-                "Open Transactions": 0,
+                "Open Commercial Documents": 0,
                 "Status": _safe_text(
                     attributes.get("status"),
                     "Active" if bool(item.get("active", True)) else "Archived",
                 ).title(),
-                "Last Updated": _safe_text(item.get("updated_at"), ""),
+                "Last Activity": _safe_text(item.get("updated_at"), ""),
                 "_entity": item,
+                "_record_key": _customer_id_from_entity(item),
                 "_selectable": True,
             }
         )
@@ -1965,15 +2689,19 @@ def _render_customer_workspace(
                 "Customer Name": customer,
                 "Customer ID": "project-derived",
                 "Primary Contact": "",
-                "City / State": "",
+                "Location": "",
                 "Active Projects": project_customer_counts.get(customer, 0),
-                "Open Transactions": 0,
+                "Open Commercial Documents": 0,
                 "Status": "Active",
-                "Last Updated": "",
+                "Last Activity": "",
                 "_entity": {"customer": customer, "customer_id": "project-derived"},
+                "_record_key": f"project-derived:{customer}",
                 "_selectable": False,
             }
         )
+    for row in customer_rows:
+        presentation = _customer_knowledge_presentation(row, product_service)
+        row["Issue State"] = _knowledge_issue_state(presentation.findings)
 
     _knowledge_browser_layout(
         st,
@@ -1985,33 +2713,37 @@ def _render_customer_workspace(
         ],
         display_columns=[
             "Customer Name",
-            "Customer ID",
+            "Location",
             "Primary Contact",
-            "City / State",
             "Active Projects",
-            "Open Transactions",
+            "Open Commercial Documents",
             "Status",
-            "Last Updated",
+            "Last Activity",
+            "Issue State",
         ],
         selection_label_fn=lambda item: f"{_safe_text(item.get('Customer Name'), '')} ({_safe_text(item.get('Customer ID'), '')})",
         selector_label="Customer",
         sort_columns=[
             "Customer Name",
-            "Customer ID",
-            "City / State",
+            "Location",
             "Active Projects",
-            "Open Transactions",
+            "Open Commercial Documents",
             "Status",
-            "Last Updated",
+            "Last Activity",
+            "Issue State",
         ],
         default_sort_column="Customer Name",
         search_placeholder="customer name, ID, city, state",
         add_form_label="Add Customer",
-        empty_why="No customer records are currently available.",
-        empty_action="Load customer seed records or import curated customer data.",
-        empty_location="Use Knowledge Imports to initialize customer data.",
+        empty_why="No customers have been added for this tenant.",
+        empty_action="Add Customer",
+        empty_location="Use Add Customer to create the first account.",
         add_form_renderer=_render_add_form,
         inspector_renderer=_render_inspector,
+        family_key="customers",
+        presentation_adapter=lambda row: _customer_knowledge_presentation(
+            row, product_service
+        ),
     )
 
 
@@ -2228,42 +2960,98 @@ def _render_vendor_workspace(
             key_prefix=f"atlas_ck_vendor_merge_{selected_vendor_id}",
         )
 
+    operational_vendor_rows: list[dict[str, Any]] = []
+    for item in vendor_rows:
+        vendor_id = _safe_text(item.get("vendor_id"), "")
+        vendor_name = _safe_text(
+            item.get("canonical_name"), _safe_text(item.get("display_name"), "Vendor")
+        )
+        related_offers = product_service.list_vendor_offerings_by_vendor(vendor_id)
+        if not related_offers:
+            related_offers = [
+                offer
+                for offer in vendor_offers
+                if vendor_name.lower() in _safe_text(offer.get("vendor"), "").lower()
+            ]
+        active_offers = [
+            offer for offer in related_offers if bool(offer.get("active", True))
+        ]
+        channels = [
+            _knowledge_channel_label(
+                offer.get("purchasing_channel"),
+                direct=bool(offer.get("direct_from_manufacturer", False)),
+            )
+            for offer in active_offers
+        ]
+        price_sheets = [
+            sheet
+            for sheet in uploaded_price_lists
+            if vendor_name.lower() in _safe_text(sheet.get("vendor"), "").lower()
+        ]
+        current_pricing = "Current" if price_sheets else "Not available"
+        primary_contact = _safe_text(
+            dict(item.get("attributes") or {}).get("primary_email"),
+            _safe_text(dict(item.get("attributes") or {}).get("primary_phone"), ""),
+        )
+        operational_vendor_rows.append(
+            {
+                "Vendor": vendor_name,
+                "Vendor ID": vendor_id,
+                "Type": _safe_text(
+                    dict(item.get("attributes") or {}).get("vendor_type"), "Not defined"
+                ),
+                "Purchasing Channel": channels[0] if channels else "Not defined",
+                "Primary Contact": primary_contact,
+                "Active Offerings": len(active_offers),
+                "Current Pricing": current_pricing,
+                "Status": "Active" if bool(item.get("active", True)) else "Archived",
+                "Last Activity": _safe_text(item.get("updated_at"), ""),
+                "_entity": dict(item),
+                "_record_key": vendor_id,
+            }
+        )
+    for row in operational_vendor_rows:
+        presentation = _vendor_knowledge_presentation(row, product_service)
+        row["Issue State"] = _knowledge_issue_state(presentation.findings)
+
     _knowledge_browser_layout(
         st,
         key_prefix="atlas_ck_vendor",
         title="Vendors",
-        rows=vendor_rows,
-        selectable_rows=list(vendor_rows),
+        rows=operational_vendor_rows,
+        selectable_rows=list(operational_vendor_rows),
         display_columns=[
             "Vendor",
-            "Vendor ID",
-            "Code",
-            "Website",
-            "Active",
-            "Aliases",
-            "Relationships",
-            "Updated",
+            "Type",
+            "Purchasing Channel",
+            "Active Offerings",
+            "Current Pricing",
+            "Last Activity",
+            "Issue State",
         ],
         selection_label_fn=lambda item: f"{_safe_text(item.get('Vendor'), '')} ({_safe_text(item.get('Vendor ID'), '')})",
         selector_label="Vendor",
         sort_columns=[
             "Vendor",
-            "Vendor ID",
-            "Code",
-            "Website",
-            "Active",
-            "Aliases",
-            "Relationships",
-            "Updated",
+            "Type",
+            "Purchasing Channel",
+            "Active Offerings",
+            "Current Pricing",
+            "Last Activity",
+            "Issue State",
         ],
         default_sort_column="Vendor",
         search_placeholder="name, code, alias",
         add_form_label="Add Vendor",
-        empty_why="No vendor records are currently available.",
-        empty_action="Load vendor seed records or import curated vendor data.",
-        empty_location="Use Knowledge Imports to initialize vendor data.",
+        empty_why="No vendors have been added for this tenant.",
+        empty_action="Add Vendor",
+        empty_location="Use Add Vendor or catalog imports to create vendor records.",
         add_form_renderer=_render_add_form,
         inspector_renderer=_render_inspector,
+        family_key="vendors",
+        presentation_adapter=lambda row: _vendor_knowledge_presentation(
+            row, product_service
+        ),
     )
 
 
@@ -2493,42 +3281,96 @@ def _render_manufacturer_workspace(
             key_prefix=f"atlas_ck_mfr_merge_{selected_manufacturer_id}",
         )
 
+    operational_manufacturer_rows: list[dict[str, Any]] = []
+    products_by_manufacturer = product_service.list_products(include_inactive=True)
+    for item in manufacturer_rows:
+        manufacturer_id = _safe_text(item.get("manufacturer_id"), "")
+        manufacturer_name = _safe_text(
+            item.get("canonical_name"),
+            _safe_text(item.get("display_name"), "Manufacturer"),
+        )
+        related_offers = [
+            offer
+            for offer in vendor_offers
+            if manufacturer_name.lower()
+            in _safe_text(offer.get("manufacturer"), "").lower()
+        ]
+        linked_vendors = {
+            _safe_text(offer.get("vendor"), "")
+            for offer in related_offers
+            if _safe_text(offer.get("vendor"), "")
+        }
+        active_products = [
+            product
+            for product in products_by_manufacturer
+            if manufacturer_name.lower()
+            in _safe_text(product.get("manufacturer"), "").lower()
+            and bool(product.get("active", True))
+        ]
+        channels = [
+            _knowledge_channel_label(
+                offer.get("purchasing_channel"),
+                direct=bool(offer.get("direct_from_manufacturer", False)),
+            )
+            for offer in related_offers
+        ]
+        pricing_coverage = (
+            "Current" if related_offers else "No current pricing coverage"
+        )
+        operational_manufacturer_rows.append(
+            {
+                "Manufacturer": manufacturer_name,
+                "Manufacturer ID": manufacturer_id,
+                "Purchasing Path": channels[0] if channels else "Not defined",
+                "Linked Vendors": len(linked_vendors),
+                "Active Products": len(active_products),
+                "Pricing Coverage": pricing_coverage,
+                "Status": "Active" if bool(item.get("active", True)) else "Archived",
+                "Last Activity": _safe_text(item.get("updated_at"), ""),
+                "_entity": dict(item),
+                "_record_key": manufacturer_id,
+            }
+        )
+    for row in operational_manufacturer_rows:
+        presentation = _manufacturer_knowledge_presentation(row, product_service)
+        row["Issue State"] = _knowledge_issue_state(presentation.findings)
+
     _knowledge_browser_layout(
         st,
         key_prefix="atlas_ck_mfr",
         title="Manufacturers",
-        rows=manufacturer_rows,
-        selectable_rows=list(manufacturer_rows),
+        rows=operational_manufacturer_rows,
+        selectable_rows=list(operational_manufacturer_rows),
         display_columns=[
             "Manufacturer",
-            "Manufacturer ID",
-            "Code",
-            "Website",
-            "Active",
-            "Aliases",
-            "Relationships",
-            "Updated",
+            "Purchasing Path",
+            "Linked Vendors",
+            "Active Products",
+            "Pricing Coverage",
+            "Issue State",
         ],
         selection_label_fn=lambda item: f"{_safe_text(item.get('Manufacturer'), '')} ({_safe_text(item.get('Manufacturer ID'), '')})",
         selector_label="Manufacturer",
         sort_columns=[
             "Manufacturer",
-            "Manufacturer ID",
-            "Code",
-            "Website",
-            "Active",
-            "Aliases",
-            "Relationships",
-            "Updated",
+            "Purchasing Path",
+            "Linked Vendors",
+            "Active Products",
+            "Pricing Coverage",
+            "Issue State",
         ],
         default_sort_column="Manufacturer",
         search_placeholder="name, code, alias",
         add_form_label="Add Manufacturer",
-        empty_why="No manufacturer records are currently available.",
-        empty_action="Load manufacturer seed records or import curated manufacturer data.",
-        empty_location="Use Knowledge Imports to initialize manufacturer data.",
+        empty_why="No manufacturers have been added for this tenant.",
+        empty_action="Add Manufacturer",
+        empty_location="Use Add Manufacturer or catalog imports to create manufacturer records.",
         add_form_renderer=_render_add_form,
         inspector_renderer=_render_inspector,
+        family_key="manufacturers",
+        presentation_adapter=lambda row: _manufacturer_knowledge_presentation(
+            row, product_service
+        ),
     )
 
 
@@ -2544,6 +3386,7 @@ def _render_catalog_workspace(
     vendor_rows: list[dict[str, Any]],
     uploaded_price_lists: list[dict[str, Any]],
     vendor_offers: list[dict[str, Any]],
+    active_catalog_view: str = "Catalog",
 ) -> None:
     engine = _estimate_engine_service(st)
     assembly_service = AssemblyExpansionService(
@@ -2552,12 +3395,23 @@ def _render_catalog_workspace(
 
     catalog_rows: list[dict[str, Any]] = []
     for item in product_rows:
+        product_id = _safe_text(item.get("atlas_product_uuid"), "")
+        commercial = dict(item.get("commercial") or {})
+        offerings = product_service.list_vendor_offerings_by_product(product_id)
+        active_offerings = [
+            offer for offer in offerings if bool(offer.get("active", True))
+        ]
+        preferred_vendor = _safe_text(commercial.get("preferred_vendor"), "")
+        if not preferred_vendor and active_offerings:
+            preferred_vendor = _safe_text(active_offerings[0].get("vendor"), "")
+        preferred_cost = commercial.get("preferred_cost")
         catalog_rows.append(
             {
                 "Item Type": "Product",
                 "Name": _safe_text(
                     item.get("product_name"), _safe_text(item.get("model"), "Product")
                 ),
+                "Manufacturer": _safe_text(item.get("manufacturer"), ""),
                 "Code": _safe_text(
                     item.get("manufacturer_part_number"),
                     _safe_text(item.get("model"), ""),
@@ -2567,13 +3421,31 @@ def _render_catalog_workspace(
                     item.get("lifecycle_status"), _safe_text(item.get("status"), "")
                 ),
                 "Active": bool(item.get("active", True)),
-                "Updated": _safe_text(item.get("updated_at"), ""),
+                "Preferred Vendor": preferred_vendor or "Not available",
+                "Current Cost": _knowledge_money(
+                    preferred_cost,
+                    _safe_text(commercial.get("currency"), "USD"),
+                ),
+                "Pricing Age": (
+                    "Current"
+                    if active_offerings and preferred_cost is not None
+                    else "Not available"
+                ),
+                "Recent Use": (
+                    f"Used in {len(list(item.get('project_references') or []))} project(s)"
+                    if list(item.get("project_references") or [])
+                    else "No recent use"
+                ),
+                "Validation State": _safe_text(item.get("lifecycle_status"), ""),
+                "Last Activity": _safe_text(item.get("updated_at"), ""),
                 "_entity": dict(item),
                 "_entity_key": _safe_text(item.get("atlas_product_uuid"), ""),
+                "_record_key": product_id,
                 "_selectable": True,
             }
         )
     for item in service_entities:
+        attributes = dict(item.get("attributes") or {})
         catalog_rows.append(
             {
                 "Item Type": "Service",
@@ -2581,16 +3453,25 @@ def _render_catalog_workspace(
                     item.get("display_name"),
                     _safe_text(item.get("canonical_name"), "Service"),
                 ),
+                "Manufacturer": "",
                 "Code": _safe_text(
-                    item.get("attributes", {}).get("service_id"),
+                    attributes.get("service_id"),
                     _safe_text(item.get("entity_id"), ""),
                 ),
                 "Family": "",
                 "Status": "Active" if bool(item.get("active", True)) else "Inactive",
                 "Active": bool(item.get("active", True)),
-                "Updated": _safe_text(item.get("updated_at"), ""),
+                "Preferred Vendor": "Not available",
+                "Current Cost": _knowledge_money(attributes.get("rate")),
+                "Pricing Age": "Current" if attributes.get("rate") else "Not available",
+                "Recent Use": "No recent use",
+                "Validation State": (
+                    "Active" if bool(item.get("active", True)) else "Inactive"
+                ),
+                "Last Activity": _safe_text(item.get("updated_at"), ""),
                 "_entity": dict(item),
                 "_entity_key": _safe_text(item.get("entity_id"), ""),
+                "_record_key": _safe_text(item.get("entity_id"), ""),
                 "_selectable": True,
             }
         )
@@ -2601,17 +3482,54 @@ def _render_catalog_workspace(
             {
                 "Item Type": "Fee",
                 "Name": _safe_text(item.get("name"), "Fee"),
+                "Manufacturer": "",
                 "Code": _safe_text(item.get("code"), ""),
                 "Family": _safe_text(item.get("category"), ""),
                 "Status": _safe_text(item.get("status"), ""),
                 "Active": not bool(item.get("archived", False)),
-                "Updated": _safe_text(item.get("updated_at"), ""),
+                "Preferred Vendor": "Not available",
+                "Current Cost": _knowledge_money(item.get("default_sales_price")),
+                "Pricing Age": (
+                    "Current" if item.get("default_sales_price") else "Not available"
+                ),
+                "Recent Use": "No recent use",
+                "Validation State": _safe_text(item.get("status"), ""),
+                "Last Activity": _safe_text(item.get("updated_at"), ""),
                 "_entity": dict(item),
                 "_entity_key": _safe_text(item.get("catalog_item_id"), ""),
+                "_record_key": _safe_text(item.get("catalog_item_id"), ""),
                 "_selectable": True,
             }
         )
     for assembly in list(assembly_service.state.get("assemblies", {}).values()):
+        assembly_id = _safe_text(assembly.get("assembly_id"), "")
+        assembly_versions = [
+            dict(item)
+            for item in assembly_service.state.get("versions", {}).values()
+            if _safe_text(item.get("assembly_id"), "") == assembly_id
+        ]
+        active_version = next(
+            (
+                item
+                for item in assembly_versions
+                if _safe_text(item.get("lifecycle_state"), "") == "active"
+            ),
+            assembly_versions[0] if assembly_versions else {},
+        )
+        active_version_id = _safe_text(active_version.get("assembly_version_id"), "")
+        version_components = list(
+            assembly_service.state.get("components", {}).get(active_version_id) or []
+        )
+        material_count = sum(
+            1
+            for component in version_components
+            if _safe_text(component.get("component_type"), "") != "labor"
+        )
+        labor_count = sum(
+            1
+            for component in version_components
+            if _safe_text(component.get("component_type"), "") == "labor"
+        )
         catalog_rows.append(
             {
                 "Item Type": "Assembly",
@@ -2619,29 +3537,59 @@ def _render_catalog_workspace(
                     assembly.get("display_name"),
                     _safe_text(assembly.get("canonical_name"), "Assembly"),
                 ),
-                "Code": _safe_text(assembly.get("assembly_id"), ""),
+                "Manufacturer": "",
+                "Code": assembly_id,
                 "Family": _safe_text(assembly.get("category"), ""),
-                "Status": (
-                    "Active" if bool(assembly.get("active", True)) else "Inactive"
+                "Status": _format_knowledge_state(
+                    active_version.get("lifecycle_state"),
+                    "Active" if bool(assembly.get("active", True)) else "Inactive",
                 ),
                 "Active": bool(assembly.get("active", True)),
-                "Updated": _safe_text(assembly.get("updated_at"), ""),
+                "Preferred Vendor": "Not available",
+                "Current Cost": "Not available",
+                "Pricing Age": "Not available",
+                "Recent Use": "No recent use",
+                "Validation State": _format_knowledge_state(
+                    active_version.get("lifecycle_state"),
+                    "Not available",
+                ),
+                "Material Count": material_count,
+                "Labor Count": labor_count,
+                "Last Activity": _safe_text(assembly.get("updated_at"), ""),
                 "_entity": dict(assembly),
-                "_entity_key": _safe_text(assembly.get("assembly_id"), ""),
+                "_entity_key": assembly_id,
+                "_record_key": assembly_id,
                 "_selectable": True,
             }
         )
 
+    type_options = ["All", "Products", "Services", "Fees", "Assemblies"]
+    default_type_filter = {
+        "Catalog": "All",
+        "Products": "Products",
+        "Services": "Services",
+        "Fees": "Fees",
+        "Assemblies": "Assemblies",
+    }.get(active_catalog_view, "All")
     type_filter = st.selectbox(
         "Item Type Filter",
-        options=["All", "Products", "Services", "Fees", "Assemblies"],
+        options=type_options,
+        index=type_options.index(default_type_filter),
         key="atlas_ck_catalog_type_filter",
     )
 
     def _render_add_form() -> None:
+        add_type_options = ["product", "service", "fee", "assembly"]
+        default_add_type = {
+            "Products": "product",
+            "Services": "service",
+            "Fees": "fee",
+            "Assemblies": "assembly",
+        }.get(active_catalog_view, "product")
         add_type = st.selectbox(
             "Type",
-            options=["product", "service", "fee", "assembly"],
+            options=add_type_options,
+            index=add_type_options.index(default_add_type),
             key="atlas_ck_catalog_add_type",
         )
         if add_type == "product":
@@ -2676,6 +3624,11 @@ def _render_catalog_workspace(
             )
             product_desc = st.text_input(
                 "Description", key="atlas_ck_catalog_product_description"
+            )
+            product_category = st.text_input(
+                "Category",
+                value="other",
+                key="atlas_ck_catalog_product_category",
             )
             channel = st.selectbox(
                 "Purchasing Channel",
@@ -2720,31 +3673,32 @@ def _render_catalog_workspace(
                         manufacturer_part_number=part_number,
                         product_name=product_name,
                         product_description=product_desc,
-                        category="other",
+                        category=product_category,
                         lifecycle_status="pending_verification",
                         active=True,
                         notes="catalog_add",
                     )
-                    product_service.create_vendor_offering(
-                        vendor_id=_safe_text(vendor_record.get("vendor_id"), ""),
-                        vendor=_safe_text(vendor_record.get("canonical_name"), ""),
-                        atlas_product_uuid=_safe_text(
-                            created_product.get("atlas_product_uuid"), ""
-                        ),
-                        vendor_sku=vendor_sku or part_number,
-                        purchasing_channel=channel,
-                        direct_from_manufacturer=(
-                            channel == "direct_from_manufacturer"
-                        ),
-                        authorization_status="unknown",
-                        minimum_order_quantity=0,
-                        order_multiple=1,
-                        unit_of_measure="ea",
-                        pack_quantity=0,
-                        lead_time_notes="",
-                        active=True,
-                        notes="catalog_add",
-                    )
+                    if _safe_text(vendor_record.get("vendor_id"), ""):
+                        product_service.create_vendor_offering(
+                            vendor_id=_safe_text(vendor_record.get("vendor_id"), ""),
+                            vendor=_safe_text(vendor_record.get("canonical_name"), ""),
+                            atlas_product_uuid=_safe_text(
+                                created_product.get("atlas_product_uuid"), ""
+                            ),
+                            vendor_sku=vendor_sku or part_number,
+                            purchasing_channel=channel,
+                            direct_from_manufacturer=(
+                                channel == "direct_from_manufacturer"
+                            ),
+                            authorization_status="unknown",
+                            minimum_order_quantity=0,
+                            order_multiple=1,
+                            unit_of_measure="ea",
+                            pack_quantity=0,
+                            lead_time_notes="",
+                            active=True,
+                            notes="catalog_add",
+                        )
                     _save_commercial_product_state(st, product_service)
                     st.success("Product created.")
                     st.rerun()
@@ -3235,33 +4189,57 @@ def _render_catalog_workspace(
         if type_filter == "All"
         or _safe_text(item.get("Item Type"), "") == type_filter_map.get(type_filter, "")
     ]
+    for row in catalog_rows:
+        presentation = _catalog_knowledge_presentation(row)
+        row["Issue State"] = _knowledge_issue_state(presentation.findings)
 
     _knowledge_browser_layout(
         st,
         key_prefix="atlas_ck_catalog",
-        title="Catalog",
+        title=active_catalog_view if active_catalog_view != "Catalog" else "Catalog",
         rows=catalog_rows,
         selectable_rows=list(catalog_rows),
         display_columns=[
             "Item Type",
             "Name",
+            "Manufacturer",
             "Code",
             "Family",
             "Status",
-            "Active",
-            "Updated",
+            "Preferred Vendor",
+            "Current Cost",
+            "Pricing Age",
+            "Recent Use",
+            "Issue State",
         ],
         selection_label_fn=lambda item: f"{_safe_text(item.get('Item Type'), '')} · {_safe_text(item.get('Name'), '')} ({_safe_text(item.get('Code'), '')})",
         selector_label="Catalog Item",
-        sort_columns=["Item Type", "Name", "Code", "Family", "Status", "Updated"],
+        sort_columns=[
+            "Item Type",
+            "Name",
+            "Manufacturer",
+            "Family",
+            "Status",
+            "Preferred Vendor",
+            "Current Cost",
+            "Pricing Age",
+            "Issue State",
+        ],
         default_sort_column="Name",
         search_placeholder="product, service, fee, assembly",
         add_form_label="Add Catalog Item",
-        empty_why="No catalog items are currently available.",
-        empty_action="Create a product, service, fee, or assembly item.",
-        empty_location="Use the catalog add form or import catalog data.",
+        empty_why="No catalog items have been added for this tenant.",
+        empty_action="Add Catalog Item",
+        empty_location="Use Add Catalog Item or import supported catalog data.",
         add_form_renderer=_render_add_form,
         inspector_renderer=_render_inspector,
+        family_key={
+            "Product": "products",
+            "Service": "services",
+            "Fee": "fees",
+            "Assembly": "assemblies",
+        }.get(type_filter_map.get(type_filter, ""), "catalog"),
+        presentation_adapter=_catalog_knowledge_presentation,
     )
 
 
@@ -8407,6 +9385,7 @@ def _knowledge_content_view_from_shell(st: Any) -> str:
 
 def _sync_knowledge_content_state(st: Any) -> str:
     _knowledge_navigation_defaults(st)
+    _sync_knowledge_route_from_query_params(st)
     active_view = _knowledge_content_view_from_shell(st)
     st.session_state[_knowledge_secondary_state_key()] = (
         _knowledge_secondary_group_for_page(active_view)
@@ -13641,7 +14620,13 @@ def _render_application_knowledge_page(
         )
         return
 
-    if active_knowledge_view == "Catalog":
+    if active_knowledge_view in {
+        "Catalog",
+        "Products",
+        "Services",
+        "Fees",
+        "Assemblies",
+    }:
         _render_catalog_workspace(
             st,
             workspace_service,
@@ -13653,6 +14638,7 @@ def _render_application_knowledge_page(
             vendor_rows=vendor_rows,
             uploaded_price_lists=uploaded_price_lists,
             vendor_offers=vendor_offers,
+            active_catalog_view=active_knowledge_view,
         )
         return
 

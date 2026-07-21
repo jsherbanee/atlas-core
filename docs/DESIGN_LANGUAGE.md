@@ -608,6 +608,7 @@ Atlas components should be optimized for engineering clarity.
 - Checklist-driven review summaries should make completion state understandable at a glance.
 - Internal summary reports should default to concise decision support and expose long evidence/detail through expansion, not by default verbosity.
 - Commercial transaction workspaces should organize existing document state into summary, health, readiness, line work, relationships, and one recommended action. They should not expose implementation identifiers, sync internals, or decorative financial widgets in the default view.
+- Knowledge workspaces should feel like operational record workbenches, not database browsers. Default-visible content should explain identity, relevance, usage, issues, relationships, activity, and the next action. Record mechanics belong in collapsed supporting details.
 
 ## 17. Themes
 

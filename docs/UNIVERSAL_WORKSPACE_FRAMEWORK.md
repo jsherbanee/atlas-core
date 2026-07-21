@@ -38,6 +38,20 @@ This order keeps navigation and object selection stable while allowing presentat
 
 Projects and Transactions are the active migration targets using this order; both keep their service-layer behavior intact while converging on the shared shell grammar.
 
+PX-04 extends the same migration order to Knowledge. Knowledge browse/list
+surfaces remain service-backed, while selected records render through a shared
+operational workbench structure:
+
+1. Business Summary
+2. Operational Health
+3. Current Relationships
+4. Recent Activity
+5. Recommended Next Step
+6. Supporting Details
+
+Supporting Details is the home for edit/archive/import/export/admin mechanics
+and is collapsed by default.
+
 ## Compatibility Boundaries
 
 The framework intentionally stays below the business-domain layer. It should not:
@@ -48,6 +62,11 @@ The framework intentionally stays below the business-domain layer. It should not
 - bypass tenant, organization, or audit controls
 
 Use domain services for data changes, and use the framework only to render them consistently.
+
+PX-04 Knowledge adapters may normalize existing Customer, Vendor,
+Manufacturer, Product, Service, Fee, and Assembly data into presentation
+contracts. They must not create new commercial rules, new pricing calculations,
+or independent health state.
 
 ## Related Documents
 

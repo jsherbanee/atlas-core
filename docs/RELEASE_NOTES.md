@@ -19,6 +19,29 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (PX-04 Knowledge That Works)
+
+### Improved
+
+- Knowledge selected records now render as operational workbenches for Customers, Vendors, Manufacturers, Products, Services, Fees, and Assemblies.
+- Default-visible Knowledge content now emphasizes business summary, operational health, current relationships, recent activity, one recommended next step, and usage/pricing context where supported.
+- Knowledge browse rows now use business columns such as purchasing path, active offerings, pricing state, current cost, pricing age, recent use, and issue state instead of defaulting to record mechanics.
+- Technical identifiers, edit/archive controls, import/export, merge, and provenance details are deferred under Supporting Details.
+- Knowledge URL state now supports `atlas_knowledge_family` and `atlas_knowledge_record` for selected-record restoration.
+- Quick product creation now preserves product-row compatibility after service-backed single-SKU creation.
+
+### Quality
+
+- Added focused regression coverage for Knowledge adapters, finding precedence, purchasing-path presentation, selected-record URL state, operational workbench rendering, and quick-created product row compatibility.
+
+### Scope Notes
+
+- no new commercial rules
+- no new pricing calculations or vendor-selection automation
+- no persistence redesign
+- no inventory, procurement, accounting, QuickBooks transport, AI, or predictive scoring
+- representative validation data is development/test-only via `python3 scripts/px04_representative_knowledge_fixture.py`
+
 ## Unreleased (PX-03 Commercial Transaction Workbench)
 
 ### Improved

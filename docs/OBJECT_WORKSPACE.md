@@ -287,3 +287,29 @@ Action rendering now resolves deterministically as:
 - hidden
 
 Authorization checks remain centralized in shared action evaluation and are not scattered across page-specific object UI code.
+
+## PX-04 Knowledge Workbench Note
+
+PX-04 keeps Knowledge records compatible with Universal Object identity and
+Working Set handoff while improving the default Knowledge page experience.
+
+Supported Knowledge families:
+- Customer
+- Vendor
+- Manufacturer
+- Product
+- Service
+- Fee
+- Assembly
+
+Knowledge selected-record presentation uses shared adapter contracts for:
+- business summary
+- deterministic operational findings
+- business-language relationships
+- recent activity
+- one recommended next step
+- supporting details
+
+Technical identifiers, edit forms, archive/restore actions, import/export
+controls, merge controls, and provenance remain available as supporting details
+instead of default-visible business context.

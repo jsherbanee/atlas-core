@@ -60,6 +60,7 @@ Status: Active
 - PX-01 Mission Control Tenant Operations Center
 - PX-02 Project Operations Center
 - PX-03 Commercial Transaction Workbench
+- PX-04 Knowledge That Works
 
 ### PX-01 Scope
 
@@ -113,6 +114,30 @@ Explicitly out of scope:
 - persistence redesign
 - accounting, payment, procurement, inventory, or QuickBooks transport behavior
 - decorative dashboards, charts, gauges, and duplicate financial metrics
+
+### PX-04 Scope
+
+- transform Knowledge from record-directory pages into operational workbenches
+  for Customers, Vendors, Manufacturers, Products, Services, Fees, and
+  Assemblies
+- present shared selected-record sections for Business Summary, Operational
+  Health, Current Relationships, Recent Activity, Recommended Next Step, and
+  Supporting Details
+- derive deterministic findings and recommendations from existing Knowledge,
+  catalog, offering, pricing, assembly, transaction, project, and activity data
+- preserve Knowledge navigation, URL selection, Working Set, archive/restore,
+  tenant isolation, permissions, and Universal Object compatibility
+- provide a development/test-only representative Knowledge fixture invocation
+  without automatic production seeding
+
+Explicitly out of scope:
+- new commercial rules
+- new pricing calculations
+- vendor-selection automation
+- inventory, procurement, accounting, or QuickBooks transport behavior
+- persistence redesign
+- AI or predictive scoring
+- production demo data
 
 ### A-07 Scope
 

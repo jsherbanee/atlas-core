@@ -195,3 +195,29 @@ document exists in the current tenant transaction service state.
 Explicit URL state wins after workspace-state restoration so refreshed,
 shared, or browser-authored Transactions links can reopen the intended family,
 action, and selected document without breaking the shared return-context model.
+
+## Knowledge Workbench Routing
+
+PX-04 preserves the existing Knowledge secondary/tertiary navigation contract
+and adds browser-visible selected-record state for Knowledge validation and
+direct links.
+
+Supported query parameters:
+- `atlas_page=Knowledge`
+- `atlas_knowledge_family`
+- `atlas_knowledge_record`
+
+`atlas_knowledge_family` maps to:
+- `customers`
+- `vendors`
+- `manufacturers`
+- `products`
+- `services`
+- `fees`
+- `assemblies`
+- `catalog`
+
+Explicit URL family state updates the shared secondary/tertiary navigation
+keys. `atlas_knowledge_record` selects a matching row when that record exists
+in the current tenant-visible Knowledge state. URL state does not create,
+seed, or mutate Knowledge records.
