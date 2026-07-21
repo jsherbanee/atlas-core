@@ -386,6 +386,14 @@ Project open behavior (AV-00B):
 - Unexpected project route errors write searchable runtime diagnostic records
   with tenant, project, page, route, hydration mode, section, exception type,
   stack trace, and recent action context.
+- Document-processing status refresh is contained to the status region when
+  Streamlit fragments are available. The project shell, left navigation rail,
+  header actions, folder controls, and pending upload state are treated as stable
+  while job stage/progress/warnings/failure rows refresh.
+- Processing polling uses 3 seconds for running jobs, 7 seconds for queued or
+  retry-scheduled jobs, and stops when no jobs remain active. If contained
+  refresh is unavailable, `Refresh Status` and `Auto-refresh while processing`
+  provide the fallback controls.
 - On the representative MAW runtime project, the measured blocking full-context
   load was 45.56 seconds before AV-00B; lightweight bootstrap now measures about
   0.04 seconds locally before rendering.

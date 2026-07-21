@@ -5430,6 +5430,117 @@ def _document_processing_rows(jobs: list[dict[str, Any]]) -> list[dict[str, Any]
     return rows
 
 
+def _document_processing_jobs_signature(jobs: list[dict[str, Any]]) -> str:
+    payload = [
+        {
+            "job_id": _safe_text(item.get("job_id"), ""),
+            "status": _safe_text(item.get("status"), ""),
+            "progress": dict(item.get("progress") or {}),
+            "diagnostics": list(item.get("diagnostics") or []),
+            "completed_at": _safe_text(item.get("completed_at"), ""),
+            "retry_available": bool(item.get("retry_available", False)),
+        }
+        for item in jobs
+    ]
+    return hashlib.sha1(
+        json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()
+
+
+def _processing_status_cache(st: Any) -> dict[str, Any]:
+    cache = st.session_state.setdefault("atlas_processing_status_cache", {})
+    if isinstance(cache, dict):
+        return cache
+    st.session_state["atlas_processing_status_cache"] = {}
+    return st.session_state["atlas_processing_status_cache"]
+
+
+def _cached_processing_status(st: Any, workspace_id: str) -> dict[str, Any]:
+    cached = _processing_status_cache(st).get(workspace_id)
+    return dict(cached) if isinstance(cached, dict) else {}
+
+
+def _processing_status_snapshot(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+    *,
+    tenant_id: str,
+    organization_id: str,
+) -> dict[str, Any]:
+    previous = _cached_processing_status(st, record.workspace_id)
+    try:
+        if hasattr(workspace_service, "list_document_processing_statuses"):
+            jobs = workspace_service.list_document_processing_statuses(
+                record.workspace_id,
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                limit=200,
+            )
+        else:
+            try:
+                raw_jobs = workspace_service.list_background_jobs(
+                    record.workspace_id,
+                    tenant_id=tenant_id,
+                    organization_id=organization_id,
+                    limit=200,
+                )
+            except TypeError:
+                raw_jobs = workspace_service.list_background_jobs(record.workspace_id)
+            jobs = [
+                item
+                for item in raw_jobs
+                if dict(item.get("request") or {}).get("category") == "document_import"
+            ]
+        signature = _document_processing_jobs_signature(jobs)
+        snapshot = {
+            "jobs": jobs,
+            "signature": signature,
+            "updated_at": datetime.now(UTC).isoformat(),
+            "stale": False,
+            "message": "",
+            "changed": signature != _safe_text(previous.get("signature"), ""),
+        }
+        _processing_status_cache(st)[record.workspace_id] = snapshot
+        return snapshot
+    except Exception:
+        if previous:
+            stale_snapshot = {
+                **previous,
+                "stale": True,
+                "message": "Processing status is updating.",
+                "changed": False,
+            }
+            _processing_status_cache(st)[record.workspace_id] = stale_snapshot
+            return stale_snapshot
+        return {
+            "jobs": [],
+            "signature": "",
+            "updated_at": datetime.now(UTC).isoformat(),
+            "stale": True,
+            "message": "Processing status is updating.",
+            "changed": False,
+        }
+
+
+def _processing_poll_interval_seconds(jobs: list[dict[str, Any]]) -> int:
+    statuses = {_safe_text(item.get("status"), "") for item in jobs}
+    if "running" in statuses:
+        return 3
+    if statuses.intersection({"queued", "retry_scheduled"}):
+        return 7
+    return 0
+
+
+def _processing_poll_interval_label(jobs: list[dict[str, Any]]) -> str | None:
+    seconds = _processing_poll_interval_seconds(jobs)
+    return f"{seconds}s" if seconds > 0 else None
+
+
+def _processing_jobs_active(jobs: list[dict[str, Any]]) -> bool:
+    return _processing_poll_interval_seconds(jobs) > 0
+
+
 def _elapsed_label(started_at: str, completed_at: str = "") -> str:
     try:
         start = datetime.fromisoformat(started_at)
@@ -36430,6 +36541,271 @@ def _render_global_search_panel(
     _render_global_search_results(st, workspace_service, filtered, grouped_refs, query)
 
 
+def _processing_auto_refresh_enabled(st: Any, workspace_id: str) -> bool:
+    state = st.session_state.setdefault("atlas_processing_auto_refresh", {})
+    if not isinstance(state, dict):
+        state = {}
+        st.session_state["atlas_processing_auto_refresh"] = state
+    return bool(state.get(workspace_id, True))
+
+
+def _set_processing_auto_refresh_enabled(
+    st: Any,
+    workspace_id: str,
+    enabled: bool,
+) -> None:
+    state = st.session_state.setdefault("atlas_processing_auto_refresh", {})
+    if not isinstance(state, dict):
+        state = {}
+        st.session_state["atlas_processing_auto_refresh"] = state
+    state[workspace_id] = bool(enabled)
+
+
+def _render_processing_refresh_controls(
+    st: Any,
+    *,
+    workspace_id: str,
+    active_jobs: bool,
+    fragment_available: bool,
+) -> bool:
+    control_cols = st.columns([1.4, 1.0])
+    enabled = _processing_auto_refresh_enabled(st, workspace_id)
+    if active_jobs:
+        enabled = bool(
+            control_cols[0].checkbox(
+                "Auto-refresh while processing",
+                value=enabled,
+                key=f"atlas_processing_auto_refresh_{workspace_id}",
+            )
+        )
+        _set_processing_auto_refresh_enabled(st, workspace_id, enabled)
+    else:
+        _set_processing_auto_refresh_enabled(st, workspace_id, False)
+        control_cols[0].caption("Automatic processing refresh is stopped.")
+
+    if control_cols[1].button(
+        "Refresh Status",
+        key=f"atlas_processing_refresh_status_{workspace_id}",
+        width="stretch",
+    ):
+        st.rerun()
+    if enabled and not fragment_available:
+        st.caption(
+            "Manual refresh is available while contained refresh is unavailable."
+        )
+    return enabled
+
+
+def _render_document_processing_status_table(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+    *,
+    tenant_id: str,
+    organization_id: str,
+    manage_access: Any | None = None,
+    user_id: str = "atlas-ui",
+    compact: bool = False,
+) -> None:
+    snapshot = _processing_status_snapshot(
+        st,
+        workspace_service,
+        record,
+        tenant_id=tenant_id,
+        organization_id=organization_id,
+    )
+    jobs = list(snapshot.get("jobs") or [])
+    if bool(snapshot.get("stale")):
+        st.caption(
+            _safe_text(snapshot.get("message"), "Processing status is updating.")
+        )
+    if not jobs:
+        if compact:
+            st.info("No recent document processing jobs.")
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="No document processing jobs have been created for this project.",
+                action_to_populate="Upload project documents to queue background processing.",
+                next_location="Use Documents to add files.",
+            )
+        return
+
+    all_rows = _document_processing_rows(jobs)
+    if compact:
+        st.dataframe(
+            [
+                {
+                    "Filename": item["Filename"],
+                    "Stage": item["Stage"],
+                    "Progress": item["Progress"],
+                    "Warnings": item["Warnings"],
+                    "Failure Reason": item["Failure Reason"],
+                }
+                for item in all_rows[:20]
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+        return
+
+    filter_value = st.selectbox(
+        "Processing Filter",
+        options=["Active", "Ready", "Needs Attention", "Failed", "All"],
+        key=f"atlas_processing_filter_{record.workspace_id}",
+    )
+    if filter_value == "Active":
+        rows = [
+            item
+            for item in all_rows
+            if item["Stage"] in {"Queued", "Inspecting", "Extracting", "Processing"}
+        ]
+    elif filter_value == "Ready":
+        rows = [item for item in all_rows if item["Stage"] == "Ready"]
+    elif filter_value == "Needs Attention":
+        rows = [item for item in all_rows if item["Stage"] == "Needs Attention"]
+    elif filter_value == "Failed":
+        rows = [item for item in all_rows if item["Stage"] == "Failed"]
+    else:
+        rows = all_rows
+
+    active_count = sum(
+        1
+        for item in all_rows
+        if item["Stage"] in {"Queued", "Inspecting", "Extracting", "Processing"}
+    )
+    ready_count = sum(1 for item in all_rows if item["Stage"] == "Ready")
+    failed_count = sum(1 for item in all_rows if item["Stage"] == "Failed")
+    metrics = st.columns(4)
+    metrics[0].metric("Active", str(active_count))
+    metrics[1].metric("Ready", str(ready_count))
+    metrics[2].metric(
+        "Needs Attention",
+        str(sum(1 for item in all_rows if item["Stage"] == "Needs Attention")),
+    )
+    metrics[3].metric("Failed", str(failed_count))
+
+    if not rows:
+        st.info("No document processing jobs match the selected filter.")
+        return
+
+    st.dataframe(rows, width="stretch", hide_index=True)
+    selected_job = st.selectbox(
+        "Select Job",
+        options=[_safe_text(item.get("job_id"), "") for item in jobs],
+        key=f"atlas_processing_selected_job_{record.workspace_id}",
+    )
+    selected_payload = next(
+        item for item in jobs if _safe_text(item.get("job_id"), "") == selected_job
+    )
+
+    if manage_access is None or not bool(getattr(manage_access, "allowed", False)):
+        if manage_access is not None:
+            st.caption(_safe_text(getattr(manage_access, "reason", ""), ""))
+        return
+
+    action_cols = st.columns(2)
+    can_retry = bool(selected_payload.get("retry_available", False))
+    can_cancel = _safe_text(selected_payload.get("status"), "") in {
+        "queued",
+        "retry_scheduled",
+    }
+    if action_cols[0].button(
+        "Retry Job",
+        key=f"atlas_processing_retry_{selected_job}",
+        width="stretch",
+        disabled=not can_retry,
+    ):
+        workspace_service.retry_background_job(
+            record.workspace_id,
+            job_id=selected_job,
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        st.success("Job retry requested.")
+        st.rerun()
+
+    if action_cols[1].button(
+        "Cancel Job",
+        key=f"atlas_processing_cancel_{selected_job}",
+        width="stretch",
+        disabled=not can_cancel,
+    ):
+        workspace_service.cancel_background_job(
+            record.workspace_id,
+            job_id=selected_job,
+            actor_id=user_id,
+            reason="Cancelled from Processing workspace",
+            tenant_id=tenant_id,
+            organization_id=organization_id,
+        )
+        st.success("Job cancelled.")
+        st.rerun()
+
+
+def _render_processing_status_region(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+    *,
+    tenant_id: str,
+    organization_id: str,
+    manage_access: Any | None = None,
+    user_id: str = "atlas-ui",
+    compact: bool = False,
+) -> None:
+    initial_snapshot = _processing_status_snapshot(
+        st,
+        workspace_service,
+        record,
+        tenant_id=tenant_id,
+        organization_id=organization_id,
+    )
+    jobs = list(initial_snapshot.get("jobs") or [])
+    active_jobs = _processing_jobs_active(jobs)
+    fragment_available = callable(getattr(st, "fragment", None))
+    auto_refresh = _render_processing_refresh_controls(
+        st,
+        workspace_id=record.workspace_id,
+        active_jobs=active_jobs,
+        fragment_available=fragment_available,
+    )
+    interval = (
+        _processing_poll_interval_label(jobs)
+        if auto_refresh and fragment_available
+        else None
+    )
+
+    if fragment_available:
+
+        @st.fragment(run_every=interval)
+        def _processing_status_fragment() -> None:
+            _render_document_processing_status_table(
+                st,
+                workspace_service,
+                record,
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                manage_access=manage_access,
+                user_id=user_id,
+                compact=compact,
+            )
+
+        _processing_status_fragment()
+        return
+
+    _render_document_processing_status_table(
+        st,
+        workspace_service,
+        record,
+        tenant_id=tenant_id,
+        organization_id=organization_id,
+        manage_access=manage_access,
+        user_id=user_id,
+        compact=compact,
+    )
+
+
 def _render_upload_panel(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -36575,27 +36951,16 @@ def _render_upload_panel(
     ]
     can_upload = bool(accepted_items)
 
-    recent_jobs = [
-        item
-        for item in workspace_service.list_background_jobs(record.workspace_id)
-        if dict(item.get("request") or {}).get("category") == "document_import"
-    ][:20]
-    if recent_jobs:
-        st.markdown("#### Document Processing Status")
-        st.dataframe(
-            [
-                {
-                    "Filename": item["Filename"],
-                    "Stage": item["Stage"],
-                    "Progress": item["Progress"],
-                    "Warnings": item["Warnings"],
-                    "Failure Reason": item["Failure Reason"],
-                }
-                for item in _document_processing_rows(recent_jobs)
-            ],
-            width="stretch",
-            hide_index=True,
-        )
+    transactions_state = _transactions_workspace_state(st)
+    st.markdown("#### Document Processing Status")
+    _render_processing_status_region(
+        st,
+        workspace_service,
+        record,
+        tenant_id=_safe_text(transactions_state.get("tenant_id"), "local"),
+        organization_id=_safe_text(transactions_state.get("organization_id"), "atlas"),
+        compact=True,
+    )
 
     if not can_upload and pending:
         st.caption("No accepted pending files are ready to upload.")
@@ -39365,119 +39730,15 @@ def _render_processing_page(
         st.warning(view_access.reason)
         return
 
-    jobs = workspace_service.list_background_jobs(
-        record.workspace_id,
+    _render_processing_status_region(
+        st,
+        workspace_service,
+        record,
         tenant_id=tenant_id,
         organization_id=organization_id,
-        limit=200,
+        manage_access=manage_access,
+        user_id=user_id,
     )
-    jobs = [
-        item
-        for item in jobs
-        if dict(item.get("request") or {}).get("category") == "document_import"
-    ]
-    if not jobs:
-        _render_guided_empty_state(
-            st,
-            why_empty="No document processing jobs have been created for this project.",
-            action_to_populate="Upload project documents to queue background processing.",
-            next_location="Use Documents to add files.",
-        )
-        return
-
-    filter_value = st.selectbox(
-        "Processing Filter",
-        options=["Active", "Ready", "Needs Attention", "Failed", "All"],
-        key=f"atlas_processing_filter_{record.workspace_id}",
-    )
-    all_rows = _document_processing_rows(jobs)
-    if filter_value == "Active":
-        rows = [
-            item
-            for item in all_rows
-            if item["Stage"] in {"Queued", "Inspecting", "Extracting", "Processing"}
-        ]
-    elif filter_value == "Ready":
-        rows = [item for item in all_rows if item["Stage"] == "Ready"]
-    elif filter_value == "Needs Attention":
-        rows = [item for item in all_rows if item["Stage"] == "Needs Attention"]
-    elif filter_value == "Failed":
-        rows = [item for item in all_rows if item["Stage"] == "Failed"]
-    else:
-        rows = all_rows
-
-    active_count = sum(
-        1
-        for item in all_rows
-        if item["Stage"] in {"Queued", "Inspecting", "Extracting", "Processing"}
-    )
-    ready_count = sum(1 for item in all_rows if item["Stage"] == "Ready")
-    failed_count = sum(1 for item in all_rows if item["Stage"] == "Failed")
-    metrics = st.columns(4)
-    metrics[0].metric("Active", str(active_count))
-    metrics[1].metric("Ready", str(ready_count))
-    metrics[2].metric(
-        "Needs Attention",
-        str(sum(1 for item in all_rows if item["Stage"] == "Needs Attention")),
-    )
-    metrics[3].metric("Failed", str(failed_count))
-
-    if not rows:
-        st.info("No document processing jobs match the selected filter.")
-        return
-
-    st.dataframe(rows, width="stretch", hide_index=True)
-
-    selected_job = st.selectbox(
-        "Select Job",
-        options=[_safe_text(item.get("job_id"), "") for item in jobs],
-        key=f"atlas_processing_selected_job_{record.workspace_id}",
-    )
-    selected_payload = next(
-        item for item in jobs if _safe_text(item.get("job_id"), "") == selected_job
-    )
-
-    if not manage_access.allowed:
-        st.caption(manage_access.reason)
-        return
-
-    action_cols = st.columns(2)
-    can_retry = bool(selected_payload.get("retry_available", False))
-    can_cancel = _safe_text(selected_payload.get("status"), "") in {
-        "queued",
-        "retry_scheduled",
-    }
-    if action_cols[0].button(
-        "Retry Job",
-        key=f"atlas_processing_retry_{selected_job}",
-        width="stretch",
-        disabled=not can_retry,
-    ):
-        workspace_service.retry_background_job(
-            record.workspace_id,
-            job_id=selected_job,
-            tenant_id=tenant_id,
-            organization_id=organization_id,
-        )
-        st.success("Job retry requested.")
-        st.rerun()
-
-    if action_cols[1].button(
-        "Cancel Job",
-        key=f"atlas_processing_cancel_{selected_job}",
-        width="stretch",
-        disabled=not can_cancel,
-    ):
-        workspace_service.cancel_background_job(
-            record.workspace_id,
-            job_id=selected_job,
-            actor_id=user_id,
-            reason="Cancelled from Processing workspace",
-            tenant_id=tenant_id,
-            organization_id=organization_id,
-        )
-        st.success("Job cancelled.")
-        st.rerun()
 
 
 def _select_first_node(graph: dict[str, Any], node_type: str) -> dict[str, Any] | None:

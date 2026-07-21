@@ -23,6 +23,14 @@ cached document and processing counts only; it does not claim jobs, wait for job
 completion, inspect PDFs, run OCR, extract text, classify documents, or generate
 evidence during the Streamlit route transition.
 
+AV-00C keeps processing-status refresh isolated from project navigation.
+Documents and Processing read only persisted job summary fields for filename,
+status, stage, progress, warning count, failure reason, and update timing. Those
+reads do not claim jobs, run workers, scan document contents, reconcile the
+repository, or hydrate drawing intelligence. When status storage is temporarily
+unavailable, the UI keeps the latest cached rows and reports
+`Processing status is updating.`
+
 ## Upload Policy
 
 Bid-package intake uses one shared upload policy for the Streamlit uploader,

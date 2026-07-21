@@ -173,6 +173,9 @@ class _HomeContractStreamlit:
         _ = kwargs
         return value
 
+    def metric(self, label: str, value: str) -> None:
+        self.markdowns.append(f"Metric: {label}={value}")
+
     def expander(self, _label: str, expanded: bool = False) -> _HomeContractStreamlit:
         self.expander_calls.append({"label": _label, "expanded": expanded})
         return self
@@ -4976,6 +4979,180 @@ def test_documents_upload_pending_files_enqueues_without_expensive_processing() 
     assert st.session_state["atlas_active_page"] == "Processing"
     assert app._pending_upload_state(st, "BID-1") == []
     assert st.rerun_called is True
+
+
+class _ProcessingFragmentStreamlit(_HomeContractStreamlit):
+    def __init__(self) -> None:
+        super().__init__()
+        self.fragment_intervals: list[str | None] = []
+
+    def fragment(self, *, run_every: str | None = None) -> Any:
+        self.fragment_intervals.append(run_every)
+
+        def _decorator(func: Any) -> Any:
+            return func
+
+        return _decorator
+
+
+class _ProcessingStatusWorkspaceService:
+    def __init__(self, jobs: list[dict[str, Any]]) -> None:
+        self.jobs = list(jobs)
+        self.status_calls = 0
+        self.bootstrap_calls = 0
+
+    def load_workspace_bootstrap(self, _workspace_id: str) -> None:
+        self.bootstrap_calls += 1
+        raise AssertionError("processing status refresh must not reload bootstrap")
+
+    def list_document_processing_statuses(
+        self, _workspace_id: str, **_kwargs: Any
+    ) -> list[dict[str, Any]]:
+        self.status_calls += 1
+        return list(self.jobs)
+
+
+def _processing_job(
+    *,
+    job_id: str = "job-1",
+    status: str = "running",
+    step: str = "start",
+    percent: int = 20,
+) -> dict[str, Any]:
+    return {
+        "job_id": job_id,
+        "project_id": "BID-1",
+        "request": {
+            "category": "document_import",
+            "input_payload": {"uploaded_files": [{"name": "active.pdf"}]},
+        },
+        "status": status,
+        "progress": {
+            "percent": percent,
+            "message": "Inspecting",
+            "step": step,
+            "updated_at": "2026-07-20T10:00:00+00:00",
+        },
+        "diagnostics": [],
+        "created_at": "2026-07-20T09:59:00+00:00",
+        "started_at": "2026-07-20T10:00:00+00:00",
+        "completed_at": None,
+        "retry_available": False,
+    }
+
+
+def test_processing_status_fragment_refreshes_without_navigation_rerender() -> None:
+    record = _project_record("BID-1", "Processing")
+    st = _ProcessingFragmentStreamlit()
+    st.session_state.update(
+        {
+            "atlas_active_workspace_id": "BID-1",
+            "atlas_active_page": "Documents",
+            "atlas_active_secondary_section": "documents",
+            "atlas_documents_pending_uploads": {
+                "BID-1": [{"identity_key": "file|1", "name": "pending.pdf"}]
+            },
+        }
+    )
+    service = _ProcessingStatusWorkspaceService([_processing_job()])
+
+    app._render_processing_status_region(
+        st,
+        service,  # type: ignore[arg-type]
+        record,
+        tenant_id="local",
+        organization_id="atlas",
+        compact=True,
+    )
+
+    assert st.fragment_intervals == ["3s"]
+    assert service.status_calls == 2
+    assert service.bootstrap_calls == 0
+    assert st.session_state["atlas_active_page"] == "Documents"
+    assert st.session_state["atlas_active_secondary_section"] == "documents"
+    assert (
+        st.session_state["atlas_documents_pending_uploads"]["BID-1"][0]["name"]
+        == "pending.pdf"
+    )
+    assert st.rerun_called is False
+
+
+def test_processing_polling_stops_when_no_jobs_are_active() -> None:
+    record = _project_record("BID-1", "Processing")
+    st = _ProcessingFragmentStreamlit()
+    service = _ProcessingStatusWorkspaceService(
+        [_processing_job(status="succeeded", step="complete", percent=100)]
+    )
+
+    app._render_processing_status_region(
+        st,
+        service,  # type: ignore[arg-type]
+        record,
+        tenant_id="local",
+        organization_id="atlas",
+        compact=True,
+    )
+
+    assert st.fragment_intervals == [None]
+    assert st.session_state["atlas_processing_auto_refresh"]["BID-1"] is False
+    assert "Automatic processing refresh is stopped." in st.captions
+
+
+def test_processing_status_uses_stale_cache_when_status_query_is_locked() -> None:
+    record = _project_record("BID-1", "Processing")
+    st = _HomeContractStreamlit()
+    service = _ProcessingStatusWorkspaceService([_processing_job()])
+    first = app._processing_status_snapshot(
+        st,
+        service,  # type: ignore[arg-type]
+        record,
+        tenant_id="local",
+        organization_id="atlas",
+    )
+
+    class _LockedProcessingStatusService(_ProcessingStatusWorkspaceService):
+        def list_document_processing_statuses(
+            self, _workspace_id: str, **_kwargs: Any
+        ) -> list[dict[str, Any]]:
+            raise TimeoutError("jobs file is locked")
+
+    stale = app._processing_status_snapshot(
+        st,
+        _LockedProcessingStatusService([]),  # type: ignore[arg-type]
+        record,
+        tenant_id="local",
+        organization_id="atlas",
+    )
+
+    assert first["stale"] is False
+    assert stale["stale"] is True
+    assert stale["message"] == "Processing status is updating."
+    assert stale["jobs"] == first["jobs"]
+    assert stale["changed"] is False
+
+
+def test_unchanged_processing_status_does_not_mark_snapshot_changed() -> None:
+    record = _project_record("BID-1", "Processing")
+    st = _HomeContractStreamlit()
+    service = _ProcessingStatusWorkspaceService([_processing_job()])
+
+    first = app._processing_status_snapshot(
+        st,
+        service,  # type: ignore[arg-type]
+        record,
+        tenant_id="local",
+        organization_id="atlas",
+    )
+    second = app._processing_status_snapshot(
+        st,
+        service,  # type: ignore[arg-type]
+        record,
+        tenant_id="local",
+        organization_id="atlas",
+    )
+
+    assert first["changed"] is True
+    assert second["changed"] is False
 
 
 def test_documents_upload_pending_files_queues_only_accepted_files() -> None:

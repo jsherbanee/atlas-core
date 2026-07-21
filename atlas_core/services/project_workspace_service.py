@@ -1277,6 +1277,64 @@ class ProjectWorkspaceService:
             limit=limit,
         )
 
+    def list_document_processing_statuses(
+        self,
+        workspace_id: str,
+        *,
+        tenant_id: str,
+        organization_id: str,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        jobs_file = Path(self.project_location(workspace_id)) / "jobs" / "jobs.jsonl"
+        if not jobs_file.exists():
+            return []
+
+        rows: list[dict[str, Any]] = []
+        with jobs_file.open(encoding="utf-8") as file:
+            for line in file:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(item, dict):
+                    continue
+                request = dict(item.get("request") or {})
+                if request.get("category") != JobCategory.DOCUMENT_IMPORT.value:
+                    continue
+                if str(request.get("tenant_id") or "") != tenant_id:
+                    continue
+                if str(request.get("organization_id") or "") != organization_id:
+                    continue
+                rows.append(
+                    {
+                        "job_id": str(item.get("job_id") or ""),
+                        "project_id": str(item.get("project_id") or workspace_id),
+                        "request": {
+                            "category": str(request.get("category") or ""),
+                            "input_payload": dict(request.get("input_payload") or {}),
+                        },
+                        "status": str(item.get("status") or "queued"),
+                        "progress": dict(item.get("progress") or {}),
+                        "diagnostics": list(item.get("diagnostics") or []),
+                        "created_at": str(item.get("created_at") or ""),
+                        "started_at": item.get("started_at"),
+                        "completed_at": item.get("completed_at"),
+                        "retry_available": bool(item.get("retry_available", False)),
+                    }
+                )
+
+        rows.sort(
+            key=lambda item: (
+                str(item.get("created_at") or ""),
+                str(item.get("job_id") or ""),
+            ),
+            reverse=True,
+        )
+        return rows[:limit]
+
     def cancel_background_job(
         self,
         workspace_id: str,

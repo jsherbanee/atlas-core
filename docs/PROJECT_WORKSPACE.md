@@ -76,10 +76,34 @@ AV-00A makes document intake asynchronous for local Atlas:
 - Expensive document work such as PDF inspection, OCR, extraction, classification, drawing intelligence, and evidence generation runs from the persisted Processing queue, not inside the Streamlit button callback.
 - Processing displays filename, folder, upload time, current stage, progress, elapsed time, warnings, failure reason, retry, and cancel controls.
 - Active, Ready, Needs Attention, Failed, and All filters read persisted job state and survive reruns, refreshes, navigation, and local application restart where the queued job record is present.
+- Processing status refresh is isolated from the stable project shell. The top
+  navigation, project selector, identity header, primary project actions, left
+  navigation rail, upload controls, pending upload state, and active route remain
+  stable while processing rows poll persisted status summaries.
 
 Local limitation: the built-in worker is an in-process daemon. Jobs remain
 durable on disk, but processing only advances while a local Atlas worker process
 is running.
+
+## Processing Refresh Boundary
+
+AV-00C uses a contained Streamlit refresh boundary for volatile document
+processing status when the runtime supports fragments. Only job stage, progress,
+elapsed time, warnings, failure reason, completion state, and retry/cancel
+controls refresh frequently.
+
+Polling cadence is restrained:
+
+- running jobs: every 3 seconds
+- queued or retry-scheduled jobs: every 7 seconds
+- completed, failed, cancelled, or empty queues: automatic polling stops
+
+The fallback behavior is explicit: users can select `Refresh Status`, and
+`Auto-refresh while processing` is only active while jobs remain active. Status
+queries read persisted job summary fields only and do not claim jobs, process
+jobs, inspect documents, reconcile repositories, or load full review context. If
+status storage is temporarily unavailable, Atlas keeps the latest cached rows and
+shows `Processing status is updating.`
 
 ## Lightweight Project Open
 

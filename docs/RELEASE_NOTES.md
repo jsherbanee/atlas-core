@@ -43,6 +43,15 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Unexpected application and section errors now write runtime diagnostics with
   tenant, project, route, active page, hydration mode, section, exception type,
   stack trace, and recent action context.
+- Documents and Processing now isolate volatile job-status refresh from the
+  stable project shell, navigation rail, header actions, upload controls, and
+  pending upload state.
+- Processing status now reads projected persisted job summaries only; it does
+  not claim jobs, process jobs, inspect documents, reconcile repositories, or
+  hydrate full review context.
+- Polling uses 3 seconds for running jobs, 7 seconds for queued or
+  retry-scheduled jobs, and stops when no active jobs remain; `Refresh Status`
+  remains available as the fallback control.
 
 ### Scope Notes
 

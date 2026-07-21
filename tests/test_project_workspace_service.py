@@ -743,6 +743,40 @@ def test_workspace_service_enqueues_document_import_without_running(
     assert service.list_background_jobs(record.workspace_id)[0]["status"] == "queued"
 
 
+def test_workspace_service_lists_document_processing_statuses_without_loading_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="job-status-1",
+        name="Status Import",
+        client="Client",
+    )
+    service.save_record(record)
+    service.enqueue_document_processing(
+        workspace_id=record.workspace_id,
+        uploaded_files=[("bid-package.pdf", _blank_pdf_bytes())],
+        actor_id="user-1",
+    )
+
+    def _fail_load_record(_workspace_id: str) -> None:
+        raise AssertionError("status summaries must not load full workspace record")
+
+    monkeypatch.setattr(service, "load_record", _fail_load_record)
+
+    rows = service.list_document_processing_statuses(
+        record.workspace_id,
+        tenant_id="local",
+        organization_id="atlas",
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["status"] == "queued"
+    assert rows[0]["request"]["category"] == JobCategory.DOCUMENT_IMPORT.value
+    assert "result" not in rows[0]
+
+
 def test_workspace_service_enqueues_observed_maw_plan_check_size_without_running(
     tmp_path: Path,
 ) -> None:
