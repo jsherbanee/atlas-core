@@ -865,6 +865,27 @@ def test_top_navigation_settings_routes_to_administration() -> None:
     assert st.session_state["atlas_active_page"] == "Administration"
 
 
+def test_query_params_restore_selected_project_workspace() -> None:
+    record = _project_record("maw-demo", "MAW")
+    st = _FakeStreamlit(session_state={})
+    st.query_params = {"atlas_workspace_id": "maw-demo"}
+    service = _FakeWorkspaceService([record])
+
+    app._sync_active_workspace_from_query_params(st, service)
+
+    assert st.session_state["atlas_active_workspace_id"] == "maw-demo"
+
+
+def test_query_params_ignore_unknown_project_workspace() -> None:
+    st = _FakeStreamlit(session_state={})
+    st.query_params = {"atlas_workspace_id": "missing-project"}
+    service = _FakeWorkspaceService([_project_record("maw-demo", "MAW")])
+
+    app._sync_active_workspace_from_query_params(st, service)
+
+    assert "atlas_active_workspace_id" not in st.session_state
+
+
 def test_atlas_button_routes_back_home() -> None:
     st = _HomeContractStreamlit(pressed={"Atlas"})
     st.query_params = {}
@@ -2124,6 +2145,21 @@ def test_mission_control_rendering_uses_operations_center_sections() -> None:
     assert all(title not in st.markdowns for title in removed_titles)
 
 
+def test_atlas_workspace_without_secondary_sections_still_renders_content() -> None:
+    st = _HomeContractStreamlit()
+    st.session_state["atlas_navigation_primary"] = "Atlas"
+    st.session_state["atlas_active_workspace_mode"] = "application"
+
+    app._render_workspace_navigation(
+        st,
+        record=None,
+        content_renderer=lambda: st.markdown("Tenant Operations Center rendered"),
+    )
+
+    assert "Tenant Operations Center rendered" in st.markdowns
+    assert st.column_specs == []
+
+
 def test_home_primary_actions_route_correctly() -> None:
     actions = {
         "Create New Project": "Create New Project",
@@ -3178,6 +3214,26 @@ def test_restore_workspace_state_restores_navigation_state() -> None:
     assert st.session_state["atlas_tenant_scope"] == "local"
 
 
+def test_query_page_can_override_restored_workspace_page() -> None:
+    class _RestoreService:
+        def load_workspace_state(self, _workspace_id: str) -> dict[str, Any]:
+            return {
+                "last_open_page": "Mission Control",
+                "filters": {},
+                "search_state": {},
+                "window_preferences": {},
+            }
+
+    st = _FakeStreamlit(session_state={})
+    st.query_params = {"atlas_page": "Overview"}
+    record = _project_record("maw-demo", "MAW")
+
+    app._restore_workspace_state(st, _RestoreService(), record)
+    app._sync_active_page_from_query_params(st)
+
+    assert st.session_state["atlas_active_page"] == "Overview"
+
+
 def test_open_project_record_updates_recency() -> None:
     record = _project_record("maw-demo", "MAW")
     st = _FakeStreamlit(session_state={})
@@ -3539,6 +3595,7 @@ def test_filter_returns_empty_for_non_matching_query() -> None:
 def test_open_project_result_activates_workspace() -> None:
     record = _project_record("maw-demo", "MAW")
     st = _FakeStreamlit(session_state={})
+    st.query_params = {}
     service = _FakeWorkspaceService(records=[record])
     reference = {
         "selection_kind": "project_record",
@@ -3551,6 +3608,8 @@ def test_open_project_result_activates_workspace() -> None:
 
     assert st.session_state["atlas_active_workspace_id"] == "maw-demo"
     assert st.session_state["atlas_active_page"] == "Overview"
+    assert st.query_params["atlas_workspace_id"] == "maw-demo"
+    assert st.query_params["atlas_page"] == "Overview"
 
 
 def test_project_context_header_builder_returns_expected_fields() -> None:

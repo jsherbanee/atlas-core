@@ -20,6 +20,9 @@ This document defines the reusable navigation contract used by the shell and wor
 - Breadcrumbs should reflect the active workspace and selection context
 - Disabled or future sections should remain visible only when they are intentionally part of the contract
 - Primary navigation must stay within the current browser window and preserve session state
+- Explicit browser routes may carry both `atlas_page` and `atlas_workspace_id`;
+  the workspace id is accepted only when it resolves to an existing tenant-visible
+  project workspace
 
 ## Current Implementation Notes
 
@@ -30,6 +33,10 @@ This document defines the reusable navigation contract used by the shell and wor
 - Knowledge search results restore the active secondary group and tertiary page selection context
 - The framework is intended to be extended to additional workspaces without changing the contract shape
 - Shared workspace headers and object summaries are now factored into the reusable Universal Workspace Framework so page shells can reuse the same navigation and presentation grammar
+- Application-level routes such as Mission Control render their content even when
+  the active primary workspace has no secondary accordion sections
+- Project workspace opens persist `atlas_workspace_id` alongside `atlas_page` so
+  browser refreshes and validation links can restore the selected project context
 
 ## Transactions Navigation Direction
 

@@ -479,6 +479,8 @@ Project-specific engineering pages are not shown while no project is open.
 
 PX-01 Mission Control refinement notes:
 - Mission Control remains backed by the existing compatibility route key.
+- Mission Control renders as the application home even though Atlas has no
+  secondary accordion sections.
 - Atlas in the global header is the sole application-home action.
 - Global search submits directly on Enter from the header input.
 - Empty/whitespace-only search does not execute and does not render results.
@@ -520,6 +522,11 @@ The active Project Overview is now a Project Operations Center.
 
 It answers one question:
 - What does the team need to know and do to move this project forward?
+
+Browser routes for the Project Operations Center preserve selected project
+context with `atlas_workspace_id` alongside `atlas_page`, so refreshes and
+validation links restore the active project instead of falling back to Mission
+Control.
 
 The default project surface shows:
 - concise operational project header with project name, customer, current phase,

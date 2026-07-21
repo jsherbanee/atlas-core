@@ -7869,6 +7869,13 @@ def _navigate_to_project_page(
 ) -> None:
     st.session_state["atlas_active_workspace_id"] = record.workspace_id
     st.session_state["atlas_active_page"] = page
+    query_params = getattr(st, "query_params", None)
+    if query_params is not None:
+        try:
+            query_params["atlas_workspace_id"] = record.workspace_id
+            query_params["atlas_page"] = page
+        except Exception:
+            pass
     if workspace_service is not None and hasattr(workspace_service, "save_record"):
         workspace_service.save_record(record)
     if page == "Documents":
@@ -8225,17 +8232,42 @@ def _set_active_page_query_param(st: Any, page: str) -> None:
         return
 
 
-def _sync_active_page_from_query_params(st: Any) -> None:
+def _query_param_text(st: Any, key: str) -> str:
     query_params = getattr(st, "query_params", None)
     if query_params is None:
-        return
-    page = _safe_text(getattr(query_params, "get", lambda *_: None)("atlas_page"), "")
+        return ""
+    value = getattr(query_params, "get", lambda *_: None)(key)
+    if isinstance(value, list):
+        value = value[0] if value else ""
+    return _safe_text(value, "")
+
+
+def _sync_active_page_from_query_params(st: Any) -> None:
+    page = _query_param_text(st, "atlas_page")
     if not page:
         return
     if page == "Settings":
         page = "Administration"
     if page in ALL_ACTIVE_PAGES:
         st.session_state["atlas_active_page"] = page
+
+
+def _sync_active_workspace_from_query_params(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    workspace_id = _query_param_text(st, "atlas_workspace_id")
+    if not workspace_id:
+        return
+    records = {
+        record.workspace_id: record
+        for record in workspace_service.list_workspaces(
+            include_archived=True,
+            limit=1000,
+        )
+    }
+    if workspace_id in records:
+        st.session_state["atlas_active_workspace_id"] = workspace_id
 
 
 def _open_page(st: Any, page: str) -> None:
@@ -10502,6 +10534,8 @@ def _render_workspace_navigation(
     )
     sections = _workspace_navigation_contract(primary, mode)
     if not sections:
+        if content_renderer is not None:
+            content_renderer()
         return
 
     grouped_sections = _group_navigation_sections(primary, mode, sections)
@@ -38800,11 +38834,13 @@ def main() -> None:
     _sync_active_page_from_query_params(st)
     try:
         workspace_service = _build_workspace_service()
+        _sync_active_workspace_from_query_params(st, workspace_service)
         _ensure_active_workspace(st, workspace_service)
 
         record = _active_record(st, workspace_service)
         if record is not None:
             _restore_workspace_state(st, workspace_service, record)
+            _sync_active_page_from_query_params(st)
 
         context = _load_context_for_record(record) if record is not None else None
         if record is not None and context is not None:
