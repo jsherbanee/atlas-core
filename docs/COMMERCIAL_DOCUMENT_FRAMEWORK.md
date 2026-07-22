@@ -202,6 +202,11 @@ Related documents:
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [LIFECYCLE_ENGINE.md](LIFECYCLE_ENGINE.md)
 - [INTEGRATIONS.md](INTEGRATIONS.md)
+- [validation/AV-00E_VALIDATION_TRANSCRIPT.md](validation/AV-00E_VALIDATION_TRANSCRIPT.md)
+
+## AV-00E Validation Reference
+
+AV-00E route and timing evidence for non-blocking project estimate-open behavior is recorded in [validation/AV-00E_VALIDATION_TRANSCRIPT.md](validation/AV-00E_VALIDATION_TRANSCRIPT.md).
 
 ## Framework Role
 

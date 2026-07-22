@@ -49,6 +49,21 @@ This document tracks product-facing changes for Atlas Preview releases.
   malformed workspace-state recovery, shell-visible content failure recovery,
   bootstrap failure recovery, and stable Project Overview action keys.
 
+## Unreleased (AV-00E Non-Blocking Open Estimate Validation Evidence)
+
+### Improved
+
+- Added durable AV-00E validation transcript artifact at [validation/AV-00E_VALIDATION_TRANSCRIPT.md](validation/AV-00E_VALIDATION_TRANSCRIPT.md).
+- Captured validated no-estimate route behavior confirming deterministic non-blocking Create Estimate navigation to Transactions > Estimates > Add.
+- Captured restricted-run PermissionError caveat as sandbox-permission related (not application-logic failure), plus successful broader-access rerun evidence.
+- Captured legacy heavy-path timing payload and evidence-bound interpretation that synchronous BOM enrichment dominates measured legacy estimate-open latency.
+- Captured heredoc wrapper noise note (EOF marker not found) with confirmation that timing payload execution/output still completed successfully.
+
+### Scope Notes
+
+- documentation evidence closeout only
+- no application behavior changes
+
 ## Unreleased (AV-00A Asynchronous Document Intake)
 
 ### Improved

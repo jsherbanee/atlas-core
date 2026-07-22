@@ -39,6 +39,11 @@ Related documents:
 - [INTEGRATIONS.md](INTEGRATIONS.md)
 - [NAVIGATION_ARCHITECTURE.md](NAVIGATION_ARCHITECTURE.md)
 - [COMMERCIAL_DOCUMENT_FRAMEWORK.md](COMMERCIAL_DOCUMENT_FRAMEWORK.md)
+- [validation/AV-00E_VALIDATION_TRANSCRIPT.md](validation/AV-00E_VALIDATION_TRANSCRIPT.md)
+
+## AV-00E Validation Reference
+
+AV-00E non-blocking project estimate-open route behavior, sandbox execution caveat, and legacy heavy-path timing evidence are documented in [validation/AV-00E_VALIDATION_TRANSCRIPT.md](validation/AV-00E_VALIDATION_TRANSCRIPT.md).
 
 ## Architectural Position
 

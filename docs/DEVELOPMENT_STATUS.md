@@ -87,6 +87,7 @@ resolve deterministically to Mission Control, ignoring malformed persisted
 workspace state with durable diagnostics, preserving shell visibility on
 route-level content failures, and fixing a duplicate Streamlit button-id failure
 that previously broke Project Overview recovery paths.
+AV-00E documents non-blocking project estimate-open validation evidence, including deterministic no-estimate routing, sandbox-permission caveat, successful broader-access rerun, legacy heavy-path timing payload, and shell-wrapper noise interpretation in [validation/AV-00E_VALIDATION_TRANSCRIPT.md](validation/AV-00E_VALIDATION_TRANSCRIPT.md).
 Alpha UI Cleanup (Responsive Navigation and Estimate Creation UX) standardizes primary shell order to Transactions, Projects, Knowledge, Reports, restores tenant-facing footer copyright text, and adds a dedicated Transactions > Estimates > Add workflow with dropdown-driven estimate details and catalog-backed Product/Service/Fee/Assembly line controls.
 Alpha UI Cleanup (Header Consolidation and Copy Reduction) standardizes a one-row shared header (Atlas, Transactions, Projects, Knowledge, Reports, Settings, Search), removes redundant tenant-facing shell metadata and repeated descriptive copy, and preserves continuity-critical object breadcrumbs and deterministic settings navigation.
 Atlas Workspace Alpha UI Repair standardizes fixed-width primary navigation buttons, same-window routing, bounded search, deliberate Settings tertiary wrapping, and table containment across the shared shell.
