@@ -6981,6 +6981,7 @@ def _default_transactions_workspace_state() -> dict[str, Any]:
     return {
         "documents": [],
         "project_commercial_state": {},
+        "project_scope": {},
         "tenant_id": "local",
         "organization_id": "atlas",
     }
@@ -7180,6 +7181,241 @@ def _save_transactions_workspace_state(
         reason="transactions-workspace-sync",
     )
     _save_settings_workspace_state(st, settings_service)
+
+
+def _transactions_project_scope(st: Any) -> dict[str, Any]:
+    state = _transactions_workspace_state(st)
+    scope = state.get("project_scope")
+    if isinstance(scope, dict):
+        return dict(scope)
+    return {}
+
+
+def _set_transactions_project_scope(st: Any, scope: dict[str, Any]) -> None:
+    state = _transactions_workspace_state(st)
+    state["project_scope"] = dict(scope)
+    st.session_state["atlas_transactions_workspace"] = state
+
+
+def _clear_transactions_project_scope(st: Any) -> None:
+    _set_transactions_project_scope(st, {})
+
+
+def _project_transaction_scope(record: ProjectWorkspaceRecord) -> dict[str, Any]:
+    project_ids = [
+        _safe_text(record.workspace_id, ""),
+        _safe_text(record.project.project_id, ""),
+        _atlas_bid_id(record),
+    ]
+    project_codes = _estimate_project_code_candidates(record)
+    return {
+        "workspace_id": _safe_text(record.workspace_id, ""),
+        "project_name": _safe_text(record.project.name, "Project"),
+        "customer": _safe_text(record.project.client, ""),
+        "project_ids": [item for item in project_ids if item],
+        "project_codes": [item for item in project_codes if item],
+    }
+
+
+def _document_matches_project_scope(
+    document: CommercialDocument,
+    scope: dict[str, Any],
+) -> bool:
+    project_ids = {
+        _safe_text(item, "")
+        for item in list(scope.get("project_ids") or [])
+        if _safe_text(item, "")
+    }
+    project_codes = {
+        _safe_text(item, "")
+        for item in list(scope.get("project_codes") or [])
+        if _safe_text(item, "")
+    }
+    document_project_id = _safe_text(document.project_id, "")
+    document_project_code = _safe_text(document.project_code, "")
+    return bool(
+        (document_project_id and document_project_id in project_ids)
+        or (document_project_code and document_project_code in project_codes)
+    )
+
+
+def _project_estimate_documents(
+    service: TransactionsWorkspaceService,
+    record: ProjectWorkspaceRecord,
+) -> list[CommercialDocument]:
+    scope = _project_transaction_scope(record)
+    return [
+        item
+        for item in service.list_documents(
+            document_type=CommercialDocumentType.ESTIMATE,
+            include_archived=True,
+        )
+        if _document_matches_project_scope(item, scope)
+    ]
+
+
+def _project_estimate_action_state(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+) -> dict[str, Any]:
+    service = _transactions_workspace_service(st)
+    documents = _project_estimate_documents(service, record)
+    selected_document_id = _safe_text(
+        st.session_state.get("atlas_transactions_selected_document_id"),
+        "",
+    )
+    selected_document = next(
+        (item for item in documents if item.document_id == selected_document_id),
+        None,
+    )
+    target_document = selected_document
+    if target_document is None and len(documents) == 1:
+        target_document = documents[0]
+
+    if not _safe_text(record.workspace_id, ""):
+        return {
+            "label": "No estimate is available",
+            "disabled": True,
+            "mode": "disabled",
+            "reason": "Project setup is incomplete.",
+            "documents": documents,
+            "current_documents": [],
+        }
+
+    if not documents:
+        return {
+            "label": "Create Estimate",
+            "disabled": False,
+            "mode": "create",
+            "reason": "No estimate exists for this project yet.",
+            "documents": documents,
+            "current_documents": [],
+        }
+
+    if target_document is not None:
+        return {
+            "label": (
+                "Continue Estimate" if target_document.is_mutable else "Open Estimate"
+            ),
+            "disabled": False,
+            "mode": "open",
+            "reason": _safe_text(
+                target_document.document_number,
+                target_document.document_id,
+            ),
+            "documents": documents,
+            "current_documents": [],
+            "target_document_id": target_document.document_id,
+        }
+
+    return {
+        "label": (
+            "Continue Estimate"
+            if any(item.is_mutable for item in documents)
+            else "Open Estimate"
+        ),
+        "disabled": False,
+        "mode": "browse",
+        "reason": f"{len(documents)} estimates are available for this project.",
+        "documents": documents,
+        "current_documents": [],
+    }
+
+
+def _prime_estimate_create_defaults(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+) -> None:
+    project_scope = _project_transaction_scope(record)
+    st.session_state["atlas_transactions_estimate_add_document_id"] = ""
+    if not _safe_text(st.session_state.get("atlas_estimate_add_project"), ""):
+        st.session_state["atlas_estimate_add_project"] = _safe_text(
+            project_scope.get("workspace_id"),
+            "",
+        )
+    if not _safe_text(st.session_state.get("atlas_estimate_add_project_code"), ""):
+        project_codes = list(project_scope.get("project_codes") or [])
+        st.session_state["atlas_estimate_add_project_code"] = _safe_text(
+            project_codes[0] if project_codes else "",
+            "",
+        )
+
+
+def _open_project_estimate_action(
+    st: Any,
+    record: ProjectWorkspaceRecord,
+    *,
+    source_label: str,
+) -> None:
+    state = _project_estimate_action_state(st, record)
+    if bool(state.get("disabled")):
+        return
+    _record_return_context(st, source_label=source_label)
+    _set_transactions_project_scope(st, _project_transaction_scope(record))
+    st.session_state["atlas_active_page"] = "Transactions"
+    st.session_state[_navigation_primary_state_key()] = "Transactions"
+    st.session_state[_navigation_mode_state_key()] = "application"
+    st.session_state[_navigation_secondary_state_key()] = "estimates"
+
+    mode = _safe_text(state.get("mode"), "browse")
+    if mode == "create":
+        st.session_state[_navigation_tertiary_state_key()] = "add"
+        st.session_state["atlas_transactions_selected_document_id"] = ""
+        _prime_estimate_create_defaults(st, record)
+        _set_transaction_query_params(
+            st,
+            secondary="estimates",
+            tertiary="add",
+        )
+        st.rerun()
+        return
+
+    st.session_state[_navigation_tertiary_state_key()] = "browse"
+    target_document_id = _safe_text(state.get("target_document_id"), "")
+    st.session_state["atlas_transactions_selected_document_id"] = target_document_id
+    _set_transaction_query_params(
+        st,
+        secondary="estimates",
+        tertiary="browse",
+        document_id=target_document_id,
+    )
+    st.rerun()
+
+
+def _render_project_estimate_action_button(
+    st: Any,
+    host: Any,
+    record: ProjectWorkspaceRecord,
+    *,
+    key: str,
+    source_label: str,
+    width: str = "stretch",
+    button_type: str = "secondary",
+) -> dict[str, Any]:
+    state = _project_estimate_action_state(st, record)
+    if host.button(
+        _safe_text(state.get("label"), "Open Estimate"),
+        key=key,
+        width=width,
+        type=button_type,
+        disabled=bool(state.get("disabled")),
+    ):
+        _open_project_estimate_action(
+            st,
+            record,
+            source_label=source_label,
+        )
+    return state
+
+
+def _render_project_estimate_action_explanation(
+    st: Any,
+    state: dict[str, Any],
+) -> None:
+    reason = _safe_text(state.get("reason"), "")
+    if not reason:
+        return
+    st.caption(f"Estimate: {reason}")
 
 
 def _ensure_commercial_seed_data(st: Any) -> CommercialProductService:
@@ -17749,6 +17985,15 @@ def _sync_transaction_route_from_query_params(
         st.session_state["atlas_transactions_selected_document_id"] = document_id
 
 
+def _transaction_scope_rows(
+    rows: list[CommercialDocument],
+    scope: dict[str, Any],
+) -> list[CommercialDocument]:
+    if not scope:
+        return rows
+    return [item for item in rows if _document_matches_project_scope(item, scope)]
+
+
 def _transaction_row(document: Any) -> dict[str, Any]:
     metadata = dict(document.document_metadata or {})
     change_order_number = _safe_text(metadata.get("change_order_number"), "")
@@ -18337,92 +18582,194 @@ def _render_commercial_transaction_workbench(
     prefix: str,
     primary_action: Callable[[], None] | None = None,
 ) -> None:
-    presentation = _commercial_transaction_presentation(document, all_documents)
-    summary = dict(presentation["summary"])
-    recommendation = dict(presentation["recommendation"])
+    margin, margin_text = _commercial_margin(document)
+    findings = _commercial_health_findings(document, all_documents)
+    readiness = _commercial_readiness_checks(document, findings)
+    recommendation = _commercial_recommendation(document, findings, all_documents)
+    blocked = any(item["State"] == "Blocked" for item in readiness)
+    needs_attention = any(item["State"] == "Needs Attention" for item in readiness)
+    _ = margin
+    summary = {
+        "document": _safe_text(document.document_number, "Draft"),
+        "family": _transaction_family_label(document.document_type),
+        "customer": _safe_text(document.customer_id, "Not assigned"),
+        "project": _safe_text(
+            document.project_code or document.project_id, "Standalone"
+        ),
+        "revision": f"R{document.revision_number}",
+        "status": _format_commercial_state(document.lifecycle_state.value),
+        "owner": _safe_text(
+            (document.document_metadata or {}).get("owner"),
+            "Unassigned",
+        ),
+        "updated": _safe_text(document.updated_at, "n/a"),
+        "total": _commercial_money(
+            document.totals.grand_total, document.totals.currency
+        ),
+        "margin": margin_text,
+        "readiness_state": (
+            "Blocked" if blocked else "Needs Attention" if needs_attention else "Ready"
+        ),
+    }
 
-    _render_section_title(st, "Document Summary")
-    with st.container(border=True):
-        st.markdown(f"### {_safe_text(summary.get('document'), 'Draft')}")
-        st.caption(
-            " · ".join(
-                [
-                    _safe_text(summary.get("family"), "Transaction"),
-                    f"Customer: {_safe_text(summary.get('customer'), 'Not assigned')}",
-                    f"Project: {_safe_text(summary.get('project'), 'Standalone')}",
-                    f"Revision: {_safe_text(summary.get('revision'), 'R1')}",
-                    f"Status: {_safe_text(summary.get('status'), 'Draft')}",
-                ]
+    def _render_transaction_section_safely(
+        section: str,
+        renderer: Callable[[], None],
+    ) -> None:
+        try:
+            renderer()
+        except Exception as exc:
+            error_id = _log_application_error(
+                st,
+                summary=f"{section} could not be loaded",
+                exception=exc,
+                severity="high",
+                tenant_id=_safe_text(document.tenant_id, "local"),
+                organization_id=_safe_text(document.organization_id, "atlas"),
+                user_id=_safe_text(
+                    st.session_state.get("atlas_settings_user_id"), "atlas-ui"
+                ),
+                workspace="Transactions",
+                route="Transactions",
+                related_object_id=document.document_id,
+                related_object_type=document.document_type.value,
+                request_or_session_ref=document.document_id,
+                active_page="Transactions",
+                hydration_mode="lightweight",
+                section=section,
+                recent_action="transactions_workbench",
+                diagnostic_context={
+                    "document_number": _safe_text(
+                        document.document_number,
+                        document.document_id,
+                    ),
+                    "document_family": document.document_type.value,
+                },
             )
-        )
-        st.caption(
-            " · ".join(
-                [
-                    f"Owner: {_safe_text(summary.get('owner'), 'Unassigned')}",
-                    f"Last updated: {_safe_text(summary.get('updated'), 'n/a')}",
-                    f"Total: {_safe_text(summary.get('total'), 'USD 0.00')}",
-                    f"Margin: {_safe_text(summary.get('margin'), 'Not available')}",
-                ]
-            )
-        )
-        if primary_action is not None:
+            st.warning("This section could not be loaded.")
+            st.caption(f"Reference Error ID: {error_id}")
+            st.caption(f"Admin detail: {type(exc).__name__}: {exc}")
             if st.button(
-                _safe_text(recommendation.get("action"), "Continue Editing"),
-                key=f"{prefix}_workbench_primary_action",
-                type="primary",
-                width="stretch",
+                "Retry",
+                key=f"{prefix}_{_stable_widget_suffix(section)}_retry",
+                width="content",
             ):
-                primary_action()
+                st.rerun()
+
+    def _render_document_summary() -> None:
+        _render_section_title(st, "Document Summary")
+        with st.container(border=True):
+            st.markdown(f"### {_safe_text(summary.get('document'), 'Draft')}")
+            st.caption(
+                " · ".join(
+                    [
+                        _safe_text(summary.get("family"), "Transaction"),
+                        f"Customer: {_safe_text(summary.get('customer'), 'Not assigned')}",
+                        f"Project: {_safe_text(summary.get('project'), 'Standalone')}",
+                        f"Revision: {_safe_text(summary.get('revision'), 'R1')}",
+                        f"Status: {_safe_text(summary.get('status'), 'Draft')}",
+                    ]
+                )
+            )
+            st.caption(
+                " · ".join(
+                    [
+                        f"Owner: {_safe_text(summary.get('owner'), 'Unassigned')}",
+                        f"Last updated: {_safe_text(summary.get('updated'), 'n/a')}",
+                        f"Total: {_safe_text(summary.get('total'), 'USD 0.00')}",
+                        f"Margin: {_safe_text(summary.get('margin'), 'Not available')}",
+                    ]
+                )
+            )
+            if primary_action is not None:
+                if st.button(
+                    _safe_text(recommendation.get("action"), "Continue Editing"),
+                    key=f"{prefix}_workbench_primary_action",
+                    type="primary",
+                    width="stretch",
+                ):
+                    primary_action()
+
+    _render_transaction_section_safely("Document Summary", _render_document_summary)
 
     workbench_cols = st.columns([1.25, 1.0], gap="small")
     with workbench_cols[0]:
-        _render_section_title(st, "Commercial Health")
-        findings = list(presentation["findings"] or [])
-        if findings:
-            _render_data_table(
-                st,
-                [
-                    {
-                        "Severity": _safe_text(item.get("severity"), "Review"),
-                        "Finding": _safe_text(item.get("title"), ""),
-                        "Business Impact": _safe_text(item.get("explanation"), ""),
-                        "Area": _safe_text(item.get("area"), ""),
-                        "Action": _safe_text(item.get("action"), ""),
-                    }
-                    for item in findings
-                ],
-            )
-        else:
-            st.caption("No significant commercial issues detected.")
 
-        _render_section_title(st, "Commercial Readiness")
-        _render_data_table(st, list(presentation["readiness"] or []))
+        def _render_commercial_health() -> None:
+            _render_section_title(st, "Commercial Health")
+            if findings:
+                _render_data_table(
+                    st,
+                    [
+                        {
+                            "Severity": _safe_text(item.get("severity"), "Review"),
+                            "Finding": _safe_text(item.get("title"), ""),
+                            "Business Impact": _safe_text(item.get("explanation"), ""),
+                            "Area": _safe_text(item.get("area"), ""),
+                            "Action": _safe_text(item.get("action"), ""),
+                        }
+                        for item in findings
+                    ],
+                )
+            else:
+                st.caption("No significant commercial issues detected.")
 
-    with workbench_cols[1]:
-        _render_section_title(st, "Decision Panel")
-        with st.container(border=True):
-            st.markdown(f"**{_safe_text(recommendation.get('title'), 'Next Step')}**")
-            st.caption(_safe_text(recommendation.get("detail"), "Continue review."))
-        _render_data_table(st, list(presentation["totals"] or []))
+        def _render_commercial_readiness() -> None:
+            _render_section_title(st, "Commercial Readiness")
+            _render_data_table(st, list(readiness or []))
 
-    _render_section_title(st, "Line Item Workspace")
-    line_rows = list(presentation["line_rows"] or [])
-    if line_rows:
-        _render_data_table(st, line_rows)
-    else:
-        _render_guided_empty_state(
-            st,
-            why_empty="This document has no commercial line items yet.",
-            action_to_populate="Add the first item before commercial review.",
-            next_location="Use the Lines or Add controls for this transaction family.",
+        _render_transaction_section_safely(
+            "Commercial Health",
+            _render_commercial_health,
+        )
+        _render_transaction_section_safely(
+            "Readiness Checklist",
+            _render_commercial_readiness,
         )
 
-    _render_section_title(st, "Commercial Relationships")
-    relationship_rows = list(presentation["relationships"] or [])
-    if relationship_rows:
-        _render_data_table(st, relationship_rows)
-    else:
-        st.caption("No related commercial documents are linked yet.")
+    with workbench_cols[1]:
+
+        def _render_decision_panel() -> None:
+            _render_section_title(st, "Decision Panel")
+            with st.container(border=True):
+                st.markdown(
+                    f"**{_safe_text(recommendation.get('title'), 'Next Step')}**"
+                )
+                st.caption(_safe_text(recommendation.get("detail"), "Continue review."))
+            _render_data_table(st, _commercial_totals_rows(document))
+
+        _render_transaction_section_safely("Decision Panel", _render_decision_panel)
+
+    def _render_line_item_workspace() -> None:
+        _render_section_title(st, "Line Item Workspace")
+        line_rows = _commercial_line_rows(document)
+        if line_rows:
+            _render_data_table(st, line_rows)
+        else:
+            _render_guided_empty_state(
+                st,
+                why_empty="This document has no commercial line items yet.",
+                action_to_populate="Add the first item before commercial review.",
+                next_location="Use the Lines or Add controls for this transaction family.",
+            )
+
+    _render_transaction_section_safely(
+        "Line Item Workspace",
+        _render_line_item_workspace,
+    )
+
+    def _render_commercial_relationships() -> None:
+        _render_section_title(st, "Commercial Relationships")
+        relationship_rows = _commercial_relationship_rows(document, all_documents)
+        if relationship_rows:
+            _render_data_table(st, relationship_rows)
+        else:
+            st.caption("No related commercial documents are linked yet.")
+
+    _render_transaction_section_safely(
+        "Relationships",
+        _render_commercial_relationships,
+    )
 
     with st.expander("Administration and History", expanded=False):
         _render_data_table(
@@ -18753,6 +19100,7 @@ def _render_transactions_workspace_page(
         return
 
     prefix = f"atlas_transactions_{secondary}_{tertiary}"
+    project_scope = _transactions_project_scope(st)
     search_query, include_archived = _shared_render_control_bar(
         st,
         [
@@ -18775,6 +19123,23 @@ def _render_transactions_workspace_page(
         document_type=document_type,
         include_archived=include_archived,
     )
+    if secondary == "estimates":
+        rows = _transaction_scope_rows(rows, project_scope)
+
+    if secondary == "estimates" and project_scope:
+        project_scope_name = _safe_text(project_scope.get("project_name"), "Project")
+        project_scope_codes = ", ".join(list(project_scope.get("project_codes") or []))
+        st.caption(
+            f"Estimate scope: {project_scope_name}"
+            + (f" · {project_scope_codes}" if project_scope_codes else "")
+        )
+        if st.button(
+            "Show All Estimates",
+            key=f"{prefix}_clear_project_scope",
+            width="content",
+        ):
+            _clear_transactions_project_scope(st)
+            st.rerun()
 
     if tertiary == "add":
         if document_type == CommercialDocumentType.RETURN_ORDER:
@@ -19210,7 +19575,15 @@ def _render_transactions_workspace_page(
                     st.error(f"Unable to create draft: {exc}")
 
     if not rows:
-        if search_query:
+        if secondary == "estimates" and project_scope:
+            why_empty = "No estimate is currently stored for this project."
+            action_to_populate = (
+                "Create a draft estimate when commercial work is ready to begin."
+            )
+            next_location = (
+                "Use Add Estimate to start the Commercial Transaction Workbench."
+            )
+        elif search_query:
             why_empty = "No transactions match the current filters."
             action_to_populate = "Clear the search or include archived documents."
             next_location = "Use Browse to review all records in this family."
@@ -19244,6 +19617,23 @@ def _render_transactions_workspace_page(
             width="content",
         ):
             st.session_state[_navigation_tertiary_state_key()] = "add"
+            if secondary == "estimates" and project_scope:
+                if not _safe_text(
+                    st.session_state.get("atlas_estimate_add_project"), ""
+                ):
+                    st.session_state["atlas_estimate_add_project"] = _safe_text(
+                        project_scope.get("workspace_id"),
+                        "",
+                    )
+                if not _safe_text(
+                    st.session_state.get("atlas_estimate_add_project_code"),
+                    "",
+                ):
+                    project_codes = list(project_scope.get("project_codes") or [])
+                    st.session_state["atlas_estimate_add_project_code"] = _safe_text(
+                        project_codes[0] if project_codes else "",
+                        "",
+                    )
             _set_transaction_query_params(
                 st,
                 secondary=secondary,
@@ -29236,9 +29626,14 @@ def _render_engineering_review_page(
     if action_cols[1].button("Open BOM Review", width="stretch"):
         st.session_state["atlas_active_page"] = "BOM Review"
         st.rerun()
-    if action_cols[2].button("Open Estimate", width="stretch"):
-        st.session_state["atlas_active_page"] = "Estimate"
-        st.rerun()
+    estimate_action_state = _render_project_estimate_action_button(
+        st,
+        action_cols[2],
+        record,
+        key="atlas_engineering_review_open_estimate",
+        source_label="Engineering Review",
+    )
+    _render_project_estimate_action_explanation(st, estimate_action_state)
 
     _render_section_title(st, "1. What Atlas Found")
     _render_data_table(
@@ -30111,12 +30506,13 @@ def _render_overview_page(
         type="primary",
     ):
         _open_page(st, _safe_text(next_action.get("page"), "Documents"))
-    if next_cols[1].button(
-        "Open Estimate",
+    estimate_action_state = _render_project_estimate_action_button(
+        st,
+        next_cols[1],
+        record,
         key="atlas_project_ops_open_estimate",
-        width="stretch",
-    ):
-        _open_page(st, "Estimate")
+        source_label="Project Operations Center",
+    )
     if next_cols[2].button(
         "View Drawings",
         key="atlas_project_ops_view_drawings",
@@ -30128,6 +30524,7 @@ def _render_overview_page(
             _open_page(st, "Documents")
         if st.button("Open Reports", key="atlas_project_ops_more_reports"):
             _open_page(st, "Reports")
+    _render_project_estimate_action_explanation(st, estimate_action_state)
 
     def _render_current_work_section() -> None:
         _render_section_title(st, "Current Work")
@@ -41584,8 +41981,13 @@ def _render_shell(
                     "Overview",
                 ),
             )
-        if header_action_cols[1].button("Open Estimate", width="stretch"):
-            _open_page(st, "Estimate")
+        estimate_action_state = _render_project_estimate_action_button(
+            st,
+            header_action_cols[1],
+            record,
+            key="atlas_project_header_open_estimate",
+            source_label="Project Header",
+        )
         if header_action_cols[2].button("View Drawings", width="stretch"):
             _open_page(st, "Drawings")
         with header_action_cols[3].popover("More Actions"):
@@ -41595,6 +41997,7 @@ def _render_shell(
                 _open_page(st, "Reports")
             if st.button("Open Settings", key="atlas_project_header_more_settings"):
                 _open_page(st, "Project Metadata")
+        _render_project_estimate_action_explanation(st, estimate_action_state)
 
     _render_return_context_action(st, workspace_service)
 

@@ -1162,6 +1162,15 @@ def _draft_estimate_with_line() -> tuple[Any, Any]:
     return service, service.get_document(document.document_id)
 
 
+def _streamlit_with_transactions(service: Any) -> _HomeContractStreamlit:
+    st = _HomeContractStreamlit()
+    app._init_session_state(st)
+    state = dict(st.session_state["atlas_transactions_workspace"])
+    state["documents"] = service.to_payload()
+    st.session_state["atlas_transactions_workspace"] = state
+    return st
+
+
 def test_commercial_transaction_presentation_builds_summary_health_and_totals() -> None:
     _service, document = _draft_estimate_with_line()
     assert document is not None
@@ -1246,6 +1255,195 @@ def test_commercial_transaction_relationships_show_downstream_document() -> None
         for row in relationships
     )
     assert presentation["recommendation"]["title"] == "Sales order already exists"
+
+
+def test_project_estimate_action_state_requires_create_when_project_has_no_estimate() -> (
+    None
+):
+    st = _streamlit_with_transactions(_transaction_service_with_catalog())
+    record = _project_record("BID-2026-0002", "Music Academy of the West")
+
+    state = app._project_estimate_action_state(st, record)
+
+    assert state["label"] == "Create Estimate"
+    assert state["mode"] == "create"
+    assert state["reason"] == "No estimate exists for this project yet."
+    assert state["documents"] == []
+
+
+def test_project_estimate_action_state_opens_single_current_estimate() -> None:
+    service = _transaction_service_with_catalog()
+    created = service.create_draft(
+        tenant_id="local",
+        organization_id="atlas",
+        document_type=app.CommercialDocumentType.ESTIMATE,
+        customer_id="cust-1",
+        project_id="BID-2026-0002",
+        project_code="BID-2026-0002",
+    )
+    st = _streamlit_with_transactions(service)
+    record = _project_record("BID-2026-0002", "Music Academy of the West")
+
+    state = app._project_estimate_action_state(st, record)
+
+    assert state["label"] == "Continue Estimate"
+    assert state["mode"] == "open"
+    assert state["target_document_id"] == created.document_id
+
+
+def test_project_estimate_action_state_browses_when_multiple_estimates_exist() -> None:
+    service = _transaction_service_with_catalog()
+    first = service.create_draft(
+        tenant_id="local",
+        organization_id="atlas",
+        document_type=app.CommercialDocumentType.ESTIMATE,
+        customer_id="cust-1",
+        project_id="BID-2026-0002",
+        project_code="BID-2026-0002",
+    )
+    second = service.create_draft_revision(
+        document_id=first.document_id,
+        reason="revision",
+        actor="qa",
+        revision_label="R2",
+    )
+    _ = second
+    service.create_draft(
+        tenant_id="local",
+        organization_id="atlas",
+        document_type=app.CommercialDocumentType.ESTIMATE,
+        customer_id="cust-1",
+        project_id="BID-2026-0002",
+        project_code="ALT-1",
+    )
+    st = _streamlit_with_transactions(service)
+    record = _project_record("BID-2026-0002", "Music Academy of the West")
+
+    state = app._project_estimate_action_state(st, record)
+
+    assert state["mode"] == "browse"
+    assert len(state["documents"]) == 2
+
+
+def test_open_project_estimate_action_routes_to_create_estimate() -> None:
+    service = _transaction_service_with_catalog()
+    st = _streamlit_with_transactions(service)
+    st.query_params = {}
+    record = _project_record("BID-2026-0002", "Music Academy of the West")
+    st.session_state["atlas_active_page"] = "Overview"
+
+    app._open_project_estimate_action(
+        st,
+        record,
+        source_label="Project Operations Center",
+    )
+
+    assert st.session_state["atlas_active_page"] == "Transactions"
+    assert st.session_state[app._navigation_secondary_state_key()] == "estimates"
+    assert st.session_state[app._navigation_tertiary_state_key()] == "add"
+    assert st.session_state["atlas_estimate_add_project"] == "BID-2026-0002"
+    assert st.query_params["atlas_page"] == "Transactions"
+    assert st.query_params["atlas_transaction_family"] == "estimates"
+    assert st.query_params["atlas_transaction_action"] == "add"
+    assert st.rerun_called is True
+
+
+def test_open_project_estimate_action_routes_to_existing_estimate() -> None:
+    service = _transaction_service_with_catalog()
+    created = service.create_draft(
+        tenant_id="local",
+        organization_id="atlas",
+        document_type=app.CommercialDocumentType.ESTIMATE,
+        customer_id="cust-1",
+        project_id="BID-2026-0002",
+        project_code="BID-2026-0002",
+    )
+    st = _streamlit_with_transactions(service)
+    st.query_params = {}
+    record = _project_record("BID-2026-0002", "Music Academy of the West")
+    st.session_state["atlas_active_page"] = "Overview"
+
+    app._open_project_estimate_action(
+        st,
+        record,
+        source_label="Project Header",
+    )
+
+    assert st.session_state["atlas_active_page"] == "Transactions"
+    assert (
+        st.session_state["atlas_transactions_selected_document_id"]
+        == created.document_id
+    )
+    assert st.session_state[app._navigation_tertiary_state_key()] == "browse"
+    assert st.query_params["atlas_transaction_id"] == created.document_id
+
+
+def test_transactions_workspace_page_filters_estimates_to_project_scope() -> None:
+    service = _transaction_service_with_catalog()
+    service.create_draft(
+        tenant_id="local",
+        organization_id="atlas",
+        document_type=app.CommercialDocumentType.ESTIMATE,
+        customer_id="cust-1",
+        project_id="BID-2026-0002",
+        project_code="BID-2026-0002",
+    )
+    service.create_draft(
+        tenant_id="local",
+        organization_id="atlas",
+        document_type=app.CommercialDocumentType.ESTIMATE,
+        customer_id="cust-1",
+        project_id="OTHER-PROJECT",
+        project_code="OTHER-PROJECT",
+    )
+    st = _streamlit_with_transactions(service)
+    st.session_state["atlas_active_page"] = "Transactions"
+    st.session_state[app._navigation_secondary_state_key()] = "estimates"
+    st.session_state[app._navigation_tertiary_state_key()] = "browse"
+    app._set_transactions_project_scope(
+        st,
+        app._project_transaction_scope(
+            _project_record("BID-2026-0002", "Music Academy of the West")
+        ),
+    )
+
+    app._render_transactions_workspace_page(st, _FakeWorkspaceService([]))
+
+    transaction_rows = next(
+        rows
+        for rows in st.dataframes
+        if rows
+        and isinstance(rows, list)
+        and isinstance(rows[0], dict)
+        and "Document Number" in rows[0]
+    )
+    assert len(transaction_rows) == 1
+    assert transaction_rows[0]["Family"] == "Estimate"
+    assert transaction_rows[0]["Project"] == "BID-2026-0002"
+
+
+def test_commercial_transaction_workbench_reports_section_failures() -> None:
+    _service, document = _draft_estimate_with_line()
+    assert document is not None
+    st = _HomeContractStreamlit()
+    app._init_session_state(st)
+    app_module: Any = app
+    original = app_module._commercial_line_rows
+    app_module._commercial_line_rows = lambda _document: (_ for _ in ()).throw(
+        RuntimeError("line boom")
+    )
+    try:
+        app._render_commercial_transaction_workbench(
+            st,
+            document=document,
+            all_documents=[document],
+            prefix="commercial_workbench_test",
+        )
+    finally:
+        app_module._commercial_line_rows = original
+
+    assert "This section could not be loaded." in st.warnings
+    assert any("Reference Error ID:" in item for item in st.captions)
 
 
 def test_transaction_row_uses_operational_columns_without_internal_id() -> None:
