@@ -19,6 +19,36 @@ This document tracks product-facing changes for Atlas Preview releases.
 - Focus on user-visible behavior and workflow changes.
 - Include quality gate status when relevant.
 
+## Unreleased (AV-00D Blank Homepage Bootstrap Recovery)
+
+### Improved
+
+- Bare `/` now resolves deterministically to Mission Control during startup,
+  refresh, and fresh browser sessions instead of inheriting prior project route
+  state.
+- Malformed persisted workspace state is now ignored and logged with a durable
+  error reference rather than leaving Atlas on an empty or unusable startup path.
+- Route-level page-content failures now render a recoverable in-shell error
+  surface with Return Home and Retry while preserving the shell header,
+  navigation, tenant context, and footer.
+- Startup failures before the main shell is available now render a minimal
+  recoverable error surface instead of collapsing to a blank page.
+- Project Overview now uses stable explicit action-button keys, eliminating the
+  duplicate Streamlit element-id failure that broke the route after startup.
+
+### Scope Notes
+
+- no project-intake behavior changes
+- no AV-01 scope started
+- Mission Control and lightweight-safe routes still rely on persisted summaries
+  instead of blocking on MAW processing work
+
+### Quality
+
+- Focused regression coverage added for bare-root Mission Control resolution,
+  malformed workspace-state recovery, shell-visible content failure recovery,
+  bootstrap failure recovery, and stable Project Overview action keys.
+
 ## Unreleased (AV-00A Asynchronous Document Intake)
 
 ### Improved

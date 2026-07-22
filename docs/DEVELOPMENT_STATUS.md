@@ -82,6 +82,11 @@ AV-00A addendum unifies bid-package upload policy across the Documents uploader,
 AV-00B makes project opening non-blocking by replacing full context hydration on Project Operations Center entry with a lightweight bootstrap of identity, navigation, cached document counts, and processing counts; full document/review/evidence hydration is deferred to detail sections, and workspace-state persistence no longer rebuilds manifests on normal rerenders.
 AV-00B.1 hardens deferred project hydration by keeping Overview, Documents, and Processing on the lightweight contract, isolating secondary Project Operations Center panel failures, and writing searchable runtime diagnostics for unexpected application and section error references.
 AV-00C isolates document-processing status refresh from project navigation by reading projected persisted job summaries inside a contained refresh boundary, preserving the project shell, left navigation rail, route state, and pending uploads while applying restrained polling only while jobs are active.
+AV-00D hardens application bootstrap and root-route recovery by making bare `/`
+resolve deterministically to Mission Control, ignoring malformed persisted
+workspace state with durable diagnostics, preserving shell visibility on
+route-level content failures, and fixing a duplicate Streamlit button-id failure
+that previously broke Project Overview recovery paths.
 Alpha UI Cleanup (Responsive Navigation and Estimate Creation UX) standardizes primary shell order to Transactions, Projects, Knowledge, Reports, restores tenant-facing footer copyright text, and adds a dedicated Transactions > Estimates > Add workflow with dropdown-driven estimate details and catalog-backed Product/Service/Fee/Assembly line controls.
 Alpha UI Cleanup (Header Consolidation and Copy Reduction) standardizes a one-row shared header (Atlas, Transactions, Projects, Knowledge, Reports, Settings, Search), removes redundant tenant-facing shell metadata and repeated descriptive copy, and preserves continuity-critical object breadcrumbs and deterministic settings navigation.
 Atlas Workspace Alpha UI Repair standardizes fixed-width primary navigation buttons, same-window routing, bounded search, deliberate Settings tertiary wrapping, and table containment across the shared shell.

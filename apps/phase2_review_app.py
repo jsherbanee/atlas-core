@@ -8398,6 +8398,64 @@ def _application_error_diagnostic_log_path() -> Path:
     return ensure_runtime_workspace_root().parent / "application_errors.jsonl"
 
 
+def _bootstrap_trace_key() -> str:
+    return "atlas_bootstrap_trace"
+
+
+def _bootstrap_notice_key() -> str:
+    return "atlas_bootstrap_notice"
+
+
+def _record_bootstrap_phase(
+    st: Any,
+    phase: str,
+    **details: Any,
+) -> None:
+    trace = list(st.session_state.get(_bootstrap_trace_key()) or [])
+    query_params = getattr(st, "query_params", None)
+    trace.append(
+        {
+            "timestamp": _now_iso(),
+            "phase": _safe_text(phase, "unknown"),
+            "route": _safe_text(
+                st.session_state.get("atlas_active_page"),
+                "Mission Control",
+            ),
+            "query_params": dict(query_params or {}),
+            "details": {
+                key: value
+                for key, value in details.items()
+                if value is not None and value != ""
+            },
+        }
+    )
+    st.session_state[_bootstrap_trace_key()] = trace[-25:]
+
+
+def _bootstrap_diagnostic_context(
+    st: Any,
+    *,
+    record: ProjectWorkspaceRecord | None,
+) -> dict[str, Any]:
+    return {
+        "query_params": dict(getattr(st, "query_params", {}) or {}),
+        "record_workspace_id": record.workspace_id if record else "",
+        "record_project_name": record.project.name if record else "",
+        "primary_workspace": _safe_text(
+            st.session_state.get(_navigation_primary_state_key()), "Atlas"
+        ),
+        "bootstrap_trace": [
+            dict(item)
+            for item in list(st.session_state.get(_bootstrap_trace_key()) or [])
+            if isinstance(item, dict)
+        ],
+        "session_state_keys": sorted(str(key) for key in st.session_state.keys()),
+        "recent_action": _safe_text(
+            st.session_state.get("atlas_workspace_action"), "render"
+        ),
+    }
+
+
 def _write_application_error_diagnostic(
     error_id: str,
     payload: dict[str, Any],
@@ -8573,6 +8631,8 @@ def _init_session_state(st: Any) -> None:
     st.session_state.setdefault(_originating_workspace_key(), "")
     st.session_state.setdefault(_originating_route_key(), "")
     st.session_state.setdefault(_tenant_scope_key(), "local")
+    st.session_state.setdefault(_bootstrap_trace_key(), [])
+    st.session_state.setdefault(_bootstrap_notice_key(), {})
 
 
 def _project_stage(record: ProjectWorkspaceRecord) -> str:
@@ -9740,9 +9800,15 @@ def _query_param_text(st: Any, key: str) -> str:
     return _safe_text(value, "")
 
 
-def _sync_active_page_from_query_params(st: Any) -> None:
+def _sync_active_page_from_query_params(
+    st: Any,
+    *,
+    default_to_home: bool = False,
+) -> None:
     page = _query_param_text(st, "atlas_page")
     if not page:
+        if default_to_home:
+            st.session_state["atlas_active_page"] = "Mission Control"
         return
     if page == "Settings":
         page = "Administration"
@@ -14606,6 +14672,52 @@ def _restore_workspace_state(
         st.session_state["atlas_recent_opened_results"] = list(recent_opened_results)
 
     st.session_state["atlas_loaded_workspace_state_for"] = record.workspace_id
+
+
+def _restore_workspace_state_safely(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+    record: ProjectWorkspaceRecord,
+) -> None:
+    try:
+        _restore_workspace_state(st, workspace_service, record)
+    except Exception as exc:
+        st.session_state["atlas_loaded_workspace_state_for"] = record.workspace_id
+        st.session_state["atlas_active_page"] = "Mission Control"
+        _record_bootstrap_phase(
+            st,
+            "workspace_restore_failed",
+            workspace_id=record.workspace_id,
+            exception_type=type(exc).__name__,
+        )
+        error_id = _log_application_error(
+            st,
+            summary="Workspace state restore failed",
+            exception=exc,
+            severity="high",
+            tenant_id=_safe_text(
+                st.session_state.get(_tenant_scope_key()),
+                "local",
+            ),
+            organization_id="atlas",
+            user_id=_safe_text(
+                st.session_state.get("atlas_settings_user_id"), "atlas-ui"
+            ),
+            workspace="Projects",
+            route="Mission Control",
+            related_object_id=record.workspace_id,
+            related_object_type="project",
+            request_or_session_ref=record.workspace_id,
+            active_page="Mission Control",
+            hydration_mode="none",
+            section="workspace_restore",
+            recent_action="restore_workspace_state",
+            diagnostic_context=_bootstrap_diagnostic_context(st, record=record),
+        )
+        st.session_state[_bootstrap_notice_key()] = {
+            "message": "Saved workspace state was ignored because it could not be restored.",
+            "error_id": error_id,
+        }
 
 
 def _persist_repository_artifacts(
@@ -29994,13 +30106,22 @@ def _render_overview_page(
     next_cols = _responsive_control_columns(st, [1.2, 1.0, 1.0, 1.0])
     if next_cols[0].button(
         f"Open {_safe_text(next_action.get('page'), 'Documents')}",
+        key="atlas_project_ops_open_next_step",
         width="stretch",
         type="primary",
     ):
         _open_page(st, _safe_text(next_action.get("page"), "Documents"))
-    if next_cols[1].button("Open Estimate", width="stretch"):
+    if next_cols[1].button(
+        "Open Estimate",
+        key="atlas_project_ops_open_estimate",
+        width="stretch",
+    ):
         _open_page(st, "Estimate")
-    if next_cols[2].button("View Drawings", width="stretch"):
+    if next_cols[2].button(
+        "View Drawings",
+        key="atlas_project_ops_view_drawings",
+        width="stretch",
+    ):
         _open_page(st, "Drawings")
     with next_cols[3].popover("More Actions"):
         if st.button("Open Documents", key="atlas_project_ops_more_documents"):
@@ -41370,6 +41491,15 @@ def _render_shell(
     current_page = st.session_state.get("atlas_active_page", "Mission Control")
     if _should_render_shell_breadcrumb(st, current_page):
         st.caption(_breadcrumb(record, current_page))
+    bootstrap_notice = dict(st.session_state.get(_bootstrap_notice_key()) or {})
+    if bootstrap_notice:
+        message = _safe_text(
+            bootstrap_notice.get("message"),
+            "Startup recovered with a degraded route state.",
+        )
+        error_id = _safe_text(bootstrap_notice.get("error_id"), "ERR-UNAVAILABLE")
+        st.warning(f"{message} Reference Error ID: {error_id}")
+        st.session_state[_bootstrap_notice_key()] = {}
     mission_control_payload = None
     if current_page == "Mission Control":
         if record is not None:
@@ -41477,19 +41607,113 @@ def _render_shell(
         )
     else:
         _sync_workspace_navigation_state(st, record)
+
+        def _render_content_with_boundary() -> None:
+            route = _safe_text(
+                st.session_state.get("atlas_active_page"),
+                "Mission Control",
+            )
+            _record_bootstrap_phase(st, "page_renderer_start", route=route)
+            try:
+                _render_main_content(
+                    st,
+                    workspace_service,
+                    record,
+                    context,
+                    mission_control_payload,
+                )
+            except Exception as exc:
+                error_id = _log_application_error(
+                    st,
+                    summary=f"{route} could not be loaded",
+                    exception=exc,
+                    severity="critical",
+                    tenant_id=_safe_text(
+                        st.session_state.get(_tenant_scope_key()),
+                        "local",
+                    ),
+                    organization_id="atlas",
+                    user_id=_safe_text(
+                        st.session_state.get("atlas_settings_user_id"), "atlas-ui"
+                    ),
+                    workspace=_safe_text(
+                        st.session_state.get(_navigation_primary_state_key()), "Atlas"
+                    ),
+                    route=route,
+                    related_object_id=(
+                        record.workspace_id if record is not None else None
+                    ),
+                    related_object_type="project" if record is not None else None,
+                    request_or_session_ref=(
+                        record.workspace_id if record is not None else None
+                    ),
+                    active_page=route,
+                    hydration_mode=_context_hydration_mode(context),
+                    section=_safe_text(
+                        st.session_state.get(_navigation_secondary_state_key()), ""
+                    ),
+                    recent_action=_safe_text(
+                        st.session_state.get("atlas_workspace_action"), "render"
+                    ),
+                    diagnostic_context=_bootstrap_diagnostic_context(st, record=record),
+                )
+                st.error(f"{route} could not be loaded. Reference Error ID: {error_id}")
+                recovery_cols = st.columns(2)
+                if recovery_cols[0].button(
+                    "Return Home",
+                    key=f"atlas_content_failure_home_{_stable_widget_suffix(route)}",
+                    type="primary",
+                    width="stretch",
+                ):
+                    _open_page(st, "Mission Control")
+                if recovery_cols[1].button(
+                    "Retry",
+                    key=f"atlas_content_failure_retry_{_stable_widget_suffix(route)}",
+                    width="stretch",
+                ):
+                    st.rerun()
+                _record_bootstrap_phase(
+                    st,
+                    "page_renderer_failed",
+                    route=route,
+                    exception_type=type(exc).__name__,
+                    error_id=error_id,
+                )
+                return
+            _record_bootstrap_phase(st, "page_renderer_complete", route=route)
+
         _render_workspace_navigation(
             st,
             record,
-            content_renderer=lambda: _render_main_content(
-                st,
-                workspace_service,
-                record,
-                context,
-                mission_control_payload,
-            ),
+            content_renderer=_render_content_with_boundary,
         )
 
     _render_status_bar(st, record, context)
+
+
+def _render_bootstrap_failure_surface(
+    st: Any,
+    *,
+    summary: str,
+    error_id: str,
+) -> None:
+    st.markdown("## Atlas startup could not be completed")
+    st.error(f"{summary}. Reference Error ID: {error_id}")
+    recovery_cols = st.columns(2)
+    if recovery_cols[0].button(
+        "Return Home",
+        key="atlas_bootstrap_failure_home",
+        type="primary",
+        width="stretch",
+    ):
+        st.session_state["atlas_active_page"] = "Mission Control"
+        st.rerun()
+    if recovery_cols[1].button(
+        "Retry",
+        key="atlas_bootstrap_failure_retry",
+        width="stretch",
+    ):
+        st.rerun()
 
 
 def _should_render_shell_breadcrumb(st: Any, page: str) -> bool:
@@ -41549,26 +41773,46 @@ def _ensure_document_processing_worker(
 
 def main() -> None:
     st = _load_streamlit()
-    st.set_page_config(page_title="Atlas Workspace", layout="wide")
-    _inject_styles(st)
-    _init_session_state(st)
-    _sync_active_page_from_query_params(st)
+    record: ProjectWorkspaceRecord | None = None
+    context: dict[str, Any] | None = None
     try:
+        st.set_page_config(page_title="Atlas Workspace", layout="wide")
+        _record_bootstrap_phase(st, "page_configured")
+        _inject_styles(st)
+        _record_bootstrap_phase(st, "styles_injected")
+        _init_session_state(st)
+        _record_bootstrap_phase(st, "session_initialized")
+        _sync_active_page_from_query_params(st, default_to_home=True)
+        _record_bootstrap_phase(st, "query_state_parsed")
         workspace_service = _build_workspace_service()
+        _record_bootstrap_phase(st, "workspace_service_ready")
         _ensure_document_processing_worker(workspace_service)
+        _record_bootstrap_phase(st, "processing_worker_ready")
         _sync_active_workspace_from_query_params(st, workspace_service)
+        _record_bootstrap_phase(st, "workspace_query_state_parsed")
         _ensure_active_workspace(st, workspace_service)
+        _record_bootstrap_phase(st, "active_workspace_validated")
 
         record = _active_record(st, workspace_service)
+        _record_bootstrap_phase(
+            st,
+            "workspace_resolved",
+            workspace_id=record.workspace_id if record is not None else "",
+        )
         if record is not None:
-            _restore_workspace_state(st, workspace_service, record)
-            _sync_active_page_from_query_params(st)
+            _restore_workspace_state_safely(st, workspace_service, record)
+            _sync_active_page_from_query_params(st, default_to_home=True)
+            _record_bootstrap_phase(
+                st,
+                "workspace_state_restored",
+                workspace_id=record.workspace_id,
+            )
 
         current_page = _safe_text(
             st.session_state.get("atlas_active_page"),
             "Mission Control",
         )
-        context = None
+        _record_bootstrap_phase(st, "route_resolved", route=current_page)
         full_context_loaded = False
         if record is not None:
             if _project_page_requires_full_context(current_page):
@@ -41609,7 +41853,21 @@ def main() -> None:
         }:
             st.session_state["atlas_active_page"] = "Mission Control"
 
+        _record_bootstrap_phase(
+            st,
+            "shell_start",
+            route=_safe_text(
+                st.session_state.get("atlas_active_page"), "Mission Control"
+            ),
+        )
         _render_shell(st, workspace_service, record, context)
+        _record_bootstrap_phase(
+            st,
+            "shell_complete",
+            route=_safe_text(
+                st.session_state.get("atlas_active_page"), "Mission Control"
+            ),
+        )
         if record is not None:
             workspace_service.save_workspace_state(
                 record.workspace_id,
@@ -41636,7 +41894,7 @@ def main() -> None:
             st.session_state.get("atlas_active_workspace_id"),
             "session",
         )
-        _render_logged_error_message(
+        error_id = _log_application_error(
             st,
             summary="Unexpected application error",
             exception=exc,
@@ -41661,12 +41919,12 @@ def main() -> None:
             recent_action=_safe_text(
                 st.session_state.get("atlas_workspace_action"), "render"
             ),
-            diagnostic_context={
-                "query_params": dict(getattr(st, "query_params", {}) or {}),
-                "record_workspace_id": record.workspace_id if record else "",
-                "record_project_name": record.project.name if record else "",
-                "primary_workspace": active_primary,
-            },
+            diagnostic_context=_bootstrap_diagnostic_context(st, record=record),
+        )
+        _render_bootstrap_failure_surface(
+            st,
+            summary="Unexpected application error",
+            error_id=error_id,
         )
 
 

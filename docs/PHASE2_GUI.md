@@ -550,16 +550,27 @@ PX-01 Mission Control refinement notes:
 - Mission Control remains backed by the existing compatibility route key.
 - Mission Control renders as the application home even though Atlas has no
   secondary accordion sections.
+- Bare `/` deterministically resolves to Mission Control on startup, refresh,
+  and fresh browser sessions; prior project state does not replace the home route.
 - Atlas in the global header is the sole application-home action.
 - Global search submits directly on Enter from the header input.
 - Empty/whitespace-only search does not execute and does not render results.
 - Search results are grouped by user-facing object type with deterministic preferred ordering.
 - Unknown object types are rendered after preferred groups in alphabetical order.
+- Saved workspace state restore is best-effort. If persisted route or workspace
+  state is malformed, Atlas ignores that state, logs a durable error reference,
+  and continues on Mission Control instead of leaving the page blank.
 - Removed Home sections: Application Areas, Portfolio Signals, Upcoming Timeline, Projects Requiring Attention, and Workspace Recommendations.
 - Removed decorative landing sections: Action Center, Notifications, Favorites, and
   Recent Projects as a standalone card group.
 - Tenant-facing content avoids technical metadata, repository language, empty
   placeholder cards, charts, gauges, and duplicated metrics.
+
+Startup and failure-boundary contract:
+
+- startup failures before the shell is ready render a minimal recoverable error surface with Return Home, Retry, and a durable error reference
+- shell-visible page-content failures preserve the header, navigation, tenant context, and recovery controls instead of collapsing to a blank page
+- Mission Control, Overview, Documents, and Processing remain lightweight-safe and do not wait on MAW processing jobs to become visible
 
 Transactions alpha navigation posture:
 

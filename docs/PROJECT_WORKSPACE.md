@@ -142,9 +142,25 @@ not take down the entire project workspace. A contained section failure shows
 error reference, and administrator technical detail while leaving the remaining
 workspace usable.
 
+Top-level project page content failures are also contained within the shell. The
+header, project selector, project context header, navigation rail, and footer
+remain visible while the failed route shows a concise error message, a durable
+error reference, Return Home, and Retry.
+
 Unexpected application and section errors write searchable diagnostic records to
 the runtime error log with timestamp, tenant, project, route, active page,
 hydration mode, section, exception type, stack trace, and recent action context.
+
+## Root Route And Persisted State Recovery
+
+The application root route remains application-scoped.
+
+- bare `/` resolves to Mission Control during startup and refresh
+- explicit `atlas_page` query state wins over restored workspace-state routes
+- malformed persisted workspace state is ignored and logged instead of blocking
+  startup or replacing the root route
+- Mission Control keeps prior project context available through Continue Working,
+  but prior project state does not automatically replace the home route
 
 ## Boundaries
 

@@ -2305,6 +2305,53 @@ def test_render_shell_suppresses_body_when_search_is_active(
     assert "body" not in calls
 
 
+def test_render_shell_keeps_visible_error_and_status_when_page_content_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    record = _project_record("maw-demo", "MAW")
+    st = _HomeContractStreamlit()
+    app._init_session_state(st)
+    st.session_state["atlas_active_page"] = "Overview"
+    calls: list[str] = []
+
+    monkeypatch.setattr(app, "_render_header", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "_sync_notebook_state_to_context", lambda *args: None)
+    monkeypatch.setattr(app, "_active_global_search_query", lambda *_args: "")
+    monkeypatch.setattr(app, "_render_return_context_action", lambda *args: None)
+    monkeypatch.setattr(app, "_sync_workspace_navigation_state", lambda *args: None)
+    monkeypatch.setattr(
+        app,
+        "_render_workspace_navigation",
+        lambda _st, _record, content_renderer=None: content_renderer(),
+    )
+    monkeypatch.setattr(
+        app,
+        "_render_main_content",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    monkeypatch.setattr(
+        app, "_log_application_error", lambda *args, **kwargs: "ERR-CONTENT"
+    )
+    monkeypatch.setattr(
+        app, "_render_status_bar", lambda *args, **kwargs: calls.append("status")
+    )
+
+    app._render_shell(st, _FakeWorkspaceService([record]), record, None)
+
+    assert calls == ["status"]
+    assert st.errors == [
+        "Overview could not be loaded. Reference Error ID: ERR-CONTENT"
+    ]
+    assert any(
+        call.get("key") == "atlas_content_failure_home_overview"
+        for call in st.button_calls
+    )
+    assert any(
+        call.get("key") == "atlas_content_failure_retry_overview"
+        for call in st.button_calls
+    )
+
+
 def test_breadcrumb_page_label_maps_mission_control_to_home() -> None:
     assert app._breadcrumb_page_label("Mission Control") == "Home"
 
@@ -3673,6 +3720,42 @@ def test_query_page_can_override_restored_workspace_page() -> None:
     assert st.session_state["atlas_active_page"] == "Overview"
 
 
+def test_blank_root_defaults_to_mission_control() -> None:
+    st = _FakeStreamlit(session_state={"atlas_active_page": "Overview"})
+    st.query_params = {}
+
+    app._sync_active_page_from_query_params(st, default_to_home=True)
+
+    assert st.session_state["atlas_active_page"] == "Mission Control"
+
+
+def test_restore_workspace_state_safely_ignores_malformed_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _RestoreService:
+        def load_workspace_state(self, _workspace_id: str) -> dict[str, Any]:
+            raise ValueError("bad state")
+
+    st = _HomeContractStreamlit()
+    app._init_session_state(st)
+    record = _project_record("maw-demo", "MAW")
+
+    monkeypatch.setattr(
+        app,
+        "_log_application_error",
+        lambda *args, **kwargs: "ERR-RESTORE",
+    )
+
+    app._restore_workspace_state_safely(st, _RestoreService(), record)
+
+    assert st.session_state["atlas_active_page"] == "Mission Control"
+    assert st.session_state["atlas_loaded_workspace_state_for"] == "maw-demo"
+    assert st.session_state["atlas_bootstrap_notice"] == {
+        "message": "Saved workspace state was ignored because it could not be restored.",
+        "error_id": "ERR-RESTORE",
+    }
+
+
 def test_open_project_record_updates_recency() -> None:
     record = _project_record("maw-demo", "MAW")
     st = _FakeStreamlit(session_state={})
@@ -3720,6 +3803,107 @@ def test_lightweight_project_context_uses_bootstrap_without_full_review() -> Non
     assert "review" not in context
     assert context["import_summary"]["total_files"] == 3
     assert context["import_summary"]["processing_counts"] == {"queued": 3, "failed": 1}
+
+
+def test_main_bootstrap_failure_renders_recoverable_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _BootstrapFailureStreamlit:
+        def __init__(self) -> None:
+            self.session_state: dict[str, Any] = {}
+            self.query_params: dict[str, Any] = {}
+            self.markdowns: list[str] = []
+            self.errors: list[str] = []
+            self.button_calls: list[dict[str, Any]] = []
+            self.rerun_called = False
+
+        def set_page_config(self, **_kwargs: Any) -> None:
+            return None
+
+        def markdown(self, text: str, **_kwargs: Any) -> None:
+            self.markdowns.append(text)
+
+        def error(self, text: str) -> None:
+            self.errors.append(text)
+
+        def columns(self, count: int | list[Any], **_kwargs: Any) -> list[Any]:
+            size = len(count) if isinstance(count, list) else count
+            return [self for _ in range(size)]
+
+        def button(self, label: str, **kwargs: Any) -> bool:
+            self.button_calls.append({"label": label, **kwargs})
+            return False
+
+        def rerun(self) -> None:
+            self.rerun_called = True
+
+    st = _BootstrapFailureStreamlit()
+
+    monkeypatch.setattr(app, "_load_streamlit", lambda: st)
+    monkeypatch.setattr(
+        app,
+        "_inject_styles",
+        lambda _st: (_ for _ in ()).throw(RuntimeError("style boom")),
+    )
+    monkeypatch.setattr(
+        app, "_log_application_error", lambda *args, **kwargs: "ERR-BOOT"
+    )
+
+    app.main()
+
+    assert "## Atlas startup could not be completed" in st.markdowns
+    assert st.errors == ["Unexpected application error. Reference Error ID: ERR-BOOT"]
+
+
+def test_overview_primary_actions_use_stable_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    st = _HomeContractStreamlit()
+    record = _project_record("maw-demo", "MAW")
+
+    monkeypatch.setattr(app, "_render_page_header", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        app, "_build_project_analysis_summary", lambda *args, **kwargs: {}
+    )
+    monkeypatch.setattr(app, "_scope_risk_findings", lambda *args, **kwargs: [])
+    monkeypatch.setattr(app, "_timeline_events", lambda *args, **kwargs: [])
+    monkeypatch.setattr(app, "_review_step_status_rows", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        app,
+        "_next_review_action",
+        lambda *args, **kwargs: {
+            "step": "Review Documents",
+            "detail": "Open Documents and run project analysis.",
+            "page": "Documents",
+        },
+    )
+    monkeypatch.setattr(app, "_files_by_folder", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        app, "_project_operations_health_conditions", lambda *args, **kwargs: []
+    )
+    monkeypatch.setattr(
+        app, "_project_operations_current_work", lambda *args, **kwargs: []
+    )
+    monkeypatch.setattr(
+        app, "_project_operations_timeline_rows", lambda *args, **kwargs: []
+    )
+    monkeypatch.setattr(
+        app, "_project_operations_context_rows", lambda *args, **kwargs: []
+    )
+    monkeypatch.setattr(app, "_render_section_title", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        app, "_responsive_control_columns", lambda _st, _spec: _st.columns(4)
+    )
+    monkeypatch.setattr(
+        app, "_render_project_section_safely", lambda *args, **kwargs: None
+    )
+
+    app._render_overview_page(st, record, None)
+
+    keys = {call.get("key") for call in st.button_calls}
+    assert "atlas_project_ops_open_next_step" in keys
+    assert "atlas_project_ops_open_estimate" in keys
+    assert "atlas_project_ops_view_drawings" in keys
 
 
 def test_recent_search_queries_are_deduplicated() -> None:

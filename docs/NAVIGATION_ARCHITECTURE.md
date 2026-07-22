@@ -35,16 +35,25 @@ This document defines the reusable navigation contract used by the shell and wor
 - Shared workspace headers and object summaries are now factored into the reusable Universal Workspace Framework so page shells can reuse the same navigation and presentation grammar
 - Application-level routes such as Mission Control render their content even when
   the active primary workspace has no secondary accordion sections
+- A bare `/` route resolves to Mission Control during startup, even when prior
+  project or workspace state exists in the current session
 - Project workspace opens persist `atlas_workspace_id` alongside `atlas_page` so
   browser refreshes and validation links can restore the selected project context
+- Persisted workspace state restore is best-effort; malformed state is ignored,
+  logged with an error reference, and does not replace the root-route contract
 - Project workspace opens use a lightweight bootstrap contract and must not
   synchronously hydrate full document/review context, process background jobs,
   or rebuild repository manifests before the route is visible
 - Project Overview, Documents, and Processing remain lightweight-safe browser
   routes; full review, evidence, engineering, relationship, and commercial
   detail hydration belongs behind the pages that explicitly require it
+- Mission Control and lightweight-safe routes must not wait on queued document
+  processing or full review hydration; they render from persisted summaries and
+  show bounded updating diagnostics when summary data is temporarily unavailable
 - Project Operations Center secondary panels log contained section failures with
   searchable error references while preserving the rest of the active route
+- Route-level content failures render a recoverable in-shell error surface with
+  Return Home and Retry actions instead of collapsing the entire application shell
 - Explicit URL page state continues to win after workspace-state restoration;
   project-open callbacks avoid duplicate reruns when the requested route is
   already active
