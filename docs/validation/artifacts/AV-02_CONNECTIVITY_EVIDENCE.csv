@@ -1,0 +1,50 @@
+reference_type,source_id,target_id,confidence,message
+equipment_to_spec,detected-control-processor,11-61-39,0.9,Equipment detected-control-processor references specification 11 61 39.
+equipment_to_drawing,detected-microphone,e-604,0.9,Equipment detected-microphone references drawing E-604.
+equipment_to_spec,detected-lighting-fixture,11-61-91,0.9,Equipment detected-lighting-fixture references specification 11 61 91.
+equipment_to_spec,detected-lighting-console,11-61-92,0.9,Equipment detected-lighting-console references specification 11 61 92.
+equipment_to_spec,detected-drapery,11-61-12,0.9,Equipment detected-drapery references specification 11 61 12.
+system_to_spec,detected-audio,27-41-00,0.75,System detected-audio aligns with specification 27 41 00.
+system_to_spec,detected-audio,27-41-16,0.75,System detected-audio aligns with specification 27 41 16.
+system_to_spec,detected-control,27-41-00,0.75,System detected-control aligns with specification 27 41 00.
+system_to_spec,detected-control,27-41-16,0.75,System detected-control aligns with specification 27 41 16.
+drawing_to_spec,avp-5,27-41-00,0.75,Drawing AVP-5 aligns with specification 27 41 00.
+drawing_to_spec,avp-5,27-41-16,0.75,Drawing AVP-5 aligns with specification 27 41 16.
+drawing_to_spec,dp01,27-41-00,0.75,Drawing DP01 aligns with specification 27 41 00.
+drawing_to_spec,dp01,27-41-16,0.75,Drawing DP01 aligns with specification 27 41 16.
+drawing_to_spec,av02,27-41-00,0.75,Drawing AV02 aligns with specification 27 41 00.
+drawing_to_spec,av02,27-41-16,0.75,Drawing AV02 aligns with specification 27 41 16.
+drawing_to_spec,av010,27-41-00,0.75,Drawing AV010 aligns with specification 27 41 00.
+drawing_to_spec,av010,27-41-16,0.75,Drawing AV010 aligns with specification 27 41 16.
+drawing_to_spec,av04,27-41-00,0.75,Drawing AV04 aligns with specification 27 41 00.
+drawing_to_spec,av04,27-41-16,0.75,Drawing AV04 aligns with specification 27 41 16.
+drawing_to_spec,l14,27-41-00,0.75,Drawing L14 aligns with specification 27 41 00.
+drawing_to_spec,l14,27-41-16,0.75,Drawing L14 aligns with specification 27 41 16.
+drawing_to_spec,s-03,27-41-00,0.75,Drawing S-03 aligns with specification 27 41 00.
+drawing_to_spec,s-03,27-41-16,0.75,Drawing S-03 aligns with specification 27 41 16.
+drawing_to_spec,s-06,27-41-00,0.75,Drawing S-06 aligns with specification 27 41 00.
+drawing_to_spec,s-06,27-41-16,0.75,Drawing S-06 aligns with specification 27 41 16.
+drawing_to_spec,a2,27-41-00,0.75,Drawing A2 aligns with specification 27 41 00.
+drawing_to_spec,a2,27-41-16,0.75,Drawing A2 aligns with specification 27 41 16.
+drawing_to_spec,av-005,27-41-00,0.75,Drawing AV-005 aligns with specification 27 41 00.
+drawing_to_spec,av-005,27-41-16,0.75,Drawing AV-005 aligns with specification 27 41 16.
+drawing_to_spec,av-301,27-41-00,0.75,Drawing AV-301 aligns with specification 27 41 00.
+drawing_to_spec,av-301,27-41-16,0.75,Drawing AV-301 aligns with specification 27 41 16.
+drawing_to_spec,av-104,27-41-00,0.75,Drawing AV-104 aligns with specification 27 41 00.
+drawing_to_spec,av-104,27-41-16,0.75,Drawing AV-104 aligns with specification 27 41 16.
+drawing_to_spec,dp75,27-41-00,0.75,Drawing DP75 aligns with specification 27 41 00.
+drawing_to_spec,dp75,27-41-16,0.75,Drawing DP75 aligns with specification 27 41 16.
+drawing_to_spec,av-003,27-41-00,0.75,Drawing AV-003 aligns with specification 27 41 00.
+drawing_to_spec,av-003,27-41-16,0.75,Drawing AV-003 aligns with specification 27 41 16.
+drawing_to_spec,av-004,27-41-00,0.75,Drawing AV-004 aligns with specification 27 41 00.
+drawing_to_spec,av-004,27-41-16,0.75,Drawing AV-004 aligns with specification 27 41 16.
+drawing_to_spec,av-302,27-41-00,0.75,Drawing AV-302 aligns with specification 27 41 00.
+drawing_to_spec,av-302,27-41-16,0.75,Drawing AV-302 aligns with specification 27 41 16.
+drawing_to_spec,av-100,27-41-00,0.75,Drawing AV-100 aligns with specification 27 41 00.
+drawing_to_spec,av-100,27-41-16,0.75,Drawing AV-100 aligns with specification 27 41 16.
+drawing_to_spec,av-101,27-41-00,0.75,Drawing AV-101 aligns with specification 27 41 00.
+drawing_to_spec,av-101,27-41-16,0.75,Drawing AV-101 aligns with specification 27 41 16.
+drawing_to_spec,av-102,27-41-00,0.75,Drawing AV-102 aligns with specification 27 41 00.
+drawing_to_spec,av-102,27-41-16,0.75,Drawing AV-102 aligns with specification 27 41 16.
+drawing_to_spec,av-103,27-41-00,0.75,Drawing AV-103 aligns with specification 27 41 00.
+drawing_to_spec,av-103,27-41-16,0.75,Drawing AV-103 aligns with specification 27 41 16.

@@ -1,0 +1,5 @@
+system_id,name,category,complexity,confidence,review_required,room_id,building_id,equipment_count,manufacturer_count,assumption_count,assumptions
+detected-audio,Audio System,audio,medium,0.75,False,,,0,0,1,Detected from drawing A2: 08 Audio Visual Music Academy of the West 80  CD Plan Check 2026.05.29
+detected-control,Control System,control,medium,0.75,False,,,0,0,1,Detected from drawing DMX512: a. MOTORIZED BREAKER CENTRAL RELAY CABINETS WITH 120V AND 208V RELAYS AND FRONT -END ELECTRONICS RECEIVING A  CONTROL
+detected-lighting,Theatrical Lighting System,lighting,high,0.75,False,,,0,0,1,Detected from drawing EC-6: B. THEATRICAL POWER AND CONTROL DEVICE SCHEDULES
+detected-drapery,Drapery System,drapery,high,0.75,False,,,0,0,1,Detected from specification 11 61 12: Acoustical Curtain Track Layout & Specification TheatreDNA TheatreDNA TheatreDNA PEC PEC PEC TheatreDNA
