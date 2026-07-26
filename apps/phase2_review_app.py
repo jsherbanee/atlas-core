@@ -9300,17 +9300,21 @@ def _load_lightweight_context_for_record(
 def _ensure_active_workspace(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    active_id = st.session_state.get("atlas_active_workspace_id")
-    if not active_id:
+    records = {
+        record.workspace_id: record
+        for record in workspace_service.list_workspaces(
+            include_archived=True,
+            limit=2000,
+        )
+    }
+    active_id = _safe_text(st.session_state.get("atlas_active_workspace_id"), "")
+    if active_id and active_id in records:
         return
 
-    exists = any(
-        item.workspace_id == active_id
-        for item in workspace_service.list_workspaces(include_archived=True, limit=2000)
-    )
-    if not exists:
-        st.session_state["atlas_active_workspace_id"] = None
-        st.session_state["atlas_active_page"] = "Mission Control"
+    st.session_state["atlas_active_workspace_id"] = None
+    if not active_id:
+        return
+    st.session_state["atlas_active_page"] = "Mission Control"
 
 
 def _active_record(
@@ -9329,6 +9333,67 @@ def _active_record(
         )
     }
     return records.get(active_id)
+
+
+def _set_workspace_query_param(st: Any, workspace_id: str | None) -> None:
+    query_params = getattr(st, "query_params", None)
+    if query_params is None:
+        return
+    try:
+        if workspace_id:
+            query_params["atlas_workspace_id"] = workspace_id
+        else:
+            query_params.pop("atlas_workspace_id", None)
+    except Exception:
+        return
+
+
+def _resolve_active_workspace_record(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+) -> ProjectWorkspaceRecord | None:
+    records = {
+        record.workspace_id: record
+        for record in workspace_service.list_workspaces(
+            include_archived=True,
+            limit=2000,
+        )
+    }
+    if not records:
+        st.session_state["atlas_active_workspace_id"] = None
+        _set_workspace_query_param(st, None)
+        return None
+
+    active_id = _safe_text(st.session_state.get("atlas_active_workspace_id"), "")
+    if active_id and active_id in records:
+        _set_workspace_query_param(st, active_id)
+        return records[active_id]
+
+    query_workspace_id = _query_param_text(st, "atlas_workspace_id")
+    if query_workspace_id and query_workspace_id in records:
+        st.session_state["atlas_active_workspace_id"] = query_workspace_id
+        _set_workspace_query_param(st, query_workspace_id)
+        return records[query_workspace_id]
+
+    persisted_id = _safe_text(
+        st.session_state.get("atlas_loaded_workspace_state_for"),
+        "",
+    )
+    if persisted_id and persisted_id in records:
+        st.session_state["atlas_active_workspace_id"] = persisted_id
+        _set_workspace_query_param(st, persisted_id)
+        return records[persisted_id]
+
+    recent = workspace_service.list_recent_workspaces(limit=1)
+    if recent:
+        record = recent[0]
+        st.session_state["atlas_active_workspace_id"] = record.workspace_id
+        _set_workspace_query_param(st, record.workspace_id)
+        return record
+
+    st.session_state["atlas_active_workspace_id"] = None
+    _set_workspace_query_param(st, None)
+    return None
 
 
 def _selector_options(
@@ -10089,6 +10154,9 @@ def _sync_active_workspace_from_query_params(
             limit=1000,
         )
     }
+    active_id = _safe_text(st.session_state.get("atlas_active_workspace_id"), "")
+    if active_id and active_id in records:
+        return
     if workspace_id in records:
         st.session_state["atlas_active_workspace_id"] = workspace_id
 
@@ -10097,6 +10165,14 @@ def _open_page(st: Any, page: str) -> None:
     st.session_state["atlas_active_page"] = page
     _set_active_page_query_param(st, page)
     st.rerun()
+
+
+def _persist_active_route_query_params(st: Any, page: str) -> None:
+    _set_active_page_query_param(st, page)
+    _set_workspace_query_param(
+        st,
+        _safe_text(st.session_state.get("atlas_active_workspace_id"), "") or None,
+    )
 
 
 def _format_recent_opened_at(timestamp: str | None) -> str:
@@ -12213,10 +12289,12 @@ def _open_secondary_navigation_section(
         section
     )
     _set_navigation_prior_route(st, primary=primary, mode=mode)
-    st.session_state["atlas_active_page"] = _safe_text(
+    page = _safe_text(
         section.get("route"),
         _safe_text(st.session_state.get("atlas_active_page"), "Mission Control"),
     )
+    st.session_state["atlas_active_page"] = page
+    _persist_active_route_query_params(st, page)
     st.rerun()
 
 
@@ -12234,6 +12312,7 @@ def _open_tertiary_navigation_action(
     route = _safe_text(action.get("route"), "")
     if route:
         st.session_state["atlas_active_page"] = route
+        _persist_active_route_query_params(st, route)
     st.rerun()
 
 
@@ -15345,7 +15424,11 @@ def _render_home_page(
 def _render_application_knowledge_page(
     st: Any, workspace_service: ProjectWorkspaceService
 ) -> None:
-    _render_page_header(st, "", "")
+    _render_page_header(
+        st,
+        "Knowledge",
+        "Shared project intelligence, commercial knowledge, and catalog views.",
+    )
     active_knowledge_view = _sync_knowledge_content_state(st)
 
     project_rows = _project_library_rows(
@@ -19112,7 +19195,12 @@ def _render_transactions_workspace_page(
         return
 
     if document_type is None:
-        _render_empty_state(st, "Transactions section is not available.")
+        _render_guided_empty_state(
+            st,
+            why_empty="This transaction route is not available for the current selection.",
+            action_to_populate="Open a supported transaction family from the route selector.",
+            next_location="Use Estimates, Sales Orders, Return Orders, Credit Memos, or Invoices.",
+        )
         return
 
     if tertiary == "add" and document_type == CommercialDocumentType.ESTIMATE:
@@ -25595,7 +25683,23 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         )
         return
 
-    selected_label = st.selectbox("Open Project", options=labels)
+    active_workspace_id = _safe_text(
+        st.session_state.get("atlas_active_workspace_id"),
+        "",
+    )
+    selected_index = next(
+        (
+            index
+            for index, item in enumerate(filtered)
+            if item["record"].workspace_id == active_workspace_id
+        ),
+        0,
+    )
+    selected_label = st.selectbox(
+        "Open Project",
+        options=labels,
+        index=selected_index if labels else 0,
+    )
     selected_item = filtered[labels.index(selected_label)]
     selected = selected_item["record"]
 
@@ -27419,7 +27523,23 @@ def _render_pinned_projects_page(
     labels = [
         f"{record.project.name} · {record.project.project_id}" for record in records
     ]
-    selected_label = st.selectbox("Open Pinned Project", options=labels)
+    active_workspace_id = _safe_text(
+        st.session_state.get("atlas_active_workspace_id"),
+        "",
+    )
+    selected_index = next(
+        (
+            index
+            for index, record in enumerate(records)
+            if record.workspace_id == active_workspace_id
+        ),
+        0,
+    )
+    selected_label = st.selectbox(
+        "Open Pinned Project",
+        options=labels,
+        index=selected_index if labels else 0,
+    )
     selected = records[labels.index(selected_label)]
     _shared_render_section_title(st, "Selected Pinned Project")
     _render_project_library_selected_record(
@@ -27470,7 +27590,23 @@ def _render_reference_projects_page(
         labels = [
             f"{record.project.name} · {record.workspace_id}" for record in references
         ]
-        selected_label = st.selectbox("Open Reference Project", options=labels)
+        active_workspace_id = _safe_text(
+            st.session_state.get("atlas_active_workspace_id"),
+            "",
+        )
+        selected_index = next(
+            (
+                index
+                for index, record in enumerate(references)
+                if record.workspace_id == active_workspace_id
+            ),
+            0,
+        )
+        selected_label = st.selectbox(
+            "Open Reference Project",
+            options=labels,
+            index=selected_index if labels else 0,
+        )
         selected = references[labels.index(selected_label)]
         _shared_render_section_title(st, "Selected Reference Project")
         _render_project_library_selected_record(
@@ -27546,7 +27682,23 @@ def _render_recent_projects_page(
     labels = [
         f"{record.project.name} · {record.project.project_id}" for record in records
     ]
-    selected_label = st.selectbox("Open Recent Project", options=labels)
+    active_workspace_id = _safe_text(
+        st.session_state.get("atlas_active_workspace_id"),
+        "",
+    )
+    selected_index = next(
+        (
+            index
+            for index, record in enumerate(records)
+            if record.workspace_id == active_workspace_id
+        ),
+        0,
+    )
+    selected_label = st.selectbox(
+        "Open Recent Project",
+        options=labels,
+        index=selected_index if labels else 0,
+    )
     selected = records[labels.index(selected_label)]
     _shared_render_section_title(st, "Selected Recent Project")
     _render_project_library_selected_record(
@@ -42220,7 +42372,9 @@ def main() -> None:
         _record_bootstrap_phase(st, "processing_worker_ready")
         _sync_active_workspace_from_query_params(st, workspace_service)
         _record_bootstrap_phase(st, "workspace_query_state_parsed")
-        _ensure_active_workspace(st, workspace_service)
+        record = _resolve_active_workspace_record(st, workspace_service)
+        if record is None:
+            _ensure_active_workspace(st, workspace_service)
         _record_bootstrap_phase(st, "active_workspace_validated")
 
         record = _active_record(st, workspace_service)
@@ -42231,7 +42385,7 @@ def main() -> None:
         )
         if record is not None:
             _restore_workspace_state_safely(st, workspace_service, record)
-            _sync_active_page_from_query_params(st, default_to_home=True)
+            _sync_active_page_from_query_params(st, default_to_home=False)
             _record_bootstrap_phase(
                 st,
                 "workspace_state_restored",
@@ -42243,26 +42397,11 @@ def main() -> None:
             "Mission Control",
         )
         _record_bootstrap_phase(st, "route_resolved", route=current_page)
-        full_context_loaded = False
         if record is not None:
-            if _project_page_requires_full_context(current_page):
-                context = _load_context_for_record(record)
-                full_context_loaded = context is not None
-            else:
-                context = _load_lightweight_context_for_record(
-                    workspace_service,
-                    record,
-                )
-        if record is not None and context is not None and full_context_loaded:
-            record = _build_record_from_context(context, existing_record=record)
-            record.workspace_state = workspace_service.load_workspace_state(
-                record.workspace_id
+            context = _load_lightweight_context_for_record(
+                workspace_service,
+                record,
             )
-            record.pinned = bool(record.metadata.get("pinned", record.pinned))
-            record.is_reference = bool(
-                record.metadata.get("reference", record.is_reference)
-            )
-            record.archived = bool(record.metadata.get("archived", record.archived))
 
         if st.session_state.get("atlas_active_page") not in ALL_ACTIVE_PAGES:
             st.session_state["atlas_active_page"] = "Mission Control"

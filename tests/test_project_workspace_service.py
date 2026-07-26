@@ -149,6 +149,43 @@ def test_workspace_service_recent_projects_excludes_archived_by_default(
     assert [record.workspace_id for record in recent] == ["project-active"]
 
 
+def test_workspace_service_excludes_placeholder_project_roots(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+
+    valid = ProjectWorkspaceRecord(
+        workspace_id="BID-2026-0002",
+        project=Project(
+            project_id="BID-2026-0002",
+            name="Music Academy of the West",
+            client="Music Academy of the West",
+        ),
+        last_opened_at="2024-01-03T00:00:00+00:00",
+    )
+    placeholder = ProjectWorkspaceRecord(
+        workspace_id="BID-2026-0001",
+        project=Project(
+            project_id="documents",
+            name="documents",
+            client="documents",
+        ),
+        source_mode="reference_project_real_intake",
+        source_label="Reference Project",
+        last_opened_at="2024-01-04T00:00:00+00:00",
+    )
+
+    service.save_record(valid)
+    service.save_record(placeholder)
+
+    records = service.list_workspaces(include_archived=True)
+
+    assert [record.workspace_id for record in records] == ["BID-2026-0002"]
+    assert [record.workspace_id for record in service.list_recent_workspaces()] == [
+        "BID-2026-0002"
+    ]
+
+
 def test_workspace_service_project_manager_actions(tmp_path: Path) -> None:
     service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
     record = service.create_manual_record(

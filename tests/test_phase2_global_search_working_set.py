@@ -966,6 +966,56 @@ def test_query_params_ignore_unknown_project_workspace() -> None:
     assert "atlas_active_workspace_id" not in st.session_state
 
 
+def test_resolve_active_workspace_prefers_user_selection_over_query_params() -> None:
+    selected = _project_record("BID-2026-0002", "Music Academy of the West")
+    fallback = _project_record("BID-2026-0003", "Reference Workspace")
+    st = _FakeStreamlit(
+        session_state={
+            "atlas_active_workspace_id": selected.workspace_id,
+            "atlas_loaded_workspace_state_for": fallback.workspace_id,
+        }
+    )
+    st.query_params = {"atlas_workspace_id": fallback.workspace_id}
+    service = _FakeWorkspaceService([selected, fallback])
+
+    resolved = app._resolve_active_workspace_record(st, service)
+
+    assert resolved is not None
+    assert resolved.workspace_id == selected.workspace_id
+    assert st.session_state["atlas_active_workspace_id"] == selected.workspace_id
+    assert st.query_params["atlas_workspace_id"] == selected.workspace_id
+
+
+def test_resolve_active_workspace_uses_query_params_before_recent_projects() -> None:
+    recent = _project_record("BID-2026-0002", "Music Academy of the West")
+    persisted = _project_record("BID-2026-0003", "Reference Workspace")
+    st = _FakeStreamlit(
+        session_state={"atlas_loaded_workspace_state_for": persisted.workspace_id}
+    )
+    st.query_params = {"atlas_workspace_id": recent.workspace_id}
+    service = _FakeWorkspaceService([recent, persisted])
+
+    resolved = app._resolve_active_workspace_record(st, service)
+
+    assert resolved is not None
+    assert resolved.workspace_id == recent.workspace_id
+    assert st.session_state["atlas_active_workspace_id"] == recent.workspace_id
+
+
+def test_resolve_active_workspace_falls_back_to_recent_when_state_is_missing() -> None:
+    recent = _project_record("BID-2026-0002", "Music Academy of the West")
+    older = _project_record("BID-2026-0003", "Reference Workspace")
+    st = _FakeStreamlit(session_state={})
+    st.query_params = {}
+    service = _FakeWorkspaceService([recent, older])
+
+    resolved = app._resolve_active_workspace_record(st, service)
+
+    assert resolved is not None
+    assert resolved.workspace_id == recent.workspace_id
+    assert st.session_state["atlas_active_workspace_id"] == recent.workspace_id
+
+
 def test_atlas_button_routes_back_home() -> None:
     st = _HomeContractStreamlit(pressed={"Atlas"})
     st.query_params = {}
@@ -2834,6 +2884,46 @@ def test_home_primary_actions_use_compact_responsive_columns() -> None:
     assert st.column_specs[0] == [1.0, 1.0, 1.0]
 
 
+def test_secondary_navigation_section_persists_query_params() -> None:
+    st = _FakeStreamlit(session_state={"atlas_active_workspace_id": "BID-2026-0002"})
+    st.query_params = {}
+
+    app._open_secondary_navigation_section(
+        st,
+        primary="Projects",
+        mode="active",
+        section={
+            "secondary_key": "bom_review",
+            "route": "BOM Review",
+        },
+    )
+
+    assert st.session_state["atlas_active_page"] == "BOM Review"
+    assert st.query_params["atlas_page"] == "BOM Review"
+    assert st.query_params["atlas_workspace_id"] == "BID-2026-0002"
+    assert st.rerun_called is True
+
+
+def test_tertiary_navigation_action_persists_query_params() -> None:
+    st = _FakeStreamlit(session_state={"atlas_active_workspace_id": "BID-2026-0002"})
+    st.query_params = {}
+
+    app._open_tertiary_navigation_action(
+        st,
+        primary="Projects",
+        mode="active",
+        action={
+            "tertiary_key": "browse",
+            "route": "Reports",
+        },
+    )
+
+    assert st.session_state["atlas_active_page"] == "Reports"
+    assert st.query_params["atlas_page"] == "Reports"
+    assert st.query_params["atlas_workspace_id"] == "BID-2026-0002"
+    assert st.rerun_called is True
+
+
 def test_injected_styles_define_centered_content_width() -> None:
     st = _HomeContractStreamlit()
 
@@ -3916,6 +4006,27 @@ def test_query_page_can_override_restored_workspace_page() -> None:
     app._sync_active_page_from_query_params(st)
 
     assert st.session_state["atlas_active_page"] == "Overview"
+
+
+def test_restored_workspace_page_survives_missing_query_params() -> None:
+    class _RestoreService:
+        def load_workspace_state(self, _workspace_id: str) -> dict[str, Any]:
+            return {
+                "last_open_page": "BOM Review",
+                "filters": {},
+                "search_state": {},
+                "window_preferences": {},
+            }
+
+    st = _FakeStreamlit(session_state={})
+    st.query_params = {}
+    record = _project_record("maw-demo", "MAW")
+
+    app._sync_active_page_from_query_params(st, default_to_home=True)
+    app._restore_workspace_state(st, _RestoreService(), record)
+    app._sync_active_page_from_query_params(st, default_to_home=False)
+
+    assert st.session_state["atlas_active_page"] == "BOM Review"
 
 
 def test_blank_root_defaults_to_mission_control() -> None:

@@ -42,6 +42,26 @@ from atlas_core.services.organization_directory_service import (
     OrganizationDirectoryService,
 )
 
+_RESERVED_PROJECT_ROOT_NAMES = {
+    "addenda",
+    "cache",
+    "documents",
+    "drawings",
+    "exports",
+    "history",
+    "images",
+    "intake",
+    "jobs",
+    "other",
+    "project",
+    "projects",
+    "reports",
+    "schedules",
+    "specifications",
+    "review",
+    "workspace",
+}
+
 
 @dataclass
 class ProjectWorkspaceRecord:
@@ -410,6 +430,9 @@ class ProjectWorkspaceService:
                 workspace_payload,
                 storage_location,
             ) in rows
+        ]
+        records = [
+            record for record in records if self._is_canonical_workspace_record(record)
         ]
         records.sort(key=self._sort_key, reverse=True)
         if limit is None:
@@ -1925,3 +1948,33 @@ class ProjectWorkspaceService:
             record.last_opened_at or record.updated_at or record.created_at,
             record.workspace_id,
         )
+
+    @staticmethod
+    def _is_canonical_workspace_record(record: ProjectWorkspaceRecord) -> bool:
+        workspace_id = record.workspace_id.strip().lower()
+        project_id = record.project.project_id.strip().lower()
+        project_name = record.project.name.strip().lower()
+        atlas_bid_id = (record.project.atlas_bid_id or "").strip().lower()
+        project_root_name = Path(record.project_root or "").name.strip().lower()
+
+        if not workspace_id or not project_id or not project_name:
+            return False
+        if workspace_id != project_id:
+            return False
+        if atlas_bid_id and atlas_bid_id != workspace_id:
+            return False
+
+        for candidate in {
+            workspace_id,
+            project_id,
+            project_name,
+            atlas_bid_id,
+            project_root_name,
+        }:
+            if candidate and candidate in _RESERVED_PROJECT_ROOT_NAMES:
+                return False
+
+        if project_root_name and project_root_name != workspace_id:
+            return False
+
+        return True
