@@ -362,4 +362,24 @@ The next build step should be:
 3. generate a draft estimate from the latest accepted review baseline
 4. preserve the transition contract from accepted estimate to sales order
 
+## Implemented Contract
+
+The repository now includes a dedicated bid-review journey contract in
+`atlas_core/domain/bid_review_journey.py`.
+
+Implemented pieces:
+- immutable bid-review report versions
+- explicit estimate journey states
+- tenant policy snapshots for conversion rules
+- deterministic report and estimate transition validation
+- sales-order conversion eligibility with traceability to the source document set
+- audit records that preserve actor, timestamp, state change, policy snapshot, and guidance snapshot
+
+Deferred decisions:
+- UI workflow for accepting or rejecting reviews
+- persistence and migration of bid-review history
+- pricing, allowances, lots, and contingencies
+- automatic sales-order creation in the service layer
+- tenant-specific RFI acknowledgement UX
+
 That sequence keeps AV-03 grounded in a stable review baseline without collapsing report versions, commercial documents, and lifecycle state into one mutable object.
