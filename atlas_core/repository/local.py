@@ -27,6 +27,7 @@ from atlas_core.repository.contracts import (
 from atlas_core.repository.models import ProjectManifest, RepositoryHealthReport
 from atlas_core.services.document_intake_service import (
     DocumentIntakeService,
+    cleanup_duplicate_document_variants,
     UploadedIntakeFile,
 )
 
@@ -747,6 +748,14 @@ class LocalDocumentRepository(DocumentRepository):
         }
 
     @staticmethod
+    def _file_sha1(path: Path) -> str:
+        digest = hashlib.sha1()
+        with path.open("rb") as file:
+            for chunk in iter(lambda: file.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    @staticmethod
     def _copy_group(source: Path, target: Path) -> None:
         target.mkdir(parents=True, exist_ok=True)
         if not source.exists() or not source.is_dir():
@@ -756,11 +765,13 @@ class LocalDocumentRepository(DocumentRepository):
             if not file_path.is_file():
                 continue
             destination = target / file_path.name
-            if destination.exists():
-                destination = (
-                    target / f"{file_path.stem}-{_utc_stamp()}{file_path.suffix}"
-                )
+            if destination.exists() and LocalDocumentRepository._file_sha1(
+                destination
+            ) == LocalDocumentRepository._file_sha1(file_path):
+                continue
             shutil.copy2(file_path, destination)
+
+        cleanup_duplicate_document_variants(target)
 
 
 class LocalReviewRepository(ReviewRepository):

@@ -515,6 +515,33 @@ def test_workspace_service_create_project_with_single_pdf_upload(
     assert int(uploaded.import_summary.get("uploaded_file_count", 0) or 0) >= 1
 
 
+def test_workspace_service_retry_uploads_do_not_create_duplicate_copies(
+    tmp_path: Path,
+) -> None:
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        name="Retry Upload",
+        client="Client",
+    )
+    service.save_record(record)
+
+    service.import_uploaded_documents(
+        record.workspace_id,
+        [("bid-package.pdf", _blank_pdf_bytes())],
+    )
+    service.import_uploaded_documents(
+        record.workspace_id,
+        [("bid-package.pdf", _blank_pdf_bytes())],
+    )
+
+    drawings_root = Path(service.project_location(record.workspace_id)) / "documents"
+    files = sorted(
+        path.relative_to(drawings_root) for path in drawings_root.rglob("*.pdf")
+    )
+
+    assert files == [Path("drawings/bid-package.pdf")]
+
+
 def test_workspace_service_mixed_valid_invalid_uploads_partial_success(
     tmp_path: Path,
 ) -> None:

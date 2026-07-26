@@ -18,6 +18,7 @@ from pypdf import PdfWriter
 
 from atlas_core.services.document_intake_service import (
     DocumentIntakeService,
+    cleanup_duplicate_document_variants,
     LocalOcrEngine,
     UploadedIntakeFile,
 )
@@ -30,15 +31,27 @@ def _write_blank_pdf(path: Path) -> None:
         writer.write(file)
 
 
+def _blank_pdf_bytes() -> bytes:
+    from io import BytesIO
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    buffer = BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
 def _build_package(tmp_path: Path) -> Path:
     package = tmp_path / "example_project"
     drawings = package / "drawings"
     specifications = package / "specifications"
+    reports = package / "reports"
     schedules = package / "schedules"
     addenda = package / "addenda"
 
     drawings.mkdir(parents=True)
     specifications.mkdir(parents=True)
+    reports.mkdir(parents=True)
     schedules.mkdir(parents=True)
     addenda.mkdir(parents=True)
 
@@ -56,6 +69,9 @@ def _build_package(tmp_path: Path) -> Path:
 
     _write_blank_pdf(drawings / "AV-101 Audio Plan.pdf")
     _write_blank_pdf(specifications / "27 41 16 Integrated Audio Systems.pdf")
+    _write_blank_pdf(
+        reports / "2025.12.15 MAW 100DD Acoustics Narrative by Kirkegaard.pdf"
+    )
     _write_blank_pdf(addenda / "ADD-1 AV Addendum.pdf")
 
     with (schedules / "audio_schedule.csv").open(
@@ -74,6 +90,7 @@ def test_package_folder_discovery(tmp_path: Path) -> None:
 
     assert len(discovery.drawing_files) == 1
     assert len(discovery.specification_files) == 1
+    assert len(discovery.report_files) == 1
     assert len(discovery.schedule_files) == 1
     assert len(discovery.addenda_files) == 1
     assert discovery.metadata_path is not None
@@ -84,12 +101,12 @@ def test_metadata_and_pdf_page_extraction(tmp_path: Path) -> None:
     snapshot = DocumentIntakeService().build_snapshot(package)
 
     assert snapshot.metadata["project_id"] == "project-intake-001"
-    assert len(snapshot.raw_pages) == 3
+    assert len(snapshot.raw_pages) == 4
     assert all(page["source_file"].endswith(".pdf") for page in snapshot.raw_pages)
     assert any("OCR is required" in warning for warning in snapshot.warnings)
-    assert snapshot.import_summary["total_files"] >= 4
-    assert snapshot.import_summary["total_pages"] == 3
-    assert snapshot.import_summary["pages_without_embedded_text"] >= 3
+    assert snapshot.import_summary["total_files"] >= 5
+    assert snapshot.import_summary["total_pages"] == 4
+    assert snapshot.import_summary["pages_without_embedded_text"] >= 4
     assert snapshot.import_summary["documents_requiring_ocr"] >= 1
     assert snapshot.import_summary["extraction_warning_count"] >= 1
 
@@ -122,6 +139,39 @@ def test_review_pipeline_from_snapshot_output(tmp_path: Path) -> None:
     assert result.review.name == "Example Intake Plan Review"
 
 
+def test_snapshot_includes_relevance_assessments_roundtrip(tmp_path: Path) -> None:
+    package = _build_package(tmp_path)
+    intake_service = DocumentIntakeService()
+
+    snapshot = intake_service.build_snapshot(package)
+    assert snapshot.document_relevance_assessments
+    assert snapshot.import_summary["relevance_assessment_count"] == len(
+        snapshot.document_relevance_assessments
+    )
+
+    snapshot_path = intake_service.write_snapshot(snapshot, tmp_path / "outputs")
+    loaded_snapshot = intake_service.load_snapshot(snapshot_path)
+
+    assert len(loaded_snapshot.document_relevance_assessments) == len(
+        snapshot.document_relevance_assessments
+    )
+    assert loaded_snapshot.document_relevance_assessments[0].page_assessments
+    assert (
+        loaded_snapshot.document_relevance_assessments[0]
+        .page_assessments[0]
+        .page_number
+        == 1
+    )
+    assert all(
+        assessment.source_file
+        for assessment in loaded_snapshot.document_relevance_assessments
+    )
+    assert any(
+        assessment.authority_level in {"governing", "coordination", "contextual"}
+        for assessment in loaded_snapshot.document_relevance_assessments
+    )
+
+
 def test_build_session_package_from_uploads_classifies_and_runs_intake(
     tmp_path: Path,
 ) -> None:
@@ -131,6 +181,10 @@ def test_build_session_package_from_uploads_classifies_and_runs_intake(
         UploadedIntakeFile(
             name="27_41_16_Integrated_Audio_Systems.docx",
             data=_docx_bytes("SECTION 27 41 16\nIntegrated Audio Systems"),
+        ),
+        UploadedIntakeFile(
+            name="2025.12.15 MAW 100DD Acoustics Narrative by Kirkegaard.pdf",
+            data=_blank_pdf_bytes(),
         ),
         UploadedIntakeFile(
             name="audio_schedule.csv",
@@ -160,6 +214,7 @@ def test_build_session_package_from_uploads_classifies_and_runs_intake(
     assert result.snapshot_path.exists()
     assert result.import_summary["drawing_count"] == 1
     assert result.import_summary["specification_count"] == 1
+    assert result.import_summary["report_count"] == 1
     assert result.import_summary["schedule_count"] == 1
     assert result.import_summary["image_count"] == 1
     assert result.import_summary["unsupported_file_count"] == 0
@@ -319,6 +374,49 @@ def test_build_session_package_from_uploads_supports_partial_success(
     assert any(
         str(item.get("name", "")).endswith("rejected.exe") for item in diagnostics
     )
+
+
+def test_build_session_package_from_uploads_reuses_canonical_filename_on_retry(
+    tmp_path: Path,
+) -> None:
+    service = DocumentIntakeService()
+    uploads = [UploadedIntakeFile(name="bid-package.pdf", data=_blank_pdf_bytes())]
+
+    first = service.build_session_package_from_uploads(
+        uploaded_files=uploads,
+        uploads_root=tmp_path / "uploads",
+        session_id="retry-session",
+    )
+    second = service.build_session_package_from_uploads(
+        uploaded_files=uploads,
+        uploads_root=tmp_path / "uploads",
+        session_id="retry-session",
+    )
+
+    drawings_root = second.package_path / "drawings"
+    files = sorted(path.name for path in drawings_root.glob("*.pdf"))
+
+    assert first.package_path == second.package_path
+    assert files == ["bid-package.pdf"]
+
+
+def test_cleanup_duplicate_document_variants_collapses_nested_retry_suffixes(
+    tmp_path: Path,
+) -> None:
+    folder = tmp_path / "documents"
+    folder.mkdir()
+    canonical = folder / "Div 11 Equipment.pdf"
+    nested_retry = folder / "Div 11 Equipment_1-20260721040943.pdf"
+
+    canonical.write_bytes(_blank_pdf_bytes())
+    nested_retry.write_bytes(_blank_pdf_bytes())
+
+    removed = cleanup_duplicate_document_variants(folder)
+
+    assert removed == 1
+    assert sorted(path.name for path in folder.glob("*.pdf")) == [
+        "Div 11 Equipment.pdf"
+    ]
 
 
 def test_zip_upload_rejects_traversal_unsupported_and_system_artifacts(

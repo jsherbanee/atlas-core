@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from atlas_core.domain.document_relevance import DocumentRelevanceAssessment
+
 
 @dataclass
 class IntakeSourceReference:
@@ -30,6 +32,9 @@ class DocumentIntakeSnapshot:
     raw_device_schedules: list[dict[str, Any]] = field(default_factory=list)
     equipment_candidates: list[dict[str, Any]] = field(default_factory=list)
     source_references: list[dict[str, Any]] = field(default_factory=list)
+    document_relevance_assessments: list[DocumentRelevanceAssessment] = field(
+        default_factory=list
+    )
     warnings: list[str] = field(default_factory=list)
     import_summary: dict[str, Any] = field(default_factory=dict)
     data_source: str = "real_package_intake"
@@ -54,6 +59,14 @@ class DocumentIntakeSnapshot:
             raw_device_schedules=list(payload.get("raw_device_schedules") or []),
             equipment_candidates=list(payload.get("equipment_candidates") or []),
             source_references=list(payload.get("source_references") or []),
+            document_relevance_assessments=[
+                (
+                    item
+                    if isinstance(item, DocumentRelevanceAssessment)
+                    else DocumentRelevanceAssessment(**dict(item))
+                )
+                for item in list(payload.get("document_relevance_assessments") or [])
+            ],
             warnings=[str(item) for item in list(payload.get("warnings") or [])],
             import_summary=dict(payload.get("import_summary") or {}),
             data_source=str(payload.get("data_source") or "real_package_intake"),

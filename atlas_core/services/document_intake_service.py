@@ -30,6 +30,9 @@ from atlas_core.services.pdf_text_extraction_service import PdfTextExtractionSer
 from atlas_core.services.plan_review_application_service import (
     PlanReviewApplicationService,
 )
+from atlas_core.services.document_relevance_service import DocumentRelevanceService
+
+_RETRY_SUFFIX_PATTERN = re.compile(r"(?:[_-]\d+|-\d{14})$", re.IGNORECASE)
 
 
 @dataclass
@@ -38,6 +41,7 @@ class PackageDiscoveryResult:
     metadata_path: Path | None
     drawing_files: list[Path]
     specification_files: list[Path]
+    report_files: list[Path]
     schedule_files: list[Path]
     addenda_files: list[Path]
     image_files: list[Path]
@@ -96,6 +100,74 @@ class NoOpLocalOcrEngine:
         return "", []
 
 
+def _file_sha1(path: Path) -> str:
+    digest = hashlib.sha1()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _bytes_sha1(data: bytes) -> str:
+    return hashlib.sha1(data).hexdigest()
+
+
+def _canonical_retry_base_name(name: str) -> str:
+    path = Path(name)
+    stem = path.stem
+    while True:
+        next_stem = _RETRY_SUFFIX_PATTERN.sub("", stem)
+        if next_stem == stem:
+            break
+        stem = next_stem
+    return f"{stem}{path.suffix}"
+
+
+def cleanup_duplicate_document_variants(folder: str | Path) -> int:
+    """Remove exact duplicate retry copies while keeping one canonical file.
+
+    Cleanup rule:
+    - Keep one file per canonical base name and content hash.
+    - Prefer the unsuffixed canonical filename when it exists.
+    - Drop retry variants such as `_1` or timestamp-suffixed copies when they are
+      byte-for-byte identical to the canonical document.
+    """
+
+    folder_path = Path(folder)
+    if not folder_path.exists() or not folder_path.is_dir():
+        return 0
+
+    grouped: dict[tuple[str, str], list[Path]] = {}
+    for file_path in folder_path.rglob("*"):
+        if not file_path.is_file():
+            continue
+        key = (_canonical_retry_base_name(file_path.name), _file_sha1(file_path))
+        grouped.setdefault(key, []).append(file_path)
+
+    removed = 0
+    for (base_name, _), paths in grouped.items():
+        if len(paths) < 2:
+            continue
+
+        canonical_candidates = [path for path in paths if path.name == base_name]
+        keep = (
+            sorted(canonical_candidates, key=lambda path: str(path))[0]
+            if canonical_candidates
+            else sorted(paths, key=lambda path: str(path))[0]
+        )
+
+        for path in paths:
+            if path == keep:
+                continue
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                continue
+            removed += 1
+
+    return removed
+
+
 def _extraction_mode(
     *,
     status: str,
@@ -145,11 +217,15 @@ class DocumentIntakeService:
     def __init__(
         self,
         pdf_text_extraction_service: PdfTextExtractionService | None = None,
+        document_relevance_service: DocumentRelevanceService | None = None,
         local_ocr_engine: LocalOcrEngine | None = None,
         enable_local_ocr: bool = False,
     ) -> None:
         self.pdf_text_extraction_service = (
             pdf_text_extraction_service or PdfTextExtractionService()
+        )
+        self.document_relevance_service = (
+            document_relevance_service or DocumentRelevanceService()
         )
         self.local_ocr_engine = local_ocr_engine or NoOpLocalOcrEngine()
         self.enable_local_ocr = enable_local_ocr
@@ -165,6 +241,7 @@ class DocumentIntakeService:
             metadata_path=metadata_path if metadata_path.exists() else None,
             drawing_files=self._sorted_files(root / "drawings"),
             specification_files=self._sorted_files(root / "specifications"),
+            report_files=self._sorted_files(root / "reports"),
             schedule_files=self._sorted_files(root / "schedules"),
             addenda_files=self._sorted_files(root / "addenda"),
             image_files=self._sorted_files(root / "images"),
@@ -198,6 +275,7 @@ class DocumentIntakeService:
 
         drawing_count = 0
         specification_count = 0
+        report_count = 0
         schedule_count = 0
         addenda_count = 0
         image_count = 0
@@ -217,6 +295,8 @@ class DocumentIntakeService:
                 drawing_count += 1
             elif target_group == "specifications":
                 specification_count += 1
+            elif target_group == "reports":
+                report_count += 1
             elif target_group == "schedules":
                 schedule_count += 1
             elif target_group == "addenda":
@@ -237,9 +317,21 @@ class DocumentIntakeService:
 
                         metadata_written = True
 
+        for folder_name in (
+            "drawings",
+            "specifications",
+            "reports",
+            "schedules",
+            "addenda",
+            "images",
+            "unsupported",
+        ):
+            cleanup_duplicate_document_variants(session_root / folder_name)
+
         summary = {
             "drawing_count": drawing_count,
             "specification_count": specification_count,
+            "report_count": report_count,
             "schedule_count": schedule_count,
             "addenda_count": addenda_count,
             "image_count": image_count,
@@ -356,6 +448,7 @@ class DocumentIntakeService:
         for group_name, files in (
             ("drawings", discovery.drawing_files),
             ("specifications", discovery.specification_files),
+            ("reports", discovery.report_files),
             ("schedules", discovery.schedule_files),
             ("addenda", discovery.addenda_files),
             ("images", discovery.image_files),
@@ -475,6 +568,20 @@ class DocumentIntakeService:
             raw_sections=raw_sections,
         )
 
+        discovered_files = {
+            "drawings": [path.name for path in discovery.drawing_files],
+            "specifications": [path.name for path in discovery.specification_files],
+            "reports": [path.name for path in discovery.report_files],
+            "schedules": [path.name for path in discovery.schedule_files],
+            "addenda": [path.name for path in discovery.addenda_files],
+            "images": [path.name for path in discovery.image_files],
+            "unsupported": [path.name for path in discovery.unsupported_files],
+        }
+        relevance_assessments = self.document_relevance_service.assess_documents(
+            page_records=page_records,
+            discovered_files=discovered_files,
+        )
+
         for sheet in raw_sheets:
             source_references.append(
                 IntakeSourceReference(
@@ -534,29 +641,35 @@ class DocumentIntakeService:
             snapshot_id=snapshot_id,
             package_path=package_path_value,
             metadata=metadata,
-            discovered_files={
-                "drawings": [path.name for path in discovery.drawing_files],
-                "specifications": [path.name for path in discovery.specification_files],
-                "schedules": [path.name for path in discovery.schedule_files],
-                "addenda": [path.name for path in discovery.addenda_files],
-                "images": [path.name for path in discovery.image_files],
-                "unsupported": [path.name for path in discovery.unsupported_files],
-            },
+            discovered_files=discovered_files,
             raw_pages=page_records,
             raw_sheets=raw_sheets,
             raw_sections=raw_sections,
             raw_device_schedules=raw_device_schedules,
             equipment_candidates=equipment_candidates,
             source_references=self._dedupe_dicts(source_references),
+            document_relevance_assessments=relevance_assessments,
             warnings=sorted(set(warnings)),
             import_summary={
                 "drawing_count": len(discovery.drawing_files),
                 "specification_count": len(discovery.specification_files),
+                "report_count": len(discovery.report_files),
                 "schedule_count": len(discovery.schedule_files),
                 "addenda_count": len(discovery.addenda_files),
                 "image_count": len(discovery.image_files),
                 "unsupported_file_count": len(discovery.unsupported_files),
                 **diagnostics_summary,
+                "relevance_assessment_count": len(relevance_assessments),
+                "governing_document_count": sum(
+                    1
+                    for item in relevance_assessments
+                    if item.authority_level == "governing"
+                ),
+                "coordination_document_count": sum(
+                    1
+                    for item in relevance_assessments
+                    if item.authority_level == "coordination"
+                ),
                 "extraction_warnings": sorted(set(warnings)),
                 "package_location": package_path_value,
             },
@@ -1059,6 +1172,7 @@ class DocumentIntakeService:
         for folder_name in (
             "drawings",
             "specifications",
+            "reports",
             "schedules",
             "addenda",
             "images",
@@ -1080,6 +1194,9 @@ class DocumentIntakeService:
 
         if suffix in self._SCHEDULE_EXTENSIONS:
             return "schedules"
+
+        if any(token in lowered for token in ("report", "narrative", "acoustics")):
+            return "reports"
 
         if suffix not in self._SUPPORTED_EXTENSIONS:
             return "unsupported"
@@ -1131,25 +1248,11 @@ class DocumentIntakeService:
             destination = destination / part
         destination.mkdir(parents=True, exist_ok=True)
         destination = destination / safe_parts[-1]
-        destination = self._resolve_duplicate_path(destination)
+        if destination.exists() and _file_sha1(destination) == _bytes_sha1(upload_data):
+            return destination
         destination.write_bytes(upload_data)
+        cleanup_duplicate_document_variants(destination.parent)
         return destination
-
-    @staticmethod
-    def _resolve_duplicate_path(path: Path) -> Path:
-        if not path.exists():
-            return path
-
-        stem = path.stem
-        suffix = path.suffix
-        parent = path.parent
-        counter = 1
-        while True:
-            candidate = parent / f"{stem}_{counter}{suffix}"
-            if not candidate.exists():
-                return candidate
-
-            counter += 1
 
     @staticmethod
     def _normalize_metadata_file(path: Path) -> dict[str, Any] | None:

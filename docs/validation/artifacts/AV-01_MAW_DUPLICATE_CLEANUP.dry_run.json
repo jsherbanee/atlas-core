@@ -1,0 +1,737 @@
+{
+  "cleanup_rule": {
+    "canonicalization": "Strip trailing _<digits> and/or -<YYYYMMDDHHMMSS> segments repeatedly until the filename stabilizes, then group by canonical filename + SHA-1 checksum.",
+    "description": "Keep one canonical unsuffixed file per canonical base name and checksum. Remove byte-identical retry copies created by numbered or timestamped upload retries.",
+    "safety_notes": [
+      "Never delete a file unless it matches another file byte-for-byte.",
+      "Prefer the unsuffixed filename when it exists.",
+      "Do not remove non-identical files, missing documents, or uncertain extras without review."
+    ]
+  },
+  "delete_candidates": [
+    {
+      "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721024056.pdf",
+      "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721024056.pdf",
+      "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+      "size_bytes": 13893949
+    },
+    {
+      "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040937.pdf",
+      "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040937.pdf",
+      "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+      "size_bytes": 13893949
+    },
+    {
+      "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040943.pdf",
+      "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040943.pdf",
+      "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+      "size_bytes": 13893949
+    },
+    {
+      "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041518.pdf",
+      "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041518.pdf",
+      "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+      "size_bytes": 13893949
+    },
+    {
+      "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041900.pdf",
+      "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041900.pdf",
+      "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+      "size_bytes": 13893949
+    },
+    {
+      "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721023607.pdf",
+      "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721023607.pdf",
+      "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+      "size_bytes": 12946676
+    },
+    {
+      "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721024056.pdf",
+      "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721024056.pdf",
+      "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+      "size_bytes": 12946676
+    },
+    {
+      "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040938.pdf",
+      "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040938.pdf",
+      "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+      "size_bytes": 12946676
+    },
+    {
+      "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040943.pdf",
+      "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040943.pdf",
+      "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+      "size_bytes": 12946676
+    },
+    {
+      "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041518.pdf",
+      "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041518.pdf",
+      "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+      "size_bytes": 12946676
+    },
+    {
+      "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041900.pdf",
+      "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041900.pdf",
+      "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+      "size_bytes": 12946676
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment-20260721040943.pdf",
+      "path": "schedules/Div 11 Equipment-20260721040943.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment-20260721041518.pdf",
+      "path": "schedules/Div 11 Equipment-20260721041518.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment-20260721041900.pdf",
+      "path": "schedules/Div 11 Equipment-20260721041900.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_1-20260721040943.pdf",
+      "path": "schedules/Div 11 Equipment_1-20260721040943.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_1-20260721041518.pdf",
+      "path": "schedules/Div 11 Equipment_1-20260721041518.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_1-20260721041900.pdf",
+      "path": "schedules/Div 11 Equipment_1-20260721041900.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_1.pdf",
+      "path": "schedules/Div 11 Equipment_1.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_2-20260721040943.pdf",
+      "path": "schedules/Div 11 Equipment_2-20260721040943.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_2-20260721041518.pdf",
+      "path": "schedules/Div 11 Equipment_2-20260721041518.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_2-20260721041900.pdf",
+      "path": "schedules/Div 11 Equipment_2-20260721041900.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_2.pdf",
+      "path": "schedules/Div 11 Equipment_2.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_3-20260721040943.pdf",
+      "path": "schedules/Div 11 Equipment_3-20260721040943.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_3-20260721041518.pdf",
+      "path": "schedules/Div 11 Equipment_3-20260721041518.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_3-20260721041900.pdf",
+      "path": "schedules/Div 11 Equipment_3-20260721041900.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_3.pdf",
+      "path": "schedules/Div 11 Equipment_3.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_4-20260721040943.pdf",
+      "path": "schedules/Div 11 Equipment_4-20260721040943.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_4-20260721041518.pdf",
+      "path": "schedules/Div 11 Equipment_4-20260721041518.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_4-20260721041900.pdf",
+      "path": "schedules/Div 11 Equipment_4-20260721041900.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_4.pdf",
+      "path": "schedules/Div 11 Equipment_4.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_5-20260721041900.pdf",
+      "path": "schedules/Div 11 Equipment_5-20260721041900.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "name": "Div 11 Equipment_5.pdf",
+      "path": "schedules/Div 11 Equipment_5.pdf",
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+      "size_bytes": 969549
+    },
+    {
+      "canonical_name": "Div 27 Communications.pdf",
+      "name": "Div 27 Communications-20260721040939.pdf",
+      "path": "specifications/Div 27 Communications-20260721040939.pdf",
+      "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17",
+      "size_bytes": 388499
+    },
+    {
+      "canonical_name": "Div 27 Communications.pdf",
+      "name": "Div 27 Communications-20260721040943.pdf",
+      "path": "specifications/Div 27 Communications-20260721040943.pdf",
+      "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17",
+      "size_bytes": 388499
+    },
+    {
+      "canonical_name": "Div 27 Communications.pdf",
+      "name": "Div 27 Communications-20260721041518.pdf",
+      "path": "specifications/Div 27 Communications-20260721041518.pdf",
+      "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17",
+      "size_bytes": 388499
+    },
+    {
+      "canonical_name": "Div 27 Communications.pdf",
+      "name": "Div 27 Communications-20260721041900.pdf",
+      "path": "specifications/Div 27 Communications-20260721041900.pdf",
+      "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17",
+      "size_bytes": 388499
+    },
+    {
+      "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+      "name": "MAW_MBD-013_Interior Scaffold Phasing-20260721040938.pdf",
+      "path": "drawings/MAW_MBD-013_Interior Scaffold Phasing-20260721040938.pdf",
+      "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345",
+      "size_bytes": 1038004
+    },
+    {
+      "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+      "name": "MAW_MBD-013_Interior Scaffold Phasing-20260721040943.pdf",
+      "path": "drawings/MAW_MBD-013_Interior Scaffold Phasing-20260721040943.pdf",
+      "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345",
+      "size_bytes": 1038004
+    },
+    {
+      "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+      "name": "MAW_MBD-013_Interior Scaffold Phasing-20260721041518.pdf",
+      "path": "drawings/MAW_MBD-013_Interior Scaffold Phasing-20260721041518.pdf",
+      "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345",
+      "size_bytes": 1038004
+    },
+    {
+      "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+      "name": "MAW_MBD-013_Interior Scaffold Phasing-20260721041900.pdf",
+      "path": "drawings/MAW_MBD-013_Interior Scaffold Phasing-20260721041900.pdf",
+      "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345",
+      "size_bytes": 1038004
+    },
+    {
+      "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+      "name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721040938.pdf",
+      "path": "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721040938.pdf",
+      "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90",
+      "size_bytes": 1172520
+    },
+    {
+      "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+      "name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721040943.pdf",
+      "path": "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721040943.pdf",
+      "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90",
+      "size_bytes": 1172520
+    },
+    {
+      "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+      "name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721041518.pdf",
+      "path": "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721041518.pdf",
+      "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90",
+      "size_bytes": 1172520
+    },
+    {
+      "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+      "name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721041900.pdf",
+      "path": "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721041900.pdf",
+      "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90",
+      "size_bytes": 1172520
+    }
+  ],
+  "groups": [
+    {
+      "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "count": 6,
+      "delete": [
+        {
+          "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721024056.pdf",
+          "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721024056.pdf",
+          "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+          "size_bytes": 13893949
+        },
+        {
+          "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040937.pdf",
+          "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040937.pdf",
+          "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+          "size_bytes": 13893949
+        },
+        {
+          "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040943.pdf",
+          "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040943.pdf",
+          "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+          "size_bytes": 13893949
+        },
+        {
+          "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041518.pdf",
+          "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041518.pdf",
+          "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+          "size_bytes": 13893949
+        },
+        {
+          "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041900.pdf",
+          "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041900.pdf",
+          "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+          "size_bytes": 13893949
+        }
+      ],
+      "keep": {
+        "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+        "name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+        "path": "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+        "sha1": "6d70c1466943cd4b804add754bcbe54955532df4",
+        "size_bytes": 13893949
+      },
+      "sha1": "6d70c1466943cd4b804add754bcbe54955532df4"
+    },
+    {
+      "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "count": 7,
+      "delete": [
+        {
+          "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721023607.pdf",
+          "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721023607.pdf",
+          "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+          "size_bytes": 12946676
+        },
+        {
+          "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721024056.pdf",
+          "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721024056.pdf",
+          "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+          "size_bytes": 12946676
+        },
+        {
+          "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040938.pdf",
+          "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040938.pdf",
+          "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+          "size_bytes": 12946676
+        },
+        {
+          "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040943.pdf",
+          "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721040943.pdf",
+          "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+          "size_bytes": 12946676
+        },
+        {
+          "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041518.pdf",
+          "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041518.pdf",
+          "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+          "size_bytes": 12946676
+        },
+        {
+          "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+          "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041900.pdf",
+          "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29-20260721041900.pdf",
+          "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+          "size_bytes": 12946676
+        }
+      ],
+      "keep": {
+        "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+        "name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+        "path": "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+        "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993",
+        "size_bytes": 12946676
+      },
+      "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993"
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "count": 22,
+      "delete": [
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment-20260721040943.pdf",
+          "path": "schedules/Div 11 Equipment-20260721040943.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment-20260721041518.pdf",
+          "path": "schedules/Div 11 Equipment-20260721041518.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment-20260721041900.pdf",
+          "path": "schedules/Div 11 Equipment-20260721041900.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_1-20260721040943.pdf",
+          "path": "schedules/Div 11 Equipment_1-20260721040943.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_1-20260721041518.pdf",
+          "path": "schedules/Div 11 Equipment_1-20260721041518.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_1-20260721041900.pdf",
+          "path": "schedules/Div 11 Equipment_1-20260721041900.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_1.pdf",
+          "path": "schedules/Div 11 Equipment_1.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_2-20260721040943.pdf",
+          "path": "schedules/Div 11 Equipment_2-20260721040943.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_2-20260721041518.pdf",
+          "path": "schedules/Div 11 Equipment_2-20260721041518.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_2-20260721041900.pdf",
+          "path": "schedules/Div 11 Equipment_2-20260721041900.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_2.pdf",
+          "path": "schedules/Div 11 Equipment_2.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_3-20260721040943.pdf",
+          "path": "schedules/Div 11 Equipment_3-20260721040943.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_3-20260721041518.pdf",
+          "path": "schedules/Div 11 Equipment_3-20260721041518.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_3-20260721041900.pdf",
+          "path": "schedules/Div 11 Equipment_3-20260721041900.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_3.pdf",
+          "path": "schedules/Div 11 Equipment_3.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_4-20260721040943.pdf",
+          "path": "schedules/Div 11 Equipment_4-20260721040943.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_4-20260721041518.pdf",
+          "path": "schedules/Div 11 Equipment_4-20260721041518.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_4-20260721041900.pdf",
+          "path": "schedules/Div 11 Equipment_4-20260721041900.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_4.pdf",
+          "path": "schedules/Div 11 Equipment_4.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_5-20260721041900.pdf",
+          "path": "schedules/Div 11 Equipment_5-20260721041900.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        },
+        {
+          "canonical_name": "Div 11 Equipment.pdf",
+          "name": "Div 11 Equipment_5.pdf",
+          "path": "schedules/Div 11 Equipment_5.pdf",
+          "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+          "size_bytes": 969549
+        }
+      ],
+      "keep": {
+        "canonical_name": "Div 11 Equipment.pdf",
+        "name": "Div 11 Equipment.pdf",
+        "path": "schedules/Div 11 Equipment.pdf",
+        "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092",
+        "size_bytes": 969549
+      },
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092"
+    },
+    {
+      "canonical_name": "Div 27 Communications.pdf",
+      "count": 5,
+      "delete": [
+        {
+          "canonical_name": "Div 27 Communications.pdf",
+          "name": "Div 27 Communications-20260721040939.pdf",
+          "path": "specifications/Div 27 Communications-20260721040939.pdf",
+          "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17",
+          "size_bytes": 388499
+        },
+        {
+          "canonical_name": "Div 27 Communications.pdf",
+          "name": "Div 27 Communications-20260721040943.pdf",
+          "path": "specifications/Div 27 Communications-20260721040943.pdf",
+          "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17",
+          "size_bytes": 388499
+        },
+        {
+          "canonical_name": "Div 27 Communications.pdf",
+          "name": "Div 27 Communications-20260721041518.pdf",
+          "path": "specifications/Div 27 Communications-20260721041518.pdf",
+          "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17",
+          "size_bytes": 388499
+        },
+        {
+          "canonical_name": "Div 27 Communications.pdf",
+          "name": "Div 27 Communications-20260721041900.pdf",
+          "path": "specifications/Div 27 Communications-20260721041900.pdf",
+          "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17",
+          "size_bytes": 388499
+        }
+      ],
+      "keep": {
+        "canonical_name": "Div 27 Communications.pdf",
+        "name": "Div 27 Communications.pdf",
+        "path": "specifications/Div 27 Communications.pdf",
+        "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17",
+        "size_bytes": 388499
+      },
+      "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17"
+    },
+    {
+      "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+      "count": 5,
+      "delete": [
+        {
+          "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+          "name": "MAW_MBD-013_Interior Scaffold Phasing-20260721040938.pdf",
+          "path": "drawings/MAW_MBD-013_Interior Scaffold Phasing-20260721040938.pdf",
+          "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345",
+          "size_bytes": 1038004
+        },
+        {
+          "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+          "name": "MAW_MBD-013_Interior Scaffold Phasing-20260721040943.pdf",
+          "path": "drawings/MAW_MBD-013_Interior Scaffold Phasing-20260721040943.pdf",
+          "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345",
+          "size_bytes": 1038004
+        },
+        {
+          "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+          "name": "MAW_MBD-013_Interior Scaffold Phasing-20260721041518.pdf",
+          "path": "drawings/MAW_MBD-013_Interior Scaffold Phasing-20260721041518.pdf",
+          "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345",
+          "size_bytes": 1038004
+        },
+        {
+          "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+          "name": "MAW_MBD-013_Interior Scaffold Phasing-20260721041900.pdf",
+          "path": "drawings/MAW_MBD-013_Interior Scaffold Phasing-20260721041900.pdf",
+          "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345",
+          "size_bytes": 1038004
+        }
+      ],
+      "keep": {
+        "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+        "name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+        "path": "drawings/MAW_MBD-013_Interior Scaffold Phasing.pdf",
+        "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345",
+        "size_bytes": 1038004
+      },
+      "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345"
+    },
+    {
+      "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+      "count": 5,
+      "delete": [
+        {
+          "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+          "name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721040938.pdf",
+          "path": "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721040938.pdf",
+          "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90",
+          "size_bytes": 1172520
+        },
+        {
+          "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+          "name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721040943.pdf",
+          "path": "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721040943.pdf",
+          "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90",
+          "size_bytes": 1172520
+        },
+        {
+          "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+          "name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721041518.pdf",
+          "path": "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721041518.pdf",
+          "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90",
+          "size_bytes": 1172520
+        },
+        {
+          "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+          "name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721041900.pdf",
+          "path": "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL-20260721041900.pdf",
+          "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90",
+          "size_bytes": 1172520
+        }
+      ],
+      "keep": {
+        "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+        "name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+        "path": "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+        "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90",
+        "size_bytes": 1172520
+      },
+      "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90"
+    },
+    {
+      "canonical_name": "av00c-navigation-refresh-validation.pdf",
+      "count": 1,
+      "delete": [],
+      "keep": {
+        "canonical_name": "av00c-navigation-refresh-validation.pdf",
+        "name": "av00c-navigation-refresh-validation.pdf",
+        "path": "drawings/av00c-navigation-refresh-validation.pdf",
+        "sha1": "278c75c7977c0f4acd0b55f5b208cc968ae91226",
+        "size_bytes": 29
+      },
+      "sha1": "278c75c7977c0f4acd0b55f5b208cc968ae91226"
+    }
+  ],
+  "project_id": "BID-2026-0002",
+  "project_name": null,
+  "summary": {
+    "delete_candidate_count": 44,
+    "duplicate_groups": 6,
+    "retain_count": 7,
+    "total_files": 51,
+    "unique_groups": 7
+  }
+}

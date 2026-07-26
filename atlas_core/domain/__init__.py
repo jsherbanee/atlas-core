@@ -111,6 +111,11 @@ from atlas_core.domain.document_intake import (
     DocumentIntakeSnapshot,
     IntakeSourceReference,
 )
+from atlas_core.domain.document_relevance import (
+    DocumentRelevanceAssessment,
+    PageRelevanceAssessment,
+    RelevanceWorkflowScores,
+)
 from atlas_core.domain.master_library import (
     EngineeringAttributes,
     ManufacturerReference,
@@ -397,6 +402,9 @@ __all__ = [
     "DrawingSheet",
     "SpecificationDiscipline",
     "SpecificationSection",
+    "DocumentRelevanceAssessment",
+    "PageRelevanceAssessment",
+    "RelevanceWorkflowScores",
     "Invoice",
     "InvoiceLine",
     "InvoiceStatus",

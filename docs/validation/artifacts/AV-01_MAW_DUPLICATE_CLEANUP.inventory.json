@@ -1,0 +1,86 @@
+{
+  "delete_candidate_count": 0,
+  "documents_root": "/Users/joesherbanee/.atlas_core/runtime/AtlasProjects/BID-2026-0002/documents",
+  "duplicate_groups": 0,
+  "files": [
+    "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+    "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+    "drawings/09_Theater Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+    "drawings/MAW_MBD-013_Interior Scaffold Phasing.pdf",
+    "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+    "reports/2025.12.15 MAW 100DD Acoustics Narrative by Kirkegaard.pdf",
+    "schedules/Div 11 Equipment.pdf",
+    "specifications/Div 27 Communications.pdf"
+  ],
+  "generated_at": "2026-07-26T03:48:54.625280Z",
+  "groups": [
+    {
+      "canonical_name": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "count": 1,
+      "paths": [
+        "drawings/07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf"
+      ],
+      "sha1": "6d70c1466943cd4b804add754bcbe54955532df4"
+    },
+    {
+      "canonical_name": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "count": 1,
+      "paths": [
+        "drawings/08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf"
+      ],
+      "sha1": "81f5fbbfdf003bce7ec124026db73d239267b993"
+    },
+    {
+      "canonical_name": "09_Theater Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "count": 1,
+      "paths": [
+        "drawings/09_Theater Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf"
+      ],
+      "sha1": "b686aab3550c380fea1010105bffc089b97208fe"
+    },
+    {
+      "canonical_name": "2025.12.15 MAW 100DD Acoustics Narrative by Kirkegaard.pdf",
+      "count": 1,
+      "paths": [
+        "reports/2025.12.15 MAW 100DD Acoustics Narrative by Kirkegaard.pdf"
+      ],
+      "sha1": "e3519c7d342b838765432c316a31d6679b9e6be3"
+    },
+    {
+      "canonical_name": "Div 11 Equipment.pdf",
+      "count": 1,
+      "paths": [
+        "schedules/Div 11 Equipment.pdf"
+      ],
+      "sha1": "42ae7d9aeff48c0bad10e736e15aec4cfc370092"
+    },
+    {
+      "canonical_name": "Div 27 Communications.pdf",
+      "count": 1,
+      "paths": [
+        "specifications/Div 27 Communications.pdf"
+      ],
+      "sha1": "40a8ccd7ab319f06edc8fefaaa5aac916d0d6c17"
+    },
+    {
+      "canonical_name": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+      "count": 1,
+      "paths": [
+        "drawings/MAW_MBD-013_Interior Scaffold Phasing.pdf"
+      ],
+      "sha1": "a0cb87ad54ecfa2204ee0fedcb0e5c6b76496345"
+    },
+    {
+      "canonical_name": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+      "count": 1,
+      "paths": [
+        "drawings/MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf"
+      ],
+      "sha1": "584607a80622d2bcc56697b6fd452c2955c6cf90"
+    }
+  ],
+  "project_id": "BID-2026-0002",
+  "project_name": "Music Academy of the West",
+  "total_files": 8,
+  "unique_groups": 8
+}

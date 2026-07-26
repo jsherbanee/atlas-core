@@ -1,0 +1,85 @@
+{
+  "classification_clarity": {
+    "clear": 5,
+    "mixed": 2,
+    "ratio": 0.7142857142857143
+  },
+  "excluded_documents": [
+    {
+      "file": "MAW_MBD-013_Interior Scaffold Phasing.pdf",
+      "reason": "Accidental source file removed from live project set",
+      "destination": "review/validation_artifacts/MAW_MBD-013_Interior Scaffold Phasing.pdf"
+    },
+    {
+      "file": "av00c-navigation-refresh-validation.pdf",
+      "reason": "Internal validation artifact, not project source material",
+      "destination": "review/validation_artifacts/av00c-navigation-refresh-validation.pdf"
+    }
+  ],
+  "file_count": 7,
+  "project_id": "BID-2026-0002",
+  "project_name": "Music Academy of the West",
+  "source_documents": [
+    {
+      "current_bucket": "drawings",
+      "content_classification": "drawing, electrical discipline",
+      "confidence": "high",
+      "file": "07_Electrical for AV Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "pages": 12,
+      "status": "clear"
+    },
+    {
+      "current_bucket": "drawings",
+      "content_classification": "drawing, audiovisual discipline",
+      "confidence": "high",
+      "file": "08_Audio Visual Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "pages": 12,
+      "status": "clear"
+    },
+    {
+      "current_bucket": "drawings",
+      "content_classification": "drawing, theater/performance discipline",
+      "confidence": "high",
+      "file": "09_Theater Music Academy of the West 80_ CD Plan Check 2026.05.29.pdf",
+      "pages": 64,
+      "status": "clear"
+    },
+    {
+      "current_bucket": "schedules",
+      "content_classification": "specification-like section (11 31 00) with schedule packaging",
+      "confidence": "medium",
+      "file": "Div 11 Equipment.pdf",
+      "pages": 132,
+      "status": "mixed"
+    },
+    {
+      "current_bucket": "specifications",
+      "content_classification": "specification, audiovisual systems",
+      "confidence": "high",
+      "file": "Div 27 Communications.pdf",
+      "pages": 56,
+      "status": "clear"
+    },
+    {
+      "current_bucket": "reports",
+      "content_classification": "acoustics report / narrative",
+      "confidence": "high",
+      "file": "2025.12.15 MAW 100DD Acoustics Narrative by Kirkegaard.pdf",
+      "pages": 26,
+      "status": "clear"
+    },
+    {
+      "current_bucket": "drawings",
+      "content_classification": "design narrative / general document",
+      "confidence": "medium",
+      "file": "MAW_MBD-018_Aurora Element - Design Narrative FINAL.pdf",
+      "pages": 4,
+      "status": "mixed"
+    }
+  ],
+  "summary": {
+    "duplicate_groups_remaining": 0,
+    "duplicate_hygiene_score": 1.0,
+    "source_set_completeness_score": 1.0
+  }
+}

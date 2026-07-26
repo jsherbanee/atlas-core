@@ -1,0 +1,21 @@
+{
+  "cleanup_applied": true,
+  "duplicate_groups_remaining": 0,
+  "exceptions": [],
+  "moved_validation_artifact": "review/validation_artifacts/av00c-navigation-refresh-validation.pdf",
+  "post_restore_document_counts": {
+    "addenda": 0,
+    "drawings": 4,
+    "images": 0,
+    "other": 0,
+    "reports": 1,
+    "schedules": 1,
+    "specifications": 1
+  },
+  "post_restore_documents_root_file_count": 7,
+  "project_id": "BID-2026-0002",
+  "project_name": "Music Academy of the West",
+  "retry_copy_count_deleted": 44,
+  "status": "post_restore_inventory_complete",
+  "validation_artifact_note": "The internal Atlas validation PDF remains outside the project documents tree and does not count as source material."
+}
