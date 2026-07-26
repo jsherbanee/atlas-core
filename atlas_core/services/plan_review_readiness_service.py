@@ -399,7 +399,6 @@ class PlanReviewReadinessService:
         missing_model_count = 0
         missing_manufacturer_count = 0
         missing_quantity_count = 0
-        drawing_spec_gap_count = 0
         responsibility_token_count = 0
 
         for equipment in equipment_items:
@@ -440,11 +439,6 @@ class PlanReviewReadinessService:
                     )
                 )
 
-            if not self._text(
-                getattr(equipment, "drawing_reference", None)
-            ) or not self._text(getattr(equipment, "specification_reference", None)):
-                drawing_spec_gap_count += 1
-
             token_count = len(self._responsibility_tokens_for_equipment(equipment))
             responsibility_token_count += token_count
 
@@ -476,19 +470,31 @@ class PlanReviewReadinessService:
         )
         scope_clarity -= min(0.55, scope_ambiguity_candidates * 0.2)
 
-        drawing_spec_alignment = 1.0
+        drawing_spec_alignment = 0.0
         if equipment_count > 0:
-            drawing_spec_alignment -= min(
-                0.8,
-                (drawing_spec_gap_count / equipment_count) * 0.8,
+            drawing_spec_gap_groups = sum(
+                1
+                for candidate in review.rfi_candidates
+                if self._text(getattr(candidate, "detected_condition", None))
+                == "drawing_spec_cross_reference_gap"
             )
-        drawing_spec_rfi = sum(
-            1
-            for candidate in review.rfi_candidates
-            if self._text(getattr(candidate, "detected_condition", None))
-            == "drawing_spec_cross_reference_gap"
-        )
-        drawing_spec_alignment -= min(0.3, drawing_spec_rfi * 0.1)
+            drawing_spec_support = sum(
+                1
+                for reference in review.cross_references
+                if self._value(getattr(reference, "reference_type", None))
+                in {
+                    "equipment_to_drawing",
+                    "equipment_to_spec",
+                    "drawing_to_spec",
+                    "system_to_spec",
+                }
+            )
+            drawing_spec_alignment = 0.68
+            drawing_spec_alignment += min(
+                0.18,
+                (drawing_spec_support / equipment_count) * 0.18,
+            )
+            drawing_spec_alignment -= min(0.28, drawing_spec_gap_groups * 0.04)
 
         assumptions = list(review.engineering_assumptions)
         assumptions_quality = 0.85 if not assumptions else 1.0

@@ -16,6 +16,7 @@ from atlas_core.services.scope_reconciliation_service import (
 
 
 def make_review(
+    project_id: str = "project-001",
     equipment: list[Equipment] | None = None,
     drawings: list[DrawingSheet] | None = None,
     specs: list[SpecificationSection] | None = None,
@@ -24,7 +25,7 @@ def make_review(
 ) -> BidPackageReview:
     return BidPackageReview(
         review_id="review-001",
-        project_id="project-001",
+        project_id=project_id,
         name="Plan Review",
         equipment=list(equipment or []),
         drawing_sheets=list(drawings or []),
@@ -238,3 +239,126 @@ def test_clean_review_returns_empty_list():
     candidates = RFICandidateService().build(review)
 
     assert candidates == []
+
+
+def test_missing_manufacturer_candidates_are_grouped_and_project_scoped():
+    review = make_review(
+        project_id="project-a",
+        equipment=[
+            Equipment(
+                equipment_id="eq-display-1",
+                description="Lobby display",
+                category=EquipmentCategory.DISPLAY,
+                specification_reference="27 41 16",
+            ),
+            Equipment(
+                equipment_id="eq-display-2",
+                description="Lobby display",
+                category=EquipmentCategory.DISPLAY,
+                specification_reference="27 41 16",
+            ),
+        ],
+    )
+
+    candidates = RFICandidateService().build(review)
+    missing_manufacturer = [
+        candidate
+        for candidate in candidates
+        if candidate.detected_condition == "missing_manufacturer"
+    ]
+
+    assert len(missing_manufacturer) == 1
+    assert missing_manufacturer[0].project_id == "project-a"
+    assert missing_manufacturer[0].candidate_id.startswith("rfi-project-a-")
+    assert len(missing_manufacturer[0].related_items) == 2
+    assert len(missing_manufacturer[0].source_refs) >= 2
+
+
+def test_drawing_spec_gaps_are_grouped():
+    review = make_review(
+        equipment=[
+            Equipment(
+                equipment_id="eq-projector-1",
+                description="Projector",
+                category=EquipmentCategory.PROJECTOR,
+                drawing_reference="AV-201",
+            ),
+            Equipment(
+                equipment_id="eq-projector-2",
+                description="Projector",
+                category=EquipmentCategory.PROJECTOR,
+                drawing_reference="AV-201",
+            ),
+        ]
+    )
+
+    candidates = RFICandidateService().build(review)
+    gaps = [
+        candidate
+        for candidate in candidates
+        if candidate.detected_condition == "drawing_spec_cross_reference_gap"
+    ]
+
+    assert len(gaps) == 1
+    assert len(gaps[0].related_items) == 2
+
+
+def test_rfi_output_is_deterministic():
+    review = make_review(
+        equipment=[
+            Equipment(
+                equipment_id="eq-mic",
+                description="Wireless microphone",
+                category=EquipmentCategory.MICROPHONE,
+                manufacturer="Shure",
+            )
+        ]
+    )
+
+    service = RFICandidateService()
+    first = service.build(review)
+    second = service.build(review)
+
+    assert [candidate.candidate_id for candidate in first] == [
+        candidate.candidate_id for candidate in second
+    ]
+
+
+def test_rfi_candidates_remain_project_isolated():
+    review_a = make_review(
+        project_id="project-a",
+        equipment=[
+            Equipment(
+                equipment_id="eq-display",
+                description="Lobby display",
+                category=EquipmentCategory.DISPLAY,
+                specification_reference="27 41 16",
+            )
+        ],
+    )
+    review_b = make_review(
+        project_id="project-b",
+        equipment=[
+            Equipment(
+                equipment_id="eq-display",
+                description="Lobby display",
+                category=EquipmentCategory.DISPLAY,
+                specification_reference="27 41 16",
+            )
+        ],
+    )
+
+    candidate_a = next(
+        candidate
+        for candidate in RFICandidateService().build(review_a)
+        if candidate.detected_condition == "missing_manufacturer"
+    )
+    candidate_b = next(
+        candidate
+        for candidate in RFICandidateService().build(review_b)
+        if candidate.detected_condition == "missing_manufacturer"
+    )
+
+    assert candidate_a.candidate_id != candidate_b.candidate_id
+    assert candidate_a.candidate_id.startswith("rfi-project-a-")
+    assert candidate_b.candidate_id.startswith("rfi-project-b-")

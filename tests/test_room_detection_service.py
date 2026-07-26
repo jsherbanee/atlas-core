@@ -43,6 +43,24 @@ def test_detects_rooms_from_drawing_sheet_title() -> None:
     assert [room.name for room in rooms] == ["Recital Hall"]
 
 
+def test_normalizes_alternate_room_spellings_and_room_numbers() -> None:
+    rooms = RoomDetectionService().detect_rooms(
+        building_id="building-1",
+        drawings=[
+            DrawingSheet(
+                sheet_id="av1.01",
+                sheet_number="AV1.01",
+                title="Black Box Theatre 204",
+                discipline=DrawingDiscipline.AUDIOVISUAL,
+            )
+        ],
+    )
+
+    assert len(rooms) == 1
+    assert rooms[0].name == "Black Box Theater 204"
+    assert rooms[0].room_number == "204"
+
+
 def test_detects_rooms_from_drawing_notes() -> None:
     rooms = RoomDetectionService().detect_rooms(
         building_id="building-1",

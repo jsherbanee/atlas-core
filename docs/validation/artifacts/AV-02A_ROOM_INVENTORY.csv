@@ -1,0 +1,8 @@
+room_id,name,room_number,room_type,building_id,confidence,notes
+BID-2026-0002-architect-and-theater,Architect And Theater,,performance,BID-2026-0002,0.75,Detected from equipment: by Architect and Theatre
+BID-2026-0002-indicated-on-the-theater,Indicated On The Theater,,performance,BID-2026-0002,0.75,Detected from equipment: as indicated on the Theatre
+BID-2026-0002-lobby,Lobby,,lobby,BID-2026-0002,0.75,Detected from specification: LOBBY
+BID-2026-0002-performance-hall,Performance Hall,,performance,BID-2026-0002,0.75,Detected from specification: PERFORMANCE HALL
+BID-2026-0002-platform-number-and-stage,Platform Number And Stage,,performance,BID-2026-0002,0.75,Detected from equipment: corresponding platform number and stage
+BID-2026-0002-theater,Theater,,performance,BID-2026-0002,0.75,Detected from equipment: the Theatre
+BID-2026-0002-theatrical-stage,Theatrical Stage,,performance,BID-2026-0002,0.75,Detected from specification: Theatrical stage

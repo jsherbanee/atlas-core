@@ -179,7 +179,9 @@ class RFICandidateEngine:
         self,
         review: BidPackageReview,
     ) -> list[_CandidateDraft]:
-        drafts: list[_CandidateDraft] = []
+        grouped_items: dict[tuple[str, str, str, str, str], list[Any]] = defaultdict(
+            list
+        )
         for item in review.equipment:
             manufacturer = self._text(getattr(item, "manufacturer", None))
             category_value = self._enum_value(getattr(item, "category", None))
@@ -194,18 +196,46 @@ class RFICandidateEngine:
             equipment_id = self._text(getattr(item, "equipment_id", None))
             if not equipment_id:
                 continue
+            group_key = (
+                category_value or "unknown",
+                specification_reference or "",
+                self._text(getattr(item, "room_id", None)).casefold(),
+                self._text(getattr(item, "system_id", None)).casefold(),
+                self._text(getattr(item, "drawing_reference", None)).casefold(),
+            )
+            grouped_items[group_key].append(item)
 
+        drafts: list[_CandidateDraft] = []
+        for (
+            category_value,
+            specification_reference,
+            room_id,
+            system_id,
+            drawing_reference,
+        ), grouped in grouped_items.items():
+            equipment_ids = tuple(
+                sorted(
+                    self._text(getattr(item, "equipment_id", None))
+                    for item in grouped
+                    if self._text(getattr(item, "equipment_id", None))
+                )
+            )
+            if not equipment_ids:
+                continue
+
+            sample = grouped[0]
             source_refs = [
                 RFICandidateSourceRef(
                     source_type="equipment",
                     source_id=equipment_id,
                     field="manufacturer",
-                    source_label=getattr(item, "description", None),
+                    source_label=getattr(sample, "description", None),
                     excerpt=(
                         f"category={category_value or 'unknown'}"
                         f" spec={specification_reference or 'none'}"
                     ),
                 )
+                for equipment_id in equipment_ids
             ]
             if specification_reference:
                 source_refs.append(
@@ -215,13 +245,28 @@ class RFICandidateEngine:
                         source_label=specification_reference,
                     )
                 )
+            if drawing_reference:
+                source_refs.append(
+                    RFICandidateSourceRef(
+                        source_type="drawing",
+                        source_id=drawing_reference,
+                        source_label=drawing_reference,
+                    )
+                )
+
+            context_bits = [f"category={category_value or 'unknown'}"]
+            if room_id:
+                context_bits.append(f"room={room_id}")
+            if system_id:
+                context_bits.append(f"system={system_id}")
 
             drafts.append(
                 _CandidateDraft(
-                    title=f"Missing manufacturer for {equipment_id}",
+                    title=f"Missing manufacturer for {equipment_ids[0]}",
                     description=(
-                        f"Equipment {equipment_id} has known device context but no "
-                        "manufacturer assignment."
+                        "Equipment has device context but no manufacturer "
+                        f"assignment across {len(equipment_ids)} item(s)"
+                        f" ({'; '.join(context_bits)})."
                     ),
                     category=RFICandidateCategory.MISSING_INFORMATION,
                     severity=RFICandidateSeverity.MEDIUM,
@@ -229,10 +274,10 @@ class RFICandidateEngine:
                     detected_condition="missing_manufacturer",
                     recommended_action=(
                         "Confirm named manufacturer or approved manufacturers list for "
-                        "this item."
+                        "the grouped items."
                     ),
                     source_refs=tuple(source_refs),
-                    related_items=(equipment_id,),
+                    related_items=equipment_ids,
                 )
             )
 
@@ -394,7 +439,7 @@ class RFICandidateEngine:
         self,
         review: BidPackageReview,
     ) -> list[_CandidateDraft]:
-        drafts: list[_CandidateDraft] = []
+        grouped_items: dict[tuple[str, str], list[Any]] = defaultdict(list)
         for item in review.equipment:
             description = self._text(getattr(item, "description", None))
             normalized = description.casefold()
@@ -403,31 +448,49 @@ class RFICandidateEngine:
             equipment_id = self._text(getattr(item, "equipment_id", None))
             if not equipment_id:
                 continue
+            grouped_items[
+                (normalized, self._enum_value(getattr(item, "category", None)))
+            ].append(item)
+
+        drafts: list[_CandidateDraft] = []
+        for (description_key, category_value), grouped in grouped_items.items():
+            equipment_ids = tuple(
+                sorted(
+                    self._text(getattr(item, "equipment_id", None))
+                    for item in grouped
+                    if self._text(getattr(item, "equipment_id", None))
+                )
+            )
+            if not equipment_ids:
+                continue
+
+            source_refs = [
+                RFICandidateSourceRef(
+                    source_type="equipment",
+                    source_id=equipment_id,
+                    field="description",
+                    excerpt=description_key,
+                )
+                for equipment_id in equipment_ids
+            ]
 
             drafts.append(
                 _CandidateDraft(
-                    title=f"Placeholder device description for {equipment_id}",
+                    title=f"Placeholder device description for {equipment_ids[0]}",
                     description=(
-                        f"Equipment description '{description}' appears generic and may "
-                        "not be priceable without clarification."
+                        f"Equipment descriptions containing '{description_key}' "
+                        f"appear generic across {len(equipment_ids)} item(s)."
                     ),
                     category=RFICandidateCategory.MISSING_INFORMATION,
                     severity=RFICandidateSeverity.MEDIUM,
-                    confidence=self._confidence(0.8, source_count=1),
+                    confidence=self._confidence(0.8, source_count=len(source_refs)),
                     detected_condition="placeholder_device_description",
                     recommended_action=(
                         "Request a specific performance requirement or basis-of-design "
-                        "selection for this item."
+                        "selection for the grouped items."
                     ),
-                    source_refs=(
-                        RFICandidateSourceRef(
-                            source_type="equipment",
-                            source_id=equipment_id,
-                            field="description",
-                            excerpt=description,
-                        ),
-                    ),
-                    related_items=(equipment_id,),
+                    source_refs=tuple(source_refs),
+                    related_items=equipment_ids,
                 )
             )
 
@@ -437,7 +500,7 @@ class RFICandidateEngine:
         self,
         review: BidPackageReview,
     ) -> list[_CandidateDraft]:
-        drafts: list[_CandidateDraft] = []
+        grouped_items: dict[str, list[Any]] = defaultdict(list)
         responsibility_text = self._review_installation_text(review)
         for item in review.equipment:
             category = self._enum_value(getattr(item, "category", None))
@@ -452,30 +515,47 @@ class RFICandidateEngine:
                 for token in self._INSTALLATION_RESPONSIBILITY_TOKENS
             ):
                 continue
+            grouped_items[category].append(item)
+
+        drafts: list[_CandidateDraft] = []
+        for category, grouped in grouped_items.items():
+            equipment_ids = tuple(
+                sorted(
+                    self._text(getattr(item, "equipment_id", None))
+                    for item in grouped
+                    if self._text(getattr(item, "equipment_id", None))
+                )
+            )
+            if not equipment_ids:
+                continue
+
+            source_refs = [
+                RFICandidateSourceRef(
+                    source_type="equipment",
+                    source_id=equipment_id,
+                    source_label=getattr(grouped[0], "description", None),
+                )
+                for equipment_id in equipment_ids
+            ]
 
             drafts.append(
                 _CandidateDraft(
-                    title=f"Installation responsibility gap for {equipment_id}",
+                    title=f"Installation responsibility gap for {category}",
                     description=(
                         "No mounting/power/network/conduit/backing/rigging/structural "
-                        "responsibility language was detected for this installation item."
+                        f"responsibility language was detected for {len(equipment_ids)} "
+                        f"{category} item(s)."
                     ),
                     category=RFICandidateCategory.RESPONSIBILITY_GAP,
                     severity=RFICandidateSeverity.HIGH,
-                    confidence=self._confidence(0.79, source_count=1),
+                    confidence=self._confidence(0.79, source_count=len(source_refs)),
                     detected_condition="installation_responsibility_gap",
                     recommended_action=(
                         "Request explicit trade responsibility for mounting, pathway, "
                         "power, data, and structural support."
                     ),
-                    source_refs=(
-                        RFICandidateSourceRef(
-                            source_type="equipment",
-                            source_id=equipment_id,
-                            source_label=getattr(item, "description", None),
-                        ),
-                    ),
-                    related_items=(equipment_id,),
+                    source_refs=tuple(source_refs),
+                    related_items=equipment_ids,
                 )
             )
 
@@ -485,31 +565,40 @@ class RFICandidateEngine:
         self,
         review: BidPackageReview,
     ) -> list[_CandidateDraft]:
-        drafts: list[_CandidateDraft] = []
+        grouped_sources: dict[
+            tuple[str, str], list[tuple[RFICandidateSourceRef, str]]
+        ] = defaultdict(list)
         for source_ref, text in self._iter_review_text(review):
             normalized = text.casefold()
             if not any(token in normalized for token in self._ADD_ALTERNATE_TOKENS):
                 continue
             if self._contains_pricing_detail(normalized):
                 continue
+            grouped_sources[(source_ref.source_type, source_ref.source_id)].append(
+                (source_ref, text)
+            )
 
+        drafts: list[_CandidateDraft] = []
+        for (source_type, source_id), grouped in grouped_sources.items():
+            source_refs = tuple(ref for ref, _ in grouped)
+            related_items = tuple(sorted({ref.source_id for ref, _ in grouped}))
             drafts.append(
                 _CandidateDraft(
                     title="Add alternate or allowance language needs clarification",
                     description=(
                         "Detected add alternate/allowance language without enough "
-                        "pricing definition (scope, quantity, or basis of design)."
+                        f"pricing definition in {source_type} {source_id}."
                     ),
                     category=RFICandidateCategory.ADD_ALTERNATE_CLARIFICATION,
                     severity=RFICandidateSeverity.HIGH,
-                    confidence=self._confidence(0.86, source_count=1),
+                    confidence=self._confidence(0.86, source_count=len(source_refs)),
                     detected_condition="add_alternate_ambiguity",
                     recommended_action=(
                         "Request add alternate definition including scope limits, "
                         "quantity basis, and acceptable products."
                     ),
-                    source_refs=(source_ref,),
-                    related_items=(source_ref.source_id,),
+                    source_refs=source_refs,
+                    related_items=related_items,
                 )
             )
 
@@ -554,7 +643,10 @@ class RFICandidateEngine:
         self,
         review: BidPackageReview,
     ) -> list[_CandidateDraft]:
-        drafts: list[_CandidateDraft] = []
+        grouped_items: dict[
+            tuple[str, str, str, str, str],
+            list[Any],
+        ] = defaultdict(list)
         for item in review.equipment:
             equipment_id = self._text(getattr(item, "equipment_id", None))
             if not equipment_id:
@@ -566,6 +658,33 @@ class RFICandidateEngine:
             )
             if bool(drawing_reference) == bool(specification_reference):
                 continue
+            grouped_items[
+                (
+                    self._enum_value(getattr(item, "category", None)) or "unknown",
+                    drawing_reference or "",
+                    specification_reference or "",
+                    self._text(getattr(item, "room_id", None)).casefold(),
+                    self._text(getattr(item, "system_id", None)).casefold(),
+                )
+            ].append(item)
+
+        drafts: list[_CandidateDraft] = []
+        for (
+            category,
+            drawing_reference,
+            specification_reference,
+            room_id,
+            system_id,
+        ), grouped in grouped_items.items():
+            equipment_ids = tuple(
+                sorted(
+                    self._text(getattr(item, "equipment_id", None))
+                    for item in grouped
+                    if self._text(getattr(item, "equipment_id", None))
+                )
+            )
+            if not equipment_ids:
+                continue
 
             missing_reference = (
                 "specification"
@@ -576,12 +695,13 @@ class RFICandidateEngine:
                 RFICandidateSourceRef(
                     source_type="equipment",
                     source_id=equipment_id,
-                    source_label=getattr(item, "description", None),
+                    source_label=getattr(grouped[0], "description", None),
                     excerpt=(
                         f"drawing={drawing_reference or 'none'} "
                         f"spec={specification_reference or 'none'}"
                     ),
                 )
+                for equipment_id in equipment_ids
             ]
             if drawing_reference:
                 source_refs.append(
@@ -600,23 +720,30 @@ class RFICandidateEngine:
                     )
                 )
 
+            context_bits = [f"category={category}"]
+            if room_id:
+                context_bits.append(f"room={room_id}")
+            if system_id:
+                context_bits.append(f"system={system_id}")
+
             drafts.append(
                 _CandidateDraft(
-                    title=f"Drawing/spec mismatch for {equipment_id}",
+                    title=f"Drawing/spec mismatch for {equipment_ids[0]}",
                     description=(
-                        f"Equipment {equipment_id} is missing a linked {missing_reference} "
-                        "reference, creating a cross-reference gap."
+                        f"Equipment is missing a linked {missing_reference} "
+                        f"reference across {len(equipment_ids)} item(s)"
+                        f" ({'; '.join(context_bits)})."
                     ),
                     category=RFICandidateCategory.DRAWING_SPEC_MISMATCH,
                     severity=RFICandidateSeverity.MEDIUM,
                     confidence=self._confidence(0.87, source_count=len(source_refs)),
                     detected_condition="drawing_spec_cross_reference_gap",
                     recommended_action=(
-                        "Confirm both drawing and specification references for this item "
-                        "to align scope and pricing basis."
+                        "Confirm both drawing and specification references for the grouped "
+                        "items to align scope and pricing basis."
                     ),
                     source_refs=tuple(source_refs),
-                    related_items=(equipment_id,),
+                    related_items=equipment_ids,
                 )
             )
 

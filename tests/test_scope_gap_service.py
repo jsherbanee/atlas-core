@@ -92,7 +92,7 @@ def test_drapery_without_cross_reference_creates_high_severity_gap():
     gaps = ScopeGapService().detect_gaps(equipment=[drapery])
 
     assert len(gaps) == 1
-    assert gaps[0].gap_id == "drapery_missing_cross_reference"
+    assert gaps[0].gap_id == "drapery_missing_cross_reference:room-001:no-system"
     assert gaps[0].severity is ScopeGapSeverity.HIGH
 
 
@@ -152,3 +152,24 @@ def test_drapery_with_cross_reference_does_not_create_gap():
     )
 
     assert gaps == []
+
+
+def test_drapery_scope_gaps_are_grouped_by_room_and_system():
+    drapery_a = make_equipment(
+        "drapery-001",
+        EquipmentCategory.DRAPERY,
+        room_id="room-001",
+        system_id="system-001",
+    )
+    drapery_b = make_equipment(
+        "drapery-002",
+        EquipmentCategory.DRAPERY,
+        room_id="room-001",
+        system_id="system-001",
+    )
+
+    gaps = ScopeGapService().detect_gaps(equipment=[drapery_a, drapery_b])
+
+    assert len(gaps) == 1
+    assert gaps[0].gap_id == "drapery_missing_cross_reference:room-001:system-001"
+    assert "2 item(s)" in gaps[0].message

@@ -25,6 +25,14 @@ class RoomDetectionService:
         r"\b(?:[A-Za-z0-9][A-Za-z0-9'&/-]*\s+){0,4}Room(?:\s+\d+)?\b",
         re.IGNORECASE,
     )
+    _ROOM_NUMBER_PATTERN = re.compile(
+        r"\b(?:Room|Rm|Suite|Space)\s+(\d{1,4}[A-Za-z]?)\b",
+        re.IGNORECASE,
+    )
+    _ALTERNATE_ROOM_NAMES = {
+        "theatre": "theater",
+        "auditorium": "theater",
+    }
 
     def detect_rooms(
         self,
@@ -56,6 +64,7 @@ class RoomDetectionService:
                     seen_names,
                     normalized_building_id,
                     room_name,
+                    source_label="drawing metadata",
                 )
 
         for drawing in drawings:
@@ -64,6 +73,7 @@ class RoomDetectionService:
                 seen_names,
                 normalized_building_id,
                 " ".join([drawing.title, *drawing.notes]),
+                source_label="drawing",
             )
 
         for specification in specifications:
@@ -72,6 +82,7 @@ class RoomDetectionService:
                 seen_names,
                 normalized_building_id,
                 " ".join([specification.title, *specification.notes]),
+                source_label="specification",
             )
 
         for schedule in device_schedules:
@@ -83,6 +94,7 @@ class RoomDetectionService:
                         seen_names,
                         normalized_building_id,
                         room_name,
+                        source_label="device schedule",
                     )
 
         for keynote in keynotes:
@@ -91,6 +103,7 @@ class RoomDetectionService:
                 seen_names,
                 normalized_building_id,
                 keynote.description,
+                source_label="keynote",
             )
 
         for legend in legends:
@@ -100,6 +113,7 @@ class RoomDetectionService:
                     seen_names,
                     normalized_building_id,
                     item.description,
+                    source_label="legend",
                 )
 
         for item in equipment:
@@ -108,6 +122,7 @@ class RoomDetectionService:
                 seen_names,
                 normalized_building_id,
                 item.description,
+                source_label="equipment",
             )
             room_id = getattr(item, "room_id", None)
             if room_id and self._looks_human_readable(room_id):
@@ -116,6 +131,7 @@ class RoomDetectionService:
                     seen_names,
                     normalized_building_id,
                     room_id,
+                    source_label="equipment room id",
                 )
 
         return sorted(rooms, key=lambda room: room.name.casefold())
@@ -126,6 +142,7 @@ class RoomDetectionService:
         seen_names: set[str],
         building_id: str,
         text: str,
+        source_label: str | None = None,
     ) -> None:
         if not isinstance(text, str) or not text.strip():
             return
@@ -145,6 +162,7 @@ class RoomDetectionService:
                     seen_names,
                     building_id,
                     match.group(0),
+                    source_label=source_label,
                 )
 
     def _add_room_candidate(
@@ -153,6 +171,7 @@ class RoomDetectionService:
         seen_names: set[str],
         building_id: str,
         room_name: str,
+        source_label: str | None = None,
     ) -> None:
         normalized_name = self._normalize_room_name(room_name)
         if not normalized_name:
@@ -163,13 +182,20 @@ class RoomDetectionService:
             return
 
         seen_names.add(key)
+        room_number = self._extract_room_number(normalized_name)
+        notes = []
+        if source_label:
+            notes.append(f"Detected from {source_label}: {room_name.strip()}")
+
         rooms.append(
             Room(
                 room_id=self._room_id(building_id, normalized_name),
                 name=normalized_name,
                 building_id=building_id,
+                room_number=room_number,
                 room_type=self._room_type(normalized_name),
                 confidence=0.75,
+                notes=notes,
             )
         )
 
@@ -248,6 +274,14 @@ class RoomDetectionService:
             return ""
 
         cleaned = re.sub(r"[,:;\-/]+$", "", cleaned).strip()
+        cleaned = re.sub(r"\((?:[^()]*)\)$", "", cleaned).strip()
+        for alternate, canonical in RoomDetectionService._ALTERNATE_ROOM_NAMES.items():
+            cleaned = re.sub(
+                rf"\b{re.escape(alternate)}\b",
+                canonical,
+                cleaned,
+                flags=re.IGNORECASE,
+            )
         words = cleaned.split()
         if len(words) > 4:
             words = words[-4:]
@@ -274,3 +308,15 @@ class RoomDetectionService:
             words = words[1:]
 
         return " ".join(words).title()
+
+    @classmethod
+    def _extract_room_number(cls, value: str) -> str | None:
+        match = cls._ROOM_NUMBER_PATTERN.search(value)
+        if match is not None:
+            return match.group(1).strip()
+
+        trailing_digits = re.search(r"\b(\d{1,4}[A-Za-z]?)\b$", value)
+        if trailing_digits is not None:
+            return trailing_digits.group(1).strip()
+
+        return None

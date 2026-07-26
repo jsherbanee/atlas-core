@@ -139,12 +139,34 @@ def test_equipment_without_drawing_or_spec_reference_creates_low_severity_issue(
     )
 
     assert len(issues) == 1
-    assert (
-        issues[0].issue_id
-        == "equipment_missing_drawing_or_specification_reference:eq-001"
+    assert issues[0].issue_id == (
+        "equipment_missing_drawing_or_specification_reference:"
+        "speaker:no-room:no-system"
     )
     assert issues[0].severity is ReconciliationSeverity.LOW
-    assert issues[0].message == "Equipment has no drawing or specification reference."
+    assert "1 item(s)" in issues[0].message
+
+
+def test_equipment_reference_gaps_are_grouped():
+    issues = ScopeReconciliationService().reconcile(
+        equipment=[
+            make_equipment(
+                "eq-001",
+                category=EquipmentCategory.SPEAKER,
+                drawing_reference=None,
+                specification_reference=None,
+            ),
+            make_equipment(
+                "eq-002",
+                category=EquipmentCategory.SPEAKER,
+                drawing_reference=None,
+                specification_reference=None,
+            ),
+        ]
+    )
+
+    assert len(issues) == 1
+    assert "2 item(s)" in issues[0].message
 
 
 def test_no_issue_when_categories_match():

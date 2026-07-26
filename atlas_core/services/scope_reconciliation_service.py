@@ -148,6 +148,10 @@ class ScopeReconciliationService:
                         ),
                     )
 
+        grouped_reference_gaps: dict[
+            tuple[str, str | None, str | None], list[Equipment]
+        ]
+        grouped_reference_gaps = {}
         for equipment_item in equipment_items:
             drawing_reference = self._normalize_value(equipment_item.drawing_reference)
             specification_reference = self._normalize_value(
@@ -156,17 +160,44 @@ class ScopeReconciliationService:
             if drawing_reference or specification_reference:
                 continue
 
+            group_key = (
+                self._normalize_value(enum_value(equipment_item.category)) or "unknown",
+                self._normalize_value(getattr(equipment_item, "room_id", None)),
+                self._normalize_value(getattr(equipment_item, "system_id", None)),
+            )
+            grouped_reference_gaps.setdefault(group_key, []).append(equipment_item)
+
+        for (
+            category,
+            room_id,
+            system_id,
+        ), grouped_items in grouped_reference_gaps.items():
+            sample = grouped_items[0]
+            sample_id = self._normalize_value(sample.equipment_id) or "equipment"
+            context = [f"category={category}"]
+            if room_id:
+                context.append(f"room={room_id}")
+            if system_id:
+                context.append(f"system={system_id}")
+
             self._add_issue(
                 issues,
                 emitted_issue_ids,
                 ReconciliationIssue(
                     issue_id=(
                         "equipment_missing_drawing_or_specification_reference:"
-                        f"{equipment_item.equipment_id}"
+                        f"{category}:{room_id or 'no-room'}:{system_id or 'no-system'}"
                     ),
-                    message="Equipment has no drawing or specification reference.",
+                    message=(
+                        "Equipment has no drawing or specification reference for "
+                        f"{len(grouped_items)} item(s) ({'; '.join(context)})."
+                    ),
                     severity=ReconciliationSeverity.LOW,
-                    target_id=equipment_item.equipment_id,
+                    target_id=sample_id,
+                    suggested_action=(
+                        "Link the grouped items to their governing drawing or "
+                        "specification sources."
+                    ),
                 ),
             )
 

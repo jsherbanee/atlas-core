@@ -1,0 +1,10 @@
+metric,label,before,after,delta
+rooms_detected,Rooms detected,0,7,7
+total_equipment,Total equipment items,626,204,-422
+unresolved_equipment,Unresolved equipment items,580,188,-392
+drawing_spec_alignment,Drawing/spec alignment,0.0,0.52,0.52
+rfi_candidates,RFI candidates,638,74,-564
+conflicts_gaps,Consolidated conflicts + gaps,636,58,-578
+scope_score,Scope responsibility score,0.4,0.65,0.25
+labor_readiness,Labor readiness confidence,0.05,0.05,0.0
+overall_readiness,Overall readiness,0.39,0.53,0.14

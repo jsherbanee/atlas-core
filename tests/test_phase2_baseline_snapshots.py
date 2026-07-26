@@ -201,7 +201,7 @@ def test_maw_phase2_plan_review_snapshot() -> None:
         },
         "readiness": {
             "status": "ready",
-            "score": 0.89,
+            "score": 0.87,
             "level": "bid_ready_with_assumptions",
             "blocking_issues": [],
             "warnings": [
@@ -221,7 +221,7 @@ def test_maw_phase2_plan_review_snapshot() -> None:
             "brief_title": "Estimator Brief - MAW Music Education Center Plan Review",
             "executive_summary": (
                 "MAW Music Education Center Plan Review: readiness level "
-                "bid_ready_with_assumptions (score=0.89), with 0 blockers, "
+                "bid_ready_with_assumptions (score=0.87), with 0 blockers, "
                 "5 warnings, and 6 prioritized reviewer actions."
             ),
             "top_blockers": [],

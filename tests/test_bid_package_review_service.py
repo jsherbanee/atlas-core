@@ -330,7 +330,7 @@ def test_does_not_replace_supplied_rooms():
     assert review.rooms == [supplied_room]
 
 
-def test_does_not_detect_rooms_without_building_context():
+def test_detects_rooms_without_building_context_using_project_fallback():
     review = build_review(
         raw_sheets=[
             {
@@ -340,7 +340,9 @@ def test_does_not_detect_rooms_without_building_context():
         ],
     )
 
-    assert review.rooms == []
+    assert len(review.rooms) == 1
+    assert review.rooms[0].name == "Main Lobby"
+    assert review.rooms[0].building_id == "project-001"
 
 
 def test_includes_scope_gaps_for_missing_projector_mount():

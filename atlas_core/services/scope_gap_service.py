@@ -61,6 +61,7 @@ class ScopeGapService:
         cross_reference_items = list(cross_references or [])
         gaps: list[ScopeGap] = []
         emitted: set[tuple[str, str]] = set()
+        grouped_drapery_gaps: dict[tuple[str | None, str | None], list[Equipment]] = {}
 
         for item in equipment_items:
             category = self._value(item.category)
@@ -132,23 +133,41 @@ class ScopeGapService:
                     item.equipment_id,
                     cross_reference_items,
                 ):
-                    self._add_gap(
-                        gaps,
-                        emitted,
-                        ScopeGap(
-                            gap_id="drapery_missing_cross_reference",
-                            target_id=item.equipment_id,
-                            message=(
-                                "Drapery scope is present, but drawing/spec cross "
-                                "references are incomplete."
-                            ),
-                            severity=ScopeGapSeverity.HIGH,
-                            suggested_action=(
-                                "Review drapery track, hardware, structural "
-                                "support, fire rating, and site conditions."
-                            ),
-                        ),
+                    group_key = (
+                        self._value(getattr(item, "room_id", None)),
+                        self._value(getattr(item, "system_id", None)),
                     )
+                    grouped_drapery_gaps.setdefault(group_key, []).append(item)
+
+        for (room_id, system_id), grouped_items in grouped_drapery_gaps.items():
+            sample = grouped_items[0]
+            context = []
+            if room_id:
+                context.append(f"room={room_id}")
+            if system_id:
+                context.append(f"system={system_id}")
+
+            self._add_gap(
+                gaps,
+                emitted,
+                ScopeGap(
+                    gap_id=(
+                        "drapery_missing_cross_reference:"
+                        f"{room_id or 'no-room'}:{system_id or 'no-system'}"
+                    ),
+                    target_id=sample.equipment_id,
+                    message=(
+                        "Drapery scope is present, but drawing/spec cross "
+                        f"references are incomplete for {len(grouped_items)} item(s)"
+                        f"{' (' + '; '.join(context) + ')' if context else ''}."
+                    ),
+                    severity=ScopeGapSeverity.HIGH,
+                    suggested_action=(
+                        "Review drapery track, hardware, structural support, fire "
+                        "rating, installation method, and site conditions."
+                    ),
+                ),
+            )
 
         return gaps
 

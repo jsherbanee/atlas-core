@@ -228,6 +228,7 @@ class BidPackageReviewService:
         )
         equipment_items = [*base_equipment_items, *schedule_derived_equipment]
         room_items = self._prepare_rooms(
+            project_id=project_id,
             room_items=inputs["room_items"],
             building_items=inputs["building_items"],
             drawing_metadata=drawing_metadata,
@@ -237,6 +238,18 @@ class BidPackageReviewService:
             keynotes=keynotes,
             legends=legends,
             equipment_items=equipment_items,
+        )
+        cross_references = self.cross_reference_service.build_references(
+            drawings=drawing_sheets,
+            specifications=specification_sections,
+            systems=system_items,
+            equipment=equipment_items,
+        )
+        self._enrich_equipment_references_from_cross_references(
+            equipment_items=equipment_items,
+            drawing_sheets=drawing_sheets,
+            specification_sections=specification_sections,
+            cross_references=cross_references,
         )
         reconciliation_issues = self.scope_reconciliation_service.reconcile(
             equipment=equipment_items,
@@ -254,12 +267,6 @@ class BidPackageReviewService:
                 systems=system_items,
                 equipment=equipment_items,
             )
-        )
-        cross_references = self.cross_reference_service.build_references(
-            drawings=drawing_sheets,
-            specifications=specification_sections,
-            systems=system_items,
-            equipment=equipment_items,
         )
         scope_gaps = self.scope_gap_service.detect_gaps(
             equipment=equipment_items,
@@ -398,6 +405,7 @@ class BidPackageReviewService:
 
     def _prepare_rooms(
         self,
+        project_id: str,
         room_items: list,
         building_items: list,
         drawing_metadata: list,
@@ -414,7 +422,7 @@ class BidPackageReviewService:
 
         building_id = self._first_building_id(building_items)
         if building_id is None:
-            return []
+            building_id = project_id
 
         return self.room_detection_service.detect_rooms(
             building_id=building_id,
@@ -464,6 +472,93 @@ class BidPackageReviewService:
             confidence = matched_raw_sheet.get("confidence")
             if isinstance(confidence, (int, float)) and 0 <= confidence <= 1:
                 drawing_sheet.confidence = confidence
+
+    @staticmethod
+    def _enrich_equipment_references_from_cross_references(
+        equipment_items: list,
+        drawing_sheets: list,
+        specification_sections: list,
+        cross_references: list,
+    ) -> None:
+        drawing_number_by_id = {
+            getattr(drawing, "sheet_id", None): getattr(drawing, "sheet_number", None)
+            for drawing in drawing_sheets
+            if getattr(drawing, "sheet_id", None)
+        }
+        spec_number_by_id = {
+            getattr(section, "section_id", None): getattr(
+                section, "section_number", None
+            )
+            for section in specification_sections
+            if getattr(section, "section_id", None)
+        }
+        drawing_spec_by_drawing_id: dict[str, str] = {}
+        drawing_id_by_spec_id: dict[str, str] = {}
+        for reference in cross_references:
+            reference_type = str(
+                getattr(getattr(reference, "reference_type", None), "value", "")
+                or getattr(reference, "reference_type", "")
+                or ""
+            )
+            source_id = str(getattr(reference, "source_id", "") or "")
+            target_id = str(getattr(reference, "target_id", "") or "")
+            if reference_type.endswith("drawing_to_spec") and source_id and target_id:
+                drawing_spec_by_drawing_id[source_id] = target_id
+                drawing_id_by_spec_id[target_id] = source_id
+
+        equipment_by_id = {
+            getattr(item, "equipment_id", None): item
+            for item in equipment_items
+            if getattr(item, "equipment_id", None)
+        }
+        equipment_to_drawing: dict[str, str] = {}
+        equipment_to_spec: dict[str, str] = {}
+        for reference in cross_references:
+            reference_type = str(
+                getattr(getattr(reference, "reference_type", None), "value", "")
+                or getattr(reference, "reference_type", "")
+                or ""
+            )
+            source_id = str(getattr(reference, "source_id", "") or "")
+            target_id = str(getattr(reference, "target_id", "") or "")
+            if (
+                reference_type.endswith("equipment_to_drawing")
+                and source_id
+                and target_id
+            ):
+                equipment_to_drawing[source_id] = target_id
+            elif (
+                reference_type.endswith("equipment_to_spec") and source_id and target_id
+            ):
+                equipment_to_spec[source_id] = target_id
+
+        for equipment_id, item in equipment_by_id.items():
+            equipment_key = str(equipment_id)
+            drawing_reference = str(getattr(item, "drawing_reference", "") or "")
+            specification_reference = str(
+                getattr(item, "specification_reference", "") or ""
+            )
+
+            drawing_target_id = equipment_to_drawing.get(equipment_key)
+            spec_target_id = equipment_to_spec.get(equipment_key)
+
+            if drawing_target_id and not specification_reference:
+                drawing_sheet_number = drawing_number_by_id.get(drawing_target_id)
+                if drawing_sheet_number:
+                    item.specification_reference = item.specification_reference or (
+                        spec_number_by_id.get(
+                            drawing_spec_by_drawing_id.get(drawing_target_id, "")
+                        )
+                    )
+
+            if spec_target_id and not drawing_reference:
+                spec_sheet_number = spec_number_by_id.get(spec_target_id)
+                if spec_sheet_number:
+                    item.drawing_reference = item.drawing_reference or (
+                        drawing_number_by_id.get(
+                            drawing_id_by_spec_id.get(spec_target_id, "")
+                        )
+                    )
 
     def _assemble_review(
         self,

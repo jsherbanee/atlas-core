@@ -73,11 +73,10 @@ def detect_schedule_like_pages(raw_pages: list[dict[str, Any]]) -> list[dict[str
             if not normalized:
                 continue
 
-            parts = [
-                part.strip()
-                for part in re.split(r"\s{2,}|\t|,", normalized)
-                if part.strip()
-            ]
+            if not _looks_like_schedule_row(normalized):
+                continue
+
+            parts = _split_row_parts(normalized)
             if len(parts) < 2:
                 continue
 
@@ -118,17 +117,20 @@ def extract_equipment_candidates(
         source_file = str(page.get("source_file") or "")
         page_number = page.get("page_number")
         for line in text.splitlines():
-            lowered = line.lower()
+            normalized = " ".join(line.strip().split())
+            if not normalized:
+                continue
+
+            lowered = normalized.lower()
             category_hint = _category_hint(lowered)
             if category_hint is None:
                 continue
 
-            description = " ".join(line.strip().split())
-            if not description:
+            if not _looks_like_equipment_row(normalized, category_hint):
                 continue
 
-            tag = _tag_from_text(description)
-            candidate_id = _stable_id(source_file, str(page_number or 0), description)
+            tag = _tag_from_text(normalized)
+            candidate_id = _stable_id(source_file, str(page_number or 0), normalized)
             if candidate_id in seen:
                 continue
 
@@ -136,13 +138,13 @@ def extract_equipment_candidates(
             candidates.append(
                 {
                     "candidate_id": candidate_id,
-                    "description": description,
+                    "description": normalized,
                     "category_hint": category_hint,
                     "tag": tag,
                     "source_ref": {
                         "source_file": source_file,
                         "page_number": page_number,
-                        "text_excerpt": description[:180],
+                        "text_excerpt": normalized[:180],
                     },
                 }
             )
@@ -325,6 +327,53 @@ def _tag_from_text(value: str) -> str | None:
         return None
 
     return match.group(0)
+
+
+def _split_row_parts(text: str) -> list[str]:
+    return [part.strip() for part in re.split(r"\s{2,}|\t|,", text) if part.strip()]
+
+
+def _looks_like_schedule_row(text: str) -> bool:
+    parts = _split_row_parts(text)
+    if len(parts) < 2:
+        return False
+
+    if _TAG_RE.search(parts[0]):
+        return True
+
+    return _has_tabular_signal(text) and not _looks_sentence_like(text)
+
+
+def _looks_like_equipment_row(text: str, category_hint: str) -> bool:
+    if _TAG_RE.search(text):
+        return True
+
+    if not _has_tabular_signal(text):
+        return False
+
+    if _looks_sentence_like(text):
+        return False
+
+    if any(token in text for token in ("qty", "manufacturer", "model", "w/", "ea")):
+        return True
+
+    if len(text.split()) <= 12:
+        return True
+
+    return category_hint != "unknown"
+
+
+def _has_tabular_signal(text: str) -> bool:
+    return bool(re.search(r"\s{2,}|\t|\|", text))
+
+
+def _looks_sentence_like(text: str) -> bool:
+    return bool(
+        re.search(r"[.?!]$", text)
+        or re.search(
+            r"\b(provide|furnish|coordinate|verify|include|submit|install)\b", text
+        )
+    )
 
 
 def _stable_id(*parts: str) -> str:
