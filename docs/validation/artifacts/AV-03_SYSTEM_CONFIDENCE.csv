@@ -1,0 +1,11 @@
+system_block,component_count,exact_count,generic_count,priced_count,confidence_score,explanation
+AUDIO,42,39,3,0,0.61,Confidence rises when the reconstructed baseline has exact products and current commercial coverage.
+CONTROL,17,15,2,0,0.59,Confidence rises when the reconstructed baseline has exact products and current commercial coverage.
+Cabling & Plates,7,5,2,0,0.51,Confidence rises when the reconstructed baseline has exact products and current commercial coverage.
+"FURNITURE, STANDS, MOUNTS",5,0,5,0,0.15,Confidence rises when the reconstructed baseline has exact products and current commercial coverage.
+MISC,5,0,5,0,0.15,Confidence rises when the reconstructed baseline has exact products and current commercial coverage.
+PATCHING AND DISTRIBUTION,8,2,6,0,0.27,Confidence rises when the reconstructed baseline has exact products and current commercial coverage.
+PRODUCTION INTERCOM,2,2,0,0,0.65,Confidence rises when the reconstructed baseline has exact products and current commercial coverage.
+SUPPORT INFRASTRUCTURE,9,9,0,0,0.65,Confidence rises when the reconstructed baseline has exact products and current commercial coverage.
+VIDEO,19,18,1,0,0.62,Confidence rises when the reconstructed baseline has exact products and current commercial coverage.
+unspecified,4,3,1,0,0.53,Confidence rises when the reconstructed baseline has exact products and current commercial coverage.

@@ -1,0 +1,7 @@
+metric,before,after,notes
+estimate line count,118,118,The commercial baseline preserves the reconstructed engineering line count.
+exact products resolved,0,93,Commercial resolution now recognizes exact products where evidence exists.
+generic products,0,25,Generic allowances are preserved rather than forced into fabricated exact SKUs.
+unresolved products,118,0,No unresolved products remain after deterministic product resolution.
+priced lines,0,0,No current pricing records were available for the reconstructed commercial keys.
+quote-required lines,118,118,The commercial baseline still needs quotes or aligned pricing records before bid defensibility improves.

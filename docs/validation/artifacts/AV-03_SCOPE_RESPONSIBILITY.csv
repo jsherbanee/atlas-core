@@ -1,0 +1,119 @@
+source_equipment_id,system_block,responsibility,allowance_status,alternate_status,scope_role,evidence_reference
+baseline:1,unspecified,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:2,unspecified,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:3,unspecified,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:4,unspecified,contractor furnished,specified,primary,contractor furnished,Div 27 Communications.pdf#p42
+baseline:5,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:6,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:7,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:8,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:9,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:10,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:11,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:12,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:13,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:14,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:15,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:16,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:17,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:18,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:19,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:20,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:21,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:22,SUPPORT INFRASTRUCTURE,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:23,SUPPORT INFRASTRUCTURE,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:24,SUPPORT INFRASTRUCTURE,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:25,SUPPORT INFRASTRUCTURE,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:26,SUPPORT INFRASTRUCTURE,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:27,SUPPORT INFRASTRUCTURE,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:28,SUPPORT INFRASTRUCTURE,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:29,SUPPORT INFRASTRUCTURE,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:30,SUPPORT INFRASTRUCTURE,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:31,PRODUCTION INTERCOM,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:32,PRODUCTION INTERCOM,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p42
+baseline:33,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p44
+baseline:34,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p44
+baseline:35,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p44
+baseline:36,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p44
+baseline:37,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p44
+baseline:38,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p44
+baseline:39,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p44
+baseline:40,Cabling & Plates,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p44
+baseline:41,Cabling & Plates,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p44
+baseline:42,Cabling & Plates,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p44
+baseline:43,Cabling & Plates,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p44
+baseline:44,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p45
+baseline:45,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p45
+baseline:46,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p45
+baseline:47,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p45
+baseline:48,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p45
+baseline:49,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p46
+baseline:50,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p47
+baseline:51,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p47
+baseline:52,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p47
+baseline:53,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p49
+baseline:54,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p49
+baseline:55,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p50
+baseline:56,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p51
+baseline:57,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p51
+baseline:58,Cabling & Plates,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p51
+baseline:59,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p52
+baseline:60,AUDIO,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p52
+baseline:61,VIDEO,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p52
+baseline:62,VIDEO,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p52
+baseline:63,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p52
+baseline:64,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p52
+baseline:65,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p52
+baseline:66,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:67,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:68,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:69,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:70,VIDEO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:71,VIDEO,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p53
+baseline:72,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:73,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:74,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:75,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:76,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:77,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:78,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:79,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:80,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:81,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:82,CONTROL,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p53
+baseline:83,"FURNITURE, STANDS, MOUNTS",allowance,allowance,primary,allowance,Div 27 Communications.pdf#p53
+baseline:84,"FURNITURE, STANDS, MOUNTS",allowance,allowance,primary,allowance,Div 27 Communications.pdf#p53
+baseline:85,"FURNITURE, STANDS, MOUNTS",coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:86,"FURNITURE, STANDS, MOUNTS",allowance,allowance,primary,allowance,Div 27 Communications.pdf#p53
+baseline:87,"FURNITURE, STANDS, MOUNTS",allowance,allowance,primary,allowance,Div 27 Communications.pdf#p53
+baseline:88,PATCHING AND DISTRIBUTION,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:89,PATCHING AND DISTRIBUTION,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:90,PATCHING AND DISTRIBUTION,contractor furnished,specified,primary,contractor furnished,Div 27 Communications.pdf#p53
+baseline:91,PATCHING AND DISTRIBUTION,contractor furnished,specified,primary,contractor furnished,Div 27 Communications.pdf#p53
+baseline:92,PATCHING AND DISTRIBUTION,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:93,PATCHING AND DISTRIBUTION,contractor furnished,specified,primary,contractor furnished,Div 27 Communications.pdf#p53
+baseline:94,PATCHING AND DISTRIBUTION,contractor furnished,specified,primary,contractor furnished,Div 27 Communications.pdf#p53
+baseline:95,PATCHING AND DISTRIBUTION,contractor furnished,specified,primary,contractor furnished,Div 27 Communications.pdf#p53
+baseline:96,MISC,contractor furnished,specified,primary,contractor furnished,Div 27 Communications.pdf#p53
+baseline:97,MISC,contractor furnished,specified,primary,contractor furnished,Div 27 Communications.pdf#p53
+baseline:98,MISC,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:99,MISC,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:100,MISC,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p53
+baseline:101,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p54
+baseline:102,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p54
+baseline:103,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p54
+baseline:104,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p54
+baseline:105,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p54
+baseline:106,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p54
+baseline:107,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p54
+baseline:108,CONTROL,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p54
+baseline:109,CONTROL,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p54
+baseline:110,Cabling & Plates,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p54
+baseline:111,Cabling & Plates,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p54
+baseline:112,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p55
+baseline:113,AUDIO,allowance,allowance,primary,allowance,Div 27 Communications.pdf#p55
+baseline:114,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p55
+baseline:115,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p55
+baseline:116,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p56
+baseline:117,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p56
+baseline:118,AUDIO,coordination only,specified,primary,coordination only,Div 27 Communications.pdf#p56

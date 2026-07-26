@@ -1,0 +1,119 @@
+source_equipment_id,system_block,room,quantity,labor_ready_score,missing_factors,evidence_reference
+baseline:1,unspecified,Performance Space,15,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:2,unspecified,Performance Space,4,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:3,unspecified,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:4,unspecified,Performance Space,17,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p42
+baseline:5,AUDIO,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:6,AUDIO,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:7,AUDIO,Performance Space,2,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:8,AUDIO,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:9,AUDIO,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:10,AUDIO,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:11,AUDIO,Performance Space,4,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:12,AUDIO,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:13,AUDIO,Performance Space,3,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:14,AUDIO,Performance Space,2,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p42
+baseline:15,AUDIO,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:16,AUDIO,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:17,AUDIO,Performance Space,3,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:18,AUDIO,Performance Space,3,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:19,AUDIO,Performance Space,3,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:20,AUDIO,Performance Space,4,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:21,AUDIO,Performance Space,2,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:22,SUPPORT INFRASTRUCTURE,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:23,SUPPORT INFRASTRUCTURE,Performance Space,2,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:24,SUPPORT INFRASTRUCTURE,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:25,SUPPORT INFRASTRUCTURE,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:26,SUPPORT INFRASTRUCTURE,Performance Space,10,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:27,SUPPORT INFRASTRUCTURE,Performance Space,10,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:28,SUPPORT INFRASTRUCTURE,Performance Space,5,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:29,SUPPORT INFRASTRUCTURE,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:30,SUPPORT INFRASTRUCTURE,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:31,PRODUCTION INTERCOM,Performance Space,1,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:32,PRODUCTION INTERCOM,Performance Space,4,1.0,commercial pricing,Div 27 Communications.pdf#p42
+baseline:33,AUDIO,Pre-function,3,1.0,commercial pricing,Div 27 Communications.pdf#p44
+baseline:34,AUDIO,Pre-function,1,1.0,commercial pricing,Div 27 Communications.pdf#p44
+baseline:35,VIDEO,Pre-function,1,1.0,commercial pricing,Div 27 Communications.pdf#p44
+baseline:36,VIDEO,Pre-function,1,1.0,commercial pricing,Div 27 Communications.pdf#p44
+baseline:37,VIDEO,Pre-function,1,1.0,commercial pricing,Div 27 Communications.pdf#p44
+baseline:38,VIDEO,Pre-function,1,1.0,commercial pricing,Div 27 Communications.pdf#p44
+baseline:39,CONTROL,Pre-function,1,1.0,commercial pricing,Div 27 Communications.pdf#p44
+baseline:40,Cabling & Plates,Pre-function,LOT,1.0,commercial pricing,Div 27 Communications.pdf#p44
+baseline:41,Cabling & Plates,Pre-function,LOT,1.0,commercial pricing,Div 27 Communications.pdf#p44
+baseline:42,Cabling & Plates,Pre-function,LOT,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p44
+baseline:43,Cabling & Plates,Pre-function,LOT,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p44
+baseline:44,AUDIO,Dressing Rooms (Typical of 3),2,1.0,commercial pricing,Div 27 Communications.pdf#p45
+baseline:45,VIDEO,Dressing Rooms (Typical of 3),1,1.0,commercial pricing,Div 27 Communications.pdf#p45
+baseline:46,VIDEO,Dressing Rooms (Typical of 3),1,1.0,commercial pricing,Div 27 Communications.pdf#p45
+baseline:47,VIDEO,Dressing Rooms (Typical of 3),1,1.0,commercial pricing,Div 27 Communications.pdf#p45
+baseline:48,CONTROL,Dressing Rooms (Typical of 3),1,1.0,commercial pricing,Div 27 Communications.pdf#p45
+baseline:49,AUDIO,Practice Rooms (Typical of 4),1,1.0,commercial pricing,Div 27 Communications.pdf#p46
+baseline:50,VIDEO,Facility Office,1,1.0,commercial pricing,Div 27 Communications.pdf#p47
+baseline:51,VIDEO,Facility Office,1,1.0,commercial pricing,Div 27 Communications.pdf#p47
+baseline:52,CONTROL,Facility Office,1,1.0,commercial pricing,Div 27 Communications.pdf#p47
+baseline:53,AUDIO,Building Circulation,64,1.0,commercial pricing,Div 27 Communications.pdf#p49
+baseline:54,AUDIO,Building Circulation,1,1.0,commercial pricing,Div 27 Communications.pdf#p49
+baseline:55,AUDIO,Student Lounge,4,1.0,commercial pricing,Div 27 Communications.pdf#p50
+baseline:56,VIDEO,Teaching Studios,1,0.8,model; commercial pricing,Div 27 Communications.pdf#p51
+baseline:57,CONTROL,Teaching Studios,1,1.0,commercial pricing,Div 27 Communications.pdf#p51
+baseline:58,Cabling & Plates,Teaching Studios,LOT,1.0,commercial pricing,Div 27 Communications.pdf#p51
+baseline:59,AUDIO,Ensemble Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p52
+baseline:60,AUDIO,Ensemble Studio,1,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p52
+baseline:61,VIDEO,Ensemble Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p52
+baseline:62,VIDEO,Ensemble Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p52
+baseline:63,VIDEO,Ensemble Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p52
+baseline:64,VIDEO,Ensemble Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p52
+baseline:65,VIDEO,Ensemble Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p52
+baseline:66,AUDIO,Recording Studio,2,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:67,AUDIO,Recording Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:68,VIDEO,Recording Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:69,VIDEO,Recording Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:70,VIDEO,Recording Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:71,VIDEO,Recording Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:72,CONTROL,Recording Studio,1,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:73,CONTROL,Recording Studio,2,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:74,CONTROL,Recording Studio,2,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:75,CONTROL,Recording Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:76,CONTROL,Recording Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:77,CONTROL,Recording Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:78,CONTROL,Recording Studio,2,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:79,CONTROL,Recording Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:80,CONTROL,Recording Studio,1,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:81,CONTROL,Recording Studio,4,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:82,CONTROL,Recording Studio,3,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:83,"FURNITURE, STANDS, MOUNTS",Recording Studio,1,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:84,"FURNITURE, STANDS, MOUNTS",Recording Studio,2,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:85,"FURNITURE, STANDS, MOUNTS",Recording Studio,2,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:86,"FURNITURE, STANDS, MOUNTS",Recording Studio,2,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:87,"FURNITURE, STANDS, MOUNTS",Recording Studio,1,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:88,PATCHING AND DISTRIBUTION,Recording Studio,8,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:89,PATCHING AND DISTRIBUTION,Recording Studio,6,1.0,commercial pricing,Div 27 Communications.pdf#p53
+baseline:90,PATCHING AND DISTRIBUTION,Recording Studio,192,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:91,PATCHING AND DISTRIBUTION,Recording Studio,96,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:92,PATCHING AND DISTRIBUTION,Recording Studio,12,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:93,PATCHING AND DISTRIBUTION,Recording Studio,6,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:94,PATCHING AND DISTRIBUTION,Recording Studio,96,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:95,PATCHING AND DISTRIBUTION,Recording Studio,4,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:96,MISC,Recording Studio,2,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:97,MISC,Recording Studio,2,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:98,MISC,Recording Studio,1,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:99,MISC,Recording Studio,1,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:100,MISC,Recording Studio,1,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p53
+baseline:101,AUDIO,Roof Terrace,1,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:102,AUDIO,Roof Terrace,2,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:103,AUDIO,Roof Terrace,1,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:104,AUDIO,Roof Terrace,2,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:105,AUDIO,Roof Terrace,2,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:106,AUDIO,Roof Terrace,3,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:107,AUDIO,Roof Terrace,1,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:108,CONTROL,Roof Terrace,1,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:109,CONTROL,Roof Terrace,1,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:110,Cabling & Plates,Roof Terrace,LOT,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:111,Cabling & Plates,Roof Terrace,LOT,1.0,commercial pricing,Div 27 Communications.pdf#p54
+baseline:112,AUDIO,Roof Terrace Portable,2,1.0,commercial pricing,Div 27 Communications.pdf#p55
+baseline:113,AUDIO,Roof Terrace Portable,1,0.6,manufacturer; model; commercial pricing,Div 27 Communications.pdf#p55
+baseline:114,AUDIO,Roof Terrace Portable,1,1.0,commercial pricing,Div 27 Communications.pdf#p55
+baseline:115,AUDIO,Roof Terrace Portable,1,1.0,commercial pricing,Div 27 Communications.pdf#p55
+baseline:116,AUDIO,Wireless Com,7,1.0,commercial pricing,Div 27 Communications.pdf#p56
+baseline:117,AUDIO,Wireless Com,8,1.0,commercial pricing,Div 27 Communications.pdf#p56
+baseline:118,AUDIO,Wireless Com,8,1.0,commercial pricing,Div 27 Communications.pdf#p56

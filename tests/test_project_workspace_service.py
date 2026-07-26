@@ -388,6 +388,61 @@ def test_workspace_service_stakeholder_directory_create_and_link(
     assert stakeholders[0]["organization_display_name"] == "Acme Owner"
 
 
+def test_project_library_rows_skip_stakeholder_enrichment_by_default(
+    tmp_path: Path,
+) -> None:
+    from apps import phase2_review_app as review_app
+
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+    record = service.create_manual_record(
+        project_id="project-fast-path",
+        name="Fast Path Project",
+        client="Client",
+    )
+    service.save_record(record)
+
+    class _CountingService:
+        def __init__(self, wrapped: ProjectWorkspaceService) -> None:
+            self._wrapped = wrapped
+            self.stakeholder_calls = 0
+            self.manifest_calls = 0
+
+        def list_workspaces(
+            self, *, include_archived: bool = False, limit: int = 500
+        ) -> list[ProjectWorkspaceRecord]:
+            return self._wrapped.list_workspaces(
+                include_archived=include_archived,
+                limit=limit,
+            )
+
+        def list_project_stakeholders(self, workspace_id: str) -> list[dict[str, Any]]:
+            self.stakeholder_calls += 1
+            return self._wrapped.list_project_stakeholders(workspace_id)
+
+        def read_manifest(self, workspace_id: str) -> dict[str, Any]:
+            self.manifest_calls += 1
+            return self._wrapped.read_manifest(workspace_id)
+
+    counting_service = _CountingService(service)
+
+    lightweight_rows = review_app._project_library_rows(
+        counting_service,
+        include_archived=False,
+        limit=10,
+    )
+    heavy_rows = review_app._project_library_rows(
+        counting_service,
+        include_archived=False,
+        limit=10,
+        include_stakeholders=True,
+    )
+
+    assert lightweight_rows[0]["stakeholder_names"] == "Client"
+    assert counting_service.stakeholder_calls == 1
+    assert counting_service.manifest_calls == 2
+    assert len(heavy_rows) == 1
+
+
 def test_workspace_service_preview_bid_id_returns_expected_format(
     tmp_path: Path,
 ) -> None:

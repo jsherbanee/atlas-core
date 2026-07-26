@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 import hashlib
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -26,6 +27,32 @@ def business_organization_roles() -> set[OrganizationRole]:
     }
 
 
+def _path_signature(path: Path) -> tuple[int, int]:
+    if not path.exists():
+        return (0, 0)
+    stat = path.stat()
+    return (int(stat.st_mtime_ns), int(stat.st_size))
+
+
+@lru_cache(maxsize=256)
+def _cached_json_list(
+    path_text: str,
+    mtime_ns: int,
+    size_bytes: int,
+) -> tuple[dict[str, Any], ...]:
+    path = Path(path_text)
+    if not path.exists():
+        return ()
+    try:
+        with path.open(encoding="utf-8") as file:
+            payload = json.load(file)
+    except Exception:
+        return ()
+    if not isinstance(payload, list):
+        return ()
+    return tuple(dict(item) for item in payload if isinstance(item, dict))
+
+
 class OrganizationDirectoryService:
     def __init__(self, workspace_root: str | Path) -> None:
         self.workspace_root = Path(workspace_root)
@@ -36,9 +63,12 @@ class OrganizationDirectoryService:
         )
 
     def list_organizations(self, include_inactive: bool = True) -> list[Organization]:
+        signature = _path_signature(self._org_path)
         rows = [
             Organization.from_dict(item)
-            for item in self._read_json_list(self._org_path)
+            for item in _cached_json_list(
+                str(self._org_path), signature[0], signature[1]
+            )
         ]
         if include_inactive:
             return rows
@@ -403,9 +433,12 @@ class OrganizationDirectoryService:
             raise PermissionError("organization scope mismatch")
 
     def list_project_stakeholders(self, project_id: str) -> list[ProjectStakeholder]:
+        signature = _path_signature(self._stakeholder_path)
         rows = [
             ProjectStakeholder.from_dict(item)
-            for item in self._read_json_list(self._stakeholder_path)
+            for item in _cached_json_list(
+                str(self._stakeholder_path), signature[0], signature[1]
+            )
         ]
         return [item for item in rows if item.project_id == project_id and item.active]
 

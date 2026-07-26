@@ -21,7 +21,7 @@ import tempfile
 import threading
 import time
 import traceback
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
@@ -132,6 +132,20 @@ from atlas_core.ui.workspace_framework import (
     render_page_header as _shared_render_page_header,
     render_section_title as _shared_render_section_title,
 )
+
+
+class _ProjectLibraryService(Protocol):
+    def list_workspaces(
+        self,
+        *,
+        include_archived: bool = False,
+        limit: int = 500,
+    ) -> list[ProjectWorkspaceRecord]: ...
+
+    def list_project_stakeholders(self, workspace_id: str) -> list[dict[str, Any]]: ...
+
+    def read_manifest(self, workspace_id: str) -> dict[str, Any]: ...
+
 
 PROJECT_MANAGER_PAGES = [
     "Mission Control",
@@ -7982,6 +7996,7 @@ def _render_estimate_add_workspace(
         workspace_service,
         include_archived=False,
         limit=300,
+        include_stakeholders=False,
     )
     _ensure_commercial_catalog_seed_data(st)
     project_options = [
@@ -9660,10 +9675,11 @@ def _project_review_status(
 
 
 def _project_library_rows(
-    workspace_service: ProjectWorkspaceService,
+    workspace_service: _ProjectLibraryService,
     *,
     include_archived: bool,
     limit: int = 500,
+    include_stakeholders: bool = False,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for record in workspace_service.list_workspaces(
@@ -9671,12 +9687,13 @@ def _project_library_rows(
         limit=limit,
     ):
         stakeholder_rows: list[dict[str, Any]] = []
-        try:
-            stakeholder_rows = list(
-                workspace_service.list_project_stakeholders(record.workspace_id)
-            )
-        except Exception:
-            stakeholder_rows = []
+        if include_stakeholders:
+            try:
+                stakeholder_rows = list(
+                    workspace_service.list_project_stakeholders(record.workspace_id)
+                )
+            except Exception:
+                stakeholder_rows = []
         manifest = workspace_service.read_manifest(record.workspace_id)
         document_count = sum(
             int(value) for value in dict(manifest.get("document_counts") or {}).values()
@@ -9691,40 +9708,46 @@ def _project_library_rows(
                     record.metadata.get("owner"), record.project.client
                 ),
                 "stakeholder_names": " | ".join(
-                    [
-                        _safe_text(record.metadata.get("owner"), record.project.client),
-                        _safe_text(record.metadata.get("consultant"), ""),
-                        _safe_text(record.metadata.get("architect"), ""),
-                        " | ".join(
-                            [
-                                _safe_text(
-                                    item.get("organization_display_name"),
-                                    "",
-                                )
-                                for item in stakeholder_rows
-                            ]
-                        ),
-                        " | ".join(
-                            [
-                                " ".join(
-                                    [
-                                        _safe_text(alias, "")
-                                        for alias in list(
-                                            item.get("organization_aliases") or []
-                                        )
-                                    ]
-                                )
-                                for item in stakeholder_rows
-                            ]
-                        ),
-                        ", ".join(
-                            [
-                                _safe_text(item, "")
-                                for item in list(record.metadata.get("engineers") or [])
-                                if _safe_text(item, "")
-                            ]
-                        ),
-                    ]
+                    [_safe_text(record.metadata.get("owner"), record.project.client)]
+                    + (
+                        [
+                            _safe_text(record.metadata.get("consultant"), ""),
+                            _safe_text(record.metadata.get("architect"), ""),
+                            " | ".join(
+                                [
+                                    _safe_text(
+                                        item.get("organization_display_name"),
+                                        "",
+                                    )
+                                    for item in stakeholder_rows
+                                ]
+                            ),
+                            " | ".join(
+                                [
+                                    " ".join(
+                                        [
+                                            _safe_text(alias, "")
+                                            for alias in list(
+                                                item.get("organization_aliases") or []
+                                            )
+                                        ]
+                                    )
+                                    for item in stakeholder_rows
+                                ]
+                            ),
+                            ", ".join(
+                                [
+                                    _safe_text(item, "")
+                                    for item in list(
+                                        record.metadata.get("engineers") or []
+                                    )
+                                    if _safe_text(item, "")
+                                ]
+                            ),
+                        ]
+                        if include_stakeholders
+                        else []
+                    ),
                 ),
                 "client_project_number": _client_project_number(record),
                 "internal_project_number": _internal_project_number(record),
@@ -15329,6 +15352,7 @@ def _render_application_knowledge_page(
         workspace_service,
         include_archived=True,
         limit=500,
+        include_stakeholders=False,
     )
     product_service = _ensure_commercial_seed_data(st)
     manufacturer_rows = product_service.list_manufacturers()
@@ -25435,6 +25459,7 @@ def _render_projects_page(st: Any, workspace_service: ProjectWorkspaceService) -
         workspace_service,
         include_archived=include_archived,
         limit=500,
+        include_stakeholders=False,
     )
     if not rows:
         _shared_render_guided_empty_state(
@@ -27721,6 +27746,7 @@ def _render_open_existing_page(
         workspace_service,
         include_archived=include_archived,
         limit=500,
+        include_stakeholders=True,
     )
     if not rows:
         _shared_render_guided_empty_state(
@@ -32185,6 +32211,7 @@ def _application_search_entries(
         workspace_service,
         include_archived=True,
         limit=500,
+        include_stakeholders=False,
     )
     for item in project_rows:
         record = item["record"]

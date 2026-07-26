@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import mimetypes
 import hashlib
+from functools import lru_cache
 from pathlib import Path
 import base64
 import json
@@ -224,6 +225,30 @@ class ProjectWorkspaceBootstrap:
             "total_document_count": self.total_document_count,
             "active_processing_count": self.active_processing_count,
         }
+
+
+def _path_signature(path: Path) -> tuple[int, int]:
+    if not path.exists():
+        return (0, 0)
+    stat = path.stat()
+    return (int(stat.st_mtime_ns), int(stat.st_size))
+
+
+@lru_cache(maxsize=512)
+def _cached_json_dict(
+    path_text: str,
+    mtime_ns: int,
+    size_bytes: int,
+) -> dict[str, Any]:
+    path = Path(path_text)
+    if not path.exists():
+        return {}
+    try:
+        with path.open(encoding="utf-8") as file:
+            payload = json.load(file)
+    except Exception:
+        return {}
+    return dict(payload) if isinstance(payload, dict) else {}
 
 
 class ProjectWorkspaceService:
@@ -479,9 +504,13 @@ class ProjectWorkspaceService:
                 if diagnostics is not None:
                     diagnostics.append("Project repository requires reconciliation.")
                 return {}
-            with manifest_path.open(encoding="utf-8") as file:
-                payload = json.load(file)
-            return dict(payload) if isinstance(payload, dict) else {}
+            signature = _path_signature(manifest_path)
+            payload = _cached_json_dict(
+                str(manifest_path),
+                signature[0],
+                signature[1],
+            )
+            return dict(payload)
         except Exception:
             if diagnostics is not None:
                 diagnostics.append(
@@ -1534,7 +1563,7 @@ class ProjectWorkspaceService:
         )
 
     def read_manifest(self, workspace_id: str) -> dict[str, Any]:
-        return self.manager.read_manifest(workspace_id)
+        return self._read_cached_manifest(workspace_id)
 
     def refresh_manifest(self, workspace_id: str) -> dict[str, Any]:
         return self.manager.refresh_manifest(workspace_id)

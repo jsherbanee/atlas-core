@@ -44,6 +44,7 @@ python_version = "3.14"
 ignore_missing_imports = true
 strict = false
 files = ["atlas_core", "tests"]
+explicit_package_bases = true
 
 [tool.setuptools.packages.find]
 where = ["."]

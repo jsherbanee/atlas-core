@@ -1,0 +1,5 @@
+root_issue,issue_group,severity,affected_count,source_files,evidence_references,explanation
+commercial pricing gap,quote required,high,118,BID-2026-0002,pricing engine returned no pricing records for the target project,"The project commercial state is populated, but the deterministic pricing engine could not match the reconstructed baseline to current price records."
+generic allowances,commercial allowance,medium,25,BID-2026-0002,reconstructed baseline generic-allowance rows,Generic allowance rows remain placeholders and should be replaced only if better source evidence exists.
+catalog alignment,commercial knowledge library,medium,12,workspace.json,workspace price_list_library.commercial_knowledge,"The workspace contains a commercial library, but its product keys do not align with the reconstructed baseline well enough to price the lines deterministically."
+all lines quote required,pricing readiness,high,118,BID-2026-0002,"pricing summary shows no current, quoted, or historical coverage",Every estimate line still requires a quote or a commercial library update before bid pricing can be defended.
