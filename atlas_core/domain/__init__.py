@@ -116,6 +116,10 @@ from atlas_core.domain.document_relevance import (
     PageRelevanceAssessment,
     RelevanceWorkflowScores,
 )
+from atlas_core.domain.source_fitness import (
+    SourceFitnessAssessment,
+    SourceFitnessResult,
+)
 from atlas_core.domain.master_library import (
     EngineeringAttributes,
     ManufacturerReference,
@@ -405,6 +409,8 @@ __all__ = [
     "DocumentRelevanceAssessment",
     "PageRelevanceAssessment",
     "RelevanceWorkflowScores",
+    "SourceFitnessAssessment",
+    "SourceFitnessResult",
     "Invoice",
     "InvoiceLine",
     "InvoiceStatus",

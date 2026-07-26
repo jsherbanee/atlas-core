@@ -201,6 +201,10 @@ from atlas_core.services.document_intake_service import (
     UploadSessionResult,
 )
 from atlas_core.services.document_relevance_service import DocumentRelevanceService
+from atlas_core.services.evidence_baseline_reconstruction_service import (
+    EvidenceBaselineReconstructionService,
+)
+from atlas_core.services.source_fitness_service import SourceFitnessService
 from atlas_core.services.engineering_insights_service import (
     EngineeringInsight,
     EngineeringInsightsService,
@@ -377,6 +381,8 @@ __all__ = [
     "CommercialProductService",
     "PackageDiscoveryResult",
     "DocumentRelevanceService",
+    "EvidenceBaselineReconstructionService",
+    "SourceFitnessService",
     "UploadedIntakeFile",
     "UploadSessionResult",
     "PdfTextExtractionService",

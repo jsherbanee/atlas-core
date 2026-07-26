@@ -1,0 +1,11 @@
+system_name,component_count,resolved_count,unresolved_count,source_coverage,confidence_score,explanation
+AUDIO,42,39,3,11,0.96,Confidence rises with resolved manufacturer/model pairs and source pages that carry structured component evidence.
+CONTROL,17,15,2,6,0.94,Confidence rises with resolved manufacturer/model pairs and source pages that carry structured component evidence.
+Cabling & Plates,7,5,2,3,0.86,Confidence rises with resolved manufacturer/model pairs and source pages that carry structured component evidence.
+"FURNITURE, STANDS, MOUNTS",5,0,5,1,0.5,Confidence rises with resolved manufacturer/model pairs and source pages that carry structured component evidence.
+MISC,5,0,5,1,0.5,Confidence rises with resolved manufacturer/model pairs and source pages that carry structured component evidence.
+PATCHING AND DISTRIBUTION,8,2,6,1,0.62,Confidence rises with resolved manufacturer/model pairs and source pages that carry structured component evidence.
+PRODUCTION INTERCOM,2,2,0,1,1.0,Confidence rises with resolved manufacturer/model pairs and source pages that carry structured component evidence.
+SUPPORT INFRASTRUCTURE,9,9,0,1,1.0,Confidence rises with resolved manufacturer/model pairs and source pages that carry structured component evidence.
+VIDEO,19,18,1,6,0.97,Confidence rises with resolved manufacturer/model pairs and source pages that carry structured component evidence.
+audio,4,3,1,1,0.88,Confidence rises with resolved manufacturer/model pairs and source pages that carry structured component evidence.

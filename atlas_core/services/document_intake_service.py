@@ -31,6 +31,7 @@ from atlas_core.services.plan_review_application_service import (
     PlanReviewApplicationService,
 )
 from atlas_core.services.document_relevance_service import DocumentRelevanceService
+from atlas_core.services.source_fitness_service import SourceFitnessService
 
 _RETRY_SUFFIX_PATTERN = re.compile(r"(?:[_-]\d+|-\d{14})$", re.IGNORECASE)
 
@@ -227,6 +228,7 @@ class DocumentIntakeService:
         self.document_relevance_service = (
             document_relevance_service or DocumentRelevanceService()
         )
+        self.source_fitness_service = SourceFitnessService()
         self.local_ocr_engine = local_ocr_engine or NoOpLocalOcrEngine()
         self.enable_local_ocr = enable_local_ocr
 
@@ -637,7 +639,7 @@ class DocumentIntakeService:
             file_diagnostics, warnings
         )
 
-        return DocumentIntakeSnapshot(
+        snapshot = DocumentIntakeSnapshot(
             snapshot_id=snapshot_id,
             package_path=package_path_value,
             metadata=metadata,
@@ -675,6 +677,27 @@ class DocumentIntakeService:
             },
             created_by_engine_version=self.ENGINE_VERSION,
         )
+
+        source_fitness_result = self.source_fitness_service.assess_snapshot(snapshot)
+        snapshot.source_fitness_assessments = (
+            list(source_fitness_result.document_assessments)
+            + list(source_fitness_result.page_assessments)
+            + list(source_fitness_result.evidence_assessments)
+        )
+        snapshot.import_summary["source_fitness_assessment_count"] = len(
+            snapshot.source_fitness_assessments
+        )
+        snapshot.import_summary["source_fitness_document_count"] = len(
+            source_fitness_result.document_assessments
+        )
+        snapshot.import_summary["source_fitness_page_count"] = len(
+            source_fitness_result.page_assessments
+        )
+        snapshot.import_summary["source_fitness_evidence_count"] = len(
+            source_fitness_result.evidence_assessments
+        )
+
+        return snapshot
 
     def write_snapshot(
         self,

@@ -148,12 +148,19 @@ def test_snapshot_includes_relevance_assessments_roundtrip(tmp_path: Path) -> No
     assert snapshot.import_summary["relevance_assessment_count"] == len(
         snapshot.document_relevance_assessments
     )
+    assert snapshot.source_fitness_assessments
+    assert snapshot.import_summary["source_fitness_assessment_count"] == len(
+        snapshot.source_fitness_assessments
+    )
 
     snapshot_path = intake_service.write_snapshot(snapshot, tmp_path / "outputs")
     loaded_snapshot = intake_service.load_snapshot(snapshot_path)
 
     assert len(loaded_snapshot.document_relevance_assessments) == len(
         snapshot.document_relevance_assessments
+    )
+    assert len(loaded_snapshot.source_fitness_assessments) == len(
+        snapshot.source_fitness_assessments
     )
     assert loaded_snapshot.document_relevance_assessments[0].page_assessments
     assert (
@@ -162,6 +169,7 @@ def test_snapshot_includes_relevance_assessments_roundtrip(tmp_path: Path) -> No
         .page_number
         == 1
     )
+    assert loaded_snapshot.source_fitness_assessments[0].source_file
     assert all(
         assessment.source_file
         for assessment in loaded_snapshot.document_relevance_assessments

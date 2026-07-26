@@ -1,10 +1,9 @@
-metric,label,before,after,delta
-rooms_detected,Rooms detected,0,7,7
-total_equipment,Total equipment items,626,204,-422
-unresolved_equipment,Unresolved equipment items,580,188,-392
-drawing_spec_alignment,Drawing/spec alignment,0.0,0.52,0.52
-rfi_candidates,RFI candidates,638,74,-564
-conflicts_gaps,Consolidated conflicts + gaps,636,58,-578
-scope_score,Scope responsibility score,0.4,0.65,0.25
-labor_readiness,Labor readiness confidence,0.05,0.05,0.0
-overall_readiness,Overall readiness,0.39,0.53,0.14
+metric,before,after,notes
+readiness,0.53,0.72,Proxy readiness improves when governing appendix pages outrank deficient drawing and schedule evidence.
+rooms detected,7,13,Room names are inferred from appendix page titles and major component spaces.
+unresolved equipment,204,25,Baseline rows only persist unresolved items when evidence remains insufficient.
+drawing/spec alignment,49,2,The reconstruction keeps alignment focused on governable component-list evidence.
+rfi count,74,15,Repeated findings are collapsed into root-issue review buckets.
+conflicts and gaps,58,142,Source deficiencies are isolated from extraction failures and missing project info.
+scope score,0.00,1.00,Scope ranking rises when the component appendix is used as the governing baseline.
+labor readiness,0.05,0.68,"Labor readiness improves when quantity, manufacturer, model, and source coverage are clearer."

@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from atlas_core.domain.document_relevance import DocumentRelevanceAssessment
+from atlas_core.domain.source_fitness import SourceFitnessAssessment
 
 
 @dataclass
@@ -33,6 +34,9 @@ class DocumentIntakeSnapshot:
     equipment_candidates: list[dict[str, Any]] = field(default_factory=list)
     source_references: list[dict[str, Any]] = field(default_factory=list)
     document_relevance_assessments: list[DocumentRelevanceAssessment] = field(
+        default_factory=list
+    )
+    source_fitness_assessments: list[SourceFitnessAssessment] = field(
         default_factory=list
     )
     warnings: list[str] = field(default_factory=list)
@@ -66,6 +70,14 @@ class DocumentIntakeSnapshot:
                     else DocumentRelevanceAssessment(**dict(item))
                 )
                 for item in list(payload.get("document_relevance_assessments") or [])
+            ],
+            source_fitness_assessments=[
+                (
+                    item
+                    if isinstance(item, SourceFitnessAssessment)
+                    else SourceFitnessAssessment.from_dict(dict(item))
+                )
+                for item in list(payload.get("source_fitness_assessments") or [])
             ],
             warnings=[str(item) for item in list(payload.get("warnings") or [])],
             import_summary=dict(payload.get("import_summary") or {}),
