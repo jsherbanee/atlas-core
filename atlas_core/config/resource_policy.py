@@ -36,6 +36,12 @@ class ResourcePolicy:
     reconciliation_stale_queue_seconds: int = 60 * 60 * 24  # 1 day
     reconciliation_stale_spawning_seconds: int = 60 * 10  # 10 minutes
     reconciliation_stale_running_seconds: int = 60 * 60  # 1 hour
+    # retry/backoff settings
+    max_retry_count: int = 2
+    retry_backoff_seconds: int = 5
+    retry_backoff_multiplier: float = 2.0
+    retry_max_delay_seconds: int = 60 * 60  # 1 hour
+    retry_jitter: bool = False
 
 
 def load_policy_from_env() -> ResourcePolicy:

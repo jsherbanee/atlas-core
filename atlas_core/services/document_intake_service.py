@@ -606,6 +606,16 @@ class DocumentIntakeService:
                 "warning": None,
                 "failure_reason": None,
                 "retryable": True,
+                # retry metadata
+                "attempt_count": 0,
+                "max_attempts": DEFAULT_POLICY.max_retry_count,
+                "first_attempt_at": None,
+                "last_attempt_at": None,
+                "next_retry_at": None,
+                "retry_backoff_seconds": DEFAULT_POLICY.retry_backoff_seconds,
+                "prior_failures": [],
+                "retry_state": "pending",
+                "final_failure_reason": None,
                 "worker_pid": None,
                 "destination": str(final_dest),
             }
@@ -751,18 +761,52 @@ class DocumentIntakeService:
                     except Exception:
                         pass
 
-                # update job file with results
+                # update job file with results and apply retry policy if needed
                 try:
-                    js["stage"] = (
-                        "classifying" if payload.get("status") == "ok" else "failed"
-                    )
+                    from atlas_core.services.retry_policy import compute_backoff
+
                     js["updated_at"] = time.time()
                     js["completed_at"] = time.time()
-                    js["elapsed_time"] = (payload.get("metrics") or {}).get(
-                        "elapsed_seconds"
-                    )
+                    js["elapsed_time"] = (payload.get("metrics") or {}).get("elapsed_seconds")
                     js["worker_pid"] = os.getpid()
-                    js["failure_reason"] = payload.get("error")
+                    status = payload.get("status")
+                    error = payload.get("error")
+                    if status == "ok":
+                        js["stage"] = "classifying"
+                        js["failure_reason"] = None
+                        js["retry_state"] = "succeeded"
+                    else:
+                        js["stage"] = "failed"
+                        js["failure_reason"] = error
+                        # classify failure: default transient unless obvious permanent indicators
+                        retryable = True
+                        failure_code = "generic_error"
+                        if (isinstance(error, str) and any(k in error.lower() for k in ("encrypted", "invalid pdf", "pathological", "unsupported"))):
+                            retryable = False
+                            failure_code = "permanent_parsing_error"
+
+                        # update failure history
+                        prior = js.get("prior_failures") or []
+                        prior.append({"at": time.time(), "reason": error, "code": failure_code, "retryable": retryable})
+                        js["prior_failures"] = prior
+
+                        # attempts
+                        attempts = int(js.get("attempt_count") or 0) + 1
+                        js["attempt_count"] = attempts
+                        if js.get("first_attempt_at") is None:
+                            js["first_attempt_at"] = time.time()
+                        js["last_attempt_at"] = time.time()
+
+                        max_attempts = int(js.get("max_attempts") or DEFAULT_POLICY.max_retry_count)
+                        if not retryable or attempts >= max_attempts:
+                            js["retry_state"] = "exhausted" if retryable else "permanent"
+                            js["final_failure_reason"] = error
+                        else:
+                            # schedule retry
+                            delay, next_at = compute_backoff(attempts, base=js.get("retry_backoff_seconds"))
+                            js["next_retry_at"] = next_at
+                            js["retry_state"] = "scheduled"
+
                     with open(job_path, "w", encoding="utf-8") as fh:
                         json.dump(js, fh)
                 except Exception:
@@ -813,16 +857,42 @@ class DocumentIntakeService:
                         proc.kill()
                     except Exception:
                         pass
-                # update job file to indicate timeout
+                # update job file to indicate timeout and apply retry logic
                 try:
                     with open(job_path, "r", encoding="utf-8") as fh:
                         js = json.load(fh)
                 except Exception:
                     js = {}
-                js["stage"] = "failed"
-                js["failure_reason"] = "timeout"
-                js["updated_at"] = time.time()
-                js["completed_at"] = time.time()
+                payload = {"status": "error", "error": "timeout", "metrics": {}}
+                # reuse the child update logic by invoking _entry's handling inline
+                try:
+                    # apply similar retry processing as child result
+                    from atlas_core.services.retry_policy import compute_backoff
+
+                    js["updated_at"] = time.time()
+                    js["completed_at"] = time.time()
+                    js["worker_pid"] = None
+                    error = "timeout"
+                    js["stage"] = "failed"
+                    js["failure_reason"] = error
+                    prior = js.get("prior_failures") or []
+                    prior.append({"at": time.time(), "reason": error, "code": "timeout", "retryable": True})
+                    js["prior_failures"] = prior
+                    attempts = int(js.get("attempt_count") or 0) + 1
+                    js["attempt_count"] = attempts
+                    if js.get("first_attempt_at") is None:
+                        js["first_attempt_at"] = time.time()
+                    js["last_attempt_at"] = time.time()
+                    max_attempts = int(js.get("max_attempts") or DEFAULT_POLICY.max_retry_count)
+                    if attempts >= max_attempts:
+                        js["retry_state"] = "exhausted"
+                        js["final_failure_reason"] = error
+                    else:
+                        delay, next_at = compute_backoff(attempts, base=js.get("retry_backoff_seconds"))
+                        js["next_retry_at"] = next_at
+                        js["retry_state"] = "scheduled"
+                except Exception:
+                    pass
                 try:
                     with open(job_path, "w", encoding="utf-8") as fh:
                         json.dump(js, fh)

@@ -43954,6 +43954,13 @@ def main() -> None:
         except Exception:
             # do not let reconciliation failures crash the UI
             pass
+        # start process-local retry dispatcher (non-blocking)
+        try:
+            from atlas_core.services.retry_dispatcher import start_retry_dispatcher
+
+            start_retry_dispatcher()
+        except Exception:
+            pass
         _ensure_document_processing_worker(workspace_service)
         _record_bootstrap_phase(st, "processing_worker_ready")
         _sync_active_workspace_from_query_params(st, workspace_service)

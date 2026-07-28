@@ -177,6 +177,17 @@ class ReconciliationService:
 
             # queued
             if stage == "queued":
+                # if this job has retry metadata and a next_retry_at in the future, skip admission
+                next_retry = payload.get("next_retry_at")
+                if next_retry and next_retry > now:
+                    # annotate as pending retry and skip
+                    payload.update({"reconciled_at": now, "reconciliation_reason": "retry_pending", "reconciliation_action": "deferred", "previous_scheduler_state": stage, "scheduler_generation": self.scheduler._generation})
+                    try:
+                        jf.write_text(json.dumps(payload), encoding="utf-8")
+                    except Exception:
+                        pass
+                    logger.info({"event": "job_deferred_retry", "job_id": job_id, "next_retry_at": next_retry})
+                    continue
                 entered = payload.get("queue_entered_at") or updated_at or now
                 age = now - entered
                 if age > self.policy.reconciliation_stale_queue_seconds:
