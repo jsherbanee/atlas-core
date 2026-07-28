@@ -52,3 +52,18 @@ Observability
 
 - The scheduler emits structured events to the `atlas.scheduler` logger for `queued`, `admitted`, `started`, `completed`, and `rejected` events. Each event includes `job_id`, `policy_tier`, `wait_time`, `active_count`, and `queue_length`.
 
+Startup Reconciliation
+
+- A `ReconciliationService` (`atlas_core/services/reconciliation.py`) performs a deterministic startup scan of `outputs/uploads/*/.jobs/*.json` and rebuilds the in-memory scheduler state.
+- Terminal jobs (`completed`, `failed`, `rejected`, `cancelled`) are ignored and annotated with `reconciled_at` and `reconciliation_action: ignored`.
+- Non-terminal jobs are inspected for `worker_pid`, timestamps, and staleness thresholds. Actions include `verified` (active PID exists), `requeued` (placed back into scheduler), or `failed` (orphaned/stale worker).
+- Reconciliation writes `reconciled_at`, `reconciliation_reason`, `reconciliation_action`, `previous_scheduler_state`, and `scheduler_generation` into job JSON.
+- The reconciliation process emits structured events: `startup_scan`, `job_verified`, `job_requeued`, `job_failed`, and `scheduler_rebuilt`.
+
+Implementation Notes & Limitations
+
+- Reconciliation is process-local and best-effort. It annotates job JSON with `reconciled_at`, `reconciliation_reason`, `reconciliation_action`, `previous_scheduler_state`, and `scheduler_generation`.
+- PID existence is detected via `psutil.pid_exists()` when `psutil` is available, or via `os.kill(pid, 0)` on POSIX as a fallback.
+- Active jobs are restored only if PID checks pass and policy serialization rules allow it; otherwise the job is queued.
+- The scheduler in-memory state is not durable across a process restart beyond this reconciliation step; operators should run reconciliation at startup and consider external orchestration for HA.
+

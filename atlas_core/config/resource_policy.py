@@ -32,6 +32,10 @@ class ResourcePolicy:
     pathological_file_behavior: str = "quarantine"  # or 'reject' or 'strict'
     preflight_page_count_threshold: int = 500
     preflight_suspicious_stream_length_ratio: float = 10.0
+    # reconciliation thresholds (seconds)
+    reconciliation_stale_queue_seconds: int = 60 * 60 * 24  # 1 day
+    reconciliation_stale_spawning_seconds: int = 60 * 10  # 10 minutes
+    reconciliation_stale_running_seconds: int = 60 * 60  # 1 hour
 
 
 def load_policy_from_env() -> ResourcePolicy:

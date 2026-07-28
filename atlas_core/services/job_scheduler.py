@@ -40,11 +40,56 @@ class JobScheduler:
         self._lock = threading.Lock()
         self._queues: Dict[str, Deque[Tuple[str, float, Path]]] = defaultdict(deque)
         self._active: Dict[str, dict] = {}  # job_id -> {policy, pid}
+        self._generation = 0
 
     def reset(self) -> None:
         with self._lock:
             self._queues = defaultdict(deque)
             self._active = {}
+            self._generation += 1
+
+    def register_active(self, job_id: str, policy: str, pid: int) -> bool:
+        """Register a job as active if it does not violate serialization rules.
+
+        Returns True if registered as active, False if placed into queue instead.
+        """
+        with self._lock:
+            # very_large must be alone
+            if policy == "very_large":
+                if self._active_count() == 0:
+                    self._active[job_id] = {"policy": "very_large", "pid": pid}
+                    self._emit_event("job_verified", job_id, policy, 0.0)
+                    return True
+                else:
+                    # queue instead
+                    self._queues["very_large"].append((job_id, time.time(), None))
+                    return False
+
+            # if a very_large active, cannot register
+            if any(v.get("policy") == "very_large" for v in self._active.values()):
+                self._queues[policy].append((job_id, time.time(), None))
+                return False
+
+            # policy-specific limits
+            if policy == "large":
+                large_active = sum(1 for v in self._active.values() if v.get("policy") == "large")
+                if large_active < getattr(self.policy, "max_concurrent_large_documents", 1):
+                    self._active[job_id] = {"policy": "large", "pid": pid}
+                    self._emit_event("job_verified", job_id, policy, 0.0)
+                    return True
+                else:
+                    self._queues["large"].append((job_id, time.time(), None))
+                    return False
+
+            # standard
+            standard_active = sum(1 for v in self._active.values() if v.get("policy") == "standard")
+            if standard_active < getattr(self.policy, "standard_job_concurrency", 1):
+                self._active[job_id] = {"policy": policy, "pid": pid}
+                self._emit_event("job_verified", job_id, policy, 0.0)
+                return True
+            else:
+                self._queues["standard"].append((job_id, time.time(), None))
+                return False
 
     def _queue_length(self) -> int:
         return sum(len(q) for q in self._queues.values())
