@@ -32,6 +32,40 @@ from atlas_core.services.plan_review_application_service import (
 )
 from atlas_core.services.document_relevance_service import DocumentRelevanceService
 from atlas_core.services.source_fitness_service import SourceFitnessService
+from atlas_core.services.intake_instrumentation import instrument_stage
+from atlas_core.utils.streaming import incremental_sha1_from_file
+from atlas_core.config.resource_policy import DEFAULT_POLICY
+from multiprocessing import Process
+import tempfile
+import time
+
+try:
+    import psutil
+except Exception:
+    psutil = None
+from typing import TypedDict
+
+
+class IntakeJobState(TypedDict, total=False):
+    job_id: str
+    intake_identity: str
+    project_id: str
+    filename: str
+    size_bytes: int
+    processing_class: str
+    stage: str
+    progress_current: int
+    progress_total: int | None
+    queued_position: int | None
+    started_at: float | None
+    updated_at: float | None
+    completed_at: float | None
+    elapsed_time: float | None
+    warning: str | None
+    failure_reason: str | None
+    retryable: bool
+    worker_pid: int | None
+
 
 _RETRY_SUFFIX_PATTERN = re.compile(r"(?:[_-]\d+|-\d{14})$", re.IGNORECASE)
 
@@ -53,6 +87,24 @@ class PackageDiscoveryResult:
 class UploadedIntakeFile:
     name: str
     data: bytes
+
+
+@dataclass
+class FileUploadReference:
+    """Lightweight file-backed upload reference used during intake.
+
+    This object intentionally does NOT contain raw bytes or in-memory buffers.
+    """
+
+    project_id: str | None
+    upload_session_id: str
+    original_filename: str
+    canonical_filename: str
+    temporary_path: Path
+    size_bytes: int
+    checksum: str
+    mime_type: str | None = None
+    processing_class: str | None = None
 
 
 @dataclass
@@ -110,7 +162,13 @@ def _file_sha1(path: Path) -> str:
 
 
 def _bytes_sha1(data: bytes) -> str:
-    return hashlib.sha1(data).hexdigest()
+    # Prefer incremental update to avoid intermediate copies in some environments
+    digest = hashlib.sha1()
+    mv = memoryview(data)
+    chunk_size = 1024 * 1024
+    for i in range(0, len(mv), chunk_size):
+        digest.update(mv[i : i + chunk_size])
+    return digest.hexdigest()
 
 
 def _canonical_retry_base_name(name: str) -> str:
@@ -255,14 +313,31 @@ class DocumentIntakeService:
         uploaded_files: list[UploadedIntakeFile],
         uploads_root: str | Path = "outputs/uploads",
         session_id: str | None = None,
+        project_id: str | None = None,
     ) -> UploadSessionResult:
         if not uploaded_files:
             raise ValueError("No files were uploaded")
 
         inspection = self.inspect_uploaded_files(uploaded_files)
-        normalized_files = [
-            (item.name, item.data) for item in list(inspection.accepted_files)
-        ]
+        # Convert accepted byte-backed uploads to file-backed temp files to avoid
+        # holding full contents in memory. Keep a mapping of original name -> file path.
+        normalized_files: list[tuple[str, Path, int, str]] = (
+            []
+        )  # (name, temp_path, size, checksum)
+        for item in inspection.accepted_files:
+            # Legacy byte-backed path: create a temp file and stream the bytes
+            tmp = tempfile.NamedTemporaryFile(delete=False)
+            tmp_path = Path(tmp.name)
+            tmp.close()
+            # write in chunks to avoid large intermediate allocations
+            chunk_size = 1024 * 1024
+            data = item.data
+            with tmp_path.open("wb") as fh:
+                for i in range(0, len(data), chunk_size):
+                    fh.write(data[i : i + chunk_size])
+            size = tmp_path.stat().st_size
+            checksum = incremental_sha1_from_file(tmp_path)
+            normalized_files.append((item.name, tmp_path, size, checksum))
         warnings = list(inspection.warnings)
         rejected_diagnostics = [
             item
@@ -284,14 +359,82 @@ class DocumentIntakeService:
         unsupported_file_count = 0
 
         metadata_written = False
-        for upload_name, upload_data in normalized_files:
+        # Enforce resource policy: reject files above max accepted size before copying
+        jobs_dir = session_root / ".jobs"
+        jobs_dir.mkdir(parents=True, exist_ok=True)
+
+        for upload_name, upload_path, size, checksum in normalized_files:
+            if size > DEFAULT_POLICY.max_accepted_upload_bytes:
+                warnings.append(
+                    f"{upload_name}: exceeds maximum accepted file size and was rejected"
+                )
+                continue
             target_group = self._classify_upload_path(upload_name)
-            destination = self._write_classified_file(
-                session_root,
-                target_group,
-                upload_name,
-                upload_data,
-            )
+            canonical_filename = Path(upload_name).name
+            pid_for_identity = project_id or str(session_root)
+            intake_identity = hashlib.sha1(
+                f"{pid_for_identity}:{canonical_filename}:{checksum}".encode("utf-8")
+            ).hexdigest()
+            job_file = jobs_dir / f"{intake_identity}.json"
+            # If a non-terminal job exists, do not start a duplicate
+            if job_file.exists():
+                try:
+                    existing = json.loads(job_file.read_text(encoding="utf-8"))
+                    if existing.get("stage") not in {
+                        "completed",
+                        "failed",
+                        "cancelled",
+                    }:
+                        warnings.append(
+                            f"{upload_name}: intake already in progress (job {existing.get('job_id')})."
+                        )
+                        continue
+                except Exception:
+                    # if job file unreadable, continue to create a new job
+                    pass
+            # Persist from temp file to canonical destination using streaming compare
+            with instrument_stage(
+                "persisting", extra={"file": upload_name, "size": size}
+            ):
+                final_dest = self._write_classified_file(
+                    session_root, target_group, upload_name, upload_path
+                )
+                # create job record
+                job_state: IntakeJobState = {
+                    "job_id": hashlib.sha1(
+                        f"{intake_identity}:{time.time()}".encode("utf-8")
+                    ).hexdigest(),
+                    "intake_identity": intake_identity,
+                    "project_id": pid_for_identity,
+                    "filename": canonical_filename,
+                    "size_bytes": size,
+                    "processing_class": (
+                        "very_large"
+                        if size > DEFAULT_POLICY.very_large_file_threshold_bytes
+                        else (
+                            "large"
+                            if size > DEFAULT_POLICY.large_file_threshold_bytes
+                            else "standard"
+                        )
+                    ),
+                    "stage": "persisting",
+                    "progress_current": 0,
+                    "progress_total": None,
+                    "queued_position": None,
+                    "started_at": time.time(),
+                    "updated_at": time.time(),
+                    "completed_at": None,
+                    "elapsed_time": None,
+                    "warning": None,
+                    "failure_reason": None,
+                    "retryable": True,
+                    "worker_pid": None,
+                }
+                try:
+                    job_file.write_text(json.dumps(job_state), encoding="utf-8")
+                except Exception:
+                    pass
+            destination = final_dest
 
             if target_group == "drawings":
                 drawing_count += 1
@@ -361,6 +504,264 @@ class DocumentIntakeService:
             import_summary=dict(snapshot.import_summary),
             warnings=list(snapshot.warnings),
         )
+
+    def build_session_package_from_file_paths(
+        self,
+        uploaded_file_paths: list[tuple[str, Path]],
+        uploads_root: str | Path = "outputs/uploads",
+        session_id: str | None = None,
+        project_id: str | None = None,
+        run_extraction: bool = True,
+    ) -> UploadSessionResult:
+        """Process a list of file-backed uploads (name, path) without loading bytes into memory.
+
+        Returns UploadSessionResult and writes per-stage JSONL measurements under
+        uploads_root/<session_id>/.artifacts/measurements.jsonl
+        """
+        if not uploaded_file_paths:
+            raise ValueError("No files were provided")
+
+        normalized_files: list[tuple[str, Path, int, str]] = []
+        for name, path in uploaded_file_paths:
+            if not path.exists() or not path.is_file():
+                raise FileNotFoundError(f"Upload file not found: {path}")
+            size = int(path.stat().st_size)
+            checksum = incremental_sha1_from_file(path)
+            normalized_files.append((name, path, size, checksum))
+
+        active_session_id = session_id or f"session-{uuid.uuid4().hex[:12]}"
+        session_root = Path(uploads_root) / active_session_id
+        self._ensure_package_folders(session_root)
+        measurements: list[dict] = []
+
+        jobs_dir = session_root / ".jobs"
+        jobs_dir.mkdir(parents=True, exist_ok=True)
+
+        for upload_name, upload_path, size, checksum in normalized_files:
+            target_group = self._classify_upload_path(upload_name)
+            canonical_filename = Path(upload_name).name
+            pid_for_identity = project_id or str(session_root)
+            intake_identity = hashlib.sha1(
+                f"{pid_for_identity}:{canonical_filename}:{checksum}".encode("utf-8")
+            ).hexdigest()
+            job_file = jobs_dir / f"{intake_identity}.json"
+
+            if job_file.exists():
+                try:
+                    existing = json.loads(job_file.read_text(encoding="utf-8"))
+                    if existing.get("stage") not in {
+                        "completed",
+                        "failed",
+                        "cancelled",
+                    }:
+                        # record a measurement to indicate duplicate submission
+                        measurements.append(
+                            {
+                                "stage": "deduplication",
+                                "intake_identity": intake_identity,
+                                "note": "duplicate_submission",
+                            }
+                        )
+                        continue
+                except Exception:
+                    pass
+
+            # Persist using _write_classified_file which supports Path uploads
+            with instrument_stage(
+                "persisting", extra={"file": upload_name, "size": size}
+            ) as m:
+                final_dest = self._write_classified_file(
+                    session_root, target_group, upload_name, upload_path
+                )
+                m.extra = {**(m.extra or {}), "destination": str(final_dest)}
+            measurements.append(m.to_dict())
+
+            # create job record
+            job_state: IntakeJobState = {
+                "job_id": hashlib.sha1(
+                    f"{intake_identity}:{time.time()}".encode("utf-8")
+                ).hexdigest(),
+                "intake_identity": intake_identity,
+                "project_id": pid_for_identity,
+                "filename": canonical_filename,
+                "size_bytes": size,
+                "processing_class": (
+                    "very_large"
+                    if size > DEFAULT_POLICY.very_large_file_threshold_bytes
+                    else (
+                        "large"
+                        if size > DEFAULT_POLICY.large_file_threshold_bytes
+                        else "standard"
+                    )
+                ),
+                "stage": "queued",
+                "progress_current": 0,
+                "progress_total": None,
+                "queued_position": None,
+                "started_at": None,
+                "updated_at": time.time(),
+                "completed_at": None,
+                "elapsed_time": None,
+                "warning": None,
+                "failure_reason": None,
+                "retryable": True,
+                "worker_pid": None,
+                "destination": str(final_dest),
+            }
+            try:
+                job_file.write_text(json.dumps(job_state), encoding="utf-8")
+            except Exception:
+                pass
+
+            # Extraction: optionally run worker now or leave queued for background
+            if run_extraction:
+                with instrument_stage(
+                    "extracting", extra={"file": str(final_dest)}
+                ) as m2:
+                    pages, warnings = self._extract_pdf_pages(final_dest, target_group)
+                    m2.extra = {**(m2.extra or {}), "page_count": len(pages)}
+                measurements.append(m2.to_dict())
+            else:
+                # record queued measurement
+                measurements.append(
+                    {
+                        "stage": "queued",
+                        "extra": {
+                            "file": str(final_dest),
+                            "destination": str(final_dest),
+                        },
+                    }
+                )
+
+        # write measurements
+        artifacts_dir = session_root / ".artifacts"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        meas_file = artifacts_dir / "measurements.jsonl"
+        with meas_file.open("w", encoding="utf-8") as fh:
+            for m in measurements:
+                fh.write(json.dumps(m) + "\n")
+
+        snapshot = self.build_snapshot(session_root)
+        snapshot.import_summary = {
+            **snapshot.import_summary,
+            "package_location": str(session_root),
+            "session_id": active_session_id,
+        }
+        snapshot.warnings = sorted(set([*snapshot.warnings]))
+        snapshot_path = self.write_snapshot(snapshot, session_root)
+        return UploadSessionResult(
+            session_id=active_session_id,
+            package_path=session_root,
+            snapshot_path=snapshot_path,
+            snapshot=snapshot,
+            import_summary=dict(snapshot.import_summary),
+            warnings=list(snapshot.warnings),
+        )
+
+    def build_session_package_from_file_refs(
+        self,
+        uploaded_file_refs: list[FileUploadReference],
+        uploads_root: str | Path = "outputs/uploads",
+        session_id: str | None = None,
+        project_id: str | None = None,
+        run_extraction: bool = False,
+    ) -> UploadSessionResult:
+        """Process a list of FileUploadReference without loading bytes into memory.
+
+        This reuses `build_session_package_from_file_paths` by converting
+        references into (name, path) tuples and ensures temp files are
+        cleaned up after persistence.
+        """
+        try:
+            paths = [
+                (ref.original_filename, ref.temporary_path)
+                for ref in uploaded_file_refs
+            ]
+            return self.build_session_package_from_file_paths(
+                paths,
+                uploads_root=uploads_root,
+                session_id=session_id,
+                project_id=project_id,
+                run_extraction=run_extraction,
+            )
+        finally:
+            # cleanup any remaining temporary files that were not moved
+            for ref in uploaded_file_refs:
+                try:
+                    if ref.temporary_path.exists():
+                        ref.temporary_path.unlink()
+                except Exception:
+                    pass
+
+    def spawn_extraction_worker_for_job(self, job_file_path: str | Path) -> int:
+        """Spawn a background process to run extraction for the job defined by job_file_path.
+
+        Returns the PID of the spawned process, or -1 on failure.
+        """
+        job_file = Path(job_file_path)
+        if not job_file.exists():
+            return -1
+
+        try:
+            data = json.loads(job_file.read_text(encoding="utf-8"))
+        except Exception:
+            return -1
+
+        dest = data.get("destination")
+        if not dest:
+            return -1
+
+        # spawn a process that runs extraction_worker.worker_main and then updates job file
+        def _entry(job_path: str):
+            try:
+                from atlas_core.services.extraction_worker import worker_main
+                import tempfile
+                import json
+                import os
+
+                with open(job_path, "r", encoding="utf-8") as fh:
+                    js = json.load(fh)
+                dest_path = js.get("destination")
+                out_json = tempfile.NamedTemporaryFile(delete=False)
+                out_json_path = out_json.name
+                out_json.close()
+                # run extraction in this child process
+                try:
+                    worker_main(dest_path, out_json_path)
+                    payload = json.loads(open(out_json_path, encoding="utf-8").read())
+                except Exception as exc:
+                    payload = {"status": "error", "error": str(exc), "pages": []}
+                finally:
+                    try:
+                        os.unlink(out_json_path)
+                    except Exception:
+                        pass
+
+                # update job file with results
+                try:
+                    js["stage"] = (
+                        "classifying" if payload.get("status") == "ok" else "failed"
+                    )
+                    js["updated_at"] = time.time()
+                    js["completed_at"] = time.time()
+                    js["elapsed_time"] = (payload.get("metrics") or {}).get(
+                        "elapsed_seconds"
+                    )
+                    js["worker_pid"] = os.getpid()
+                    js["failure_reason"] = payload.get("error")
+                    with open(job_path, "w", encoding="utf-8") as fh:
+                        json.dump(js, fh)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        from multiprocessing import Process
+        from atlas_core.services.extraction_worker import run_job_from_jobfile
+
+        p = Process(target=run_job_from_jobfile, args=(str(job_file_path),))
+        p.start()
+        return p.pid
 
     def inspect_uploaded_files(
         self,
@@ -752,11 +1153,110 @@ class DocumentIntakeService:
         group_name: str,
     ) -> tuple[list[dict[str, Any]], list[str]]:
         warnings: list[str] = []
-        try:
-            pages = self.pdf_text_extraction_service.extract_pages(pdf_path)
-        except Exception as exc:
-            warnings.append(f"{pdf_path.name}: PDF extraction failed ({exc}).")
-            return [], warnings
+        # Run extraction in a short-lived worker process to bound memory usage.
+        out_json = tempfile.NamedTemporaryFile(delete=False)
+        out_json_path = Path(out_json.name)
+        out_json.close()
+
+        # If a custom PdfTextExtractionService was injected, run it in-process
+        default_reader_type = PdfTextExtractionService
+        if type(self.pdf_text_extraction_service) is not default_reader_type:
+            try:
+                with instrument_stage("extracting", extra={"file": str(pdf_path)}):
+                    pages = self.pdf_text_extraction_service.extract_pages(pdf_path)
+            except Exception as exc:
+                warnings.append(f"{pdf_path.name}: PDF extraction failed ({exc}).")
+                return [], warnings
+        else:
+            from atlas_core.services.extraction_worker import worker_main
+
+            proc = Process(target=worker_main, args=(str(pdf_path), str(out_json_path)))
+            proc.start()
+            worker_pid = proc.pid
+
+            start_ts = time.time()
+            peak_rss = None
+            timed_out = False
+            try:
+                timeout = DEFAULT_POLICY.processing_timeout_seconds
+                poll_interval = 0.5
+                elapsed = 0.0
+                while proc.is_alive():
+                    proc.join(timeout=poll_interval)
+                    elapsed = time.time() - start_ts
+                    # monitor worker RSS
+                    try:
+                        wp = psutil.Process(worker_pid) if psutil else None
+                        if wp:
+                            rss = wp.memory_info().rss
+                            if peak_rss is None or rss > peak_rss:
+                                peak_rss = rss
+                            if rss > DEFAULT_POLICY.memory_stop_threshold_bytes:
+                                # force termination
+                                wp.terminate()
+                                timed_out = True
+                                break
+                    except Exception:
+                        pass
+                    if elapsed > timeout:
+                        # timeout
+                        proc.terminate()
+                        timed_out = True
+                        break
+
+                # ensure joined
+                proc.join(timeout=1)
+            finally:
+                pass
+
+            if timed_out:
+                warnings.append(
+                    f"{pdf_path.name}: PDF extraction timed out or exceeded memory policy."
+                )
+                try:
+                    if out_json_path.exists():
+                        out_json_path.unlink()
+                except Exception:
+                    pass
+                # Job state update is handled by the spawned worker process; nothing to do here.
+                return [], warnings
+
+            # read worker output
+            try:
+                payload = json.loads(out_json_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                warnings.append(
+                    f"{pdf_path.name}: failed to read extraction output ({exc})."
+                )
+                # Job state update is handled by the spawned worker process; nothing to do here.
+                return [], warnings
+            finally:
+                try:
+                    out_json_path.unlink()
+                except Exception:
+                    pass
+
+            if payload.get("status") != "ok":
+                warnings.append(
+                    f"{pdf_path.name}: PDF extraction failed ({payload.get('error')})."
+                )
+                # update job state to failed
+                # Job state update is handled by the spawned worker process; nothing to do here.
+                return [], warnings
+
+            # if extraction succeeded, update job state
+            # Job state update is handled by the spawned worker process; nothing to do here.
+
+            from atlas_core.services.pdf_text_extraction_service import ExtractedPdfPage
+
+            pages = []
+            for p in payload.get("pages", []):
+                page_obj = ExtractedPdfPage(
+                    page_number=int(p.get("page_number") or 0),
+                    text=str(p.get("text") or ""),
+                    source_file=str(p.get("source_file") or pdf_path.name),
+                )
+                pages.append(page_obj)
         page_records: list[dict[str, Any]] = []
         missing_text_pages = [page.page_number for page in pages if not page.has_text]
         if pages and not any(page.has_text for page in pages):
@@ -1251,7 +1751,7 @@ class DocumentIntakeService:
         package_root: Path,
         target_group: str,
         upload_name: str,
-        upload_data: bytes,
+        upload_data: bytes | Path,
     ) -> Path:
         normalized_name = upload_name.replace("\\", "/")
         relative_parts = [part for part in normalized_name.split("/") if part]
@@ -1271,9 +1771,47 @@ class DocumentIntakeService:
             destination = destination / part
         destination.mkdir(parents=True, exist_ok=True)
         destination = destination / safe_parts[-1]
-        if destination.exists() and _file_sha1(destination) == _bytes_sha1(upload_data):
-            return destination
-        destination.write_bytes(upload_data)
+        # Compare existing file incrementally to avoid large peak allocations
+        if isinstance(upload_data, Path):
+            incoming_hash = incremental_sha1_from_file(upload_data)
+            if destination.exists():
+                try:
+                    existing_hash = incremental_sha1_from_file(destination)
+                    if existing_hash == incoming_hash:
+                        try:
+                            upload_data.unlink()
+                        except Exception:
+                            pass
+                        return destination
+                except Exception:
+                    pass
+            # Instrument and move into place
+            with instrument_stage(
+                "persisting",
+                extra={"file": str(destination), "size": upload_data.stat().st_size},
+            ):
+                try:
+                    upload_data.replace(destination)
+                except Exception:
+                    destination.write_bytes(upload_data.read_bytes())
+                    try:
+                        upload_data.unlink()
+                    except Exception:
+                        pass
+        else:
+            incoming_hash = _bytes_sha1(upload_data)
+            if destination.exists():
+                try:
+                    existing_hash = incremental_sha1_from_file(destination)
+                    if existing_hash == incoming_hash:
+                        return destination
+                except Exception:
+                    pass
+            with instrument_stage(
+                "persisting", extra={"file": str(destination), "size": len(upload_data)}
+            ) as m:
+                destination.write_bytes(upload_data)
+                m.extra["written"] = True
         cleanup_duplicate_document_variants(destination.parent)
         return destination
 

@@ -253,8 +253,8 @@ def atlas_stylesheet() -> str:
         .atlas-card {{
             border: 1px solid var(--atlas-border);
             border-radius: var(--atlas-radius-md);
-            padding: var(--atlas-space-sm) 0.6rem;
-            margin-bottom: 0.4rem;
+            padding: 0.4rem 0.55rem;
+            margin-bottom: 0.3rem;
             background: var(--atlas-surface);
             box-shadow: var(--atlas-elevation-subtle);
         }}
@@ -281,8 +281,8 @@ def atlas_stylesheet() -> str:
             border: 1px solid var(--atlas-border);
             border-radius: var(--atlas-radius-lg);
             background: var(--atlas-surface);
-            padding: var(--atlas-space-md);
-            margin: 0.35rem 0 0.65rem 0;
+            padding: 0.75rem;
+            margin: 0.25rem 0 0.5rem 0;
             box-shadow: var(--atlas-elevation-subtle);
         }}
         [data-testid="stAppViewContainer"],
@@ -305,8 +305,8 @@ def atlas_stylesheet() -> str:
         }}
         .atlas-statusbar {{
             border-top: 1px solid var(--atlas-border);
-            margin-top: 1rem;
-            padding-top: 0.45rem;
+            margin-top: 0.75rem;
+            padding-top: 0.35rem;
         }}
         .atlas-chip {{
             border-radius: var(--atlas-radius-pill);
@@ -353,8 +353,8 @@ def atlas_stylesheet() -> str:
             border-radius: var(--atlas-radius-md);
             border: 1px solid var(--atlas-border);
             background: #f7faf9;
-            padding: 0.55rem 0.75rem;
-            margin: 0.35rem 0 0.65rem 0;
+            padding: 0.45rem 0.7rem;
+            margin: 0.25rem 0 0.45rem 0;
             color: #0f172a;
             font-size: var(--atlas-body-size);
             line-height: var(--atlas-line-height-relaxed);
@@ -457,8 +457,21 @@ def atlas_stylesheet() -> str:
             border: 1px solid var(--atlas-border);
             background: var(--atlas-surface);
             border-radius: var(--atlas-radius-lg);
-            padding: 0.7rem 0.85rem;
-            margin: 0.35rem 0 0.55rem 0;
+            padding: 0.65rem 0.8rem;
+            margin: 0.25rem 0 0.45rem 0;
+            display: grid;
+            gap: 0.45rem;
+        }}
+        .atlas-project-header-top {{
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }}
+        .atlas-project-title-block {{
+            min-width: 0;
+            flex: 1 1 18rem;
         }}
         .atlas-project-name {{
             font-family: var(--atlas-font-display);
@@ -474,10 +487,40 @@ def atlas_stylesheet() -> str:
             font-size: var(--atlas-body-size);
             margin-bottom: 0.3rem;
         }}
+        .atlas-project-pill-row {{
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }}
+        .atlas-project-summary-grid {{
+            display: grid;
+            gap: 0.35rem;
+            grid-template-columns: repeat(auto-fit, minmax(8.25rem, 1fr));
+        }}
+        .atlas-project-summary-item {{
+            border: 1px solid var(--atlas-border);
+            border-radius: var(--atlas-radius-sm);
+            padding: 0.35rem 0.45rem;
+            background: #fcfcfb;
+        }}
+        .atlas-project-summary-label {{
+            color: #64748b;
+            font-size: var(--atlas-label-size);
+            letter-spacing: var(--atlas-letter-spacing-label);
+            text-transform: uppercase;
+        }}
+        .atlas-project-summary-value {{
+            color: #0f172a;
+            font-size: var(--atlas-body-size);
+            font-weight: 600;
+            line-height: var(--atlas-line-height-tight);
+            margin-top: 0.05rem;
+        }}
         .atlas-project-meta {{
             color: #475569;
             font-size: var(--atlas-caption-size);
-            margin-top: 0.25rem;
+            margin-top: 0.1rem;
         }}
         .atlas-workspace-context {{
             border: 1px solid var(--atlas-border);

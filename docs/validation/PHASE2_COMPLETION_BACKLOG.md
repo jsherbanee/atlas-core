@@ -1,16 +1,34 @@
 # Phase 2 Completion Backlog
 
-| Finding | Category | Severity | Affected Screen or Workflow | Evidence | Expected Behavior | Current Behavior | Recommended Correction | Estimated Effort | Dependency | Phase 2 Blocker |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Major workspace routes render blank or skeleton-only | Incomplete committed feature | P0 | Transactions, Knowledge, Reports, Settings | [transactions-1366.png](screenshots/phase2/transactions-1366.png), [knowledge-1366.png](screenshots/phase2/knowledge-1366.png), [reports-1366.png](screenshots/phase2/reports-1366.png), [settings-1366.png](screenshots/phase2/settings-1366.png) | Each primary route should render a usable workspace or a deliberate, informative empty state | The rendered surfaces are blank or only show loading skeletons | Implement the actual route content or a clear, actionable empty-state workflow | Large | Route wiring and workspace implementation | Yes |
-| Project review / estimate routes render blank or skeleton-only | Incomplete committed feature | P0 | BOM Review, Scope & Risk, Engineering Review, Estimate | [maw-bom-review-1366.png](screenshots/phase2/maw-bom-review-1366.png), [maw-scope-risk-1366.png](screenshots/phase2/maw-scope-risk-1366.png), [maw-engineering-review-1366.png](screenshots/phase2/maw-engineering-review-1366.png), [maw-estimate-1366.png](screenshots/phase2/maw-estimate-1366.png) | The MAW project should expose the major review and estimate journeys | The captured routes do not render as usable content | Finish the route implementations and ensure they load deterministically from the project shell | Large | Project workspace routing and page content | Yes |
-| The bid-review journey is not visibly completed in the UI | Workflow gap | P0 | Bid review V1/V2, estimate review, acceptance/rejection | [maw-overview-1366.png](screenshots/phase2/maw-overview-1366.png) | The UI should expose a versioned bid-review flow with clear transitions | The screen surface stops at a generic project operations context | Add a visible bid-review path and connect it to review/decision surfaces | Large | Bid-review workflow implementation | Yes |
-| The project library is contaminated by a stray `documents` project | Technical debt | P1 | Mission Control, Projects | [mission-control-1366.png](screenshots/phase2/mission-control-1366.png), [projects-1366.png](screenshots/phase2/projects-1366.png) | Only the MAW project set should appear in the validation baseline | A generic `documents` project appears in Continue Working, Recent Activity, and the project table | Remove or quarantine the stray project fixture / persisted state | Medium | Project repository cleanup | Yes |
-| Selected-project state defaults to `documents` instead of MAW | Usability defect | P1 | Projects | [projects-1366.png](screenshots/phase2/projects-1366.png) | The selected project should match the MAW validation project | The inspector opens on `documents` | Reset or scope the selected-project persistence to the active MAW project | Medium | Workspace state handling | Yes |
-| The Projects table clips columns at narrow widths | UI polish | P1 | Projects | [projects-820.png](screenshots/phase2/projects-820.png) | Important columns should remain readable or collapse progressively | Right-side columns become cramped at 820px | Hide low-value columns first and preserve the most useful columns | Medium | Table responsiveness | No |
-| The MAW overview repeats its action cluster | UI polish | P2 | Project Overview | [maw-overview-1366.png](screenshots/phase2/maw-overview-1366.png) | Primary actions should appear once, in the most useful location | The same actions appear in the project header and again in the next-step block | Consolidate the repeated CTAs into one clear action strip | Small | Layout cleanup | No |
-| Mission Control leaves excessive whitespace below the fold | UI polish | P2 | Mission Control | [mission-control-1366.png](screenshots/phase2/mission-control-1366.png) | The landing page should feel dense and purposeful | Large sections of the page are visually empty | Tighten spacing and surface more actionable content | Small | Information density review | No |
-| Project Overview uses a lot of space for empty inspectors | UI polish | P2 | Project Overview | [maw-overview-1366.png](screenshots/phase2/maw-overview-1366.png) | Inspectors should earn their space with useful content | Object Navigation and Working Set are empty but still occupy prominent room | Collapse or defer empty inspectors until there is content | Small | Progressive disclosure | No |
-| Documents and Processing feel like status pages more than work queues | UI polish | P2 | Documents, Processing | [maw-documents-1366.png](screenshots/phase2/maw-documents-1366.png), [maw-processing-1366.png](screenshots/phase2/maw-processing-1366.png) | Users should be able to act on files and jobs from the page | The page surfaces summaries, but the work queue is thin | Promote the actionable rows and reduce summary-only space | Medium | Queue density and row design | No |
-| Route labels and copy are visually concatenated or redundant | UI polish | P2 | Project Overview, navigation labels | [maw-overview-1366.png](screenshots/phase2/maw-overview-1366.png) | Labels should read cleanly and support fast orientation | `Bid IntakeIntakeNormal` and `Move This Project ForwardReview BOM` read as concatenated text | Add spacing / tokenization fixes where label assembly is leaking into the UI | Small | Copy/layout cleanup | No |
+This backlog has been reconciled against the current rendered product on 2026-07-27.
+Only unfinished committed Phase 2 work remains below.
 
+## Reconciled Status Summary
+
+Resolved and removed from the backlog:
+
+- blank or skeleton-only primary routes
+- stray `documents` project contamination
+- selected-project defaulting to the wrong project
+- visually concatenated route labels and repeated action clusters
+- the major whitespace and density complaints called out in the P1 validation passes
+
+Still open:
+
+- estimate decision actions are not yet exposed as a complete end-state workflow in the live UI
+- major tables and work queues still need stronger drill-down, selection persistence, and evidence/history access
+- some narrow-width table surfaces remain more compressed than ideal
+
+## Remaining Committed Work
+
+| ID | Title | Category | Severity | Affected Route or Workflow | Original Source | Current Evidence | Expected Behavior | Current Behavior | Recommended Correction | Estimated Effort | Dependency | Phase 2 Blocker |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| PH2-P1-001 | Expose the complete estimate decision workflow in the rendered UI | Workflow gap | P1 | Estimate, Transactions, bid-review journey | `PHASE2_P1_BID_ESTIMATE_JOURNEY.md`, `PHASE2_USER_JOURNEY_GAPS.md` | `docs/validation/screenshots/phase2/closeout/1366/estimate.png` shows the bid-review state stack and `Decision Not Started`, but no direct accept / decline end-state controls are visible | Users should be able to complete the estimate decision path from the rendered workspace | The journey is visible, but the decision step is still a state card rather than a completed, directly actionable workflow | Add the missing decision controls or a clearly exposed end-state interaction that closes the review loop | Medium | Estimate state wiring and transaction handoff | Yes |
+| PH2-P2-001 | Add stronger row-level drill-down and selection persistence for major tables | Interaction gap | P2 | Projects, Transactions, Knowledge, Reports | `PHASE2_P1_TABLE_INTERACTIONS.md`, `PHASE2_P1_INFORMATION_DENSITY.md` | `docs/validation/screenshots/phase2/closeout/1366/projects.png`, `transactions.png`, `knowledge.png`, and `reports.png` show visible tables, but most interactions still happen through surrounding buttons and expanders rather than row-first exploration | Important rows should support fast inspection, stable selection, and visible evidence / history access | The tables are usable, but they are still closer to navigation lists than true interactive work surfaces | Add row click targets, preserved expansion state, and more direct evidence / history affordances where committed | Medium | Shared table interaction primitives | No |
+| PH2-P2-002 | Improve narrow-width column prioritization on project and work tables | UI polish | P2 | Projects and related list views at 820px | `PHASE2_P1_INFORMATION_DENSITY.md`, `PHASE2_P1_DENSITY_PLAYWRIGHT.md` | `docs/validation/screenshots/phase2/closeout/820/projects.png` shows the layout is stable, but several table columns are still compressed and less readable than the primary fields | Lower-value columns should collapse or de-prioritize before important fields lose readability | The view no longer breaks, but the column hierarchy could still be smarter at tablet width | Hide or de-emphasize low-value columns first and preserve the most useful project fields | Small | Responsive table layout | No |
+
+## Notes
+
+- The previous P0 findings are no longer present in the rendered product and should not be carried forward.
+- The completed Phase 2 shell now covers the project journey surfaces, but the remaining work is interaction depth rather than route existence.
+- Later-phase work such as procurement, sales-order conversion, and new intelligence features remains out of scope for this backlog.

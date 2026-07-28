@@ -11,3 +11,27 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# Runtime validation artifacts
+.runtime/
+
+# Ignore generated validation artifacts that should live in .runtime
+docs/validation/artifacts/large-upload/*.pdf
+docs/validation/artifacts/large-upload/*/.jobs/
+docs/validation/artifacts/large-upload/*/.artifacts/
+
+# Editor backups
+*.swp
+*~.venv/
+__pycache__/
+.pytest_cache/
+.coverage
+.mypy_cache/
+.ruff_cache/
+*.pyc
+.DS_Store
+.vscode/
+.idea/
+dist/
+build/
+*.egg-info/

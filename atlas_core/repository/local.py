@@ -729,6 +729,7 @@ class LocalDocumentRepository(DocumentRepository):
             uploaded_files=uploads,
             uploads_root=intake_root,
             session_id="latest",
+            project_id=project_id,
         )
 
         documents_root = project_dir / "documents"

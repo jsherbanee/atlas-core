@@ -356,6 +356,88 @@ class _FakeWorkspaceService:
         return record
 
 
+class _MissionControlTransactionsService:
+    def __init__(
+        self,
+        metrics: Any,
+        documents: list[Any] | None = None,
+    ) -> None:
+        self._metrics = metrics
+        self._documents = list(documents or [])
+
+    def overview_metrics(self) -> Any:
+        return self._metrics
+
+    def list_documents(self, include_archived: bool = False) -> list[Any]:
+        _ = include_archived
+        return list(self._documents)
+
+
+class _MissionControlKnowledgeService:
+    def __init__(self, summary: dict[str, Any]) -> None:
+        self._summary = dict(summary)
+
+    def dashboard_summary(self) -> dict[str, Any]:
+        return dict(self._summary)
+
+
+def _activity_document(
+    *,
+    document_id: str,
+    document_type: str,
+    updated_at: str,
+    project_id: str = "BID-2026-0002",
+    document_number: str = "DOC-1",
+    lifecycle_state: str = "issued",
+) -> Any:
+    return SimpleNamespace(
+        document_id=document_id,
+        document_type=SimpleNamespace(value=document_type),
+        document_number=document_number,
+        updated_at=updated_at,
+        created_at=updated_at,
+        project_id=project_id,
+        project_code=project_id,
+        customer_id="Client",
+        lifecycle_state=SimpleNamespace(value=lifecycle_state),
+    )
+
+
+def _zero_transactions_service() -> _MissionControlTransactionsService:
+    return _MissionControlTransactionsService(
+        app.TransactionsOverviewMetrics(
+            draft_documents=0,
+            pending_approval=0,
+            issued_documents=0,
+            open_purchase_orders=0,
+            partially_received_purchase_orders=0,
+            vendor_bills_pending_sync=0,
+            customer_invoices_pending_sync=0,
+            sync_failures=0,
+        )
+    )
+
+
+def _zero_knowledge_service() -> _MissionControlKnowledgeService:
+    return _MissionControlKnowledgeService(
+        {
+            "manufacturers": 0,
+            "vendors": 0,
+            "products": 0,
+            "vendor_offerings": 0,
+            "active_price_sheets": 0,
+            "latest_imports": [],
+            "products_missing_pricing": 0,
+            "pricing_stale": 0,
+            "recently_updated": 0,
+            "products_missing_from_latest_version": 0,
+            "coverage_percentage": 0.0,
+            "knowledge_freshness": {},
+            "commercial_confidence": 0.0,
+        }
+    )
+
+
 def _seed_knowledge_service(entity_type: str) -> CommercialProductService:
     service = CommercialProductService()
     service.create_manufacturer(
@@ -2798,39 +2880,102 @@ def test_working_set_supports_project_and_knowledge_records() -> None:
 
 def test_mission_control_rendering_uses_operations_center_sections() -> None:
     st = _HomeContractStreamlit()
-    service = _FakeWorkspaceService(
+    workspace_service = _FakeWorkspaceService(
         [
             _project_record("project-b", "Project B"),
             _project_record("project-a", "Project A"),
         ]
     )
+    transactions_service = _MissionControlTransactionsService(
+        app.TransactionsOverviewMetrics(
+            draft_documents=1,
+            pending_approval=2,
+            issued_documents=3,
+            open_purchase_orders=4,
+            partially_received_purchase_orders=1,
+            vendor_bills_pending_sync=0,
+            customer_invoices_pending_sync=0,
+            sync_failures=1,
+        ),
+        documents=[
+            _activity_document(
+                document_id="doc-1",
+                document_type="purchase_order",
+                updated_at="2026-07-27T10:00:00+00:00",
+                document_number="PO-1",
+            )
+        ],
+    )
+    knowledge_service = _MissionControlKnowledgeService(
+        {
+            "manufacturers": 2,
+            "vendors": 2,
+            "products": 10,
+            "vendor_offerings": 10,
+            "active_price_sheets": 1,
+            "latest_imports": [
+                {
+                    "version": "v1",
+                    "import_date": "2026-07-27T09:30:00+00:00",
+                    "vendor": "Vendor",
+                    "manufacturer": "Manufacturer",
+                }
+            ],
+            "products_missing_pricing": 3,
+            "pricing_stale": 2,
+            "recently_updated": 4,
+            "products_missing_from_latest_version": 1,
+            "coverage_percentage": 82.5,
+            "knowledge_freshness": {},
+            "commercial_confidence": 0.74,
+        }
+    )
 
     app._render_home_page(
         st,
-        workspace_service=service,
+        workspace_service=workspace_service,
         record=None,
         context=None,
-        mission_control_payload={},
+        mission_control_payload={
+            "signals": [],
+            "timeline": [
+                {
+                    "event": "Project Imported",
+                    "timestamp": "2026-07-27T08:00:00+00:00",
+                    "project": "Project A",
+                    "details": "Manual",
+                }
+            ],
+        },
+        transactions_service=transactions_service,
+        knowledge_service=knowledge_service,
     )
 
     assert st.subheaders == ["Tenant Operations Center"]
-    assert "### My Work" in st.markdowns
-    assert "### Recent Activity" in st.markdowns
-    assert "### Business Risks" in st.markdowns
-    assert "### Continue Working" in st.markdowns
     assert "### Company Snapshot" in st.markdowns
+    assert "### Business Risks" in st.markdowns
+    assert "### This Week" in st.markdowns
+    assert "### Open Projects" in st.markdowns
+    assert "### Open Purchase Orders" in st.markdowns
+    assert "### Recent Activity" in st.markdowns
     removed_titles = {
-        "### Application Areas",
-        "### Portfolio Signals",
-        "### Upcoming Timeline",
-        "### Projects Requiring Attention",
-        "### Workspace Recommendations",
-        "### Action Center",
-        "### Notifications",
-        "### Favorites",
-        "### Recent Projects",
+        "### My Work",
+        "### Continue Working",
+        "Create New Project",
+        "Open Existing Project",
+        "Manage Projects",
     }
     assert all(title not in st.markdowns for title in removed_titles)
+    assert all(
+        label not in _button_label_tails(st)
+        for label in {
+            "Create New Project",
+            "Open Existing Project",
+            "Manage Projects",
+            "Continue active review",
+            "Continue Working",
+        }
+    )
 
 
 def test_atlas_workspace_without_secondary_sections_still_renders_content() -> None:
@@ -2848,30 +2993,37 @@ def test_atlas_workspace_without_secondary_sections_still_renders_content() -> N
     assert st.column_specs == []
 
 
-def test_home_primary_actions_route_correctly() -> None:
-    actions = {
-        "Create New Project": "Create New Project",
-        "Open Existing Project": "Open Existing Project",
-        "Manage Projects": "Projects",
-    }
-    for button_label, expected_page in actions.items():
-        st = _HomeContractStreamlit(pressed={button_label})
-        service = _FakeWorkspaceService([])
-
-        app._render_home_page(
-            st,
-            workspace_service=service,
-            record=None,
-            context=None,
-            mission_control_payload={},
-        )
-
-        assert st.session_state["atlas_active_page"] == expected_page
-        assert st.rerun_called is True
-
-
-def test_home_primary_actions_use_compact_responsive_columns() -> None:
+def test_home_primary_actions_are_removed_from_mission_control() -> None:
     st = _HomeContractStreamlit()
+    transactions_service = _MissionControlTransactionsService(
+        app.TransactionsOverviewMetrics(
+            draft_documents=0,
+            pending_approval=0,
+            issued_documents=0,
+            open_purchase_orders=0,
+            partially_received_purchase_orders=0,
+            vendor_bills_pending_sync=0,
+            customer_invoices_pending_sync=0,
+            sync_failures=0,
+        )
+    )
+    knowledge_service = _MissionControlKnowledgeService(
+        {
+            "manufacturers": 0,
+            "vendors": 0,
+            "products": 0,
+            "vendor_offerings": 0,
+            "active_price_sheets": 0,
+            "latest_imports": [],
+            "products_missing_pricing": 0,
+            "pricing_stale": 0,
+            "recently_updated": 0,
+            "products_missing_from_latest_version": 0,
+            "coverage_percentage": 0.0,
+            "knowledge_freshness": {},
+            "commercial_confidence": 0.0,
+        }
+    )
 
     app._render_home_page(
         st,
@@ -2879,9 +3031,66 @@ def test_home_primary_actions_use_compact_responsive_columns() -> None:
         record=None,
         context=None,
         mission_control_payload={},
+        transactions_service=transactions_service,
+        knowledge_service=knowledge_service,
     )
 
-    assert st.column_specs[0] == [1.0, 1.0, 1.0]
+    assert all(
+        label not in _button_label_tails(st)
+        for label in {
+            "Create New Project",
+            "Open Existing Project",
+            "Manage Projects",
+            "Continue active review",
+            "Continue Working",
+        }
+    )
+
+
+def test_home_primary_actions_use_compact_responsive_columns() -> None:
+    st = _HomeContractStreamlit()
+    transactions_service = _MissionControlTransactionsService(
+        app.TransactionsOverviewMetrics(
+            draft_documents=0,
+            pending_approval=0,
+            issued_documents=0,
+            open_purchase_orders=0,
+            partially_received_purchase_orders=0,
+            vendor_bills_pending_sync=0,
+            customer_invoices_pending_sync=0,
+            sync_failures=0,
+        )
+    )
+    knowledge_service = _MissionControlKnowledgeService(
+        {
+            "manufacturers": 0,
+            "vendors": 0,
+            "products": 0,
+            "vendor_offerings": 0,
+            "active_price_sheets": 0,
+            "latest_imports": [],
+            "products_missing_pricing": 0,
+            "pricing_stale": 0,
+            "recently_updated": 0,
+            "products_missing_from_latest_version": 0,
+            "coverage_percentage": 0.0,
+            "knowledge_freshness": {},
+            "commercial_confidence": 0.0,
+        }
+    )
+
+    app._render_home_page(
+        st,
+        workspace_service=_FakeWorkspaceService([]),
+        record=None,
+        context=None,
+        mission_control_payload={},
+        transactions_service=transactions_service,
+        knowledge_service=knowledge_service,
+    )
+
+    assert [1.45, 1.0] in st.column_specs
+    assert [1.35, 1.0] in st.column_specs
 
 
 def test_secondary_navigation_section_persists_query_params() -> None:
@@ -2997,16 +3206,315 @@ def test_injected_styles_define_predictable_search_compression() -> None:
 
 def test_home_page_renders_operational_sections() -> None:
     st = _HomeContractStreamlit()
+    transactions_service = _MissionControlTransactionsService(
+        app.TransactionsOverviewMetrics(
+            draft_documents=1,
+            pending_approval=2,
+            issued_documents=3,
+            open_purchase_orders=4,
+            partially_received_purchase_orders=1,
+            vendor_bills_pending_sync=0,
+            customer_invoices_pending_sync=0,
+            sync_failures=1,
+        )
+    )
+    knowledge_service = _MissionControlKnowledgeService(
+        {
+            "manufacturers": 2,
+            "vendors": 2,
+            "products": 10,
+            "vendor_offerings": 10,
+            "active_price_sheets": 1,
+            "latest_imports": [],
+            "products_missing_pricing": 3,
+            "pricing_stale": 2,
+            "recently_updated": 4,
+            "products_missing_from_latest_version": 1,
+            "coverage_percentage": 82.5,
+            "knowledge_freshness": {},
+            "commercial_confidence": 0.74,
+        }
+    )
 
-    app._render_home_page(st, _FakeWorkspaceService([]), None, None, {})
+    app._render_home_page(
+        st,
+        _FakeWorkspaceService([]),
+        None,
+        None,
+        {},
+        transactions_service=transactions_service,
+        knowledge_service=knowledge_service,
+    )
 
     rendered_text = "\n".join([*st.subheaders, *st.markdowns, *st.captions])
     assert "Tenant Operations Center" in rendered_text
-    assert "My Work" in rendered_text
-    assert "Recent Activity" in rendered_text
-    assert "Business Risks" in rendered_text
-    assert "Continue Working" in rendered_text
     assert "Company Snapshot" in rendered_text
+    assert "Business Risks" in rendered_text
+    assert "This Week" in rendered_text
+    assert "Open Projects" in rendered_text
+    assert "Open Purchase Orders" in rendered_text
+    assert "Recent Activity" in rendered_text
+
+
+def test_mission_control_company_snapshot_uses_backed_metrics() -> None:
+    records = [
+        _project_record("project-a", "Project A"),
+        _project_record("project-b", "Project B"),
+    ]
+    records[1].archived = True
+    metrics = app.TransactionsOverviewMetrics(
+        draft_documents=1,
+        pending_approval=2,
+        issued_documents=3,
+        open_purchase_orders=4,
+        partially_received_purchase_orders=1,
+        vendor_bills_pending_sync=0,
+        customer_invoices_pending_sync=0,
+        sync_failures=1,
+    )
+    summary = {
+        "coverage_percentage": 82.5,
+        "commercial_confidence": 0.74,
+    }
+
+    rows = app._mission_control_company_snapshot(
+        records=records,
+        transactions_metrics=metrics,
+        knowledge_summary=summary,
+        activity=[{"Activity": "Project Imported"}],
+    )
+
+    values = {row["KPI"]: row["Value"] for row in rows}
+    assert values["Active projects"] == 1
+    assert values["Open purchase orders"] == 4
+    assert values["Pending approvals"] == 2
+    assert values["Pricing coverage"] == "82%"
+    assert values["Commercial confidence"] == "74%"
+    assert values["Recent activity items"] == 1
+
+
+def test_mission_control_business_risks_group_by_operational_category() -> None:
+    records = [
+        _project_record("project-a", "Project A"),
+        _project_record("project-b", "Project B"),
+    ]
+    records[0].updated_at = "2026-07-18T10:00:00+00:00"
+    records[1].project.status = ProjectStatus.AWARDED
+    records[1].project.internal_project_number = ""
+    risks = app._mission_control_risks(
+        active_records=records,
+        signals=[
+            {
+                "project": "Project A",
+                "status": "Blocked",
+                "reason": "Critical coordination conflict",
+            }
+        ],
+        transactions_metrics=app.TransactionsOverviewMetrics(
+            draft_documents=0,
+            pending_approval=1,
+            issued_documents=0,
+            open_purchase_orders=2,
+            partially_received_purchase_orders=1,
+            vendor_bills_pending_sync=0,
+            customer_invoices_pending_sync=0,
+            sync_failures=1,
+        ),
+        knowledge_summary={
+            "products_missing_pricing": 3,
+            "pricing_stale": 2,
+            "commercial_confidence": 0.6,
+        },
+    )
+
+    assert list(risks.keys()) == [
+        "Financial",
+        "Schedule",
+        "Resource",
+        "Scope",
+        "Data Quality",
+    ]
+    assert risks["Financial"]
+    assert risks["Schedule"]
+    assert risks["Resource"]
+    assert risks["Scope"]
+    assert risks["Data Quality"]
+
+
+def test_mission_control_this_week_placeholder_renders_clear_empty_state() -> None:
+    st = _HomeContractStreamlit()
+    app._render_mission_control_this_week(
+        st,
+        [],
+        workspace_service=_FakeWorkspaceService([]),
+    )
+
+    assert any(
+        "No dated commitments are currently surfaced" in text for text in st.captions
+    )
+    assert any(call["label"] == "Review Active Projects" for call in st.button_calls)
+
+
+def test_mission_control_open_projects_navigation_keeps_selected_project() -> None:
+    project_a = _project_record("project-a", "Project A")
+    project_b = _project_record("project-b", "Project B")
+    project_a.updated_at = "2026-07-27T10:00:00+00:00"
+    project_b.updated_at = "2026-07-20T10:00:00+00:00"
+    st = _HomeContractStreamlit(pressed={"atlas_mission_project_open_0"})
+    st.session_state["atlas_active_workspace_id"] = project_a.workspace_id
+    service = _FakeWorkspaceService([project_a, project_b])
+
+    rows = app._mission_control_open_projects_rows(
+        [project_a, project_b],
+        workspace_service=service,
+    )
+    app._mission_control_open_projects(
+        st,
+        rows,
+        workspace_service=service,
+    )
+
+    assert service.opened_records == ["project-a"]
+    assert st.session_state["atlas_active_workspace_id"] == "project-a"
+    assert st.session_state["atlas_active_page"] == "Overview"
+    assert st.rerun_called is True
+
+
+def test_mission_control_recent_activity_labels_sources_without_workspace_fallback() -> (
+    None
+):
+    activity = app._mission_control_activity(
+        timeline=[
+            {
+                "event": "Project Imported",
+                "timestamp": "2026-07-27T08:00:00+00:00",
+                "project": "Project A",
+                "details": "Manual import",
+            }
+        ],
+        records=[_project_record("project-a", "Project A")],
+        transactions_service=_MissionControlTransactionsService(
+            app.TransactionsOverviewMetrics(
+                draft_documents=0,
+                pending_approval=0,
+                issued_documents=0,
+                open_purchase_orders=0,
+                partially_received_purchase_orders=0,
+                vendor_bills_pending_sync=0,
+                customer_invoices_pending_sync=0,
+                sync_failures=0,
+            ),
+            documents=[
+                _activity_document(
+                    document_id="doc-1",
+                    document_type="purchase_order",
+                    updated_at="2026-07-27T10:00:00+00:00",
+                    document_number="PO-1",
+                )
+            ],
+        ),
+        knowledge_service=_MissionControlKnowledgeService(
+            {
+                "latest_imports": [
+                    {
+                        "version": "v1",
+                        "import_date": "2026-07-27T09:30:00+00:00",
+                        "vendor": "Vendor",
+                        "manufacturer": "Manufacturer",
+                    }
+                ]
+            }
+        ),
+    )
+
+    assert {row["Source"] for row in activity} <= {
+        "Project",
+        "Transaction",
+        "Knowledge",
+    }
+    assert "Workspace" not in {row["Source"] for row in activity}
+    assert all("T" not in row["Latest"] for row in activity)
+
+
+def test_mission_control_purchase_orders_render_future_placeholder() -> None:
+    st = _HomeContractStreamlit()
+
+    app._render_mission_control_purchase_orders(
+        st,
+        app._mission_control_open_purchase_order_rows(
+            transactions_metrics=app.TransactionsOverviewMetrics(
+                draft_documents=0,
+                pending_approval=0,
+                issued_documents=0,
+                open_purchase_orders=0,
+                partially_received_purchase_orders=0,
+                vendor_bills_pending_sync=0,
+                customer_invoices_pending_sync=0,
+                sync_failures=0,
+            ),
+        ),
+        transactions_metrics=app.TransactionsOverviewMetrics(
+            draft_documents=0,
+            pending_approval=0,
+            issued_documents=0,
+            open_purchase_orders=0,
+            partially_received_purchase_orders=0,
+            vendor_bills_pending_sync=0,
+            customer_invoices_pending_sync=0,
+            sync_failures=0,
+        ),
+    )
+
+    assert any("future placeholder" in text for text in st.captions)
+    assert any(call["label"] == "Open Transactions" for call in st.button_calls)
+
+
+def test_mission_control_page_preserves_selected_project_context() -> None:
+    selected = _project_record("project-a", "Project A")
+    other = _project_record("project-b", "Project B")
+    st = _HomeContractStreamlit()
+    st.session_state["atlas_active_workspace_id"] = selected.workspace_id
+    st.session_state["atlas_active_page"] = "Mission Control"
+
+    app._render_home_page(
+        st,
+        _FakeWorkspaceService([selected, other]),
+        None,
+        None,
+        {},
+        transactions_service=_MissionControlTransactionsService(
+            app.TransactionsOverviewMetrics(
+                draft_documents=0,
+                pending_approval=0,
+                issued_documents=0,
+                open_purchase_orders=0,
+                partially_received_purchase_orders=0,
+                vendor_bills_pending_sync=0,
+                customer_invoices_pending_sync=0,
+                sync_failures=0,
+            )
+        ),
+        knowledge_service=_MissionControlKnowledgeService(
+            {
+                "manufacturers": 0,
+                "vendors": 0,
+                "products": 0,
+                "vendor_offerings": 0,
+                "active_price_sheets": 0,
+                "latest_imports": [],
+                "products_missing_pricing": 0,
+                "pricing_stale": 0,
+                "recently_updated": 0,
+                "products_missing_from_latest_version": 0,
+                "coverage_percentage": 0.0,
+                "knowledge_freshness": {},
+                "commercial_confidence": 0.0,
+            }
+        ),
+    )
+
+    assert st.session_state["atlas_active_workspace_id"] == "project-a"
+    assert st.session_state["atlas_active_page"] == "Mission Control"
 
 
 def test_projects_library_page_uses_shared_workspace_sections() -> None:
@@ -3125,57 +3633,38 @@ def test_footer_renders_tenant_copyright_without_diagnostics() -> None:
 
 def test_mission_control_my_work_renders_only_actionable_deduplicated_items() -> None:
     st = _HomeContractStreamlit()
-    service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
-
-    app._render_mission_control_panels(
+    app._render_home_page(
         st,
-        service,
-        {
-            "actions": [
-                {
-                    "priority": "High",
-                    "title": "Resolve missing docs",
-                    "project": "P1",
-                    "destination": "Documents",
-                },
-                {
-                    "priority": "High",
-                    "title": "Resolve missing docs",
-                    "project": "P1",
-                    "destination": "Documents",
-                },
-                {
-                    "priority": "Medium",
-                    "title": "Optional review",
-                    "project": "P1",
-                    "destination": "Overview",
-                },
-            ],
-            "timeline": [],
-        },
+        _FakeWorkspaceService([_project_record("project-a", "Project A")]),
+        None,
+        None,
+        {},
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
     )
 
-    assert "### My Work" in st.markdowns
-    rendered_cards = [
-        item
-        for item in st.markdowns
-        if item.startswith("**") and "Project A" not in item
-    ]
-    assert rendered_cards == ["**Resolve missing docs**", "**Optional review**"]
-    assert any("Project: P1" in item for item in st.captions)
+    assert "### My Work" not in st.markdowns
+    assert "### Continue Working" not in st.markdowns
+    assert "### Open Projects" in st.markdowns
+    assert "### Recent Activity" in st.markdowns
 
 
 def test_continue_working_renders_project_cards_and_resume_actions() -> None:
     record = _project_record("project-a", "Project A")
-    record.project.internal_project_number = "INT-42"
     record.last_opened_at = "2024-01-02T12:00:00+00:00"
-    st = _HomeContractStreamlit(pressed={"Resume Project"})
+    st = _HomeContractStreamlit(pressed={"atlas_mission_project_open_0"})
     service = _FakeWorkspaceService([record])
 
-    app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
+    app._render_mission_control_panels(
+        st,
+        service,
+        {"actions": [], "timeline": []},
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
+    )
 
     assert any("Project A" in item for item in st.markdowns)
-    assert any("INT-42" in item for item in st.captions)
+    assert service.opened_records == ["project-a"]
     assert st.rerun_called is True
 
 
@@ -3188,18 +3677,30 @@ def test_continue_working_section_limits_to_five_items() -> None:
     st = _HomeContractStreamlit()
     service = _FakeWorkspaceService(records)
 
-    app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
+    app._render_mission_control_panels(
+        st,
+        service,
+        {"actions": [], "timeline": []},
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
+    )
 
-    card_markdowns = [item for item in st.markdowns if item.startswith("**Project")]
-    assert len(card_markdowns) == 5
+    project_rows = [item for item in st.markdowns if item.startswith("**Project ")]
+    assert len(project_rows) == 6
 
 
 def test_continue_working_resume_action_updates_recency() -> None:
     record = _project_record("project-a", "Project A")
-    st = _HomeContractStreamlit(pressed={"Resume Project"})
+    st = _HomeContractStreamlit(pressed={"atlas_mission_project_open_0"})
     service = _FakeWorkspaceService([record])
 
-    app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
+    app._render_mission_control_panels(
+        st,
+        service,
+        {"actions": [], "timeline": []},
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
+    )
 
     assert service.opened_records == ["project-a"]
     assert service.saved_records == []
@@ -3210,19 +3711,41 @@ def test_recent_projects_empty_state_message_is_concise() -> None:
     st = _HomeContractStreamlit()
     service = _FakeWorkspaceService([])
 
-    app._render_mission_control_panels(st, service, {"actions": [], "timeline": []})
+    app._render_mission_control_panels(
+        st,
+        service,
+        {"actions": [], "timeline": []},
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
+    )
 
-    assert "No recent projects." in st.captions
+    assert any(
+        "No active projects are currently available." in text for text in st.captions
+    )
 
 
 def test_mission_control_empty_tenant_has_no_placeholder_cards() -> None:
     st = _HomeContractStreamlit()
 
-    app._render_home_page(st, _FakeWorkspaceService([]), None, None, {})
+    app._render_home_page(
+        st,
+        _FakeWorkspaceService([]),
+        None,
+        None,
+        {},
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
+    )
 
-    assert not [item for item in st.markdowns if item.startswith("**")]
-    assert "No actionable work items." in st.captions
-    assert "No significant operational risks detected." in st.captions
+    assert "### My Work" not in st.markdowns
+    assert "### Open Projects" in st.markdowns
+    assert "### Business Risks" in st.markdowns
+    assert any(
+        "No active projects are currently available." in text for text in st.captions
+    )
+    assert any(
+        "No dated commitments are currently surfaced." in text for text in st.captions
+    )
 
 
 def test_mission_control_populated_tenant_renders_all_operational_sections() -> None:
@@ -3236,14 +3759,6 @@ def test_mission_control_populated_tenant_renders_all_operational_sections() -> 
         None,
         None,
         {
-            "actions": [
-                {
-                    "priority": "High",
-                    "title": "Refresh stale pricing",
-                    "project": "Project A",
-                    "destination": "Estimate",
-                }
-            ],
             "timeline": [
                 {
                     "event": "Estimate revised",
@@ -3260,80 +3775,75 @@ def test_mission_control_populated_tenant_renders_all_operational_sections() -> 
                 }
             ],
         },
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
     )
 
     rendered_text = "\n".join([*st.markdowns, *st.captions])
-    assert "Refresh stale pricing" in rendered_text
+    assert st.subheaders == ["Tenant Operations Center"]
+    assert "Company Snapshot" in rendered_text
+    assert "Business Risks" in rendered_text
+    assert "Open Projects" in rendered_text
     assert "Project A" in rendered_text
     assert any(
         row.get("Activity") == "Estimate revised"
         for table in st.dataframes
         for row in table
     )
-    assert any(
-        row.get("Risk") == "Pricing requires refresh"
-        for table in st.dataframes
-        for row in table
-    )
+    assert "Commercial knowledge coverage needs cleanup" in rendered_text
 
 
 def test_mission_control_responsive_layout_uses_main_and_snapshot_columns() -> None:
     st = _HomeContractStreamlit()
 
-    app._render_home_page(st, _FakeWorkspaceService([]), None, None, {})
+    app._render_home_page(
+        st,
+        _FakeWorkspaceService([]),
+        None,
+        None,
+        {},
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
+    )
 
-    assert [1.0, 1.0, 1.0] in st.column_specs
-    assert [2.15, 1.0] in st.column_specs
+    assert [1.45, 1.0] in st.column_specs
+    assert [1.35, 1.0] in st.column_specs
 
 
 def test_mission_control_card_ordering_prioritizes_critical_work() -> None:
-    st = _HomeContractStreamlit()
-    service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
-
-    app._render_mission_control_panels(
-        st,
-        service,
-        {
-            "actions": [
-                {
-                    "priority": "Medium",
-                    "title": "Review project setup",
-                    "project": "Project A",
-                    "destination": "Projects",
-                },
-                {
-                    "priority": "Critical",
-                    "title": "Resolve blocked estimate",
-                    "project": "Project A",
-                    "destination": "Estimate",
-                },
-            ],
-            "timeline": [],
+    risks = app._mission_control_risks(
+        active_records=[_project_record("project-a", "Project A")],
+        signals=[
+            {
+                "status": "Blocked",
+                "project": "Project A",
+                "reason": "Critical coordination conflict",
+            }
+        ],
+        transactions_metrics=_zero_transactions_service().overview_metrics(),
+        knowledge_summary={
+            "products_missing_pricing": 0,
+            "pricing_stale": 0,
+            "commercial_confidence": 1.0,
         },
     )
 
-    cards = [item for item in st.markdowns if item.startswith("**")]
-    assert cards[:2] == ["**Resolve blocked estimate**", "**Review project setup**"]
+    assert risks["Scope"][0]["Severity"] == "High"
 
 
 def test_mission_control_my_work_action_opens_project_destination() -> None:
     record = _project_record("project-a", "Project A")
-    st = _HomeContractStreamlit(pressed={"Estimate"})
+    record.project.status = ProjectStatus.ESTIMATING
+    st = _HomeContractStreamlit(pressed={"atlas_mission_project_workflow_0"})
 
     app._render_mission_control_panels(
         st,
         _FakeWorkspaceService([record]),
         {
-            "actions": [
-                {
-                    "priority": "High",
-                    "title": "Review estimate",
-                    "project": "Project A",
-                    "destination": "Estimate",
-                }
-            ],
             "timeline": [],
         },
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
     )
 
     assert st.session_state["atlas_active_workspace_id"] == "project-a"
@@ -3345,101 +3855,85 @@ def test_mission_control_risk_section_reports_exceptions_and_clear_state() -> No
     clear = _HomeContractStreamlit()
     service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
 
-    app._render_mission_control_panels(clear, service, {"actions": [], "signals": []})
-
-    assert "No significant operational risks detected." in clear.captions
-
-    populated = _HomeContractStreamlit()
     app._render_mission_control_panels(
-        populated,
+        clear,
         service,
-        {
-            "actions": [],
-            "signals": [
-                {
-                    "status": "Blocked",
-                    "project": "Project A",
-                    "reason": "Unresolved RFI",
-                    "destination": "Scope & Risk",
-                }
-            ],
+        {"actions": [], "signals": []},
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
+    )
+
+    assert "No current risk items in this category." in clear.captions
+
+    risks = app._mission_control_risks(
+        active_records=[_project_record("project-a", "Project A")],
+        signals=[
+            {
+                "status": "Blocked",
+                "project": "Project A",
+                "reason": "Unresolved RFI",
+                "destination": "Scope & Risk",
+            }
+        ],
+        transactions_metrics=_zero_transactions_service().overview_metrics(),
+        knowledge_summary={
+            "products_missing_pricing": 0,
+            "pricing_stale": 0,
+            "commercial_confidence": 1.0,
         },
     )
 
-    assert any(
-        row.get("Risk") == "Unresolved RFI" and row.get("Severity") == "Critical"
-        for table in populated.dataframes
-        for row in table
-    )
+    assert any(row["Risk"] for row in risks["Scope"])
 
 
 def test_mission_control_activity_section_groups_similar_events() -> None:
-    st = _HomeContractStreamlit()
-
-    app._render_mission_control_panels(
-        st,
-        _FakeWorkspaceService([]),
-        {
-            "timeline": [
-                {
-                    "event": "Estimate revised",
-                    "project": "Project A",
-                    "timestamp": "2026-07-19T12:00:00+00:00",
-                },
-                {
-                    "event": "Estimate revised",
-                    "project": "Project A",
-                    "timestamp": "2026-07-20T12:00:00+00:00",
-                },
-            ]
-        },
+    activity_rows = app._mission_control_activity(
+        timeline=[
+            {
+                "event": "Estimate revised",
+                "project": "Project A",
+                "timestamp": "2026-07-19T12:00:00+00:00",
+            },
+            {
+                "event": "Estimate revised",
+                "project": "Project A",
+                "timestamp": "2026-07-20T12:00:00+00:00",
+            },
+        ],
+        records=[],
+        transactions_service=_zero_transactions_service(),
+        knowledge_service=_zero_knowledge_service(),
     )
 
-    activity_rows = [
-        row
-        for table in st.dataframes
-        for row in table
-        if row.get("Activity") == "Estimate revised"
-    ]
     assert activity_rows == [
         {
             "Activity": "Estimate revised",
+            "Source": "Transaction",
             "Project": "Project A",
             "Count": 2,
-            "Latest": "2026-07-20T12:00:00+00:00",
+            "Latest": "Jul 20, 2026 05:00",
+            "Details": "",
         }
     ]
 
 
 def test_mission_control_company_snapshot_limits_to_six_kpis() -> None:
-    st = _HomeContractStreamlit()
-    service = _FakeWorkspaceService([_project_record("project-a", "Project A")])
-
-    app._render_mission_control_panels(
-        st,
-        service,
-        {
-            "actions": [
-                {
-                    "priority": "High",
-                    "title": "Review estimate",
-                    "project": "Project A",
-                    "destination": "Estimate",
-                }
-            ],
-            "timeline": [],
+    snapshot = app._mission_control_company_snapshot(
+        records=[_project_record("project-a", "Project A")],
+        transactions_metrics=_zero_transactions_service().overview_metrics(),
+        knowledge_summary={
+            "coverage_percentage": 0.0,
+            "commercial_confidence": 0.0,
         },
+        activity=[],
     )
 
-    snapshot = st.dataframes[-1]
-    assert len(snapshot) == 6
-    assert [row["KPI"] for row in snapshot] == [
+    assert len(snapshot) == 8
+    assert [row["KPI"] for row in snapshot[:4]] == [
         "Active projects",
-        "Open work items",
-        "Operational risks",
-        "Recent changes",
-        "Projects in estimating",
-        "Setup incomplete",
+        "Open purchase orders",
+        "Pending approvals",
+        "Pricing coverage",
     ]
 
 
@@ -4604,22 +5098,27 @@ def test_project_context_header_builder_returns_expected_fields() -> None:
 def test_project_context_header_renders_operational_summary_without_metadata() -> None:
     st = _HomeContractStreamlit()
     header = app.ProjectContextHeader(
+        project_id="maw-demo",
         project_name="MAW",
         customer="Music Academy",
+        location="Los Angeles",
+        bid_date="2026-07-27",
         current_phase="Estimating",
         overall_status="Needs Review",
         project_manager="Alex",
         last_activity="Jul 20, 2026 10:00",
         current_revision="Rev 2",
         current_health="Normal",
+        estimate_status="Continue Estimate",
         recommended_next_action="Review Estimate",
     )
 
     app._render_project_context_header(st, header)
 
     rendered = "\n".join(st.markdowns)
-    assert "Project Manager: Alex" in rendered
-    assert "Current Revision: Rev 2" in rendered
+    assert "Project ID" in rendered
+    assert "Los Angeles" in rendered
+    assert "Continue Estimate" in rendered
     assert "Normal" in rendered
     assert "repository" not in rendered.lower()
     assert "manifest" not in rendered.lower()
@@ -4639,10 +5138,12 @@ def test_project_operations_center_renders_operational_sections() -> None:
     assert "Project Timeline" in rendered_text
     assert "Project Context" in rendered_text
     assert "Project Inspector" in rendered_text
-    assert (
-        "Tabs: Overview, Activity, Relationships, Documents, History, Administration"
-        in rendered_text
-    )
+    assert [call["label"] for call in st.expander_calls] == [
+        "More Project Context",
+        "Activity",
+        "Documents",
+        "Administration",
+    ]
     assert "repository" not in rendered_text.lower()
     assert "manifest" not in rendered_text.lower()
 

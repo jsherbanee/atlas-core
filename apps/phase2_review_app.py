@@ -47,6 +47,12 @@ from atlas_core.domain.commercial_document import (
     CommercialNumberingPolicy,
     SyncStatus,
 )
+from atlas_core.domain.bid_review_journey import (
+    BidReviewReportStatus,
+    BidReviewReportVersion,
+    BidReviewTenantPolicy,
+    validate_report_transition,
+)
 from atlas_core.services.assembly_expansion_service import AssemblyExpansionService
 from atlas_core.services.bom_review_service import BomReviewService
 from atlas_core.services.commercial_catalog_seed_service import (
@@ -95,6 +101,7 @@ from atlas_core.services.specification_intelligence import (
     SpecificationReferenceType,
 )
 from atlas_core.services.transactions_workspace_service import (
+    TransactionsOverviewMetrics,
     TransactionsWorkspaceService,
 )
 from atlas_core.services.universal_object_registry import (
@@ -1124,15 +1131,73 @@ class SelectorOption:
 
 @dataclass
 class ProjectContextHeader:
+    project_id: str
     project_name: str
     customer: str
+    location: str
+    bid_date: str
     current_phase: str
     overall_status: str
     project_manager: str
     last_activity: str
     current_revision: str
     current_health: str
+    estimate_status: str
     recommended_next_action: str
+
+
+def _project_context_summary_items(
+    header: ProjectContextHeader,
+) -> list[tuple[str, str]]:
+    items = [
+        ("Project ID", header.project_id),
+        ("Customer", header.customer),
+        ("Location", header.location),
+        ("Bid Date", header.bid_date),
+        ("Current Revision", header.current_revision),
+        ("Readiness", header.current_health),
+        ("Estimate", header.estimate_status),
+        ("Project Manager", header.project_manager),
+        ("Last Activity", header.last_activity),
+    ]
+    return [
+        (label, _safe_text(value, ""))
+        for label, value in items
+        if _safe_text(value, "")
+    ]
+
+
+def _project_context_header_html(header: ProjectContextHeader) -> str:
+    summary_items = _project_context_summary_items(header)
+    summary_html = "".join(
+        [
+            "<div class='atlas-project-summary-item'>"
+            f"<div class='atlas-project-summary-label'>{escape(label)}</div>"
+            f"<div class='atlas-project-summary-value'>{escape(value)}</div>"
+            "</div>"
+            for label, value in summary_items
+        ]
+    )
+    pill_html = " ".join(
+        [
+            f"<span class='atlas-chip'>{escape(header.current_phase)}</span>",
+            f"<span class='atlas-chip'>{escape(header.overall_status)}</span>",
+            f"<span class='atlas-chip'>{escape(header.current_health)}</span>",
+        ]
+    )
+    return (
+        "<div class='atlas-project-header'>"
+        "<div class='atlas-project-header-top'>"
+        "<div class='atlas-project-title-block'>"
+        f"<div class='atlas-project-name'>{escape(header.project_name)}</div>"
+        f"<div class='atlas-project-customer'>{escape(header.customer)}</div>"
+        "</div>"
+        f"<div class='atlas-project-pill-row'>{pill_html}</div>"
+        "</div>"
+        f"<div class='atlas-project-summary-grid'>{summary_html}</div>"
+        f"<div class='atlas-project-meta'>Next: {escape(header.recommended_next_action)}</div>"
+        "</div>"
+    )
 
 
 def _load_streamlit() -> Any:
@@ -5611,6 +5676,648 @@ def _set_review_flag(st: Any, key: str, value: Any) -> None:
     st.session_state["atlas_review_flags"] = flags
 
 
+def _bid_review_journeys_state(st: Any) -> dict[str, dict[str, Any]]:
+    state = st.session_state.get("atlas_bid_review_journeys")
+    if isinstance(state, dict):
+        return state
+    state = {}
+    st.session_state["atlas_bid_review_journeys"] = state
+    return state
+
+
+def _bid_review_journey_state_key(project_id: str) -> str:
+    return _safe_text(project_id, "").strip()
+
+
+def _bid_review_initial_report_version(
+    project_id: str,
+    *,
+    project_name: str,
+    summary: dict[str, Any] | None,
+    generated_by: str,
+) -> BidReviewReportVersion:
+    summary = dict(summary or {})
+    review = summary.get("review")
+    overall_confidence = _safe_text(
+        summary.get("overall_confidence"),
+        _safe_text(
+            summary.get("analysis_confidence"),
+            _safe_text(
+                getattr(review, "overall_confidence", None),
+                "0.00",
+            ),
+        ),
+    )
+    try:
+        readiness_score = Decimal(overall_confidence)
+    except Exception:
+        readiness_score = Decimal("0")
+    recommended_actions = list(summary.get("recommended_actions") or [])
+    guidance_inputs = tuple(
+        _safe_text(item.get("step"), "")
+        for item in recommended_actions
+        if isinstance(item, dict) and _safe_text(item.get("step"), "")
+    )
+    if not guidance_inputs:
+        fallback_action = _safe_text(
+            summary.get("recommended_next_action"),
+            "Review uploaded project documents.",
+        )
+        guidance_inputs = (fallback_action,)
+    return BidReviewReportVersion(
+        project_id=_safe_text(project_id, "project"),
+        version=1,
+        source_document_set_id=f"{_safe_text(project_id, 'project')}::documents",
+        parent_version=None,
+        status=BidReviewReportStatus.PRELIMINARY,
+        readiness_score=readiness_score,
+        unresolved_item_count=int(summary.get("unresolved_scope_issue_count", 0) or 0),
+        pending_rfi_count=int(len(list(summary.get("coordination_findings") or []))),
+        assumptions=(),
+        guidance_inputs=guidance_inputs,
+        tenant_rules_snapshot=BidReviewTenantPolicy().to_dict(),
+        generated_at=_now_iso(),
+        generated_by=generated_by,
+        change_summary=(
+            f"Preliminary review created for {_safe_text(project_name, project_id)}.",
+        ),
+    )
+
+
+def _bid_review_journey_project_state(
+    st: Any,
+    project_id: str,
+    *,
+    project_name: str = "",
+    summary: dict[str, Any] | None = None,
+    generated_by: str = "atlas-ui",
+) -> dict[str, Any]:
+    project_key = _bid_review_journey_state_key(project_id)
+    journeys = _bid_review_journeys_state(st)
+    state = journeys.get(project_key)
+    if not isinstance(state, dict):
+        state = {}
+
+    state.setdefault("project_id", project_key)
+    state.setdefault("project_name", _safe_text(project_name, project_key))
+    state.setdefault("selected_report_version", 1)
+    state.setdefault("guidance_text", "")
+    state.setdefault("estimate_document_id", "")
+    state.setdefault("estimate_source_report_version", 1)
+    state.setdefault("estimate_decision_state", "not_started")
+
+    report_versions = list(state.get("report_versions") or [])
+    if not report_versions:
+        initial = _bid_review_initial_report_version(
+            project_key,
+            project_name=_safe_text(project_name, project_key),
+            summary=summary,
+            generated_by=generated_by,
+        )
+        report_versions = [initial.to_dict()]
+    state["report_versions"] = report_versions
+    versions = _bid_review_report_versions(state)
+    selected_report_version = int(
+        state.get("selected_report_version") or versions[-1].version
+    )
+    if not any(item.version == selected_report_version for item in versions):
+        selected_report_version = versions[-1].version
+    state["selected_report_version"] = selected_report_version
+
+    journeys[project_key] = state
+    st.session_state["atlas_bid_review_journeys"] = journeys
+    return state
+
+
+def _bid_review_report_versions(
+    state: dict[str, Any],
+) -> list[BidReviewReportVersion]:
+    versions: list[BidReviewReportVersion] = []
+    for payload in list(state.get("report_versions") or []):
+        if not isinstance(payload, dict):
+            continue
+        try:
+            versions.append(BidReviewReportVersion(**payload))
+        except Exception:
+            continue
+    versions.sort(key=lambda item: item.version)
+    return versions
+
+
+def _bid_review_selected_report_version(
+    state: dict[str, Any],
+) -> BidReviewReportVersion | None:
+    versions = _bid_review_report_versions(state)
+    if not versions:
+        return None
+    selected_version = int(state.get("selected_report_version") or versions[-1].version)
+    return next(
+        (item for item in versions if item.version == selected_version),
+        versions[-1],
+    )
+
+
+def _bid_review_select_report_version(
+    st: Any,
+    project_id: str,
+    version: int,
+) -> None:
+    journeys = _bid_review_journeys_state(st)
+    state = journeys.get(_bid_review_journey_state_key(project_id))
+    if not isinstance(state, dict):
+        return
+    state["selected_report_version"] = int(version)
+    journeys[_bid_review_journey_state_key(project_id)] = state
+    st.session_state["atlas_bid_review_journeys"] = journeys
+
+
+def _bid_review_create_revised_review(
+    st: Any,
+    project_id: str,
+    *,
+    guidance_text: str,
+) -> bool:
+    journeys = _bid_review_journeys_state(st)
+    project_key = _bid_review_journey_state_key(project_id)
+    state = journeys.get(project_key)
+    if not isinstance(state, dict):
+        return False
+    versions = _bid_review_report_versions(state)
+    if not versions:
+        return False
+    if any(item.version == 2 for item in versions):
+        state["selected_report_version"] = 2
+        state["guidance_text"] = guidance_text
+        journeys[project_key] = state
+        st.session_state["atlas_bid_review_journeys"] = journeys
+        return False
+
+    current = versions[-1]
+    revised = BidReviewReportVersion(
+        project_id=current.project_id,
+        version=2,
+        source_document_set_id=current.source_document_set_id,
+        parent_version=current.version,
+        status=validate_report_transition(
+            current.status, BidReviewReportStatus.REVISED
+        ),
+        readiness_score=current.readiness_score,
+        unresolved_item_count=current.unresolved_item_count,
+        pending_rfi_count=current.pending_rfi_count,
+        assumptions=current.assumptions,
+        guidance_inputs=tuple(
+            line.strip() for line in guidance_text.splitlines() if line.strip()
+        )
+        or current.guidance_inputs,
+        tenant_rules_snapshot=current.tenant_rules_snapshot,
+        generated_at=_now_iso(),
+        generated_by="atlas-ui",
+        change_summary=("User guidance applied to create revised review.",),
+    )
+    report_versions = list(state.get("report_versions") or [])
+    report_versions.append(revised.to_dict())
+    state["report_versions"] = report_versions
+    state["selected_report_version"] = revised.version
+    state["guidance_text"] = guidance_text
+    journeys[project_key] = state
+    st.session_state["atlas_bid_review_journeys"] = journeys
+    return True
+
+
+def _bid_review_estimate_document(
+    st: Any,
+    *,
+    project_id: str,
+) -> CommercialDocument | None:
+    if not _safe_text(project_id, ""):
+        return None
+    try:
+        service = _transactions_workspace_service(st)
+    except Exception:
+        return None
+
+    journeys = _bid_review_journeys_state(st)
+    state = journeys.get(_bid_review_journey_state_key(project_id))
+    candidate_ids = []
+    if isinstance(state, dict):
+        candidate_ids.append(_safe_text(state.get("estimate_document_id"), ""))
+    candidate_ids.extend(
+        [
+            _safe_text(
+                st.session_state.get("atlas_transactions_selected_document_id"), ""
+            ),
+            _safe_text(
+                st.session_state.get("atlas_transactions_estimate_add_document_id"),
+                "",
+            ),
+        ]
+    )
+    for document_id in candidate_ids:
+        if not document_id:
+            continue
+        try:
+            document = service.get_document(document_id)
+        except Exception:
+            document = None
+        if document is None:
+            continue
+        if document.document_type != CommercialDocumentType.ESTIMATE:
+            continue
+        if _safe_text(document.project_id, "") not in {project_id, ""} and _safe_text(
+            document.project_code, ""
+        ) not in {project_id, ""}:
+            continue
+        return document
+    return None
+
+
+def _record_bid_review_estimate_creation(
+    st: Any,
+    *,
+    project_id: str,
+    estimate_document_id: str,
+    report_version: int,
+) -> None:
+    if not _safe_text(project_id, ""):
+        return
+    journeys = _bid_review_journeys_state(st)
+    project_key = _bid_review_journey_state_key(project_id)
+    state = journeys.get(project_key)
+    if not isinstance(state, dict):
+        state = {}
+    state["estimate_document_id"] = _safe_text(estimate_document_id, "")
+    state["estimate_source_report_version"] = int(report_version)
+    state["estimate_decision_state"] = "draft"
+    journeys[project_key] = state
+    st.session_state["atlas_bid_review_journeys"] = journeys
+
+
+def _record_bid_review_estimate_decision(
+    st: Any,
+    *,
+    project_id: str,
+    approval_state: ApprovalState,
+) -> None:
+    if not _safe_text(project_id, ""):
+        return
+    journeys = _bid_review_journeys_state(st)
+    project_key = _bid_review_journey_state_key(project_id)
+    state = journeys.get(project_key)
+    if not isinstance(state, dict):
+        state = {}
+    state["estimate_decision_state"] = _safe_text(approval_state.value, "")
+    journeys[project_key] = state
+    st.session_state["atlas_bid_review_journeys"] = journeys
+
+
+def _bid_review_journey_step_rows(
+    st: Any,
+    *,
+    project_id: str,
+    project_name: str,
+    summary: dict[str, Any],
+    route_name: str,
+) -> list[dict[str, Any]]:
+    state = _bid_review_journey_project_state(
+        st,
+        project_id,
+        project_name=project_name,
+        summary=summary,
+    )
+    report_versions = _bid_review_report_versions(state)
+    selected_report = _bid_review_selected_report_version(state)
+    guidance_text = _safe_text(state.get("guidance_text"), "")
+    estimate_document = _bid_review_estimate_document(st, project_id=project_id)
+
+    documents_uploaded = int(summary.get("document_count", 0) or 0)
+    analysis_complete = (
+        _safe_text(summary.get("analysis_status"), "") == "Analysis complete"
+    )
+    estimate_approval_state = _safe_text(
+        getattr(getattr(estimate_document, "approval_state", None), "value", ""),
+        _safe_text(state.get("estimate_decision_state"), "not_started"),
+    ).lower()
+    if estimate_approval_state in {"approved", "rejected"}:
+        state["estimate_decision_state"] = estimate_approval_state
+    journeys = _bid_review_journeys_state(st)
+    journeys[_bid_review_journey_state_key(project_id)] = state
+    st.session_state["atlas_bid_review_journeys"] = journeys
+
+    rows = [
+        {
+            "step": "Documents Uploaded",
+            "status": "complete" if documents_uploaded > 0 else "not started",
+            "detail": (
+                f"{documents_uploaded} uploaded file(s)"
+                if documents_uploaded > 0
+                else "Upload project documents to start the journey."
+            ),
+        },
+        {
+            "step": "Preliminary Review V1",
+            "status": "complete" if report_versions else "blocked",
+            "detail": (
+                f"V{selected_report.version if selected_report else 1} preliminary review"
+            ),
+        },
+        {
+            "step": "User Guidance",
+            "status": "complete" if guidance_text else "needs review",
+            "detail": (
+                guidance_text.splitlines()[0][:120]
+                if guidance_text
+                else "Enter reviewer guidance before creating the revised review."
+            ),
+        },
+        {
+            "step": "Revised Review V2",
+            "status": (
+                "complete"
+                if any(item.version >= 2 for item in report_versions)
+                else "ready"
+            ),
+            "detail": (
+                "Guidance applied to create the revised review."
+                if any(item.version >= 2 for item in report_versions)
+                else "Create the revised review from user guidance."
+            ),
+        },
+        {
+            "step": "Engineering Review",
+            "status": "complete" if analysis_complete else "blocked",
+            "detail": (
+                _safe_text(
+                    summary.get("recommended_next_action"), "Open Engineering Review."
+                )
+                if analysis_complete
+                else "Run project analysis before reviewing engineering findings."
+            ),
+        },
+        {
+            "step": "Draft Estimate",
+            "status": "complete" if estimate_document is not None else "ready",
+            "detail": (
+                f"{_safe_text(estimate_document.document_number, _safe_text(getattr(estimate_document, 'document_id', ''), 'Estimate'))}"
+                if estimate_document is not None
+                else "Create the draft estimate from the selected report version."
+            ),
+        },
+        {
+            "step": "Estimate Decision",
+            "status": (
+                "complete"
+                if estimate_approval_state in {"approved", "rejected"}
+                else "needs review" if estimate_document is not None else "blocked"
+            ),
+            "detail": (
+                _format_commercial_state(estimate_approval_state)
+                if estimate_document is not None
+                else "No draft estimate is active yet."
+            ),
+        },
+    ]
+
+    for row in rows:
+        row["route"] = route_name
+    return rows
+
+
+def _bid_review_journey_next_action(
+    rows: list[dict[str, Any]],
+) -> dict[str, str]:
+    if not rows:
+        return {
+            "label": "Open Documents",
+            "page": "Documents",
+            "detail": "Upload project documents to start the bid journey.",
+        }
+    for row in rows:
+        status = _safe_text(row.get("status"), "").lower()
+        if status not in {"complete"}:
+            step = _safe_text(row.get("step"), "Next Step")
+            if step == "Documents Uploaded":
+                return {
+                    "label": "Open Documents",
+                    "page": "Documents",
+                    "detail": _safe_text(row.get("detail"), ""),
+                }
+            if step == "Preliminary Review V1":
+                return {
+                    "label": "Open Scope & Risk",
+                    "page": "Scope & Risk",
+                    "detail": _safe_text(row.get("detail"), ""),
+                }
+            if step == "User Guidance":
+                return {
+                    "label": "Open Engineering Review",
+                    "page": "Engineering Review",
+                    "detail": _safe_text(row.get("detail"), ""),
+                }
+            if step == "Revised Review V2":
+                return {
+                    "label": "Create Revised Review V2",
+                    "page": "Engineering Review",
+                    "detail": _safe_text(row.get("detail"), ""),
+                }
+            if step == "Engineering Review":
+                return {
+                    "label": "Open Estimate",
+                    "page": "Estimate",
+                    "detail": _safe_text(row.get("detail"), ""),
+                }
+            if step == "Draft Estimate":
+                return {
+                    "label": "Create Draft Estimate",
+                    "page": "Transactions",
+                    "detail": _safe_text(row.get("detail"), ""),
+                }
+            if step == "Estimate Decision":
+                return {
+                    "label": "Open Transactions",
+                    "page": "Transactions",
+                    "detail": _safe_text(row.get("detail"), ""),
+                }
+    return {
+        "label": "Open Reports",
+        "page": "Reports",
+        "detail": "All visible journey steps are complete.",
+    }
+
+
+def _render_bid_review_journey_panel(
+    st: Any,
+    *,
+    project_id: str,
+    project_name: str,
+    summary: dict[str, Any],
+    route_name: str,
+) -> None:
+    if not _safe_text(project_id, ""):
+        return
+
+    state = _bid_review_journey_project_state(
+        st,
+        project_id,
+        project_name=project_name,
+        summary=summary,
+    )
+    step_rows = _bid_review_journey_step_rows(
+        st,
+        project_id=project_id,
+        project_name=project_name,
+        summary=summary,
+        route_name=route_name,
+    )
+    selected_report = _bid_review_selected_report_version(state)
+    estimate_document = _bid_review_estimate_document(st, project_id=project_id)
+    next_action = _bid_review_journey_next_action(step_rows)
+    guidance_default = _safe_text(
+        state.get("guidance_text"),
+        _safe_text(summary.get("recommended_next_action"), ""),
+    )
+
+    _render_section_title(st, "Bid Review Journey")
+    cards = _responsive_control_columns(st, 4)
+    _metric_card(
+        cards[0],
+        "Documents",
+        _safe_text(summary.get("document_count"), "0"),
+    )
+    _metric_card(
+        cards[1],
+        "Current Review",
+        f"V{selected_report.version if selected_report else 1}",
+    )
+    _metric_card(
+        cards[2],
+        "Draft Estimate",
+        _safe_text(
+            getattr(estimate_document, "document_number", None),
+            "Not started",
+        ),
+    )
+    _metric_card(
+        cards[3],
+        "Decision",
+        _safe_text(
+            getattr(estimate_document, "approval_state", None)
+            and _format_commercial_state(
+                getattr(getattr(estimate_document, "approval_state", None), "value", "")
+            ),
+            _format_commercial_state(
+                state.get("estimate_decision_state", "Not started")
+            ),
+        ),
+    )
+
+    _render_data_table(
+        st,
+        [
+            {
+                "Step": row["step"],
+                "Status": _status_chip(_safe_text(row.get("status"), "").title()),
+                "Route": route_name,
+                "Detail": row.get("detail"),
+            }
+            for row in step_rows
+        ],
+    )
+
+    version_options = [item.version for item in _bid_review_report_versions(state)]
+    if version_options:
+        version_labels = {version: f"V{version}" for version in version_options}
+        selected_version = st.selectbox(
+            "Report Version",
+            options=version_options,
+            format_func=lambda value: version_labels.get(int(value), f"V{value}"),
+            index=max(
+                0,
+                (
+                    version_options.index(
+                        int(state.get("selected_report_version") or version_options[-1])
+                    )
+                    if int(state.get("selected_report_version") or version_options[-1])
+                    in version_options
+                    else len(version_options) - 1
+                ),
+            ),
+            key=f"atlas_bid_review_report_version_{project_id}",
+        )
+        _bid_review_select_report_version(st, project_id, int(selected_version))
+
+    guidance_text = st.text_area(
+        "User Guidance",
+        value=guidance_default,
+        height=90,
+        key=f"atlas_bid_review_guidance_{project_id}",
+        placeholder="Capture guidance, clarifications, and design direction for the revised review.",
+    )
+
+    action_cols = st.columns(3)
+    if action_cols[0].button(
+        next_action["label"],
+        type="primary",
+        width="stretch",
+        key=f"atlas_bid_review_primary_{project_id}",
+    ):
+        if (
+            next_action["page"] == "Transactions"
+            and next_action["label"] == "Create Draft Estimate"
+        ):
+            st.session_state["atlas_active_page"] = "Transactions"
+            st.session_state[_navigation_secondary_state_key()] = "estimates"
+            st.session_state[_navigation_tertiary_state_key()] = "add"
+            st.rerun()
+        else:
+            st.session_state["atlas_active_page"] = next_action["page"]
+            st.rerun()
+
+    if action_cols[1].button(
+        "Create Revised Review V2",
+        width="stretch",
+        key=f"atlas_bid_review_create_v2_{project_id}",
+    ):
+        if guidance_text.strip():
+            created = _bid_review_create_revised_review(
+                st,
+                project_id,
+                guidance_text=guidance_text,
+            )
+            if created:
+                st.success("Revised Review V2 created.")
+            st.rerun()
+        else:
+            st.warning("Enter user guidance before creating Revised Review V2.")
+
+    if action_cols[2].button(
+        "Create Draft Estimate",
+        width="stretch",
+        key=f"atlas_bid_review_create_estimate_{project_id}",
+    ):
+        st.session_state["atlas_active_page"] = "Transactions"
+        st.session_state[_navigation_secondary_state_key()] = "estimates"
+        st.session_state[_navigation_tertiary_state_key()] = "add"
+        st.rerun()
+
+    nav_cols = st.columns(4)
+    if nav_cols[0].button("Open Documents", width="stretch"):
+        _open_page(st, "Documents")
+    if nav_cols[1].button("Open Scope & Risk", width="stretch"):
+        _open_page(st, "Scope & Risk")
+    if nav_cols[2].button("Open Engineering Review", width="stretch"):
+        _open_page(st, "Engineering Review")
+    if nav_cols[3].button("Open Estimate", width="stretch"):
+        _open_page(st, "Estimate")
+
+    if _safe_text(state.get("estimate_decision_state"), "") == "rejected":
+        if st.button(
+            "Return to Revised Review",
+            width="stretch",
+            key=f"atlas_bid_review_return_review_{project_id}",
+        ):
+            _open_page(st, "Engineering Review")
+
+
 def _review_step_definitions() -> list[dict[str, str]]:
     return [
         {
@@ -8073,6 +8780,41 @@ def _render_estimate_add_workspace(
         key="atlas_estimate_add_number_preview",
     )
 
+    selected_project_meta = dict(project_by_id.get(selected_project_id) or {})
+    if selected_project_id:
+        _render_bid_review_journey_panel(
+            st,
+            project_id=selected_project_id,
+            project_name=_safe_text(
+                selected_project_meta.get("project_name"),
+                selected_project_id,
+            ),
+            summary={
+                "project_name": _safe_text(
+                    selected_project_meta.get("project_name"),
+                    selected_project_id,
+                ),
+                "analysis_status": "Ready to run",
+                "document_count": 0,
+                "project_type": "Estimate",
+                "recommended_next_action": "Create the draft estimate from the selected review version.",
+                "unresolved_scope_issue_count": 0,
+                "high_risk_issue_count": 0,
+                "documents_requiring_ocr": 0,
+                "equipment_items_found": 0,
+                "possible_bom_items": 0,
+                "scope_gaps": 0,
+                "quantity_conflicts": 0,
+                "responsibility_ambiguities": 0,
+                "missing_specifications": 0,
+                "unresolved_manufacturer_model_refs": 0,
+                "recommended_actions": [],
+                "coordination_findings": [],
+                "overall_confidence": "0.00",
+            },
+            route_name="Transactions",
+        )
+
     if selected_project is not None and len(project_code_options) == 1:
         st.warning("No Project Codes available for selected Project.")
 
@@ -8134,6 +8876,21 @@ def _render_estimate_add_workspace(
             st.error("Customer required")
         elif not draft_document_id:
             try:
+                selected_project_name = _safe_text(
+                    selected_project_meta.get("project_name"),
+                    selected_project_id,
+                )
+                journey_state = _bid_review_journey_project_state(
+                    st,
+                    selected_project_id
+                    or _safe_text(
+                        st.session_state.get("atlas_active_workspace_id"), ""
+                    ),
+                    project_name=selected_project_name,
+                )
+                selected_report_version = _bid_review_selected_report_version(
+                    journey_state
+                )
                 created = service.create_draft(
                     tenant_id="local",
                     organization_id="atlas",
@@ -8152,6 +8909,19 @@ def _render_estimate_add_workspace(
                         "salesperson": _safe_text(salesperson, "") or None,
                         "description": _safe_text(description, "") or None,
                     },
+                )
+                _record_bid_review_estimate_creation(
+                    st,
+                    project_id=selected_project_id
+                    or _safe_text(
+                        st.session_state.get("atlas_active_workspace_id"), ""
+                    ),
+                    estimate_document_id=created.document_id,
+                    report_version=(
+                        selected_report_version.version
+                        if selected_report_version is not None
+                        else 1
+                    ),
                 )
                 st.session_state["atlas_transactions_estimate_add_document_id"] = (
                     created.document_id
@@ -9608,6 +10378,7 @@ def _build_project_context_header(
     *,
     customer: str,
     confidence: str,
+    estimate_status: str = "",
     recommended_next_action: str,
     context: dict[str, Any] | None = None,
 ) -> ProjectContextHeader:
@@ -9641,8 +10412,25 @@ def _build_project_context_header(
         "Unassigned",
     )
     return ProjectContextHeader(
+        project_id=_safe_text(record.project.project_id, ""),
         project_name=record.project.name,
         customer=customer,
+        location=_safe_text(
+            _first_text(
+                record.project.location,
+                record.metadata.get("location"),
+                "n/a",
+            ),
+            "n/a",
+        ),
+        bid_date=_safe_text(
+            _first_text(
+                record.project.bid_date,
+                record.metadata.get("bid_date"),
+                "",
+            ),
+            "",
+        ),
         current_phase=_project_stage(record),
         overall_status=_safe_text(record.metadata.get("status"), "needs review")
         .replace("_", " ")
@@ -9653,23 +10441,13 @@ def _build_project_context_header(
         ),
         current_revision=current_revision,
         current_health=current_health,
+        estimate_status=_safe_text(estimate_status, ""),
         recommended_next_action=recommended_next_action,
     )
 
 
 def _render_project_context_header(st: Any, header: ProjectContextHeader) -> None:
-    st.markdown(
-        "<div class='atlas-project-header'>"
-        f"<div class='atlas-project-name'>{header.project_name}</div>"
-        f"<div class='atlas-project-customer'>{header.customer}</div>"
-        f"<span class='atlas-chip'>{header.current_phase}</span>"
-        f"<span class='atlas-chip'>{header.overall_status}</span>"
-        f"<span class='atlas-chip'>{header.current_health}</span>"
-        f"<div class='atlas-project-meta'>Project Manager: {header.project_manager} · Last Activity: {header.last_activity} · Current Revision: {header.current_revision}</div>"
-        f"<div class='atlas-project-meta'>Next: {header.recommended_next_action}</div>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown(_project_context_header_html(header), unsafe_allow_html=True)
 
 
 def _open_project_record(
@@ -10183,6 +10961,8 @@ def _format_recent_opened_at(timestamp: str | None) -> str:
         parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
     except Exception:
         return normalized
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone()
     return parsed.strftime("%b %d, %Y %H:%M")
 
 
@@ -15244,21 +16024,6 @@ def _build_mission_control_payload(
     active_signal = signal_by_id.get(record.workspace_id)
 
     actions: list[dict[str, Any]] = []
-    workspace_state = workspace_service.load_workspace_state(record.workspace_id)
-    last_page = _safe_text(
-        workspace_state.get("last_open_page"), "Engineering Workbench"
-    )
-    actions.append(
-        {
-            "title": "Continue active review",
-            "project": record.project.name,
-            "priority": "High",
-            "reason": f"Resume work where you left off on {last_page}.",
-            "count": "",
-            "related_page": last_page,
-            "destination": last_page,
-        }
-    )
 
     review = context.get("review") if context else None
     import_summary = dict(context.get("import_summary") or {}) if context else {}
@@ -15394,30 +16159,24 @@ def _render_home_page(
     record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
     mission_control_payload: dict[str, Any] | None = None,
+    *,
+    transactions_service: TransactionsWorkspaceService | None = None,
+    knowledge_service: CommercialKnowledgeService | None = None,
 ) -> None:
     _ = (record, context)
-    _render_page_header(st, "Tenant Operations Center", "")
+    _render_page_header(
+        st,
+        "Tenant Operations Center",
+        "Mission Control for Projects, Transactions, and Knowledge.",
+    )
     st.caption(date.today().strftime("%B %d, %Y"))
-
-    action_cols = _responsive_control_columns(st, [1.0, 1.0, 1.0])
-    if action_cols[0].button(
-        "Create New Project",
-        type="primary",
-        width="stretch",
-    ):
-        st.session_state["atlas_active_page"] = "Create New Project"
-        st.rerun()
-    if action_cols[1].button("Open Existing Project", width="stretch"):
-        st.session_state["atlas_active_page"] = "Open Existing Project"
-        st.rerun()
-    if action_cols[2].button("Manage Projects", width="stretch"):
-        st.session_state["atlas_active_page"] = "Projects"
-        st.rerun()
 
     _render_mission_control_panels(
         st,
         workspace_service,
         mission_control_payload or {},
+        transactions_service=transactions_service,
+        knowledge_service=knowledge_service,
     )
 
 
@@ -21085,6 +21844,14 @@ def _render_transactions_workspace_page(
                 document_id=selected_document.document_id,
                 approval_state=ApprovalState.APPROVED,
             )
+            _record_bid_review_estimate_decision(
+                st,
+                project_id=_safe_text(
+                    selected_document.project_id or selected_document.project_code,
+                    "",
+                ),
+                approval_state=ApprovalState.APPROVED,
+            )
             _save_transactions_workspace_state(st, service)
             st.success("Estimate marked as accepted.")
             st.rerun()
@@ -21100,9 +21867,56 @@ def _render_transactions_workspace_page(
                 document_id=selected_document.document_id,
                 approval_state=ApprovalState.REJECTED,
             )
+            _record_bid_review_estimate_decision(
+                st,
+                project_id=_safe_text(
+                    selected_document.project_id or selected_document.project_code,
+                    "",
+                ),
+                approval_state=ApprovalState.REJECTED,
+            )
             _save_transactions_workspace_state(st, service)
             st.success("Estimate marked as declined.")
             st.rerun()
+
+    if selected_document.document_type == CommercialDocumentType.ESTIMATE:
+        estimate_project_id = _safe_text(
+            selected_document.project_id or selected_document.project_code,
+            "",
+        )
+        if estimate_project_id:
+            _render_bid_review_journey_panel(
+                st,
+                project_id=estimate_project_id,
+                project_name=_safe_text(
+                    selected_document.project_code or selected_document.project_id,
+                    estimate_project_id,
+                ),
+                summary={
+                    "project_name": _safe_text(
+                        selected_document.project_code or selected_document.project_id,
+                        estimate_project_id,
+                    ),
+                    "analysis_status": "Analysis complete",
+                    "document_count": 1,
+                    "project_type": "Estimate Decision",
+                    "recommended_next_action": "Mark the draft estimate accepted or declined.",
+                    "unresolved_scope_issue_count": 0,
+                    "high_risk_issue_count": 0,
+                    "documents_requiring_ocr": 0,
+                    "equipment_items_found": 0,
+                    "possible_bom_items": 0,
+                    "scope_gaps": 0,
+                    "quantity_conflicts": 0,
+                    "responsibility_ambiguities": 0,
+                    "missing_specifications": 0,
+                    "unresolved_manufacturer_model_refs": 0,
+                    "recommended_actions": [],
+                    "coordination_findings": [],
+                    "overall_confidence": "0.00",
+                },
+                route_name="Transactions",
+            )
 
     if (
         tertiary == "lines"
@@ -21813,68 +22627,102 @@ def _render_home_workspace_panels(
     st: Any,
     workspace_service: ProjectWorkspaceService,
     mission_control_payload: dict[str, Any] | None,
+    *,
+    transactions_service: TransactionsWorkspaceService | None = None,
+    knowledge_service: CommercialKnowledgeService | None = None,
 ) -> None:
     payload = mission_control_payload or {}
-    records = workspace_service.list_recent_workspaces(limit=20)
+    recent_records = workspace_service.list_recent_workspaces(limit=20)
     all_records = workspace_service.list_workspaces(include_archived=True, limit=500)
-    records_by_project = {
-        _normalize_recommendation_text(record.project.name): record
-        for record in all_records
-    }
-    records_by_project.update(
-        {
-            _normalize_recommendation_text(record.workspace_id): record
-            for record in all_records
-        }
-    )
+    active_records = [record for record in all_records if not record.archived]
+    transactions_service = transactions_service or _transactions_workspace_service(st)
+    knowledge_service = knowledge_service or _commercial_service(st)
+    transactions_metrics = transactions_service.overview_metrics()
+    knowledge_summary = knowledge_service.dashboard_summary()
 
-    work_items = _mission_control_work_items(
-        list(payload.get("actions") or []),
-        records_by_project,
-    )
-    risks = _mission_control_risks(
-        list(payload.get("signals") or []),
-        work_items,
-    )
     activity = _mission_control_activity(
         list(payload.get("timeline") or []),
-        records,
+        recent_records,
+        transactions_service=transactions_service,
+        knowledge_service=knowledge_service,
+    )
+    week_rows = _mission_control_this_week_rows(
+        activity=activity,
+        transactions_service=transactions_service,
+        knowledge_service=knowledge_service,
+    )
+    risks = _mission_control_risks(
+        active_records=active_records,
+        signals=list(payload.get("signals") or []),
+        transactions_metrics=transactions_metrics,
+        knowledge_summary=knowledge_summary,
+    )
+    open_projects = _mission_control_open_projects_rows(
+        active_records,
+        workspace_service=workspace_service,
+    )
+    snapshot_rows = _mission_control_company_snapshot(
+        records=all_records,
+        transactions_metrics=transactions_metrics,
+        knowledge_summary=knowledge_summary,
+        activity=activity,
+    )
+    purchase_order_rows = _mission_control_open_purchase_order_rows(
+        transactions_metrics=transactions_metrics,
     )
 
-    main_cols = st.columns([2.15, 1.0])
-    with main_cols[0]:
-        _render_section_title(st, "My Work")
-        if work_items:
-            for index, item in enumerate(work_items[:8]):
-                _render_mission_control_work_card(st, workspace_service, item, index)
-        else:
-            st.caption("No actionable work items.")
-
-        _render_section_title(st, "Recent Activity")
-        if activity:
-            _render_data_table(st, activity[:8])
-        else:
-            st.caption("No meaningful recent activity.")
-
-        _render_section_title(st, "Business Risks")
-        if risks:
-            _render_data_table(st, risks[:8])
-        else:
-            st.caption("No significant operational risks detected.")
-
-        _render_section_title(st, "Continue Working")
-        _render_mission_control_continue_working(st, workspace_service, records[:5])
-
-    with main_cols[1]:
+    snapshot_cols = st.columns([1.45, 1.0], gap="small")
+    with snapshot_cols[0]:
         _render_section_title(st, "Company Snapshot")
-        _render_data_table(
+        _shared_render_metric_strip(
             st,
-            _mission_control_company_snapshot(
-                records=all_records,
-                work_items=work_items,
-                risks=risks,
-                activity=activity,
-            ),
+            [
+                (str(item.get("KPI")), str(item.get("Value")))
+                for item in snapshot_rows[:4]
+            ],
+        )
+        with st.expander("Snapshot Details", expanded=False):
+            _render_data_table(st, snapshot_rows)
+
+    with snapshot_cols[1]:
+        _render_section_title(st, "Open Purchase Orders")
+        _render_mission_control_purchase_orders(
+            st,
+            purchase_order_rows,
+            transactions_metrics=transactions_metrics,
+        )
+
+    risk_cols = st.columns([1.35, 1.0], gap="small")
+    with risk_cols[0]:
+        _render_section_title(st, "Business Risks")
+        _render_mission_control_risk_groups(
+            st,
+            risks,
+            workspace_service=workspace_service,
+            active_records=active_records,
+        )
+
+    with risk_cols[1]:
+        _render_section_title(st, "This Week")
+        _render_mission_control_this_week(
+            st,
+            week_rows,
+            workspace_service=workspace_service,
+        )
+
+    _render_section_title(st, "Open Projects")
+    _render_mission_control_open_projects(
+        st,
+        open_projects,
+        workspace_service=workspace_service,
+    )
+
+    _render_section_title(st, "Recent Activity")
+    if activity:
+        _render_data_table(st, activity[:12])
+    else:
+        st.caption(
+            "No recent project, transaction, or knowledge activity is available."
         )
 
 
@@ -21899,114 +22747,93 @@ def _mission_control_age(
     return _format_recent_opened_at(timestamp)
 
 
-def _mission_control_work_items(
-    actions: list[dict[str, Any]],
-    records_by_project: dict[str, ProjectWorkspaceRecord],
-) -> list[dict[str, Any]]:
-    items: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for action in actions:
-        title = _safe_text(action.get("title"), "")
-        if not title:
-            continue
-        destination = _safe_text(action.get("destination"), "Overview")
-        project = _safe_text(action.get("project"), "Company")
-        key = "|".join(
-            [
-                _normalize_recommendation_text(title),
-                _normalize_recommendation_text(project),
-                _normalize_recommendation_text(destination),
-            ]
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        record = _mission_control_record_for_item(action, records_by_project)
-        owner = _safe_text(action.get("owner"), "")
-        if not owner and record is not None:
-            owner = _safe_text(
-                record.metadata.get("owner")
-                or record.project.client
-                or record.project.consultant,
-                "",
-            )
-        items.append(
-            {
-                "title": title,
-                "project": project,
-                "owner": owner or "Unassigned",
-                "age": _mission_control_age(action, record),
-                "priority": _safe_text(action.get("priority"), "Medium"),
-                "destination": destination,
-                "record": record,
-            }
-        )
-    return sorted(
-        items,
-        key=lambda item: (
-            _priority_rank(_safe_text(item.get("priority"), "Medium")),
-            _safe_text(item.get("age"), ""),
-            _safe_text(item.get("title"), ""),
-        ),
-    )
+def _mission_control_timestamp_value(timestamp: str | None) -> datetime | None:
+    normalized = _safe_text(timestamp, "")
+    if not normalized:
+        return None
+    try:
+        parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if parsed.tzinfo is not None:
+        return parsed.astimezone()
+    return parsed
 
 
-def _mission_control_risks(
-    signals: list[dict[str, Any]],
-    work_items: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    risks: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for signal in signals:
-        status = _safe_text(signal.get("status"), "")
-        if status not in {"Blocked", "Needs Attention"}:
-            continue
-        project = _safe_text(signal.get("project"), "Project")
-        risk = _safe_text(signal.get("reason"), status)
-        key = f"{project}|{risk}"
-        if key in seen:
-            continue
-        seen.add(key)
-        risks.append(
-            {
-                "Risk": risk,
-                "Project": project,
-                "Severity": "Critical" if status == "Blocked" else "High",
-                "Action": _safe_text(signal.get("destination"), "Open Project"),
-            }
-        )
-    for item in work_items:
-        priority = _safe_text(item.get("priority"), "")
-        if priority.lower() not in {"critical", "high"}:
-            continue
-        project = _safe_text(item.get("project"), "Project")
-        risk = _safe_text(item.get("title"), "")
-        key = f"{project}|{risk}"
-        if key in seen:
-            continue
-        seen.add(key)
-        risks.append(
-            {
-                "Risk": risk,
-                "Project": project,
-                "Severity": priority,
-                "Action": _safe_text(item.get("destination"), "Open Project"),
-            }
-        )
-    return sorted(
-        risks,
-        key=lambda item: (
-            _priority_rank(_safe_text(item.get("Severity"), "Medium")),
-            _safe_text(item.get("Project"), ""),
-        ),
-    )
+def _mission_control_source_label(item: dict[str, Any]) -> str:
+    source = _safe_text(item.get("source_type") or item.get("source"), "")
+    normalized_source = source.replace("_", " ").strip().lower()
+    if normalized_source in {"project", "transaction", "knowledge"}:
+        return normalized_source.title()
+    title = " ".join(
+        [
+            _safe_text(item.get("event") or item.get("title") or item.get("label"), ""),
+            _safe_text(item.get("details"), ""),
+        ]
+    ).lower()
+    transaction_tokens = {
+        "estimate",
+        "sales order",
+        "purchase order",
+        "invoice",
+        "vendor bill",
+        "receiving",
+        "change order",
+        "transaction",
+    }
+    knowledge_tokens = {
+        "price sheet",
+        "pricing",
+        "catalog",
+        "knowledge",
+        "manufacturer",
+        "vendor",
+    }
+    if any(token in title for token in transaction_tokens):
+        return "Transaction"
+    if any(token in title for token in knowledge_tokens):
+        return "Knowledge"
+    return "Project"
 
 
 def _mission_control_activity(
     timeline: list[dict[str, Any]],
     records: list[ProjectWorkspaceRecord],
+    *,
+    transactions_service: TransactionsWorkspaceService | None = None,
+    knowledge_service: CommercialKnowledgeService | None = None,
 ) -> list[dict[str, Any]]:
-    grouped: dict[tuple[str, str], dict[str, Any]] = {}
+    grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+    def _add_row(
+        *,
+        activity: str,
+        source: str,
+        project: str,
+        latest: str,
+        details: str = "",
+    ) -> None:
+        key = (
+            _normalize_recommendation_text(activity),
+            _normalize_recommendation_text(source),
+            _normalize_recommendation_text(project),
+        )
+        row = grouped.setdefault(
+            key,
+            {
+                "Activity": activity,
+                "Source": source,
+                "Project": project,
+                "Count": 0,
+                "Latest": latest,
+                "Details": details,
+            },
+        )
+        row["Count"] = int(row.get("Count", 0) or 0) + 1
+        if latest > _safe_text(row.get("Latest"), ""):
+            row["Latest"] = latest
+            row["Details"] = details
+
     for item in timeline:
         title = _safe_text(
             item.get("event") or item.get("title") or item.get("label"),
@@ -22014,34 +22841,689 @@ def _mission_control_activity(
         )
         if not title:
             continue
-        project = _safe_text(item.get("project"), "Workspace")
-        key = (title, project)
-        row = grouped.setdefault(
-            key,
-            {
-                "Activity": title,
-                "Project": project,
-                "Count": 0,
-                "Latest": _safe_text(item.get("timestamp"), ""),
-            },
+        project = _safe_text(item.get("project"), "")
+        if project in {"", "Workspace"}:
+            project = "Project"
+        _add_row(
+            activity=title,
+            source=_mission_control_source_label(item),
+            project=project,
+            latest=_safe_text(item.get("timestamp"), ""),
+            details=_safe_text(item.get("details"), ""),
         )
-        row["Count"] = int(row.get("Count", 0) or 0) + 1
-        latest = _safe_text(item.get("timestamp"), "")
-        if latest > _safe_text(row.get("Latest"), ""):
-            row["Latest"] = latest
+
+    if transactions_service is not None:
+        try:
+            documents = transactions_service.list_documents(
+                include_archived=True,
+            )
+        except Exception:
+            documents = []
+        for document in documents[:8]:
+            timestamp = _safe_text(
+                getattr(document, "updated_at", None)
+                or getattr(document, "created_at", None),
+                "",
+            )
+            if not timestamp:
+                continue
+            doc_type = _safe_text(
+                getattr(getattr(document, "document_type", None), "value", None)
+                or getattr(document, "document_type", None),
+                "document",
+            )
+            doc_number = _safe_text(
+                getattr(document, "document_number", None)
+                or getattr(document, "document_id", None),
+                "n/a",
+            )
+            project = _safe_text(
+                getattr(document, "project_code", None)
+                or getattr(document, "project_id", None)
+                or getattr(document, "customer_id", None),
+                "Unscoped",
+            )
+            status = _safe_text(
+                getattr(getattr(document, "lifecycle_state", None), "value", None)
+                or getattr(document, "lifecycle_state", None),
+                "",
+            )
+            _add_row(
+                activity=f"{doc_type.replace('_', ' ').title()} {doc_number}",
+                source="Transaction",
+                project=project,
+                latest=timestamp,
+                details=status.replace("_", " ").title() if status else "Updated",
+            )
+
+    if knowledge_service is not None:
+        try:
+            dashboard = knowledge_service.dashboard_summary()
+        except Exception:
+            dashboard = {}
+        for item in list(dashboard.get("latest_imports") or [])[:5]:
+            timestamp = _safe_text(item.get("import_date"), "")
+            if not timestamp:
+                continue
+            version = _safe_text(item.get("version"), "Latest import")
+            vendor = _safe_text(item.get("vendor"), "Vendor")
+            manufacturer = _safe_text(item.get("manufacturer"), "Manufacturer")
+            _add_row(
+                activity=f"Price sheet import · {version}",
+                source="Knowledge",
+                project=f"{vendor} / {manufacturer}",
+                latest=timestamp,
+                details="Catalog data refreshed",
+            )
+
     if not grouped:
         for record in records[:6]:
-            grouped[("Project updated", record.project.name)] = {
-                "Activity": "Project updated",
-                "Project": record.project.name,
-                "Count": 1,
-                "Latest": _format_recent_opened_at(
+            _add_row(
+                activity="Project updated",
+                source="Project",
+                project=_safe_text(record.project.name, "Project"),
+                latest=_safe_text(record.last_opened_at or record.updated_at, ""),
+                details=_safe_text(record.project.client, "Client"),
+            )
+
+    rows = list(grouped.values())
+    rows.sort(
+        key=lambda item: (
+            _mission_control_timestamp_value(_safe_text(item.get("Latest"), ""))
+            or datetime.min,
+            _safe_text(item.get("Source"), ""),
+            _safe_text(item.get("Project"), ""),
+        ),
+        reverse=True,
+    )
+    for row in rows:
+        row["Latest"] = _format_recent_opened_at(_safe_text(row.get("Latest"), ""))
+    return rows
+
+
+def _mission_control_company_snapshot(
+    *,
+    records: list[ProjectWorkspaceRecord],
+    transactions_metrics: TransactionsOverviewMetrics,
+    knowledge_summary: dict[str, Any],
+    activity: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    active_records = [record for record in records if not record.archived]
+    estimating = [
+        record
+        for record in active_records
+        if _safe_text(
+            getattr(record.project.status, "value", record.project.status), ""
+        )
+        == "estimating"
+    ]
+    setup_needed = [
+        record
+        for record in active_records
+        if not _safe_text(record.project.internal_project_number, "")
+        and _safe_text(
+            getattr(record.project.status, "value", record.project.status), ""
+        )
+        in {"awarded", "engineering", "procurement", "active"}
+    ]
+    return [
+        {"KPI": "Active projects", "Value": len(active_records)},
+        {
+            "KPI": "Open purchase orders",
+            "Value": int(getattr(transactions_metrics, "open_purchase_orders", 0) or 0),
+        },
+        {
+            "KPI": "Pending approvals",
+            "Value": int(getattr(transactions_metrics, "pending_approval", 0) or 0),
+        },
+        {
+            "KPI": "Pricing coverage",
+            "Value": f"{float(knowledge_summary.get('coverage_percentage', 0.0) or 0.0):.0f}%",
+        },
+        {
+            "KPI": "Commercial confidence",
+            "Value": f"{float(knowledge_summary.get('commercial_confidence', 0.0) or 0.0) * 100:.0f}%",
+        },
+        {
+            "KPI": "Recent activity items",
+            "Value": len(activity),
+        },
+        {"KPI": "Projects in estimating", "Value": len(estimating)},
+        {"KPI": "Setup incomplete", "Value": len(setup_needed)},
+    ]
+
+
+def _mission_control_risks(
+    *,
+    active_records: list[ProjectWorkspaceRecord],
+    signals: list[dict[str, Any]],
+    transactions_metrics: TransactionsOverviewMetrics,
+    knowledge_summary: dict[str, Any],
+) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {
+        "Financial": [],
+        "Schedule": [],
+        "Resource": [],
+        "Scope": [],
+        "Data Quality": [],
+    }
+    active_count = len(active_records)
+    stale_projects: list[ProjectWorkspaceRecord] = []
+    for record in active_records:
+        parsed = _mission_control_timestamp_value(
+            record.updated_at or record.created_at
+        )
+        if parsed is None:
+            continue
+        if (date.today() - parsed.date()).days >= 7:
+            stale_projects.append(record)
+    setup_incomplete = [
+        record
+        for record in active_records
+        if not _safe_text(record.project.internal_project_number, "")
+        and _safe_text(
+            getattr(record.project.status, "value", record.project.status), ""
+        )
+        in {"awarded", "engineering", "procurement", "active", "estimating"}
+    ]
+    critical_signals = [
+        item
+        for item in signals
+        if _safe_text(item.get("status"), "").lower() in {"blocked", "needs attention"}
+    ]
+    scope_signals = [
+        item
+        for item in critical_signals
+        if "coordination" in _safe_text(item.get("reason"), "").lower()
+        or "conflict" in _safe_text(item.get("reason"), "").lower()
+        or "model" in _safe_text(item.get("reason"), "").lower()
+        or "resolver" in _safe_text(item.get("reason"), "").lower()
+    ]
+    financial_count = int(getattr(transactions_metrics, "open_purchase_orders", 0) or 0)
+    financial_count += int(getattr(transactions_metrics, "pending_approval", 0) or 0)
+    financial_count += int(getattr(transactions_metrics, "sync_failures", 0) or 0)
+    if financial_count > 0:
+        grouped["Financial"].append(
+            {
+                "Risk": "Commercial workflow needs attention",
+                "Severity": "High" if financial_count < 3 else "Critical",
+                "Project": "Tenant",
+                "Why": (
+                    f"{getattr(transactions_metrics, 'open_purchase_orders', 0)} open purchase orders, "
+                    f"{getattr(transactions_metrics, 'pending_approval', 0)} pending approvals, "
+                    f"{getattr(transactions_metrics, 'sync_failures', 0)} sync failures."
+                ),
+                "Action": "Open Transactions",
+                "Route": "Transactions",
+            }
+        )
+    if stale_projects:
+        grouped["Schedule"].append(
+            {
+                "Risk": "Projects have gone stale",
+                "Severity": "High" if len(stale_projects) < 3 else "Critical",
+                "Project": _safe_text(stale_projects[0].project.name, "Tenant"),
+                "Why": f"{len(stale_projects)} project(s) have not been updated in 7+ days.",
+                "Action": "Open Projects",
+                "Route": "Projects",
+            }
+        )
+    elif active_count > 0:
+        grouped["Schedule"].append(
+            {
+                "Risk": "Active projects still need schedule review",
+                "Severity": "Medium",
+                "Project": _safe_text(active_records[0].project.name, "Tenant"),
+                "Why": f"{active_count} active project(s) are being tracked this week.",
+                "Action": "Open Projects",
+                "Route": "Projects",
+            }
+        )
+    if setup_incomplete:
+        grouped["Resource"].append(
+            {
+                "Risk": "Project setup remains incomplete",
+                "Severity": "High" if len(setup_incomplete) < 3 else "Critical",
+                "Project": _safe_text(setup_incomplete[0].project.name, "Tenant"),
+                "Why": f"{len(setup_incomplete)} project(s) are missing an internal project number.",
+                "Action": "Open Projects",
+                "Route": "Projects",
+            }
+        )
+    if scope_signals:
+        grouped["Scope"].append(
+            {
+                "Risk": "Coordination and resolver issues still need review",
+                "Severity": "High" if len(scope_signals) < 3 else "Critical",
+                "Project": _safe_text(scope_signals[0].get("project"), "Tenant"),
+                "Why": f"{len(scope_signals)} critical coordination signal(s) are open.",
+                "Action": "Open Engineering Review",
+                "Route": "Engineering Review",
+            }
+        )
+    elif critical_signals:
+        grouped["Scope"].append(
+            {
+                "Risk": "Open project attention items remain unresolved",
+                "Severity": "High",
+                "Project": _safe_text(critical_signals[0].get("project"), "Tenant"),
+                "Why": f"{len(critical_signals)} project attention item(s) need follow-up.",
+                "Action": "Open Projects",
+                "Route": "Projects",
+            }
+        )
+
+    products_missing_pricing = int(
+        knowledge_summary.get("products_missing_pricing", 0) or 0
+    )
+    pricing_stale = int(knowledge_summary.get("pricing_stale", 0) or 0)
+    confidence = float(knowledge_summary.get("commercial_confidence", 0.0) or 0.0)
+    if products_missing_pricing > 0 or pricing_stale > 0 or confidence < 0.65:
+        grouped["Data Quality"].append(
+            {
+                "Risk": "Commercial knowledge coverage needs cleanup",
+                "Severity": (
+                    "High" if products_missing_pricing + pricing_stale > 5 else "Medium"
+                ),
+                "Project": "Catalog",
+                "Why": (
+                    f"{products_missing_pricing} products missing pricing, "
+                    f"{pricing_stale} stale pricing items, confidence {confidence * 100:.0f}%."
+                ),
+                "Action": "Open Knowledge",
+                "Route": "Knowledge",
+            }
+        )
+    return grouped
+
+
+def _mission_control_this_week_rows(
+    *,
+    activity: list[dict[str, Any]],
+    transactions_service: TransactionsWorkspaceService | None = None,
+    knowledge_service: CommercialKnowledgeService | None = None,
+) -> list[dict[str, Any]]:
+    start = date.today()
+    end = date.fromordinal(start.toordinal() + 6)
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def _maybe_add(
+        *,
+        title: str,
+        source: str,
+        project: str,
+        timestamp: str,
+        details: str,
+        action: str,
+    ) -> None:
+        parsed = _mission_control_timestamp_value(timestamp)
+        if parsed is None:
+            return
+        if not (start <= parsed.date() <= end):
+            return
+        key = "|".join(
+            [
+                _normalize_recommendation_text(title),
+                _normalize_recommendation_text(source),
+                _normalize_recommendation_text(project),
+            ]
+        )
+        if key in seen:
+            return
+        seen.add(key)
+        rows.append(
+            {
+                "Date": parsed.strftime("%b %d"),
+                "Item": title,
+                "Source": source,
+                "Project": project,
+                "Details": details,
+                "Action": action,
+                "Latest": _format_recent_opened_at(timestamp),
+            }
+        )
+
+    for item in activity:
+        _maybe_add(
+            title=_safe_text(item.get("Activity"), "Activity"),
+            source=_safe_text(item.get("Source"), "Project"),
+            project=_safe_text(item.get("Project"), "Project"),
+            timestamp=_safe_text(item.get("Latest"), ""),
+            details=_safe_text(item.get("Details"), ""),
+            action=(
+                "Open Project"
+                if _safe_text(item.get("Source"), "") == "Project"
+                else "Open Source"
+            ),
+        )
+
+    if transactions_service is not None:
+        try:
+            documents = transactions_service.list_documents(include_archived=True)
+        except Exception:
+            documents = []
+        for document in documents[:5]:
+            timestamp = _safe_text(
+                getattr(document, "updated_at", None)
+                or getattr(document, "created_at", None),
+                "",
+            )
+            _maybe_add(
+                title=f"{_safe_text(getattr(getattr(document, 'document_type', None), 'value', None) or getattr(document, 'document_type', None), 'Document').replace('_', ' ').title()} updated",
+                source="Transaction",
+                project=_safe_text(
+                    getattr(document, "project_code", None)
+                    or getattr(document, "project_id", None)
+                    or getattr(document, "customer_id", None),
+                    "Unscoped",
+                ),
+                timestamp=timestamp,
+                details=_safe_text(
+                    getattr(getattr(document, "lifecycle_state", None), "value", None)
+                    or getattr(document, "lifecycle_state", None),
+                    "",
+                )
+                .replace("_", " ")
+                .title()
+                or "Updated",
+                action="Open Transactions",
+            )
+
+    if knowledge_service is not None:
+        try:
+            dashboard = knowledge_service.dashboard_summary()
+        except Exception:
+            dashboard = {}
+        for item in list(dashboard.get("latest_imports") or [])[:5]:
+            timestamp = _safe_text(item.get("import_date"), "")
+            _maybe_add(
+                title=f"Price sheet import · {_safe_text(item.get('version'), 'Latest import')}",
+                source="Knowledge",
+                project=f"{_safe_text(item.get('vendor'), 'Vendor')} / {_safe_text(item.get('manufacturer'), 'Manufacturer')}",
+                timestamp=timestamp,
+                details="Catalog data refreshed",
+                action="Open Knowledge",
+            )
+
+    rows.sort(
+        key=lambda item: _safe_text(item.get("Latest"), ""),
+        reverse=True,
+    )
+    return rows
+
+
+def _mission_control_open_purchase_order_rows(
+    *,
+    transactions_metrics: TransactionsOverviewMetrics,
+) -> list[dict[str, Any]]:
+    open_count = int(getattr(transactions_metrics, "open_purchase_orders", 0) or 0)
+    partial_count = int(
+        getattr(transactions_metrics, "partially_received_purchase_orders", 0) or 0
+    )
+    sync_failures = int(getattr(transactions_metrics, "sync_failures", 0) or 0)
+    return [
+        {
+            "Metric": "Open purchase orders",
+            "Value": open_count,
+            "Detail": "Open orders remain in the transaction queue.",
+        },
+        {
+            "Metric": "Partially received",
+            "Value": partial_count,
+            "Detail": "Orders with incomplete receiving activity.",
+        },
+        {
+            "Metric": "Sync failures",
+            "Value": sync_failures,
+            "Detail": "Commercial records need sync remediation.",
+        },
+    ]
+
+
+def _render_mission_control_purchase_orders(
+    st: Any,
+    rows: list[dict[str, Any]],
+    *,
+    transactions_metrics: TransactionsOverviewMetrics,
+) -> None:
+    if rows:
+        _render_data_table(st, rows)
+    else:
+        st.caption("No open purchase order rows are available yet.")
+    st.caption(
+        "Detailed purchase-order operational views will remain a future placeholder until transaction workflows are expanded."
+    )
+    if st.button(
+        "Open Transactions",
+        key="atlas_mission_control_open_transactions",
+        width="stretch",
+    ):
+        _open_page(st, "Transactions")
+
+
+def _render_mission_control_risk_groups(
+    st: Any,
+    risks: dict[str, list[dict[str, Any]]],
+    *,
+    workspace_service: ProjectWorkspaceService,
+    active_records: list[ProjectWorkspaceRecord],
+) -> None:
+    focused_project = _safe_text(
+        st.session_state.get("atlas_mission_control_risk_focus"), ""
+    )
+    if focused_project:
+        focus_cols = st.columns([1.0, 0.6], gap="small")
+        focus_cols[0].caption(f"Risk focus: {focused_project}")
+        if focus_cols[1].button(
+            "Clear Focus",
+            key="atlas_mission_control_clear_risk_focus",
+            width="stretch",
+        ):
+            st.session_state["atlas_mission_control_risk_focus"] = ""
+            st.rerun()
+
+    records_by_name = {
+        _safe_text(record.project.name, ""): record for record in active_records
+    }
+    for group_name in ["Financial", "Schedule", "Resource", "Scope", "Data Quality"]:
+        group_rows = list(risks.get(group_name) or [])
+        if focused_project:
+            group_rows = [
+                row
+                for row in group_rows
+                if _safe_text(row.get("Project"), "") in {"Tenant", focused_project}
+            ]
+        with st.container(border=True):
+            st.markdown(f"**{group_name}**")
+            if not group_rows:
+                st.caption("No current risk items in this category.")
+                continue
+            for index, row in enumerate(group_rows):
+                st.markdown(f"**{_safe_text(row.get('Risk'), 'Operational risk')}**")
+                st.caption(
+                    " · ".join(
+                        [
+                            f"Project: {_safe_text(row.get('Project'), 'Tenant')}",
+                            f"Severity: {_safe_text(row.get('Severity'), 'Medium')}",
+                            f"Action: {_safe_text(row.get('Action'), 'Open')}",
+                        ]
+                    )
+                )
+                st.caption(_safe_text(row.get("Why"), ""))
+                row_cols = st.columns([1.0, 1.0], gap="small")
+                if row_cols[0].button(
+                    "Open Focus",
+                    key=f"atlas_mission_risk_open_{group_name}_{index}",
+                    width="stretch",
+                ):
+                    route = _safe_text(row.get("Route"), "Mission Control")
+                    if route == "Projects":
+                        if _safe_text(row.get("Project"), "") in records_by_name:
+                            _open_project_record(
+                                st,
+                                records_by_name[_safe_text(row.get("Project"), "")],
+                                workspace_service,
+                            )
+                        else:
+                            _open_page(st, "Projects")
+                    else:
+                        _open_page(st, route)
+                if row_cols[1].button(
+                    "Focus Project",
+                    key=f"atlas_mission_risk_focus_{group_name}_{index}",
+                    width="stretch",
+                ):
+                    st.session_state["atlas_mission_control_risk_focus"] = _safe_text(
+                        row.get("Project"), ""
+                    )
+                    st.rerun()
+
+
+def _render_mission_control_this_week(
+    st: Any,
+    rows: list[dict[str, Any]],
+    *,
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    _ = workspace_service
+    if rows:
+        _render_data_table(st, rows)
+        if st.button(
+            "Open Projects",
+            key="atlas_mission_control_this_week_open_projects",
+            width="stretch",
+        ):
+            _open_page(st, "Projects")
+        return
+    st.caption(
+        "No dated commitments are currently surfaced. This section will fill automatically when project, transaction, or knowledge records expose a real due date."
+    )
+    if st.button(
+        "Review Active Projects",
+        key="atlas_mission_control_this_week_review_projects",
+        width="stretch",
+    ):
+        _open_page(st, "Projects")
+
+
+def _mission_control_open_projects_rows(
+    records: list[ProjectWorkspaceRecord],
+    *,
+    workspace_service: ProjectWorkspaceService,
+) -> list[dict[str, Any]]:
+    _ = workspace_service
+    rows: list[dict[str, Any]] = []
+    active_records = [record for record in records if not record.archived]
+    active_records.sort(
+        key=lambda item: _safe_text(item.last_opened_at or item.updated_at, ""),
+        reverse=True,
+    )
+    for record in active_records:
+        rows.append(
+            {
+                "Project": _safe_text(record.project.name, "Project"),
+                "Project ID": _safe_text(record.workspace_id, ""),
+                "Customer": _safe_text(record.project.client, "n/a"),
+                "Status": _safe_text(
+                    getattr(record.project.status, "value", record.project.status),
+                    "n/a",
+                )
+                .replace("_", " ")
+                .title(),
+                "Last Activity": _format_recent_opened_at(
                     record.last_opened_at or record.updated_at
                 ),
+                "Next Action": _mission_control_next_action(record),
+                "record": record,
             }
-    rows = list(grouped.values())
-    rows.sort(key=lambda item: _safe_text(item.get("Latest"), ""), reverse=True)
+        )
     return rows
+
+
+def _mission_control_open_projects(
+    st: Any,
+    rows: list[dict[str, Any]],
+    *,
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    if not rows:
+        st.caption("No active projects are currently available.")
+        return
+    records_by_name = {
+        _safe_text(item.project.name, ""): item
+        for item in workspace_service.list_workspaces(include_archived=True, limit=500)
+    }
+    for index, row in enumerate(rows[:8]):
+        record = row.get("record")
+        with st.container(border=True):
+            st.markdown(f"**{_safe_text(row.get('Project'), 'Project')}**")
+            st.caption(
+                " · ".join(
+                    [
+                        f"Customer: {_safe_text(row.get('Customer'), 'n/a')}",
+                        f"Status: {_safe_text(row.get('Status'), 'n/a')}",
+                        f"Last activity: {_safe_text(row.get('Last Activity'), 'n/a')}",
+                    ]
+                )
+            )
+            st.caption(f"Next: {_safe_text(row.get('Next Action'), 'Resume Project')}")
+            action_cols = st.columns([1.0, 1.0, 1.0], gap="small")
+            if action_cols[0].button(
+                "Open Project",
+                key=f"atlas_mission_project_open_{index}",
+                width="stretch",
+            ):
+                if isinstance(record, ProjectWorkspaceRecord):
+                    _open_project_record(st, record, workspace_service)
+                else:
+                    target = records_by_name.get(_safe_text(row.get("Project"), ""))
+                    if target is not None:
+                        _open_project_record(st, target, workspace_service)
+            if action_cols[1].button(
+                "Open Risks",
+                key=f"atlas_mission_project_risks_{index}",
+                width="stretch",
+            ):
+                st.session_state["atlas_mission_control_risk_focus"] = _safe_text(
+                    row.get("Project"), ""
+                )
+                _open_page(st, "Mission Control")
+            if action_cols[2].button(
+                "Open Workflow",
+                key=f"atlas_mission_project_workflow_{index}",
+                width="stretch",
+            ):
+                destination = _safe_text(row.get("Next Action"), "Overview")
+                workflow_page = "Overview"
+                if destination == "Review Estimate":
+                    workflow_page = "Estimate"
+                elif destination == "Complete Setup":
+                    workflow_page = "Overview"
+                elif destination == "Resume Project":
+                    workflow_page = "Overview"
+                if isinstance(record, ProjectWorkspaceRecord):
+                    _navigate_to_project_page(
+                        st,
+                        record=record,
+                        page=workflow_page,
+                        workspace_service=workspace_service,
+                    )
+                else:
+                    _open_page(st, workflow_page)
+
+
+def _render_mission_control_open_projects(
+    st: Any,
+    rows: list[dict[str, Any]],
+    *,
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    _mission_control_open_projects(
+        st,
+        rows,
+        workspace_service=workspace_service,
+    )
 
 
 def _mission_control_completion_label(record: ProjectWorkspaceRecord) -> str:
@@ -22079,12 +23561,19 @@ def _render_mission_control_work_card(
 ) -> None:
     with st.container(border=True):
         st.markdown(f"**{_safe_text(item.get('title'), 'Work item')}**")
-        details = [
-            f"Project: {_safe_text(item.get('project'), 'Project')}",
-            f"Owner: {_safe_text(item.get('owner'), 'Unassigned')}",
-            f"Age: {_safe_text(item.get('age'), 'n/a')}",
-        ]
-        st.caption(" · ".join(details))
+        st.caption(
+            " · ".join(
+                [
+                    f"Project: {_safe_text(item.get('project'), 'Project')}",
+                    f"Owner: {_safe_text(item.get('owner'), 'Unassigned')}",
+                    f"Age: {_safe_text(item.get('age'), 'n/a')}",
+                ]
+            )
+        )
+        st.caption(
+            f"Next: {_safe_text(item.get('destination'), 'Open')}"
+            f" · {_safe_text(item.get('focus'), 'Review source context')}"
+        )
         record = item.get("record")
         if st.button(
             _safe_text(item.get("destination"), "Open"),
@@ -22148,41 +23637,6 @@ def _render_mission_control_continue_working(
                 width="stretch",
             ):
                 _open_project_record(st, record, workspace_service)
-
-
-def _mission_control_company_snapshot(
-    *,
-    records: list[ProjectWorkspaceRecord],
-    work_items: list[dict[str, Any]],
-    risks: list[dict[str, Any]],
-    activity: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    active_records = [record for record in records if not record.archived]
-    estimating = [
-        record
-        for record in active_records
-        if _safe_text(
-            getattr(record.project.status, "value", record.project.status), ""
-        )
-        == "estimating"
-    ]
-    setup_needed = [
-        record
-        for record in active_records
-        if not _safe_text(record.project.internal_project_number, "")
-        and _safe_text(
-            getattr(record.project.status, "value", record.project.status), ""
-        )
-        in {"awarded", "engineering", "procurement", "active"}
-    ]
-    return [
-        {"KPI": "Active projects", "Value": len(active_records)},
-        {"KPI": "Open work items", "Value": len(work_items)},
-        {"KPI": "Operational risks", "Value": len(risks)},
-        {"KPI": "Recent changes", "Value": len(activity)},
-        {"KPI": "Projects in estimating", "Value": len(estimating)},
-        {"KPI": "Setup incomplete", "Value": len(setup_needed)},
-    ]
 
 
 def _render_application_administration_page(
@@ -26471,6 +27925,7 @@ def _render_estimate_page(
     record: ProjectWorkspaceRecord,
     context: dict[str, Any] | None,
 ) -> None:
+    summary = _build_project_analysis_summary(record, context)
     _render_page_header(
         st,
         "Estimate",
@@ -26486,6 +27941,13 @@ def _render_estimate_page(
         st,
         "Estimate Workspace",
         "Estimate sections retain deterministic behavior while using shared presentation wrappers for clearer hierarchy.",
+    )
+    _render_bid_review_journey_panel(
+        st,
+        project_id=record.project.project_id,
+        project_name=record.project.name,
+        summary=summary,
+        route_name="Estimate",
     )
     review = context.get("review") if context else None
     labor_estimate = getattr(review, "labor_estimate", None) if review else None
@@ -28023,6 +29485,13 @@ def _render_project_summary_page(
         "Project Summary",
         "Health, readiness, and next-action tables are rendered with shared primitives for consistency.",
     )
+    _render_bid_review_journey_panel(
+        st,
+        project_id=record.project.project_id,
+        project_name=record.project.name,
+        summary=summary,
+        route_name="Project Summary",
+    )
 
     cards = _responsive_control_columns(st, 5)
     _metric_card(cards[0], "Document Count", str(summary["document_count"]))
@@ -28789,6 +30258,13 @@ def _render_scope_risk_page(
 
     finding_rows = _scope_risk_findings(context)
     if not finding_rows:
+        _render_bid_review_journey_panel(
+            st,
+            project_id=record.project.project_id,
+            project_name=record.project.name,
+            summary=_build_project_analysis_summary(record, context),
+            route_name="Scope & Risk",
+        )
         _render_guided_empty_state(
             st,
             why_empty="No scope and risk findings are available yet.",
@@ -28801,6 +30277,13 @@ def _render_scope_risk_page(
         st,
         "Scope and Risk Workspace",
         "Priority findings, sectioned risk tables, and drill-down details now use shared spacing and table wrappers.",
+    )
+    _render_bid_review_journey_panel(
+        st,
+        project_id=record.project.project_id,
+        project_name=record.project.name,
+        summary=_build_project_analysis_summary(record, context),
+        route_name="Scope & Risk",
     )
     metrics = _scope_risk_metrics(finding_rows)
     cards = _responsive_control_columns(st, 4)
@@ -29772,6 +31255,13 @@ def _render_engineering_review_page(
         st,
         "Engineering Review Workspace",
         "Narrative sections and structured findings are aligned with shared headers, action layout, and table wrappers.",
+    )
+    _render_bid_review_journey_panel(
+        st,
+        project_id=record.project.project_id,
+        project_name=record.project.name,
+        summary=_build_project_analysis_summary(record, context),
+        route_name="Engineering Review",
     )
     _render_data_table(
         st,
@@ -33288,44 +34778,29 @@ def _render_project_inspector(
     timeline_rows: list[dict[str, Any]],
     folders: dict[str, list[dict[str, Any]]],
 ) -> None:
-    tabs = st.tabs(
-        [
-            "Overview",
-            "Activity",
-            "Relationships",
-            "Documents",
-            "History",
-            "Administration",
-        ]
-    )
-    with tabs[0]:
-        _render_data_table(st, context_rows[:4])
-    with tabs[1]:
-        if timeline_rows:
-            _render_data_table(st, timeline_rows)
-        else:
-            st.caption(
-                "No activity is available because no meaningful project events have been recorded."
-            )
-    with tabs[2]:
-        st.caption(
-            "Open Relationships to inspect connected drawings, specifications, equipment, risks, and evidence."
-        )
-    with tabs[3]:
-        document_rows = [
-            {"Folder": folder, "Files": len(items)}
-            for folder, items in folders.items()
-            if items
-        ]
-        if document_rows:
-            _render_data_table(st, document_rows)
-        else:
-            st.caption("No current documents are classified for this project.")
-    with tabs[4]:
-        st.caption(
-            f"Last activity: {_format_recent_opened_at(record.last_opened_at or record.updated_at)}"
-        )
-    with tabs[5]:
+    _render_data_table(st, context_rows[:4])
+
+    inspector_cols = st.columns([1.05, 1.05, 1.0])
+    with inspector_cols[0]:
+        with st.expander("Activity", expanded=False):
+            if timeline_rows:
+                _render_data_table(st, timeline_rows)
+            else:
+                st.caption(
+                    "No activity is available because no meaningful project events have been recorded."
+                )
+    with inspector_cols[1]:
+        with st.expander("Documents", expanded=False):
+            document_rows = [
+                {"Folder": folder, "Files": len(items)}
+                for folder, items in folders.items()
+                if items
+            ]
+            if document_rows:
+                _render_data_table(st, document_rows)
+            else:
+                st.caption("No current documents are classified for this project.")
+    with inspector_cols[2]:
         with st.expander("Administration", expanded=False):
             _render_data_table(
                 st,
@@ -33333,8 +34808,20 @@ def _render_project_inspector(
                     {"Field": "Workspace ID", "Value": record.workspace_id},
                     {"Field": "Project ID", "Value": record.project.project_id},
                     {"Field": "Archived", "Value": "Yes" if record.archived else "No"},
+                    {
+                        "Field": "Last Activity",
+                        "Value": _format_recent_opened_at(
+                            record.last_opened_at or record.updated_at
+                        ),
+                    },
                 ],
             )
+            if st.button(
+                "Open Relationships",
+                key=f"atlas_project_inspector_open_relationships_{record.workspace_id}",
+                width="stretch",
+            ):
+                _open_page(st, "Relationships")
 
 
 def _build_knowledge_graph(
@@ -37668,25 +39155,90 @@ def _render_upload_panel(
         disabled=not can_upload,
         key=f"atlas_documents_upload_pending_{record.workspace_id}_{picker_key}",
     ):
+        # Stream each pending selection to a secure tempfile and create a FileUploadReference.
+        # Then use DocumentIntakeService to persist canonical files and enqueue background extraction.
+        from atlas_core.services.document_intake_service import (
+            DocumentIntakeService,
+            FileUploadReference,
+        )
+        import mimetypes
+        import uuid
+
+        intake_service = DocumentIntakeService()
         queued_jobs: list[dict[str, Any]] = []
         for item in accepted_items:
             name = _safe_text(item.get("name"), "")
-            data = _read_pending_upload_bytes(item)
-            queued_jobs.append(
-                workspace_service.enqueue_document_processing(
-                    workspace_id=record.workspace_id,
-                    uploaded_files=[(name, data)],
-                    actor_id=_safe_text(
-                        st.session_state.get("atlas_settings_user_id"),
-                        "atlas-ui",
-                    ),
-                    idempotency_key=(
-                        "document_import:"
-                        f"{record.workspace_id}:"
-                        f"{_pending_upload_identity(name, data)}"
-                    ),
+            # Legacy test path: if the pending item contains in-memory bytes, keep calling
+            # workspace_service.enqueue_document_processing for backwards compatibility.
+            if item.get("data") is not None:
+                data = bytes(item.get("data") or b"")
+                queued_jobs.append(
+                    workspace_service.enqueue_document_processing(
+                        workspace_id=record.workspace_id,
+                        uploaded_files=[(name, data)],
+                        actor_id=_safe_text(
+                            st.session_state.get("atlas_settings_user_id"),
+                            "atlas-ui",
+                        ),
+                        idempotency_key=(
+                            "document_import:"
+                            f"{record.workspace_id}:"
+                            f"{_pending_upload_identity(name, data)}"
+                        ),
+                    )
                 )
+                continue
+
+            data_path = _safe_text(item.get("data_path"), "")
+            if not data_path:
+                continue
+            tmp_path = Path(data_path)
+            size = int(
+                item.get("size")
+                or (tmp_path.stat().st_size if tmp_path.exists() else 0)
             )
+            checksum = _safe_text(item.get("source_hash"), "")
+            mime_type = mimetypes.guess_type(name)[0]
+            session_token = f"ui-{uuid.uuid4().hex[:12]}"
+            ref = FileUploadReference(
+                project_id=record.workspace_id,
+                upload_session_id=session_token,
+                original_filename=name,
+                canonical_filename=Path(name).name,
+                temporary_path=tmp_path,
+                size_bytes=size,
+                checksum=checksum,
+                mime_type=mime_type,
+            )
+
+            # Build the package from file refs; do not run extraction now (deferred).
+            try:
+                result = intake_service.build_session_package_from_file_refs(
+                    [ref],
+                    uploads_root=str(
+                        Path("AtlasProjects") / record.workspace_id / "intake"
+                    ),
+                    session_id=ref.upload_session_id,
+                    project_id=record.workspace_id,
+                    run_extraction=False,
+                )
+            except Exception as exc:
+                st.error(f"Failed to persist upload {name}: {exc}")
+                continue
+
+            # spawn background extraction for any queued jobs created in this package
+            jobs_dir = Path(result.package_path) / ".jobs"
+            if jobs_dir.exists():
+                for job_file in jobs_dir.glob("*.json"):
+                    try:
+                        queued_pid = intake_service.spawn_extraction_worker_for_job(
+                            job_file
+                        )
+                        queued_jobs.append(
+                            {"job_file": str(job_file), "pid": queued_pid}
+                        )
+                    except Exception:
+                        continue
         removable_identity_keys = {
             str(item.get("identity_key") or "")
             for item in accepted_items
@@ -37727,24 +39279,37 @@ def _render_project_files_page(
         "Documents Workspace",
         "Summary, filters, and file tables now use shared section spacing and table wrappers.",
     )
+    _render_bid_review_journey_panel(
+        st,
+        project_id=record.project.project_id,
+        project_name=record.project.name,
+        summary=_build_project_analysis_summary(record, context),
+        route_name="Documents",
+    )
 
     folder_counts = {
         key: len(value) for key, value in _files_by_folder(context).items()
     }
     _render_section_title(st, "Summary")
-    _render_data_table(
+    _shared_render_metric_strip(
         st,
         [
-            {
-                "Drawings": folder_counts.get("Drawings", 0),
-                "Specifications": folder_counts.get("Specifications", 0),
-                "Schedules": folder_counts.get("Schedules", 0),
-                "Addenda": folder_counts.get("Addenda", 0),
-                "Images": folder_counts.get("Images", 0),
-                "Other Documents": folder_counts.get("Other Documents", 0),
-            }
+            ("Drawings", str(folder_counts.get("Drawings", 0))),
+            ("Specifications", str(folder_counts.get("Specifications", 0))),
+            ("Schedules", str(folder_counts.get("Schedules", 0))),
+            ("Other Documents", str(folder_counts.get("Other Documents", 0))),
         ],
     )
+    with st.expander("Additional File Counts", expanded=False):
+        _render_data_table(
+            st,
+            [
+                {
+                    "Addenda": folder_counts.get("Addenda", 0),
+                    "Images": folder_counts.get("Images", 0),
+                }
+            ],
+        )
 
     _render_section_title(st, "Primary Action")
     _render_upload_panel(st, workspace_service, record)
@@ -42050,8 +43615,17 @@ def _render_mission_control_panels(
     st: Any,
     workspace_service: ProjectWorkspaceService,
     mission_control_payload: dict[str, Any] | None,
+    *,
+    transactions_service: TransactionsWorkspaceService | None = None,
+    knowledge_service: CommercialKnowledgeService | None = None,
 ) -> None:
-    _render_home_workspace_panels(st, workspace_service, mission_control_payload)
+    _render_home_workspace_panels(
+        st,
+        workspace_service,
+        mission_control_payload,
+        transactions_service=transactions_service,
+        knowledge_service=knowledge_service,
+    )
 
 
 def _render_shell(
@@ -42138,11 +43712,15 @@ def _render_shell(
             confidence_text = f"{int(confidence * 100)}%"
         elif confidence is not None:
             confidence_text = _safe_text(confidence, "n/a")
+        estimate_action_state = _project_estimate_action_state(st, record)
 
         project_header = _build_project_context_header(
             record,
             customer=_safe_text(summary.get("customer"), "Not available"),
             confidence=confidence_text,
+            estimate_status=_safe_text(
+                estimate_action_state.get("label"), "No estimate available"
+            ),
             recommended_next_action=_safe_text(
                 next_action.get("step"),
                 "Review project overview",
