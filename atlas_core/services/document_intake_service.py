@@ -758,9 +758,48 @@ class DocumentIntakeService:
 
         from multiprocessing import Process
         from atlas_core.services.extraction_worker import run_job_from_jobfile
+        import threading
+        from atlas_core.config.resource_policy import DEFAULT_POLICY
 
         p = Process(target=run_job_from_jobfile, args=(str(job_file_path),))
         p.start()
+
+        # Supervisor thread enforces timeouts and forced-kill grace period
+        def _monitor(proc: Process, job_path: str):
+            timeout = DEFAULT_POLICY.worker_timeout_seconds
+            grace = DEFAULT_POLICY.worker_forced_kill_grace_seconds
+            start = time.time()
+            proc.join(timeout)
+            if proc.is_alive():
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+                # wait for grace
+                proc.join(grace)
+                if proc.is_alive():
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                # update job file to indicate timeout
+                try:
+                    with open(job_path, "r", encoding="utf-8") as fh:
+                        js = json.load(fh)
+                except Exception:
+                    js = {}
+                js["stage"] = "failed"
+                js["failure_reason"] = "timeout"
+                js["updated_at"] = time.time()
+                js["completed_at"] = time.time()
+                try:
+                    with open(job_path, "w", encoding="utf-8") as fh:
+                        json.dump(js, fh)
+                except Exception:
+                    pass
+
+        monitor = threading.Thread(target=_monitor, args=(p, str(job_file_path)), daemon=True)
+        monitor.start()
         return p.pid
 
     def inspect_uploaded_files(

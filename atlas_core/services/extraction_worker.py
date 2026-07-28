@@ -9,6 +9,31 @@ import resource
 import time
 import os
 from atlas_core.services.pdf_text_extraction_service import PdfTextExtractionService
+from atlas_core.config.resource_policy import DEFAULT_POLICY
+try:
+    import psutil
+except Exception:
+    psutil = None
+
+
+def _apply_memory_limit_if_configured():
+    """Apply RLIMIT_AS (address space) if configured in DEFAULT_POLICY.
+
+    Returns a dict describing what was applied.
+    """
+    info = {"applied": False, "mechanism": None, "limit_bytes": None, "error": None}
+    limit = DEFAULT_POLICY.worker_memory_limit_bytes
+    if not limit:
+        return info
+    try:
+        # RLIMIT_AS is address space limit (bytes) on most Unixes
+        soft = limit
+        hard = limit
+        resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+        info.update({"applied": True, "mechanism": "RLIMIT_AS", "limit_bytes": limit})
+    except Exception as exc:
+        info.update({"applied": False, "mechanism": "RLIMIT_AS", "error": str(exc)})
+    return info
 
 
 def worker_main(pdf_path: str, out_json: str) -> None:
@@ -17,6 +42,9 @@ def worker_main(pdf_path: str, out_json: str) -> None:
     Produces a JSON payload containing extraction pages and resource measurements.
     """
     path = Path(pdf_path)
+    # apply memory containment as early as possible
+    containment_info = _apply_memory_limit_if_configured()
+
     start_ts = time.time()
     pid = os.getpid()
     _ = resource.getrusage(resource.RUSAGE_SELF)
@@ -33,6 +61,14 @@ def worker_main(pdf_path: str, out_json: str) -> None:
 
     end_ts = time.time()
     rusage_after = resource.getrusage(resource.RUSAGE_SELF)
+    # try to get RSS via psutil if available
+    rss_bytes = None
+    try:
+        if psutil is not None:
+            p = psutil.Process(pid)
+            rss_bytes = getattr(p.memory_info(), "rss", None)
+    except Exception:
+        rss_bytes = None
 
     payload = {
         "status": status,
@@ -45,6 +81,8 @@ def worker_main(pdf_path: str, out_json: str) -> None:
             "elapsed_seconds": end_ts - start_ts,
             # ru_maxrss units are platform dependent (bytes on Linux, kilobytes on macOS)
             "ru_maxrss": getattr(rusage_after, "ru_maxrss", None),
+            "rss_bytes": rss_bytes,
+            "containment": containment_info,
         },
     }
 

@@ -20,6 +20,18 @@ class ResourcePolicy:
     memory_stop_threshold_bytes: int = 3 * 1024 * 1024 * 1024  # 3 GiB
     processing_timeout_seconds: int = 60 * 60
     temporary_storage_limit_bytes: int = 10 * 1024 * 1024 * 1024  # 10 GiB
+    # Worker containment settings
+    worker_memory_limit_bytes: int | None = None  # None => do not hard-limit
+    worker_soft_rss_warning_bytes: int | None = 2 * 1024 * 1024 * 1024
+    worker_timeout_seconds: int = 60 * 60
+    worker_forced_kill_grace_seconds: int = 10
+    max_retry_count: int = 2
+    retry_backoff_seconds: int = 5
+    standard_job_concurrency: int = 2
+    very_large_job_concurrency: int = 1
+    pathological_file_behavior: str = "quarantine"  # or 'reject' or 'strict'
+    preflight_page_count_threshold: int = 500
+    preflight_suspicious_stream_length_ratio: float = 10.0
 
 
 def load_policy_from_env() -> ResourcePolicy:
@@ -31,6 +43,17 @@ def load_policy_from_env() -> ResourcePolicy:
             policy.max_accepted_upload_bytes = (
                 int(env["ATLAS_MAX_ACCEPTED_UPLOAD_MIB"]) * 1024 * 1024
             )
+        # worker memory limit in MiB
+        if env.get("ATLAS_WORKER_MEMORY_LIMIT_MIB"):
+            policy.worker_memory_limit_bytes = int(env["ATLAS_WORKER_MEMORY_LIMIT_MIB"]) * 1024 * 1024
+        if env.get("ATLAS_WORKER_TIMEOUT_SECONDS"):
+            policy.worker_timeout_seconds = int(env["ATLAS_WORKER_TIMEOUT_SECONDS"])
+        if env.get("ATLAS_WORKER_SOFT_RSS_WARNING_MIB"):
+            policy.worker_soft_rss_warning_bytes = int(env["ATLAS_WORKER_SOFT_RSS_WARNING_MIB"]) * 1024 * 1024
+        if env.get("ATLAS_MAX_RETRY_COUNT"):
+            policy.max_retry_count = int(env["ATLAS_MAX_RETRY_COUNT"])
+        if env.get("ATLAS_RETRY_BACKOFF_SECONDS"):
+            policy.retry_backoff_seconds = int(env["ATLAS_RETRY_BACKOFF_SECONDS"])
     except Exception:
         pass
     return policy
