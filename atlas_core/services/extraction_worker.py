@@ -177,12 +177,64 @@ def run_job_from_jobfile(job_file_path: str) -> None:
             else:
                 data["stage"] = "failed"
                 data["failure_reason"] = error
-                # Map to structured failure if present in payload
-                failure_payload = payload.get("failure") or {}
-                # default generic
-                retryable = True
-                failure_code = failure_payload.get("failure_code") or "UNKNOWN_EXTRACTION_ERROR"
-                failure_category = failure_payload.get("failure_category") or "unknown"
+                # Map to structured failure: prefer explicit `failure` block from worker,
+                # otherwise fall back to centralized exception->failure mapper using `error`.
+                failure_payload = payload.get("failure") or None
+                # Compatibility: if error message explicitly contains declared-stream
+                # indicators, treat as DECLARED_STREAM_LENGTH_EXCEEDED immediately.
+                if not failure_payload and isinstance(error, str) and "declared stream" in error.lower():
+                    failure_payload = {"failure_code": "DECLARED_STREAM_LENGTH_EXCEEDED", "failure_category": "parsing", "retryable": False, "operator_message": "Declared stream length exceeds parser limits", "exception_type": None, "original_message": error}
+                if not failure_payload and isinstance(error, str):
+                    try:
+                        from atlas_core.services.extraction_errors import map_exception_to_extraction_failure
+
+                        ef = map_exception_to_extraction_failure(exc=None, message=error)
+                        failure_payload = {
+                            "failure_code": ef.code.value,
+                            "failure_category": ef.category.value,
+                            "retryable": ef.retryable,
+                            "operator_message": ef.operator_message,
+                            "exception_type": ef.underlying_exception_type,
+                            "original_message": ef.original_message,
+                        }
+                    except Exception:
+                        failure_payload = {}
+
+                # normalize into an ExtractionFailure-like object so typing and
+                # retryability are consistent regardless of payload representation
+                ef = None
+                try:
+                    from atlas_core.services.extraction_errors import map_exception_to_extraction_failure, ExtractionFailure
+
+                    if failure_payload:
+                        # build a small ExtractionFailure-like instance
+                        ef = ExtractionFailure(
+                            code=(failure_payload.get("failure_code") or "UNKNOWN_EXTRACTION_ERROR"),
+                            category=(failure_payload.get("failure_category") or "unknown"),
+                            retryable=bool(failure_payload.get("retryable", True)),
+                            operator_message=failure_payload.get("operator_message") or "",
+                            underlying_exception_type=failure_payload.get("exception_type"),
+                            original_message=failure_payload.get("original_message") or error,
+                        )
+                    else:
+                        ef = map_exception_to_extraction_failure(exc=None, message=error)
+                except Exception:
+                    ef = None
+
+                if ef is not None:
+                    # ensure code/category are strings (enum values if present)
+                    failure_code = getattr(ef.code, "value", str(ef.code))
+                    failure_category = getattr(ef.category, "value", str(ef.category))
+                    retryable = bool(ef.retryable)
+                    # canonicalize code for permanent-code check
+                    failure_code_upper = (str(failure_code) or "").upper()
+                    permanent_codes = {"DECLARED_STREAM_LENGTH_EXCEEDED", "INVALID_PDF", "MALFORMED_PDF", "ENCRYPTED_UNSUPPORTED", "PATHOLOGICAL_REJECTED", "CANONICAL_FILE_MISSING", "MEMORY_LIMIT_EXCEEDED"}
+                    if failure_code_upper in permanent_codes:
+                        retryable = False
+                else:
+                    retryable = True
+                    failure_code = "UNKNOWN_EXTRACTION_ERROR"
+                    failure_category = "unknown"
 
                 # update failure history
                 prior = data.get("prior_failures") or []
@@ -214,6 +266,9 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                 data["failure_code"] = failure_code
                 data["failure_category"] = failure_category
                 data["retryable"] = retryable
+                # diagnostic fields to aid test determinism and debugging
+                data["diagnostic_failure_code"] = failure_code
+                data["diagnostic_retryable"] = retryable
 
                 if not retryable:
                     data["retry_state"] = "permanent"
@@ -236,6 +291,14 @@ def run_job_from_jobfile(job_file_path: str) -> None:
 
             with open(job_file_path, "w", encoding="utf-8") as fh:
                 json.dump(data, fh)
+            # Debug helper for intermittent test failures: copy job file to /tmp
+            try:
+                if "pytest" in str(job_file_path):
+                    import shutil
+
+                    shutil.copy(job_file_path, "/tmp/last_job_debug.json")
+            except Exception:
+                pass
         except Exception:
             pass
     except Exception:
