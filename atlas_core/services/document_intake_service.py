@@ -632,6 +632,14 @@ class DocumentIntakeService:
             except Exception:
                 # leave job_state unchanged if classifier fails
                 pass
+            # persist resolved policy tier and worker containment settings for the job
+            try:
+                job_state["policy_tier"] = job_state.get("classification_policy") or job_state.get("processing_class")
+                job_state["worker_memory_limit_bytes"] = DEFAULT_POLICY.worker_memory_limit_bytes
+                job_state["worker_soft_rss_warning_bytes"] = DEFAULT_POLICY.worker_soft_rss_warning_bytes
+                job_state["worker_timeout_seconds"] = DEFAULT_POLICY.worker_timeout_seconds
+            except Exception:
+                pass
             try:
                 job_file.write_text(json.dumps(job_state), encoding="utf-8")
             except Exception:
