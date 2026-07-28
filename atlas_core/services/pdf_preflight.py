@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 from typing import Dict, Any
 
-from atlas_core.config.resource_policy import DEFAULT_POLICY
+import atlas_core.config.resource_policy as rp
 
 
 _HEADER_RE = re.compile(rb"%PDF-(?P<ver>\d\.\d)")
@@ -79,7 +79,7 @@ def classify_pdf(path: Path) -> PreflightResult:
     page_estimate = max(counts) if counts else None
     if page_estimate:
         attrs["page_count_estimate"] = page_estimate
-        if page_estimate > DEFAULT_POLICY.preflight_page_count_threshold:
+        if page_estimate > rp.DEFAULT_POLICY.preflight_page_count_threshold:
             reasons.append("high_page_count_estimate")
 
     # suspicious large declared stream lengths
@@ -89,7 +89,7 @@ def classify_pdf(path: Path) -> PreflightResult:
         max_declared = max(lengths)
         attrs["max_declared_stream_length"] = max_declared
         # if any declared length is huge relative to file
-        if max_declared > max(0, DEFAULT_POLICY.preflight_suspicious_stream_length_ratio * size):
+        if max_declared > max(0, rp.DEFAULT_POLICY.preflight_suspicious_stream_length_ratio * size):
             reasons.append("suspicious_declared_stream_length")
 
     # classification by size primarily, with flags
@@ -97,12 +97,12 @@ def classify_pdf(path: Path) -> PreflightResult:
     confidence = 0.6
     recommended_policy = "standard"
 
-    if size > DEFAULT_POLICY.very_large_file_threshold_bytes:
+    if size > rp.DEFAULT_POLICY.very_large_file_threshold_bytes:
         classification = "very_large"
         confidence = 0.9
         recommended_policy = "very_large"
         reasons.append("size_exceeds_very_large_threshold")
-    elif size > DEFAULT_POLICY.large_file_threshold_bytes:
+    elif size > rp.DEFAULT_POLICY.large_file_threshold_bytes:
         classification = "large"
         confidence = 0.8
         recommended_policy = "large"

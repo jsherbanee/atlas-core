@@ -39,4 +39,3 @@ def test_classify_size_thresholds(tmp_path, monkeypatch):
     monkeypatch.setattr("atlas_core.config.resource_policy.DEFAULT_POLICY", ResourcePolicy(large_file_threshold_bytes=100*1024, very_large_file_threshold_bytes=500*1024))
     r = classify_pdf(p)
     assert r.classification == "large"
-*** End Patch
