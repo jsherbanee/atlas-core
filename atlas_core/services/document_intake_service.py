@@ -774,9 +774,26 @@ class DocumentIntakeService:
         from atlas_core.services.extraction_worker import run_job_from_jobfile
         import threading
         from atlas_core.config.resource_policy import DEFAULT_POLICY
+        from atlas_core.services.job_scheduler import get_global_scheduler
+
+        scheduler = get_global_scheduler()
+        decision = scheduler.submit(str(job_file_path))
+        if decision != "admitted":
+            # scheduler has updated job JSON for queued/rejected states
+            return -1
 
         p = Process(target=run_job_from_jobfile, args=(str(job_file_path),))
         p.start()
+
+        # notify scheduler that worker started (record PID)
+        try:
+            # read job id
+            js = json.loads(Path(job_file_path).read_text(encoding="utf-8"))
+            job_id = js.get("job_id")
+            if job_id:
+                scheduler.mark_started(job_id, p.pid)
+        except Exception:
+            pass
 
         # Supervisor thread enforces timeouts and forced-kill grace period
         def _monitor(proc: Process, job_path: str):
@@ -809,6 +826,18 @@ class DocumentIntakeService:
                 try:
                     with open(job_path, "w", encoding="utf-8") as fh:
                         json.dump(js, fh)
+                except Exception:
+                    pass
+            # notify scheduler that worker finished (admit next jobs)
+            try:
+                scheduler.worker_finished(job_id)
+            except Exception:
+                try:
+                    # best-effort: read job_id from file
+                    js2 = json.loads(Path(job_path).read_text(encoding="utf-8"))
+                    jid2 = js2.get("job_id")
+                    if jid2:
+                        scheduler.worker_finished(jid2)
                 except Exception:
                     pass
 
