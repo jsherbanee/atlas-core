@@ -60,6 +60,25 @@ Startup Reconciliation
 - Reconciliation writes `reconciled_at`, `reconciliation_reason`, `reconciliation_action`, `previous_scheduler_state`, and `scheduler_generation` into job JSON.
 - The reconciliation process emits structured events: `startup_scan`, `job_verified`, `job_requeued`, `job_failed`, and `scheduler_rebuilt`.
 
+Automatic Streamlit Startup Reconciliation
+
+- The Streamlit application automatically runs startup reconciliation once per process during application initialization to rebuild in-memory scheduler state before admitting new extraction jobs.
+- The startup run is guarded by an exactly-once process-local lock: repeated Streamlit reruns in the same process will not re-run reconciliation.
+- Environment variables to control behavior:
+	- `ATLAS_STARTUP_RECONCILIATION_ENABLED` — if set to `0` or `false` the startup run is skipped (default: enabled).
+	- `ATLAS_RECONCILIATION_ROOT` — path to uploads root scanned (default: `outputs/uploads`).
+	- `ATLAS_RECONCILIATION_FAIL_CLOSED` — if set (`1`/`true`), a startup failure leaves admissions blocked (rejecting new submissions); otherwise the system fail-opens and allows new submissions while marking startup as degraded.
+- While reconciliation runs the scheduler admission mode is deterministically set to `queue` so new submissions are queued until the rebuild completes. On success the scheduler is restored to `allow` admission. On failure the helper honors the `FAIL_CLOSED` flag to choose `reject` (closed) or `allow` (open).
+
+Manual reset and retry
+
+- For operational recovery or in tests, the process-local startup guard can be reset via `atlas_core.services.reconciliation.reset_startup_reconciliation()`; calling `ensure_startup_reconciliation()` after reset will run the startup scan again.
+
+Limitations
+
+- The automatic startup reconciliation is wired into the Streamlit UI startup path only. Other entrypoints (for example, worker-only processes or external supervisors) do not yet invoke reconciliation automatically and should call `ensure_startup_reconciliation()` if they require scheduler state reconstruction.
+- Reconciliation is best-effort and process-local; it does not replace external durable coordination for high-availability deployments.
+
 Implementation Notes & Limitations
 
 - Reconciliation is process-local and best-effort. It annotates job JSON with `reconciled_at`, `reconciliation_reason`, `reconciliation_action`, `previous_scheduler_state`, and `scheduler_generation`.

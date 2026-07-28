@@ -41,12 +41,29 @@ class JobScheduler:
         self._queues: Dict[str, Deque[Tuple[str, float, Path]]] = defaultdict(deque)
         self._active: Dict[str, dict] = {}  # job_id -> {policy, pid}
         self._generation = 0
+        # reconciliation admission control: 'allow' | 'queue' | 'reject'
+        self._admission_mode = "allow"
 
     def reset(self) -> None:
         with self._lock:
             self._queues = defaultdict(deque)
             self._active = {}
             self._generation += 1
+
+    def set_reconciliation_blocking(self, mode: str) -> None:
+        """Set admission behavior during reconciliation: 'allow'|'queue'|'reject'."""
+        with self._lock:
+            if mode not in {"allow", "queue", "reject"}:
+                raise ValueError("invalid mode")
+            self._admission_mode = mode
+
+    def get_generation(self) -> int:
+        with self._lock:
+            return self._generation
+
+    def get_admission_mode(self) -> str:
+        with self._lock:
+            return self._admission_mode
 
     def register_active(self, job_id: str, policy: str, pid: int) -> bool:
         """Register a job as active if it does not violate serialization rules.
@@ -132,6 +149,37 @@ class JobScheduler:
             # else fallthrough to queue 'quarantine' or 'strict'
 
         with self._lock:
+            # If reconciliation admission mode restricts submissions, behave deterministically
+            if self._admission_mode != "allow":
+                if self._admission_mode == "reject":
+                    # mark job as rejected at admission time
+                    try:
+                        js.update({
+                            "scheduler_state": "rejected",
+                            "policy_tier": tier,
+                            "updated_at": now,
+                        })
+                        path.write_text(json.dumps(js), encoding="utf-8")
+                    except Exception:
+                        pass
+                    self._emit_event("admission_blocked", job_id, tier, 0.0)
+                    return "rejected"
+                else:
+                    # queue deterministically while reconciliation ongoing
+                    self._queues[tier].append((job_id, now, path))
+                    js.update({
+                        "scheduler_state": "queued",
+                        "queue_position": self._queue_length(),
+                        "queue_entered_at": now,
+                        "policy_tier": tier,
+                        "scheduler_version": self.VERSION,
+                    })
+                    try:
+                        path.write_text(json.dumps(js), encoding="utf-8")
+                    except Exception:
+                        pass
+                    self._emit_event("admission_blocked", job_id, tier, 0.0)
+                    return "queued"
             # If a very_large job active, cannot admit any other
             very_large_active = any(v.get("policy") == "very_large" for v in self._active.values())
 

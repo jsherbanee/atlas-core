@@ -43946,6 +43946,14 @@ def main() -> None:
         _record_bootstrap_phase(st, "query_state_parsed")
         workspace_service = _build_workspace_service()
         _record_bootstrap_phase(st, "workspace_service_ready")
+        # Run startup reconciliation once per process to rebuild scheduler state
+        try:
+            from atlas_core.services.reconciliation import ensure_startup_reconciliation
+
+            ensure_startup_reconciliation()
+        except Exception:
+            # do not let reconciliation failures crash the UI
+            pass
         _ensure_document_processing_worker(workspace_service)
         _record_bootstrap_phase(st, "processing_worker_ready")
         _sync_active_workspace_from_query_params(st, workspace_service)
