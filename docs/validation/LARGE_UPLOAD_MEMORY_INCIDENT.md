@@ -77,6 +77,12 @@ Remaining limitations:
 
 - `pypdf` can allocate large in-memory buffers when parsing certain PDFs; if those PDFs are expected in production, consider post-processing limits or preflight checks that classify and gate very-large PDFs to stricter ResourcePolicy settings.
 
+Retry behavior and recovery notes
+
+- Extraction jobs now include retry metadata and bounded retry semantics. Timeouts and transient errors will schedule a retry (subject to `max_retry_count` and backoff configured in `atlas_core/config/resource_policy.py`).
+- Supervisor ensures worker processes are terminated before retries are scheduled — no orphaned workers should remain after a retry is planned.
+- For persistent failures, jobs will be marked exhausted and must be manually re-ingested or inspected.
+
 Where to find artifacts:
 
 - Per-run JSONs and profiler outputs: `.runtime/validation/large-upload/<run-ts>/validation_results.full.json` and `.runtime/validation/large-upload/<run-ts>/medium_profile.json`.

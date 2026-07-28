@@ -86,3 +86,30 @@ Implementation Notes & Limitations
 - Active jobs are restored only if PID checks pass and policy serialization rules allow it; otherwise the job is queued.
 - The scheduler in-memory state is not durable across a process restart beyond this reconciliation step; operators should run reconciliation at startup and consider external orchestration for HA.
 
+Retry & Failure Recovery
+
+- Jobs now carry retry metadata in their job JSON; key fields include:
+	- `attempt_count`, `max_attempts`
+	- `first_attempt_at`, `last_attempt_at`, `next_retry_at`
+	- `retry_backoff_seconds`, `prior_failures`, `retry_state`, `final_failure_reason`
+
+- Failure classification distinguishes `retryable` vs `permanent` failures. Examples:
+	- retryable: transient worker crash, temporary file access error, supervisor launch failure, recoverable timeout (when policy allows)
+	- permanent: malformed/invalid PDF, encrypted unsupported PDF, pathological policy rejection, missing canonical source, exhausted retries
+
+- Backoff calculation is deterministic by default: `delay = min(max_delay, base * multiplier^(attempt-1))`. Defaults come from `atlas_core.config.resource_policy.DEFAULT_POLICY` and are deterministic (no jitter) to keep tests reproducible.
+
+- On a retryable failure the job JSON is updated (attempt_count, prior_failures, next_retry_at) and the job is marked `retry_state: scheduled`. The original job JSON and canonical files are preserved; no duplicate job files are created.
+
+- A process-local retry dispatcher (`atlas_core/services/retry_dispatcher.py`) scans uploads for due retries and resubmits them to the scheduler when `next_retry_at` has elapsed. The dispatcher is started automatically in the Streamlit startup path and is singleton-per-process. It sleeps until the next due retry and is thread-safe.
+
+- When retries are exhausted the job is marked `retry_state: exhausted` and `final_failure_reason` is set; the job becomes terminal and will not be requeued.
+
+- Timeout behavior: timeouts are recorded as failures and treated as retryable by default (subject to `max_attempts`). Supervisor ensures worker termination before scheduler slots are released and retries are scheduled.
+
+- Reconciliation integrates retry state:
+	- Jobs with `next_retry_at` in the future are deferred during startup (not admitted) and annotated with `reconciliation_action: deferred`.
+	- Jobs with `next_retry_at` past due are eligible for resubmission during reconciliation and will be submitted to the scheduler (which enforces policy and admission gating).
+	- Reconciliation preserves prior failure history and does not duplicate scheduled retries across repeated startups in the same process.
+
+
