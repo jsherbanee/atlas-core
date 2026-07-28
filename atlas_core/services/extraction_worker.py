@@ -225,16 +225,29 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                     # ensure code/category are strings (enum values if present)
                     failure_code = getattr(ef.code, "value", str(ef.code))
                     failure_category = getattr(ef.category, "value", str(ef.category))
-                    retryable = bool(ef.retryable)
-                    # canonicalize code for permanent-code check
-                    failure_code_upper = (str(failure_code) or "").upper()
-                    permanent_codes = {"DECLARED_STREAM_LENGTH_EXCEEDED", "INVALID_PDF", "MALFORMED_PDF", "ENCRYPTED_UNSUPPORTED", "PATHOLOGICAL_REJECTED", "CANONICAL_FILE_MISSING", "MEMORY_LIMIT_EXCEEDED"}
-                    if failure_code_upper in permanent_codes:
-                        retryable = False
                 else:
-                    retryable = True
                     failure_code = "UNKNOWN_EXTRACTION_ERROR"
                     failure_category = "unknown"
+
+                # Determine retryability in a deterministic, single place:
+                # Prefer explicit worker-provided `failure.retryable` when present;
+                # otherwise fall back to the normalized `ef.retryable` from the mapper.
+                explicit_retryable = None
+                try:
+                    explicit_retryable = None if not failure_payload else failure_payload.get("retryable")
+                except Exception:
+                    explicit_retryable = None
+
+                if explicit_retryable is None:
+                    retryable = bool(getattr(ef, "retryable", True))
+                else:
+                    retryable = bool(explicit_retryable)
+
+                # canonicalize code and enforce permanent-code list (case-insensitive)
+                failure_code_upper = (str(failure_code) or "").upper()
+                permanent_codes = {"DECLARED_STREAM_LENGTH_EXCEEDED", "INVALID_PDF", "MALFORMED_PDF", "ENCRYPTED_UNSUPPORTED", "PATHOLOGICAL_REJECTED", "CANONICAL_FILE_MISSING", "MEMORY_LIMIT_EXCEEDED"}
+                if failure_code_upper in permanent_codes:
+                    retryable = False
 
                 # update failure history
                 prior = data.get("prior_failures") or []
