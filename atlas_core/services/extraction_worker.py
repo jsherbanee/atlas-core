@@ -268,15 +268,7 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                 data["last_attempt_at"] = time.time()
 
                 max_attempts = int(data.get("max_attempts") or DEFAULT_POLICY.max_retry_count)
-                # DEBUG: inspect decision variables (temporary)
-                try:
-                    print("DEBUG: failure_payload=", failure_payload)
-                    print("DEBUG: ef=", getattr(ef, '__dict__', ef))
-                    print("DEBUG: failure_code=", failure_code)
-                    print("DEBUG: retryable(before)=", retryable)
-                    print("DEBUG: attempts=", attempts, "max_attempts=", max_attempts)
-                except Exception:
-                    pass
+                # (debug prints removed)
 
                 # persist structured fields
                 data["failure_code"] = failure_code
