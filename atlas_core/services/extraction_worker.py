@@ -256,7 +256,7 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                     "reason": error,
                     "code": failure_code,
                     "category": failure_category,
-                    "retryable": bool(failure_payload.get("retryable", True)),
+                    "retryable": bool(retryable),
                 })
                 data["prior_failures"] = prior
 
@@ -268,12 +268,6 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                 data["last_attempt_at"] = time.time()
 
                 max_attempts = int(data.get("max_attempts") or DEFAULT_POLICY.max_retry_count)
-                # classify retryability primarily by structured code, fallback to message
-                retryable = bool(failure_payload.get("retryable", True))
-                # permanent classification: structured code indicating permanent
-                permanent_codes = {"DECLARED_STREAM_LENGTH_EXCEEDED", "INVALID_PDF", "MALFORMED_PDF", "ENCRYPTED_UNSUPPORTED", "PATHOLOGICAL_REJECTED", "CANONICAL_FILE_MISSING", "MEMORY_LIMIT_EXCEEDED"}
-                if failure_code in permanent_codes:
-                    retryable = False
 
                 # persist structured fields
                 data["failure_code"] = failure_code
