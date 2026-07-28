@@ -9,6 +9,8 @@ import resource
 import time
 import os
 from atlas_core.services.pdf_text_extraction_service import PdfTextExtractionService
+from atlas_core.services.extraction_errors import map_exception_to_extraction_failure
+from atlas_core.services.extraction_errors import ExtractionFailure, ExtractionFailureCode
 from atlas_core.config.resource_policy import DEFAULT_POLICY
 try:
     import psutil
@@ -63,10 +65,21 @@ def worker_main(pdf_path: str, out_json: str, policy: dict | None = None) -> Non
         records = [page.to_dict() for page in pages]
         status = "ok"
         error = None
+        failure_payload = None
     except Exception as exc:
         records = []
         status = "error"
         error = str(exc)
+        # Map exception to structured extraction failure
+        ef = map_exception_to_extraction_failure(exc=exc, message=error)
+        failure_payload = {
+            "failure_code": ef.code.value,
+            "failure_category": ef.category.value,
+            "retryable": ef.retryable,
+            "operator_message": ef.operator_message,
+            "exception_type": ef.underlying_exception_type,
+            "original_message": ef.original_message,
+        }
 
     end_ts = time.time()
     rusage_after = resource.getrusage(resource.RUSAGE_SELF)
@@ -83,6 +96,7 @@ def worker_main(pdf_path: str, out_json: str, policy: dict | None = None) -> Non
         "status": status,
         "error": error,
         "pages": records,
+        "failure": failure_payload,
         "metrics": {
             "pid": pid,
             "start_ts": start_ts,
@@ -163,21 +177,22 @@ def run_job_from_jobfile(job_file_path: str) -> None:
             else:
                 data["stage"] = "failed"
                 data["failure_reason"] = error
-                # determine permanence
+                # Map to structured failure if present in payload
+                failure_payload = payload.get("failure") or {}
+                # default generic
                 retryable = True
-                failure_code = "generic_error"
-                if isinstance(error, str):
-                    el = error.lower()
-                    if any(k in el for k in ("declared stream", "declared stream length", "exceeds maximum")):
-                        retryable = False
-                        failure_code = "permanent_parsing_error"
-                    if any(k in el for k in ("invalid pdf", "malformed", "encrypted", "pathological", "unsupported", "missing")):
-                        retryable = False
-                        failure_code = "permanent_parsing_error"
+                failure_code = failure_payload.get("failure_code") or "UNKNOWN_EXTRACTION_ERROR"
+                failure_category = failure_payload.get("failure_category") or "unknown"
 
                 # update failure history
                 prior = data.get("prior_failures") or []
-                prior.append({"at": time.time(), "reason": error, "code": failure_code, "retryable": retryable})
+                prior.append({
+                    "at": time.time(),
+                    "reason": error,
+                    "code": failure_code,
+                    "category": failure_category,
+                    "retryable": bool(failure_payload.get("retryable", True)),
+                })
                 data["prior_failures"] = prior
 
                 # attempts
@@ -188,6 +203,18 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                 data["last_attempt_at"] = time.time()
 
                 max_attempts = int(data.get("max_attempts") or DEFAULT_POLICY.max_retry_count)
+                # classify retryability primarily by structured code, fallback to message
+                retryable = bool(failure_payload.get("retryable", True))
+                # permanent classification: structured code indicating permanent
+                permanent_codes = {"DECLARED_STREAM_LENGTH_EXCEEDED", "INVALID_PDF", "MALFORMED_PDF", "ENCRYPTED_UNSUPPORTED", "PATHOLOGICAL_REJECTED", "CANONICAL_FILE_MISSING", "MEMORY_LIMIT_EXCEEDED"}
+                if failure_code in permanent_codes:
+                    retryable = False
+
+                # persist structured fields for diagnostics
+                data["failure_code"] = failure_code
+                data["failure_category"] = failure_category
+                data["retryable"] = retryable
+
                 if not retryable:
                     data["retry_state"] = "permanent"
                     data["retryable"] = False

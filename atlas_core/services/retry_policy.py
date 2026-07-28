@@ -31,3 +31,11 @@ def compute_backoff(attempt: int, *, base: int | None = None, multiplier: float 
 
     next_retry_at = time.time() + delay
     return delay, next_retry_at
+
+
+# New helper to determine retryability from structured failure code
+def is_retryable_by_code(failure_code: str | None) -> bool:
+    if not failure_code:
+        return True
+    permanent_codes = {"DECLARED_STREAM_LENGTH_EXCEEDED", "INVALID_PDF", "MALFORMED_PDF", "ENCRYPTED_UNSUPPORTED", "PATHOLOGICAL_REJECTED", "CANONICAL_FILE_MISSING", "MEMORY_LIMIT_EXCEEDED"}
+    return failure_code not in permanent_codes

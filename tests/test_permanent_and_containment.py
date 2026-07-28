@@ -51,7 +51,7 @@ def test_declared_stream_length_permanent(tmp_path, monkeypatch):
 
     # stub worker_main to simulate declared stream length error
     def fake_worker_main(pdf_path, out_json, policy=None):
-        payload = {"status": "error", "error": "Declared stream length of 178257872 exceeds maximum allowed length.", "pages": [], "metrics": {"pid": os.getpid(), "start_ts": time.time(), "end_ts": time.time(), "elapsed_seconds": 0.1, "containment": {"applied": False}}}
+        payload = {"status": "error", "error": "Declared stream length of 178257872 exceeds maximum allowed length.", "failure": {"failure_code": "DECLARED_STREAM_LENGTH_EXCEEDED", "failure_category": "parsing", "retryable": False, "operator_message": "Declared stream length exceeds parser limits", "exception_type": null, "original_message": "Declared stream length of 178257872 exceeds maximum allowed length."}, "pages": [], "metrics": {"pid": os.getpid(), "start_ts": time.time(), "end_ts": time.time(), "elapsed_seconds": 0.1, "containment": {"applied": False}}}
         Path(out_json).write_text(json.dumps(payload), encoding="utf-8")
 
     monkeypatch.setattr(extraction_worker, "worker_main", fake_worker_main)
@@ -122,7 +122,7 @@ def test_worker_receives_policy_from_jobfile(tmp_path, monkeypatch):
 
     def fake_worker_main(pdf_path, out_json, policy=None):
         captured['policy'] = policy
-        payload = {"status": "ok", "error": None, "pages": [], "metrics": {"pid": os.getpid(), "start_ts": time.time(), "end_ts": time.time(), "elapsed_seconds": 0.01, "containment": {"applied": False}}}
+        payload = {"status": "ok", "error": None, "pages": [], "metrics": {"pid": os.getpid(), "start_ts": time.time(), "end_ts": time.time(), "elapsed_seconds": 0.01, "containment": {"applied": False}}, "failure": None}
         Path(out_json).write_text(json.dumps(payload), encoding="utf-8")
 
     monkeypatch.setattr(extraction_worker, "worker_main", fake_worker_main)

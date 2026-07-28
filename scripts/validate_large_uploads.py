@@ -78,7 +78,8 @@ def run_case(service: DocumentIntakeService, output_dir: Path, files: list[tuple
             record["configured_worker_memory_limit_bytes"] = data.get("worker_memory_limit_bytes")
             record["containment_applied"] = data.get("containment_applied")
             record["containment_reason"] = data.get("containment_reason")
-            record["failure_category"] = (data.get("final_failure_reason") or data.get("failure_reason"))
+            record["failure_code"] = data.get("failure_code")
+            record["failure_category"] = data.get("failure_category")
             record["retryable"] = data.get("retryable")
             record["retry_state"] = data.get("retry_state")
             record["final_failure_reason"] = data.get("final_failure_reason")
@@ -219,11 +220,17 @@ def main():
             state = j.get("job_state_after") or {}
             stage = state.get("stage")
             retry_state = state.get("retry_state")
+            # acceptance assertions using structured failure codes when available
+            fcode = state.get("failure_code")
             failure = (state.get("final_failure_reason") or state.get("failure_reason") or "")
             lf = failure.lower() if isinstance(failure, str) else ""
             if stage == "failed" and retry_state in {"pending", "scheduled"}:
-                if any(k in lf for k in permanent_indicators):
-                    violations.append({"job": j.get("job_file"), "failure": failure, "retry_state": retry_state})
+                # if structured code exists, use it to detect declared-stream failures
+                if fcode == "DECLARED_STREAM_LENGTH_EXCEEDED":
+                    violations.append({"job": j.get("job_file"), "failure_code": fcode, "retry_state": retry_state})
+                else:
+                    if any(k in lf for k in permanent_indicators):
+                        violations.append({"job": j.get("job_file"), "failure": failure, "retry_state": retry_state})
     if violations:
         # write violations to run dir for inspection
         (run_dir / "permanent_failure_violations.json").write_text(json.dumps(violations, indent=2), encoding="utf-8")

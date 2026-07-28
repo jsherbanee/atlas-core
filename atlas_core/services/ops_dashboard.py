@@ -57,6 +57,16 @@ def summarize_uploads_root(uploads_root: str | Path = "outputs/uploads") -> Dict
                 session_counts["exhausted"] = session_counts.get("exhausted", 0) + 1
                 summary["jobs"]["exhausted"] += 1
 
+            # aggregate by failure code/category for ops insights
+            fcode = js.get("failure_code") or (js.get("prior_failures") or [{}])[-1].get("code") if js.get("prior_failures") else None
+            fcat = js.get("failure_category") or (js.get("prior_failures") or [{}])[-1].get("category") if js.get("prior_failures") else None
+            if fcode:
+                summary.setdefault("failure_by_code", {})
+                summary["failure_by_code"][fcode] = summary["failure_by_code"].get(fcode, 0) + 1
+            if fcat:
+                summary.setdefault("failure_by_category", {})
+                summary["failure_by_category"][fcat] = summary["failure_by_category"].get(fcat, 0) + 1
+
         summary["sessions_detail"][session.name] = session_counts
 
     return summary
