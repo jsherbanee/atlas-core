@@ -35,6 +35,7 @@ from atlas_core.services.source_fitness_service import SourceFitnessService
 from atlas_core.services.intake_instrumentation import instrument_stage
 from atlas_core.utils.streaming import incremental_sha1_from_file
 from atlas_core.config.resource_policy import DEFAULT_POLICY
+from atlas_core.services.pdf_preflight import classify_pdf
 from multiprocessing import Process
 import tempfile
 import time
@@ -608,6 +609,19 @@ class DocumentIntakeService:
                 "worker_pid": None,
                 "destination": str(final_dest),
             }
+            # run lightweight preflight classification and persist metadata
+            try:
+                pre = classify_pdf(final_dest)
+                job_state["classification"] = pre.classification
+                job_state["classification_reasons"] = pre.reasons
+                job_state["classification_attributes"] = pre.attributes
+                job_state["classification_confidence"] = pre.confidence
+                job_state["classification_policy"] = pre.recommended_policy
+                job_state["classifier_version"] = "v1"
+                job_state["classification_timestamp"] = time.time()
+            except Exception:
+                # leave job_state unchanged if classifier fails
+                pass
             try:
                 job_file.write_text(json.dumps(job_state), encoding="utf-8")
             except Exception:
