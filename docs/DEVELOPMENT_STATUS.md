@@ -198,6 +198,16 @@ Latest Alpha UI Cleanup navigation/estimate-add targeted validation baseline: 17
 - validated relationship and activity panels render through shared workspace sections with compatibility empty states where source history is sparse
 - validated responsive widths (820, 980, 1180, 1366) with no horizontal overflow on validated Object Workspace surfaces
 - validated no Streamlit state exceptions during repeated search-handoff and object-workspace return flows
+
+---
+
+**Large Document Processing v1.0 — Complete**
+
+- **Status:** Complete
+- **Scope delivered:** File-backed uploads; deferred extraction workers; ResourcePolicy enforcement; worker memory containment and timeout supervision; PDF preflight classification; policy-aware scheduler; startup reconciliation; bounded retry with deterministic backoff; structured extraction failure taxonomy; atomic permanent-failure transitions; operational reporting and validation harness improvements.
+- **Validation:** Full test suite passing; declared-stream permanent-failure stress tests passed; validation artifacts available under `docs/validation/artifacts/large-upload/validation_results.json`.
+- **Known limitations:** Retry dispatch and reconciliation remain process-local; RLIMIT_AS and RSS semantics are platform-dependent; parser-library limitations for certain pathological PDFs remain. These limitations remain documented and unchanged.
+
 - validated required object families in W-03 scope and compatibility surface set: Customer, Vendor, Manufacturer, Product, Service, Contact, Location, Project, Drawing, Specification, Equipment
 
 ## Tooling Status

@@ -112,4 +112,12 @@ Retry & Failure Recovery
 	- Jobs with `next_retry_at` past due are eligible for resubmission during reconciliation and will be submitted to the scheduler (which enforces policy and admission gating).
 	- Reconciliation preserves prior failure history and does not duplicate scheduled retries across repeated startups in the same process.
 
+	---
+
+	**Large Document Processing v1.0 — Complete**
+
+	- **Status:** Complete
+	- **Summary:** Resource-safety mechanisms (ResourcePolicy propagation, worker memory containment via RLIMIT_AS, policy-aware scheduler tiers, startup reconciliation, bounded retry/backoff, and operational reporting) are implemented and validated. See `docs/validation/artifacts/large-upload/validation_results.json` for representative validation results.
+
+
 

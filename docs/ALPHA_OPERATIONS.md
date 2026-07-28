@@ -128,3 +128,11 @@ Supported statuses:
 - [ALPHA_RELEASE_CHECKLIST.md](ALPHA_RELEASE_CHECKLIST.md)
 - [ALPHA_KNOWN_LIMITATIONS.md](ALPHA_KNOWN_LIMITATIONS.md)
 - [ERROR_LOGGING.md](ERROR_LOGGING.md)
+
+---
+
+**Large Document Processing v1.0 — Complete**
+
+- **Status:** Complete
+- **Notes:** Operational runbook and retry guidance for intake processing were updated to reflect the production hardening of large-document ingestion. See `docs/validation/LARGE_UPLOAD_COMPLETION.md` and `docs/validation/artifacts/large-upload/validation_results.json` for verification artifacts.
+

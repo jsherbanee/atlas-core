@@ -128,6 +128,35 @@ This document tracks product-facing changes for Atlas Preview releases.
 - no MAW parsing
 - no new business logic
 - no persistence redesign
+
+## Unreleased (Large Document Processing v1.0)
+
+### Production Hardening
+
+**Summary**: This change completes the production hardening of Atlas's large-document ingestion subsystem.
+
+### Major additions
+
+- File-backed upload architecture
+- Deferred extraction workers with ResourcePolicy-enforced memory containment and timeout supervision
+- PDF preflight classification and policy selection
+- Policy-aware scheduler and startup reconciliation
+- Deterministic retry and backoff
+- Structured extraction failure taxonomy and atomic permanent-failure transitions
+- Operational reporting and validation harness improvements
+
+### Quality
+
+- `git diff --check`: passed
+- Full test suite: 1688 passed
+- Declared-stream permanent-failure stress test: 50/50 passes
+
+### Known limitations
+
+- Retry dispatch and reconciliation remain process-local
+- RLIMIT_AS and RSS semantics are platform-dependent
+- Parser-library limitations remain for certain pathological PDFs
+
 - no new OCR, drawing parsing, commercial rules, procurement, inventory, accounting, AI, or production demo data
 
 ## Unreleased (PX-04 Knowledge That Works)
