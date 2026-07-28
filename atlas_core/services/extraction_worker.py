@@ -262,13 +262,10 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                 if failure_code in permanent_codes:
                     retryable = False
 
-                # persist structured fields for diagnostics
+                # persist structured fields
                 data["failure_code"] = failure_code
                 data["failure_category"] = failure_category
                 data["retryable"] = retryable
-                # diagnostic fields to aid test determinism and debugging
-                data["diagnostic_failure_code"] = failure_code
-                data["diagnostic_retryable"] = retryable
 
                 if not retryable:
                     data["retry_state"] = "permanent"
@@ -289,16 +286,27 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                     data["retry_state"] = "scheduled"
                     data["retryable"] = True
 
-            with open(job_file_path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh)
-            # Debug helper for intermittent test failures: copy job file to /tmp
+            # Atomically write job JSON to avoid any reader observing partial state.
+            # Write to a temporary file in the same directory and replace.
             try:
-                if "pytest" in str(job_file_path):
-                    import shutil
-
-                    shutil.copy(job_file_path, "/tmp/last_job_debug.json")
+                job_path = Path(job_file_path)
+                tmp_path = job_path.with_suffix(job_path.suffix + ".tmp")
+                with open(tmp_path, "w", encoding="utf-8") as fh:
+                    json.dump(data, fh)
+                    fh.flush()
+                    try:
+                        os.fsync(fh.fileno())
+                    except Exception:
+                        pass
+                # atomic replace
+                os.replace(str(tmp_path), str(job_path))
             except Exception:
-                pass
+                # best-effort fallback
+                try:
+                    with open(job_file_path, "w", encoding="utf-8") as fh:
+                        json.dump(data, fh)
+                except Exception:
+                    pass
         except Exception:
             pass
     except Exception:
