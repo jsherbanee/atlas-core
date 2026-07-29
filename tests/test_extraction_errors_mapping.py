@@ -1,4 +1,3 @@
-
 from atlas_core.services.extraction_errors import (
     map_exception_to_extraction_failure,
     ExtractionFailureCode,
