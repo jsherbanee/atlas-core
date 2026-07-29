@@ -13,7 +13,10 @@ from atlas_core.domain.deterministic_estimate import (
     ProductResolutionStatus,
 )
 from atlas_core.domain.pricing_engine import PricingStatus
-from atlas_core.domain.product_resolution import ProductResolution
+from atlas_core.domain.product_resolution import (
+    ProductResolution,
+    ProductResolutionCandidate,
+)
 from atlas_core.services.commercial_baseline_validation_service import (
     CommercialBaselineValidationService,
 )
@@ -139,7 +142,7 @@ def test_runtime_av03_validation_is_deterministic_and_project_scoped(
                 self.canonical_product_id = None
                 self.resolution_confidence = 0.9
                 self.resolution_reason = "test"
-                self.candidate_matches = []
+                self.candidate_matches: list[ProductResolutionCandidate] = []
                 self.source_evidence = ["doc#p1"]
                 self.manual_override = None
                 self.manufacturer_id = "Maker"
