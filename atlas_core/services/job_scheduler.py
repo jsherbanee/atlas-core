@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import deque, defaultdict
 from dataclasses import dataclass
+import json
 import threading
 import time
 import logging
@@ -464,7 +465,6 @@ class JobScheduler:
 
 
 # module-level singleton
-import json
 
 _GLOBAL_SCHEDULER: Optional[JobScheduler] = None
 

@@ -49,7 +49,7 @@ def classify_pdf(path: Path) -> PreflightResult:
 
     This is intentionally conservative and fast.
     """
-    ts = time.time()
+    # timestamp not used; avoid unused variable
     size = path.stat().st_size
     data = _read_head_tail(path)
 

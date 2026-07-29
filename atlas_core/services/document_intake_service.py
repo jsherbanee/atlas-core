@@ -882,7 +882,7 @@ class DocumentIntakeService:
         def _monitor(proc: Process, job_path: str):
             timeout = DEFAULT_POLICY.worker_timeout_seconds
             grace = DEFAULT_POLICY.worker_forced_kill_grace_seconds
-            start = time.time()
+            # start timestamp is not used here; remove unused assignment
             proc.join(timeout)
             if proc.is_alive():
                 try:
@@ -902,7 +902,7 @@ class DocumentIntakeService:
                         js = json.load(fh)
                 except Exception:
                     js = {}
-                payload = {"status": "error", "error": "timeout", "metrics": {}}
+                # payload not needed; update job file via `js` directly
                 # reuse the child update logic by invoking _entry's handling inline
                 try:
                     # apply similar retry processing as child result

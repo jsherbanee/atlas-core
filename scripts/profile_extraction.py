@@ -54,13 +54,10 @@ def main(pdf_path: str, out_json: str):
     gc.collect()
     results["steps"].append(snapshot("start"))
 
-    # Step: open PDF reader
-    t0 = time.time()
     reader = PdfReader(str(path))
     results["steps"].append(snapshot("after_open"))
 
     # Step: metadata
-    md = reader.metadata
     results["steps"].append(snapshot("after_metadata"))
 
     # Step: enumerate pages

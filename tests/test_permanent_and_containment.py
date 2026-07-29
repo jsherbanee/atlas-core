@@ -136,7 +136,8 @@ def test_reconciliation_ignores_permanent(tmp_path):
     )
 
     svc = ReconciliationService(uploads_root=str(tmp_path))
-    res = svc.run()
+    # run reconciliation (result unused for this assertion)
+    svc.run()
     # ensure job file still has permanent state and was not requeued
     data = json.loads(jf.read_text(encoding="utf-8"))
     assert data.get("retry_state") == "permanent"
