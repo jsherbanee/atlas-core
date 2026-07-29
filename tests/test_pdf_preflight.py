@@ -1,6 +1,4 @@
-import os
 from pathlib import Path
-import json
 
 from atlas_core.services.pdf_preflight import classify_pdf
 from atlas_core.config.resource_policy import ResourcePolicy
@@ -36,6 +34,12 @@ def test_classify_size_thresholds(tmp_path, monkeypatch):
     big = b"%PDF-1.4\n" + b"0" * 200_000 + b"\n%%EOF\n"
     write_fixture(p, big)
     # monkeypatch policy thresholds to make this "large"
-    monkeypatch.setattr("atlas_core.config.resource_policy.DEFAULT_POLICY", ResourcePolicy(large_file_threshold_bytes=100*1024, very_large_file_threshold_bytes=500*1024))
+    monkeypatch.setattr(
+        "atlas_core.config.resource_policy.DEFAULT_POLICY",
+        ResourcePolicy(
+            large_file_threshold_bytes=100 * 1024,
+            very_large_file_threshold_bytes=500 * 1024,
+        ),
+    )
     r = classify_pdf(p)
     assert r.classification == "large"

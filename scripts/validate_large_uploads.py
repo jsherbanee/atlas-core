@@ -49,10 +49,16 @@ def wait_for_pid(pid: int, timeout: float = 120.0) -> int:
         return status
 
 
-def run_case(service: DocumentIntakeService, output_dir: Path, files: list[tuple[str, Path]]):
+def run_case(
+    service: DocumentIntakeService, output_dir: Path, files: list[tuple[str, Path]]
+):
     session_id = f"val-{int(time.time()*1000)}"
     result = service.build_session_package_from_file_paths(
-        files, uploads_root=output_dir, session_id=session_id, project_id="repro", run_extraction=False
+        files,
+        uploads_root=output_dir,
+        session_id=session_id,
+        project_id="repro",
+        run_extraction=False,
     )
     pkg = result.package_path
     jobs = list((pkg / ".jobs").glob("*.json"))
@@ -75,7 +81,9 @@ def run_case(service: DocumentIntakeService, output_dir: Path, files: list[tuple
             # additional reporting fields for validation
             record["classification"] = data.get("classification")
             record["policy_tier"] = data.get("policy_tier")
-            record["configured_worker_memory_limit_bytes"] = data.get("worker_memory_limit_bytes")
+            record["configured_worker_memory_limit_bytes"] = data.get(
+                "worker_memory_limit_bytes"
+            )
             record["containment_applied"] = data.get("containment_applied")
             record["containment_reason"] = data.get("containment_reason")
             record["failure_code"] = data.get("failure_code")
@@ -97,9 +105,15 @@ def run_case(service: DocumentIntakeService, output_dir: Path, files: list[tuple
                 start = time.time()
                 # pass job-level policy for accurate containment metrics
                 policy = record.get("job_state_after") and {
-                    "worker_memory_limit_bytes": record["job_state_after"].get("worker_memory_limit_bytes"),
-                    "worker_soft_rss_warning_bytes": record["job_state_after"].get("worker_soft_rss_warning_bytes"),
-                    "worker_timeout_seconds": record["job_state_after"].get("worker_timeout_seconds"),
+                    "worker_memory_limit_bytes": record["job_state_after"].get(
+                        "worker_memory_limit_bytes"
+                    ),
+                    "worker_soft_rss_warning_bytes": record["job_state_after"].get(
+                        "worker_soft_rss_warning_bytes"
+                    ),
+                    "worker_timeout_seconds": record["job_state_after"].get(
+                        "worker_timeout_seconds"
+                    ),
                 }
                 worker_main(dest, out_path, policy=policy)
                 elapsed = time.time() - start
@@ -181,13 +195,19 @@ def main():
 
     # 1. small
     small_src = fresh_copy(small_master, "small.pdf")
-    results.append({"case": "small", **run_case(service, run_dir, [("small.pdf", small_src)])})
+    results.append(
+        {"case": "small", **run_case(service, run_dir, [("small.pdf", small_src)])}
+    )
     # 2. medium
     medium_src = fresh_copy(medium_master, "medium.pdf")
-    results.append({"case": "medium", **run_case(service, run_dir, [("medium.pdf", medium_src)])})
+    results.append(
+        {"case": "medium", **run_case(service, run_dir, [("medium.pdf", medium_src)])}
+    )
     # 3. large
     large_src = fresh_copy(large_master, "large.pdf")
-    results.append({"case": "large", **run_case(service, run_dir, [("large.pdf", large_src)])})
+    results.append(
+        {"case": "large", **run_case(service, run_dir, [("large.pdf", large_src)])}
+    )
     # 4. duplicate upload (two identical entries)
     # create two fresh copies of the large master so the intake service can move
     # the first source without causing the second submission to see a missing
@@ -201,19 +221,64 @@ def main():
             print("Warning: checksum mismatch for duplicate fixture copies")
     except Exception:
         pass
-    results.append({"case": "duplicate", **run_case(service, run_dir, [("large.pdf", large_a), ("large.pdf", large_b)])})
+    results.append(
+        {
+            "case": "duplicate",
+            **run_case(
+                service, run_dir, [("large.pdf", large_a), ("large.pdf", large_b)]
+            ),
+        }
+    )
     # 5. two large uploads (two different files)
     large2 = fresh_copy(large_master, "large2.pdf")
-    results.append({"case": "two_large", **run_case(service, run_dir, [("large.pdf", large2), ("large2.pdf", fresh_copy(large_master, "large2.b.pdf") )])})
+    results.append(
+        {
+            "case": "two_large",
+            **run_case(
+                service,
+                run_dir,
+                [
+                    ("large.pdf", large2),
+                    ("large2.pdf", fresh_copy(large_master, "large2.b.pdf")),
+                ],
+            ),
+        }
+    )
 
     # write compact summary back to docs (small, curated)
     out_file = docs_summary_dir / "validation_results.json"
-    compact = [{"case": r["case"] if "case" in r else r, "session": r.get("session") , "jobs": [{"job_file": j.get("job_file"), "spawn_pid": j.get("spawn_pid"), "spawn_exit_code": j.get("spawn_exit_code") } for j in r.get("jobs",[])]} for r in results]
+    compact = [
+        {
+            "case": r["case"] if "case" in r else r,
+            "session": r.get("session"),
+            "jobs": [
+                {
+                    "job_file": j.get("job_file"),
+                    "spawn_pid": j.get("spawn_pid"),
+                    "spawn_exit_code": j.get("spawn_exit_code"),
+                }
+                for j in r.get("jobs", [])
+            ],
+        }
+        for r in results
+    ]
     out_file.write_text(json.dumps(compact, indent=2), encoding="utf-8")
     # also write full run details under run dir
-    (run_dir / "validation_results.full.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+    (run_dir / "validation_results.full.json").write_text(
+        json.dumps(results, indent=2), encoding="utf-8"
+    )
     # Acceptance assertion: permanent parser failures must not end with retry_state pending or scheduled
-    permanent_indicators = ["declared stream", "declared stream length", "exceeds maximum", "invalid pdf", "malformed", "encrypted", "pathological", "unsupported", "missing canonical"]
+    permanent_indicators = [
+        "declared stream",
+        "declared stream length",
+        "exceeds maximum",
+        "invalid pdf",
+        "malformed",
+        "encrypted",
+        "pathological",
+        "unsupported",
+        "missing canonical",
+    ]
     violations = []
     for r in results:
         for j in r.get("jobs", []):
@@ -222,19 +287,37 @@ def main():
             retry_state = state.get("retry_state")
             # acceptance assertions using structured failure codes when available
             fcode = state.get("failure_code")
-            failure = (state.get("final_failure_reason") or state.get("failure_reason") or "")
+            failure = (
+                state.get("final_failure_reason") or state.get("failure_reason") or ""
+            )
             lf = failure.lower() if isinstance(failure, str) else ""
             if stage == "failed" and retry_state in {"pending", "scheduled"}:
                 # if structured code exists, use it to detect declared-stream failures
                 if fcode == "DECLARED_STREAM_LENGTH_EXCEEDED":
-                    violations.append({"job": j.get("job_file"), "failure_code": fcode, "retry_state": retry_state})
+                    violations.append(
+                        {
+                            "job": j.get("job_file"),
+                            "failure_code": fcode,
+                            "retry_state": retry_state,
+                        }
+                    )
                 else:
                     if any(k in lf for k in permanent_indicators):
-                        violations.append({"job": j.get("job_file"), "failure": failure, "retry_state": retry_state})
+                        violations.append(
+                            {
+                                "job": j.get("job_file"),
+                                "failure": failure,
+                                "retry_state": retry_state,
+                            }
+                        )
     if violations:
         # write violations to run dir for inspection
-        (run_dir / "permanent_failure_violations.json").write_text(json.dumps(violations, indent=2), encoding="utf-8")
-        raise AssertionError(f"Permanent parser failures with non-terminal retry state found: {violations}")
+        (run_dir / "permanent_failure_violations.json").write_text(
+            json.dumps(violations, indent=2), encoding="utf-8"
+        )
+        raise AssertionError(
+            f"Permanent parser failures with non-terminal retry state found: {violations}"
+        )
     print(f"Wrote run details to {run_dir}")
 
 

@@ -3,6 +3,7 @@
 
 Exits with non-zero code if any of the checks fail.
 """
+
 from pathlib import Path
 import sys
 import subprocess
@@ -32,7 +33,11 @@ def main():
 
     # 3) .runtime should not be tracked
     try:
-        out = subprocess.check_output(["git", "ls-files", "--", ".runtime"]).decode().strip()
+        out = (
+            subprocess.check_output(["git", "ls-files", "--", ".runtime"])
+            .decode()
+            .strip()
+        )
         if out:
             fail(f".runtime contains tracked files: {out.splitlines()[0]} ...")
     except subprocess.CalledProcessError:

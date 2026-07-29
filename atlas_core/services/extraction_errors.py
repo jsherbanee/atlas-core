@@ -7,11 +7,12 @@ parser/worker exceptions and error messages into structured failure objects.
 Centralizes substring fallbacks so other modules don't perform ad-hoc string
 matching.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum, auto
-from typing import Optional, Any
+from enum import Enum
+from typing import Optional
 
 
 class ExtractionFailureCategory(Enum):
@@ -53,7 +54,11 @@ def _from_message_fallback(msg: str) -> ExtractionFailure:
     """Best-effort substring mapping used only as a centralized compatibility fallback."""
     lm = (msg or "").lower()
     # declared stream length
-    if "declared stream" in lm or "declared stream length" in lm or "exceeds maximum" in lm:
+    if (
+        "declared stream" in lm
+        or "declared stream length" in lm
+        or "exceeds maximum" in lm
+    ):
         return ExtractionFailure(
             code=ExtractionFailureCode.DECLARED_STREAM_LENGTH_EXCEEDED,
             category=ExtractionFailureCategory.PARSING,
@@ -119,7 +124,9 @@ def _from_message_fallback(msg: str) -> ExtractionFailure:
     )
 
 
-def map_exception_to_extraction_failure(exc: Optional[BaseException] = None, message: Optional[str] = None) -> ExtractionFailure:
+def map_exception_to_extraction_failure(
+    exc: Optional[BaseException] = None, message: Optional[str] = None
+) -> ExtractionFailure:
     """Map an exception instance or message to a structured `ExtractionFailure`.
 
     Strategy:

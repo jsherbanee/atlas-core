@@ -634,10 +634,18 @@ class DocumentIntakeService:
                 pass
             # persist resolved policy tier and worker containment settings for the job
             try:
-                job_state["policy_tier"] = job_state.get("classification_policy") or job_state.get("processing_class")
-                job_state["worker_memory_limit_bytes"] = DEFAULT_POLICY.worker_memory_limit_bytes
-                job_state["worker_soft_rss_warning_bytes"] = DEFAULT_POLICY.worker_soft_rss_warning_bytes
-                job_state["worker_timeout_seconds"] = DEFAULT_POLICY.worker_timeout_seconds
+                job_state["policy_tier"] = job_state.get(
+                    "classification_policy"
+                ) or job_state.get("processing_class")
+                job_state["worker_memory_limit_bytes"] = (
+                    DEFAULT_POLICY.worker_memory_limit_bytes
+                )
+                job_state["worker_soft_rss_warning_bytes"] = (
+                    DEFAULT_POLICY.worker_soft_rss_warning_bytes
+                )
+                job_state["worker_timeout_seconds"] = (
+                    DEFAULT_POLICY.worker_timeout_seconds
+                )
             except Exception:
                 pass
             try:
@@ -775,7 +783,9 @@ class DocumentIntakeService:
 
                     js["updated_at"] = time.time()
                     js["completed_at"] = time.time()
-                    js["elapsed_time"] = (payload.get("metrics") or {}).get("elapsed_seconds")
+                    js["elapsed_time"] = (payload.get("metrics") or {}).get(
+                        "elapsed_seconds"
+                    )
                     js["worker_pid"] = os.getpid()
                     status = payload.get("status")
                     error = payload.get("error")
@@ -789,13 +799,28 @@ class DocumentIntakeService:
                         # classify failure: default transient unless obvious permanent indicators
                         retryable = True
                         failure_code = "generic_error"
-                        if (isinstance(error, str) and any(k in error.lower() for k in ("encrypted", "invalid pdf", "pathological", "unsupported"))):
+                        if isinstance(error, str) and any(
+                            k in error.lower()
+                            for k in (
+                                "encrypted",
+                                "invalid pdf",
+                                "pathological",
+                                "unsupported",
+                            )
+                        ):
                             retryable = False
                             failure_code = "permanent_parsing_error"
 
                         # update failure history
                         prior = js.get("prior_failures") or []
-                        prior.append({"at": time.time(), "reason": error, "code": failure_code, "retryable": retryable})
+                        prior.append(
+                            {
+                                "at": time.time(),
+                                "reason": error,
+                                "code": failure_code,
+                                "retryable": retryable,
+                            }
+                        )
                         js["prior_failures"] = prior
 
                         # attempts
@@ -805,13 +830,19 @@ class DocumentIntakeService:
                             js["first_attempt_at"] = time.time()
                         js["last_attempt_at"] = time.time()
 
-                        max_attempts = int(js.get("max_attempts") or DEFAULT_POLICY.max_retry_count)
+                        max_attempts = int(
+                            js.get("max_attempts") or DEFAULT_POLICY.max_retry_count
+                        )
                         if not retryable or attempts >= max_attempts:
-                            js["retry_state"] = "exhausted" if retryable else "permanent"
+                            js["retry_state"] = (
+                                "exhausted" if retryable else "permanent"
+                            )
                             js["final_failure_reason"] = error
                         else:
                             # schedule retry
-                            delay, next_at = compute_backoff(attempts, base=js.get("retry_backoff_seconds"))
+                            delay, next_at = compute_backoff(
+                                attempts, base=js.get("retry_backoff_seconds")
+                            )
                             js["next_retry_at"] = next_at
                             js["retry_state"] = "scheduled"
 
@@ -884,19 +915,30 @@ class DocumentIntakeService:
                     js["stage"] = "failed"
                     js["failure_reason"] = error
                     prior = js.get("prior_failures") or []
-                    prior.append({"at": time.time(), "reason": error, "code": "timeout", "retryable": True})
+                    prior.append(
+                        {
+                            "at": time.time(),
+                            "reason": error,
+                            "code": "timeout",
+                            "retryable": True,
+                        }
+                    )
                     js["prior_failures"] = prior
                     attempts = int(js.get("attempt_count") or 0) + 1
                     js["attempt_count"] = attempts
                     if js.get("first_attempt_at") is None:
                         js["first_attempt_at"] = time.time()
                     js["last_attempt_at"] = time.time()
-                    max_attempts = int(js.get("max_attempts") or DEFAULT_POLICY.max_retry_count)
+                    max_attempts = int(
+                        js.get("max_attempts") or DEFAULT_POLICY.max_retry_count
+                    )
                     if attempts >= max_attempts:
                         js["retry_state"] = "exhausted"
                         js["final_failure_reason"] = error
                     else:
-                        delay, next_at = compute_backoff(attempts, base=js.get("retry_backoff_seconds"))
+                        delay, next_at = compute_backoff(
+                            attempts, base=js.get("retry_backoff_seconds")
+                        )
                         js["next_retry_at"] = next_at
                         js["retry_state"] = "scheduled"
                 except Exception:
@@ -919,7 +961,9 @@ class DocumentIntakeService:
                 except Exception:
                     pass
 
-        monitor = threading.Thread(target=_monitor, args=(p, str(job_file_path)), daemon=True)
+        monitor = threading.Thread(
+            target=_monitor, args=(p, str(job_file_path)), daemon=True
+        )
         monitor.start()
         return p.pid
 

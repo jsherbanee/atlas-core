@@ -10,8 +10,8 @@ import time
 import os
 from atlas_core.services.pdf_text_extraction_service import PdfTextExtractionService
 from atlas_core.services.extraction_errors import map_exception_to_extraction_failure
-from atlas_core.services.extraction_errors import ExtractionFailure, ExtractionFailureCode
 from atlas_core.config.resource_policy import DEFAULT_POLICY
+
 try:
     import psutil
 except Exception:
@@ -23,10 +23,20 @@ def _apply_memory_limit_if_configured(policy: dict | None = None):
 
     Returns a dict describing what was applied and, when not applied, a reason.
     """
-    info = {"applied": False, "mechanism": None, "limit_bytes": None, "error": None, "reason": None}
+    info = {
+        "applied": False,
+        "mechanism": None,
+        "limit_bytes": None,
+        "error": None,
+        "reason": None,
+    }
     limit = None
     try:
-        if policy and isinstance(policy, dict) and policy.get("worker_memory_limit_bytes") is not None:
+        if (
+            policy
+            and isinstance(policy, dict)
+            and policy.get("worker_memory_limit_bytes") is not None
+        ):
             limit = int(policy.get("worker_memory_limit_bytes"))
         else:
             limit = DEFAULT_POLICY.worker_memory_limit_bytes
@@ -43,7 +53,14 @@ def _apply_memory_limit_if_configured(policy: dict | None = None):
         resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
         info.update({"applied": True, "mechanism": "RLIMIT_AS", "limit_bytes": limit})
     except Exception as exc:
-        info.update({"applied": False, "mechanism": "RLIMIT_AS", "error": str(exc), "reason": "apply_failed"})
+        info.update(
+            {
+                "applied": False,
+                "mechanism": "RLIMIT_AS",
+                "error": str(exc),
+                "reason": "apply_failed",
+            }
+        )
     return info
 
 
@@ -107,9 +124,21 @@ def worker_main(pdf_path: str, out_json: str, policy: dict | None = None) -> Non
             "rss_bytes": rss_bytes,
             "containment": containment_info,
             "selected_policy": {
-                "worker_memory_limit_bytes": (policy.get("worker_memory_limit_bytes") if policy and isinstance(policy, dict) else DEFAULT_POLICY.worker_memory_limit_bytes),
-                "worker_soft_rss_warning_bytes": (policy.get("worker_soft_rss_warning_bytes") if policy and isinstance(policy, dict) else DEFAULT_POLICY.worker_soft_rss_warning_bytes),
-                "worker_timeout_seconds": (policy.get("worker_timeout_seconds") if policy and isinstance(policy, dict) else DEFAULT_POLICY.worker_timeout_seconds),
+                "worker_memory_limit_bytes": (
+                    policy.get("worker_memory_limit_bytes")
+                    if policy and isinstance(policy, dict)
+                    else DEFAULT_POLICY.worker_memory_limit_bytes
+                ),
+                "worker_soft_rss_warning_bytes": (
+                    policy.get("worker_soft_rss_warning_bytes")
+                    if policy and isinstance(policy, dict)
+                    else DEFAULT_POLICY.worker_soft_rss_warning_bytes
+                ),
+                "worker_timeout_seconds": (
+                    policy.get("worker_timeout_seconds")
+                    if policy and isinstance(policy, dict)
+                    else DEFAULT_POLICY.worker_timeout_seconds
+                ),
             },
         },
     }
@@ -136,7 +165,9 @@ def run_job_from_jobfile(job_file_path: str) -> None:
             # pass job-level policy to worker_main so containment settings are honored
             policy = {
                 "worker_memory_limit_bytes": data.get("worker_memory_limit_bytes"),
-                "worker_soft_rss_warning_bytes": data.get("worker_soft_rss_warning_bytes"),
+                "worker_soft_rss_warning_bytes": data.get(
+                    "worker_soft_rss_warning_bytes"
+                ),
                 "worker_timeout_seconds": data.get("worker_timeout_seconds"),
             }
             worker_main(dest, out_json_path, policy=policy)
@@ -163,7 +194,9 @@ def run_job_from_jobfile(job_file_path: str) -> None:
             # reason logic: explicit error string or disabled_by_policy
             if not containment.get("applied"):
                 if data.get("worker_memory_limit_bytes"):
-                    data["containment_reason"] = containment.get("error") or "apply_failed"
+                    data["containment_reason"] = (
+                        containment.get("error") or "apply_failed"
+                    )
                 else:
                     data["containment_reason"] = "disabled_by_policy"
             else:
@@ -182,13 +215,28 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                 failure_payload = payload.get("failure") or None
                 # Compatibility: if error message explicitly contains declared-stream
                 # indicators, treat as DECLARED_STREAM_LENGTH_EXCEEDED immediately.
-                if not failure_payload and isinstance(error, str) and "declared stream" in error.lower():
-                    failure_payload = {"failure_code": "DECLARED_STREAM_LENGTH_EXCEEDED", "failure_category": "parsing", "retryable": False, "operator_message": "Declared stream length exceeds parser limits", "exception_type": None, "original_message": error}
+                if (
+                    not failure_payload
+                    and isinstance(error, str)
+                    and "declared stream" in error.lower()
+                ):
+                    failure_payload = {
+                        "failure_code": "DECLARED_STREAM_LENGTH_EXCEEDED",
+                        "failure_category": "parsing",
+                        "retryable": False,
+                        "operator_message": "Declared stream length exceeds parser limits",
+                        "exception_type": None,
+                        "original_message": error,
+                    }
                 if not failure_payload and isinstance(error, str):
                     try:
-                        from atlas_core.services.extraction_errors import map_exception_to_extraction_failure
+                        from atlas_core.services.extraction_errors import (
+                            map_exception_to_extraction_failure,
+                        )
 
-                        ef = map_exception_to_extraction_failure(exc=None, message=error)
+                        ef = map_exception_to_extraction_failure(
+                            exc=None, message=error
+                        )
                         failure_payload = {
                             "failure_code": ef.code.value,
                             "failure_category": ef.category.value,
@@ -204,20 +252,34 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                 # retryability are consistent regardless of payload representation
                 ef = None
                 try:
-                    from atlas_core.services.extraction_errors import map_exception_to_extraction_failure, ExtractionFailure
+                    from atlas_core.services.extraction_errors import (
+                        map_exception_to_extraction_failure,
+                        ExtractionFailure,
+                    )
 
                     if failure_payload:
                         # build a small ExtractionFailure-like instance
                         ef = ExtractionFailure(
-                            code=(failure_payload.get("failure_code") or "UNKNOWN_EXTRACTION_ERROR"),
-                            category=(failure_payload.get("failure_category") or "unknown"),
+                            code=(
+                                failure_payload.get("failure_code")
+                                or "UNKNOWN_EXTRACTION_ERROR"
+                            ),
+                            category=(
+                                failure_payload.get("failure_category") or "unknown"
+                            ),
                             retryable=bool(failure_payload.get("retryable", True)),
-                            operator_message=failure_payload.get("operator_message") or "",
-                            underlying_exception_type=failure_payload.get("exception_type"),
-                            original_message=failure_payload.get("original_message") or error,
+                            operator_message=failure_payload.get("operator_message")
+                            or "",
+                            underlying_exception_type=failure_payload.get(
+                                "exception_type"
+                            ),
+                            original_message=failure_payload.get("original_message")
+                            or error,
                         )
                     else:
-                        ef = map_exception_to_extraction_failure(exc=None, message=error)
+                        ef = map_exception_to_extraction_failure(
+                            exc=None, message=error
+                        )
                 except Exception:
                     ef = None
 
@@ -234,7 +296,11 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                 # otherwise fall back to the normalized `ef.retryable` from the mapper.
                 explicit_retryable = None
                 try:
-                    explicit_retryable = None if not failure_payload else failure_payload.get("retryable")
+                    explicit_retryable = (
+                        None
+                        if not failure_payload
+                        else failure_payload.get("retryable")
+                    )
                 except Exception:
                     explicit_retryable = None
 
@@ -245,19 +311,29 @@ def run_job_from_jobfile(job_file_path: str) -> None:
 
                 # canonicalize code and enforce permanent-code list (case-insensitive)
                 failure_code_upper = (str(failure_code) or "").upper()
-                permanent_codes = {"DECLARED_STREAM_LENGTH_EXCEEDED", "INVALID_PDF", "MALFORMED_PDF", "ENCRYPTED_UNSUPPORTED", "PATHOLOGICAL_REJECTED", "CANONICAL_FILE_MISSING", "MEMORY_LIMIT_EXCEEDED"}
+                permanent_codes = {
+                    "DECLARED_STREAM_LENGTH_EXCEEDED",
+                    "INVALID_PDF",
+                    "MALFORMED_PDF",
+                    "ENCRYPTED_UNSUPPORTED",
+                    "PATHOLOGICAL_REJECTED",
+                    "CANONICAL_FILE_MISSING",
+                    "MEMORY_LIMIT_EXCEEDED",
+                }
                 if failure_code_upper in permanent_codes:
                     retryable = False
 
                 # update failure history
                 prior = data.get("prior_failures") or []
-                prior.append({
-                    "at": time.time(),
-                    "reason": error,
-                    "code": failure_code,
-                    "category": failure_category,
-                    "retryable": bool(retryable),
-                })
+                prior.append(
+                    {
+                        "at": time.time(),
+                        "reason": error,
+                        "code": failure_code,
+                        "category": failure_category,
+                        "retryable": bool(retryable),
+                    }
+                )
                 data["prior_failures"] = prior
 
                 # attempts
@@ -267,7 +343,9 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                     data["first_attempt_at"] = time.time()
                 data["last_attempt_at"] = time.time()
 
-                max_attempts = int(data.get("max_attempts") or DEFAULT_POLICY.max_retry_count)
+                max_attempts = int(
+                    data.get("max_attempts") or DEFAULT_POLICY.max_retry_count
+                )
                 # (debug prints removed)
 
                 # persist structured fields
@@ -289,7 +367,9 @@ def run_job_from_jobfile(job_file_path: str) -> None:
                     # schedule retry
                     from atlas_core.services.retry_policy import compute_backoff
 
-                    delay, next_at = compute_backoff(attempts, base=data.get("retry_backoff_seconds"))
+                    delay, next_at = compute_backoff(
+                        attempts, base=data.get("retry_backoff_seconds")
+                    )
                     data["next_retry_at"] = next_at
                     data["retry_state"] = "scheduled"
                     data["retryable"] = True

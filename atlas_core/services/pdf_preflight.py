@@ -4,6 +4,7 @@ Does not fully parse or render PDFs. Reads small portions of the file
 to estimate page count, detect encryption/linearization, and spot
 large declared stream/object lengths.
 """
+
 from __future__ import annotations
 
 import time
@@ -13,7 +14,6 @@ import re
 from typing import Dict, Any
 
 import atlas_core.config.resource_policy as rp
-
 
 _HEADER_RE = re.compile(rb"%PDF-(?P<ver>\d\.\d)")
 _ENCRYPT_RE = re.compile(rb"/Encrypt\b")
@@ -89,7 +89,9 @@ def classify_pdf(path: Path) -> PreflightResult:
         max_declared = max(lengths)
         attrs["max_declared_stream_length"] = max_declared
         # if any declared length is huge relative to file
-        if max_declared > max(0, rp.DEFAULT_POLICY.preflight_suspicious_stream_length_ratio * size):
+        if max_declared > max(
+            0, rp.DEFAULT_POLICY.preflight_suspicious_stream_length_ratio * size
+        ):
             reasons.append("suspicious_declared_stream_length")
 
     # classification by size primarily, with flags
@@ -109,7 +111,10 @@ def classify_pdf(path: Path) -> PreflightResult:
         reasons.append("size_exceeds_large_threshold")
 
     # escalate for pathological indicators
-    pathological_indicators = {"missing_pdf_header", "suspicious_declared_stream_length"}
+    pathological_indicators = {
+        "missing_pdf_header",
+        "suspicious_declared_stream_length",
+    }
     if any(r in reasons for r in pathological_indicators):
         classification = "pathological"
         confidence = max(confidence, 0.95)
