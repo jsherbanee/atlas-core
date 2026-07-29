@@ -29,22 +29,28 @@ jobs:
       - name: Run type check (no-new-errors against origin/main)
         run: |
           set -euo pipefail
-          # ensure origin/main is available
+          # ensure origin/main is available locally
           git fetch origin main --depth=1 || true
-          current_branch=$(git rev-parse --abbrev-ref HEAD)
 
-          # Run mypy on origin/main (baseline)
-          git checkout --detach origin/main
-          python -m mypy --show-error-codes || true
-          python -m mypy --show-error-codes > /tmp/mypy_origin_raw.txt 2>&1 || true
+          # Save current workspace HEAD (PR commit) and verify later
+          PR_HEAD=$(git rev-parse HEAD)
+
+          # Create a detached git worktree for origin/main to run baseline mypy
+          BASELINE_DIR=$(mktemp -d)
+          git worktree add --detach "$BASELINE_DIR" origin/main
+          # Run mypy in the baseline worktree and normalize diagnostics
+          (cd "$BASELINE_DIR" && python -m mypy --show-error-codes > /tmp/mypy_origin_raw.txt 2>&1) || true
           sed -E 's/^(.*):[0-9]+: (.*)$/\1: \2/' /tmp/mypy_origin_raw.txt | sort -u > /tmp/mypy_origin_norm.txt || true
 
-          # Back to PR branch and run mypy
-          git checkout --detach "$current_branch"
+          # Clean up baseline worktree
+          git worktree remove --force "$BASELINE_DIR" || true
+          rm -rf "$BASELINE_DIR" || true
+
+          # Run mypy in the PR workspace (current checkout)
           python -m mypy --show-error-codes > /tmp/mypy_pr_raw.txt 2>&1 || true
           sed -E 's/^(.*):[0-9]+: (.*)$/\1: \2/' /tmp/mypy_pr_raw.txt | sort -u > /tmp/mypy_pr_norm.txt || true
 
-          # Compare normalized diagnostics: file + message + code
+          # Compare normalized diagnostics: file + message
           comm -23 /tmp/mypy_pr_norm.txt /tmp/mypy_origin_norm.txt > /tmp/mypy_new.txt || true
 
           origin_count=$(wc -l < /tmp/mypy_origin_norm.txt || true)
@@ -58,5 +64,9 @@ jobs:
             cat /tmp/mypy_new.txt >&2
             exit 1
           fi
+
+          # Assert the main workspace is still the PR commit
+          echo "workspace HEAD: $(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$PR_HEAD"
       - name: Run tests
         run: python -m pytest -q
