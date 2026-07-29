@@ -35,6 +35,7 @@ from atlas_core.services.source_fitness_service import SourceFitnessService
 from atlas_core.services.intake_instrumentation import instrument_stage
 from atlas_core.utils.streaming import incremental_sha1_from_file
 from atlas_core.config.resource_policy import DEFAULT_POLICY
+from atlas_core.services.pdf_preflight import classify_pdf
 from multiprocessing import Process
 import tempfile
 import time
@@ -605,9 +606,40 @@ class DocumentIntakeService:
                 "warning": None,
                 "failure_reason": None,
                 "retryable": True,
+                # retry metadata
+                "attempt_count": 0,
+                "max_attempts": DEFAULT_POLICY.max_retry_count,
+                "first_attempt_at": None,
+                "last_attempt_at": None,
+                "next_retry_at": None,
+                "retry_backoff_seconds": DEFAULT_POLICY.retry_backoff_seconds,
+                "prior_failures": [],
+                "retry_state": "pending",
+                "final_failure_reason": None,
                 "worker_pid": None,
                 "destination": str(final_dest),
             }
+            # run lightweight preflight classification and persist metadata
+            try:
+                pre = classify_pdf(final_dest)
+                job_state["classification"] = pre.classification
+                job_state["classification_reasons"] = pre.reasons
+                job_state["classification_attributes"] = pre.attributes
+                job_state["classification_confidence"] = pre.confidence
+                job_state["classification_policy"] = pre.recommended_policy
+                job_state["classifier_version"] = "v1"
+                job_state["classification_timestamp"] = time.time()
+            except Exception:
+                # leave job_state unchanged if classifier fails
+                pass
+            # persist resolved policy tier and worker containment settings for the job
+            try:
+                job_state["policy_tier"] = job_state.get("classification_policy") or job_state.get("processing_class")
+                job_state["worker_memory_limit_bytes"] = DEFAULT_POLICY.worker_memory_limit_bytes
+                job_state["worker_soft_rss_warning_bytes"] = DEFAULT_POLICY.worker_soft_rss_warning_bytes
+                job_state["worker_timeout_seconds"] = DEFAULT_POLICY.worker_timeout_seconds
+            except Exception:
+                pass
             try:
                 job_file.write_text(json.dumps(job_state), encoding="utf-8")
             except Exception:
@@ -737,18 +769,52 @@ class DocumentIntakeService:
                     except Exception:
                         pass
 
-                # update job file with results
+                # update job file with results and apply retry policy if needed
                 try:
-                    js["stage"] = (
-                        "classifying" if payload.get("status") == "ok" else "failed"
-                    )
+                    from atlas_core.services.retry_policy import compute_backoff
+
                     js["updated_at"] = time.time()
                     js["completed_at"] = time.time()
-                    js["elapsed_time"] = (payload.get("metrics") or {}).get(
-                        "elapsed_seconds"
-                    )
+                    js["elapsed_time"] = (payload.get("metrics") or {}).get("elapsed_seconds")
                     js["worker_pid"] = os.getpid()
-                    js["failure_reason"] = payload.get("error")
+                    status = payload.get("status")
+                    error = payload.get("error")
+                    if status == "ok":
+                        js["stage"] = "classifying"
+                        js["failure_reason"] = None
+                        js["retry_state"] = "succeeded"
+                    else:
+                        js["stage"] = "failed"
+                        js["failure_reason"] = error
+                        # classify failure: default transient unless obvious permanent indicators
+                        retryable = True
+                        failure_code = "generic_error"
+                        if (isinstance(error, str) and any(k in error.lower() for k in ("encrypted", "invalid pdf", "pathological", "unsupported"))):
+                            retryable = False
+                            failure_code = "permanent_parsing_error"
+
+                        # update failure history
+                        prior = js.get("prior_failures") or []
+                        prior.append({"at": time.time(), "reason": error, "code": failure_code, "retryable": retryable})
+                        js["prior_failures"] = prior
+
+                        # attempts
+                        attempts = int(js.get("attempt_count") or 0) + 1
+                        js["attempt_count"] = attempts
+                        if js.get("first_attempt_at") is None:
+                            js["first_attempt_at"] = time.time()
+                        js["last_attempt_at"] = time.time()
+
+                        max_attempts = int(js.get("max_attempts") or DEFAULT_POLICY.max_retry_count)
+                        if not retryable or attempts >= max_attempts:
+                            js["retry_state"] = "exhausted" if retryable else "permanent"
+                            js["final_failure_reason"] = error
+                        else:
+                            # schedule retry
+                            delay, next_at = compute_backoff(attempts, base=js.get("retry_backoff_seconds"))
+                            js["next_retry_at"] = next_at
+                            js["retry_state"] = "scheduled"
+
                     with open(job_path, "w", encoding="utf-8") as fh:
                         json.dump(js, fh)
                 except Exception:
@@ -758,9 +824,103 @@ class DocumentIntakeService:
 
         from multiprocessing import Process
         from atlas_core.services.extraction_worker import run_job_from_jobfile
+        import threading
+        from atlas_core.config.resource_policy import DEFAULT_POLICY
+        from atlas_core.services.job_scheduler import get_global_scheduler
+
+        scheduler = get_global_scheduler()
+        decision = scheduler.submit(str(job_file_path))
+        if decision != "admitted":
+            # scheduler has updated job JSON for queued/rejected states
+            return -1
 
         p = Process(target=run_job_from_jobfile, args=(str(job_file_path),))
         p.start()
+
+        # notify scheduler that worker started (record PID)
+        try:
+            # read job id
+            js = json.loads(Path(job_file_path).read_text(encoding="utf-8"))
+            job_id = js.get("job_id")
+            if job_id:
+                scheduler.mark_started(job_id, p.pid)
+        except Exception:
+            pass
+
+        # Supervisor thread enforces timeouts and forced-kill grace period
+        def _monitor(proc: Process, job_path: str):
+            timeout = DEFAULT_POLICY.worker_timeout_seconds
+            grace = DEFAULT_POLICY.worker_forced_kill_grace_seconds
+            start = time.time()
+            proc.join(timeout)
+            if proc.is_alive():
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+                # wait for grace
+                proc.join(grace)
+                if proc.is_alive():
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                # update job file to indicate timeout and apply retry logic
+                try:
+                    with open(job_path, "r", encoding="utf-8") as fh:
+                        js = json.load(fh)
+                except Exception:
+                    js = {}
+                payload = {"status": "error", "error": "timeout", "metrics": {}}
+                # reuse the child update logic by invoking _entry's handling inline
+                try:
+                    # apply similar retry processing as child result
+                    from atlas_core.services.retry_policy import compute_backoff
+
+                    js["updated_at"] = time.time()
+                    js["completed_at"] = time.time()
+                    js["worker_pid"] = None
+                    error = "timeout"
+                    js["stage"] = "failed"
+                    js["failure_reason"] = error
+                    prior = js.get("prior_failures") or []
+                    prior.append({"at": time.time(), "reason": error, "code": "timeout", "retryable": True})
+                    js["prior_failures"] = prior
+                    attempts = int(js.get("attempt_count") or 0) + 1
+                    js["attempt_count"] = attempts
+                    if js.get("first_attempt_at") is None:
+                        js["first_attempt_at"] = time.time()
+                    js["last_attempt_at"] = time.time()
+                    max_attempts = int(js.get("max_attempts") or DEFAULT_POLICY.max_retry_count)
+                    if attempts >= max_attempts:
+                        js["retry_state"] = "exhausted"
+                        js["final_failure_reason"] = error
+                    else:
+                        delay, next_at = compute_backoff(attempts, base=js.get("retry_backoff_seconds"))
+                        js["next_retry_at"] = next_at
+                        js["retry_state"] = "scheduled"
+                except Exception:
+                    pass
+                try:
+                    with open(job_path, "w", encoding="utf-8") as fh:
+                        json.dump(js, fh)
+                except Exception:
+                    pass
+            # notify scheduler that worker finished (admit next jobs)
+            try:
+                scheduler.worker_finished(job_id)
+            except Exception:
+                try:
+                    # best-effort: read job_id from file
+                    js2 = json.loads(Path(job_path).read_text(encoding="utf-8"))
+                    jid2 = js2.get("job_id")
+                    if jid2:
+                        scheduler.worker_finished(jid2)
+                except Exception:
+                    pass
+
+        monitor = threading.Thread(target=_monitor, args=(p, str(job_file_path)), daemon=True)
+        monitor.start()
         return p.pid
 
     def inspect_uploaded_files(

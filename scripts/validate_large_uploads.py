@@ -72,6 +72,17 @@ def run_case(service: DocumentIntakeService, output_dir: Path, files: list[tuple
         try:
             data = json.loads(job.read_text(encoding="utf-8"))
             record["job_state_after"] = data
+            # additional reporting fields for validation
+            record["classification"] = data.get("classification")
+            record["policy_tier"] = data.get("policy_tier")
+            record["configured_worker_memory_limit_bytes"] = data.get("worker_memory_limit_bytes")
+            record["containment_applied"] = data.get("containment_applied")
+            record["containment_reason"] = data.get("containment_reason")
+            record["failure_code"] = data.get("failure_code")
+            record["failure_category"] = data.get("failure_category")
+            record["retryable"] = data.get("retryable")
+            record["retry_state"] = data.get("retry_state")
+            record["final_failure_reason"] = data.get("final_failure_reason")
         except Exception as exc:
             record["job_read_error"] = str(exc)
 
@@ -84,7 +95,13 @@ def run_case(service: DocumentIntakeService, output_dir: Path, files: list[tuple
             try:
                 # run worker_main in-process (this will perform extraction and write metrics)
                 start = time.time()
-                worker_main(dest, out_path)
+                # pass job-level policy for accurate containment metrics
+                policy = record.get("job_state_after") and {
+                    "worker_memory_limit_bytes": record["job_state_after"].get("worker_memory_limit_bytes"),
+                    "worker_soft_rss_warning_bytes": record["job_state_after"].get("worker_soft_rss_warning_bytes"),
+                    "worker_timeout_seconds": record["job_state_after"].get("worker_timeout_seconds"),
+                }
+                worker_main(dest, out_path, policy=policy)
                 elapsed = time.time() - start
                 payload = json.loads(Path(out_path).read_text(encoding="utf-8"))
                 record["direct_worker_payload"] = payload
@@ -195,6 +212,29 @@ def main():
     out_file.write_text(json.dumps(compact, indent=2), encoding="utf-8")
     # also write full run details under run dir
     (run_dir / "validation_results.full.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+    # Acceptance assertion: permanent parser failures must not end with retry_state pending or scheduled
+    permanent_indicators = ["declared stream", "declared stream length", "exceeds maximum", "invalid pdf", "malformed", "encrypted", "pathological", "unsupported", "missing canonical"]
+    violations = []
+    for r in results:
+        for j in r.get("jobs", []):
+            state = j.get("job_state_after") or {}
+            stage = state.get("stage")
+            retry_state = state.get("retry_state")
+            # acceptance assertions using structured failure codes when available
+            fcode = state.get("failure_code")
+            failure = (state.get("final_failure_reason") or state.get("failure_reason") or "")
+            lf = failure.lower() if isinstance(failure, str) else ""
+            if stage == "failed" and retry_state in {"pending", "scheduled"}:
+                # if structured code exists, use it to detect declared-stream failures
+                if fcode == "DECLARED_STREAM_LENGTH_EXCEEDED":
+                    violations.append({"job": j.get("job_file"), "failure_code": fcode, "retry_state": retry_state})
+                else:
+                    if any(k in lf for k in permanent_indicators):
+                        violations.append({"job": j.get("job_file"), "failure": failure, "retry_state": retry_state})
+    if violations:
+        # write violations to run dir for inspection
+        (run_dir / "permanent_failure_violations.json").write_text(json.dumps(violations, indent=2), encoding="utf-8")
+        raise AssertionError(f"Permanent parser failures with non-terminal retry state found: {violations}")
     print(f"Wrote run details to {run_dir}")
 
 

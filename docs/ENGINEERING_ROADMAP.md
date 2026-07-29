@@ -183,6 +183,14 @@ Production readiness should require:
 - define the shared commercial document framework before transaction-family implementation
 - keep active work traceable to approved roadmap items and one explicit sprint objective
 
+---
+
+**Large Document Processing v1.0 — Complete**
+
+- **Status:** Complete
+- **Notes:** The engineering workstream delivering file-backed intake, policy-driven extraction workers, memory containment, timeout supervision, preflight classification, policy-aware scheduling, startup reconciliation, deterministic retry/backoff, structured failure taxonomy, and atomic permanent-failure transitions is complete and validated. See `docs/validation` for run artifacts and `RELEASE_NOTES.md` for release summary.
+
+
 ## Release Engineering
 Release engineering should emphasize:
 - reproducible builds

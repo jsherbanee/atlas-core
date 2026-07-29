@@ -1,60 +1,60 @@
 [
   {
     "case": "small",
-    "session": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785175787641",
+    "session": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785257933416",
     "jobs": [
       {
-        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785175787641/.jobs/7a2e06953e12c731120fa7efbcb61da15da3ccb4.json",
-        "spawn_pid": 22828,
+        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785257933416/.jobs/7a2e06953e12c731120fa7efbcb61da15da3ccb4.json",
+        "spawn_pid": 89651,
         "spawn_exit_code": 0
       }
     ]
   },
   {
     "case": "medium",
-    "session": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785175824012",
+    "session": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785257967570",
     "jobs": [
       {
-        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785175824012/.jobs/2ddf6d110bb9f7f449fe2344b599547932153a64.json",
-        "spawn_pid": 22923,
+        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785257967570/.jobs/2ddf6d110bb9f7f449fe2344b599547932153a64.json",
+        "spawn_pid": 89807,
         "spawn_exit_code": 0
       }
     ]
   },
   {
     "case": "large",
-    "session": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785176578682",
+    "session": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785258722998",
     "jobs": [
       {
-        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785176578682/.jobs/65bbf68f82b4eabe348a0e558109653b41c506a0.json",
-        "spawn_pid": 23003,
+        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785258722998/.jobs/65bbf68f82b4eabe348a0e558109653b41c506a0.json",
+        "spawn_pid": 90038,
         "spawn_exit_code": 0
       }
     ]
   },
   {
     "case": "duplicate",
-    "session": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785176580389",
+    "session": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785258724793",
     "jobs": [
       {
-        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785176580389/.jobs/65bbf68f82b4eabe348a0e558109653b41c506a0.json",
-        "spawn_pid": 23007,
+        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785258724793/.jobs/65bbf68f82b4eabe348a0e558109653b41c506a0.json",
+        "spawn_pid": 90043,
         "spawn_exit_code": 0
       }
     ]
   },
   {
     "case": "two_large",
-    "session": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785176582109",
+    "session": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785258726473",
     "jobs": [
       {
-        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785176582109/.jobs/65bbf68f82b4eabe348a0e558109653b41c506a0.json",
-        "spawn_pid": 23010,
+        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785258726473/.jobs/65bbf68f82b4eabe348a0e558109653b41c506a0.json",
+        "spawn_pid": 90046,
         "spawn_exit_code": 0
       },
       {
-        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/2026-07-27T110947/val-1785176582109/.jobs/d883c9b33de42c957643753d0f244c5ea32f0584.json",
-        "spawn_pid": 23011,
+        "job_file": "/Users/joesherbanee/Documents/GitHub/atlas-core/.runtime/validation/large-upload/runs/2026-07-28T095852/val-1785258726473/.jobs/d883c9b33de42c957643753d0f244c5ea32f0584.json",
+        "spawn_pid": 90047,
         "spawn_exit_code": 0
       }
     ]

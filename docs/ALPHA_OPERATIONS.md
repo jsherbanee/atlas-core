@@ -72,6 +72,17 @@ Out of scope:
 - User-facing error messaging provides a referenceable Error ID and does not expose raw stack traces.
 - Error status and resolution-note updates emit tenant audit events.
 
+### Retry & Recovery Runbook (Intake Processing)
+
+- The intake system implements bounded retries for extraction jobs. Operators can inspect job JSON under `outputs/uploads/<session>/.jobs/*.json` for `retry_state`, `attempt_count`, `next_retry_at`, and `prior_failures`.
+- Typical recovery steps:
+	1. If a job is `retry_state: scheduled`, verify `next_retry_at` and wait until due; the process-local retry dispatcher will resubmit it automatically.
+	2. If a job is `retry_state: exhausted` or `final_failure_reason` is set, review `prior_failures` to determine root cause; manual re-ingest with corrected source may be required.
+	3. To force immediate retry (operator action), clear `next_retry_at` and set `retry_state` to `pending` (not recommended unless you understand the failure semantics) or use the `reset_startup_reconciliation()` and `start_retry_dispatcher()` hooks in the live process for controlled resubmission.
+	4. If many retries are failing due to environmental issues (disk/memory), pause new admissions (`ATLAS_STARTUP_RECONCILIATION_ENABLED=0` or set scheduler to `reject`) and remediate the host.
+
+Note: dispatcher and reconciliation are process-local; in multi-process deployments coordinate restarts carefully to avoid duplicate dispatcher threads.
+
 ## Alpha Health Check Contract
 Administrator-only health checks provide:
 - application version
@@ -117,3 +128,11 @@ Supported statuses:
 - [ALPHA_RELEASE_CHECKLIST.md](ALPHA_RELEASE_CHECKLIST.md)
 - [ALPHA_KNOWN_LIMITATIONS.md](ALPHA_KNOWN_LIMITATIONS.md)
 - [ERROR_LOGGING.md](ERROR_LOGGING.md)
+
+---
+
+**Large Document Processing v1.0 — Complete**
+
+- **Status:** Complete
+- **Notes:** Operational runbook and retry guidance for intake processing were updated to reflect the production hardening of large-document ingestion. See `docs/validation/LARGE_UPLOAD_COMPLETION.md` and `docs/validation/artifacts/large-upload/validation_results.json` for verification artifacts.
+

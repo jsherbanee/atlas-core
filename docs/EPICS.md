@@ -931,3 +931,13 @@ For implementation prompts:
 
 For product-horizon prompts, use [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md).
 For technical-execution prompts, use [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md).
+
+---
+
+### Large Document Processing v1.0 — Complete
+
+- **Status:** Complete
+- **Deliverables:** File-backed upload persistence and intake; deferred extraction workers with ResourcePolicy-enforced memory containment and timeout supervision; PDF preflight classification and policy selection; policy-aware in-process scheduler; startup reconciliation; bounded retry and deterministic backoff; structured extraction failure taxonomy; atomic permanent-failure transitions; operational reporting and validation harness improvements.
+- **Validation:** Full test suite passing; validation artifacts available under `docs/validation/artifacts/large-upload/validation_results.json`.
+- **Known limitations:** Retry dispatch and reconciliation remain process-local; RLIMIT_AS and RSS semantics are platform-dependent; parser-library limitations for certain pathological PDFs remain.
+
