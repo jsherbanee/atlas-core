@@ -24,12 +24,7 @@ from atlas_core.services.commercial_knowledge_service import CommercialKnowledge
 from atlas_core.services.estimate_service import DeterministicEstimateService
 from atlas_core.services.pricing_engine_service import DeterministicPricingEngine
 
-SNAPSHOT_PATH = Path(
-    "/Users/joesherbanee/.atlas_core/runtime/AtlasProjects/bid-2026-0002/intake/latest/intake_snapshot.json"
-)
-WORKSPACE_PATH = Path(
-    "/Users/joesherbanee/.atlas_core/runtime/AtlasProjects/bid-2026-0002/workspace.json"
-)
+# Developer-local snapshot/workspace paths removed to keep tests hermetic.
 
 
 def _resolution(
