@@ -5,6 +5,7 @@ Usage:
 
 This is a profiling-only helper; it should not modify production code.
 """
+
 from pathlib import Path
 import time
 import json
@@ -19,7 +20,6 @@ try:
 except Exception:
     psutil = None
 
-from atlas_core.services.pdf_text_extraction_service import PdfTextExtractionService
 from pypdf import PdfReader
 
 
@@ -54,13 +54,10 @@ def main(pdf_path: str, out_json: str):
     gc.collect()
     results["steps"].append(snapshot("start"))
 
-    # Step: open PDF reader
-    t0 = time.time()
     reader = PdfReader(str(path))
     results["steps"].append(snapshot("after_open"))
 
     # Step: metadata
-    md = reader.metadata
     results["steps"].append(snapshot("after_metadata"))
 
     # Step: enumerate pages

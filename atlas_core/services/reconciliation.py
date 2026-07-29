@@ -1,4 +1,5 @@
 """Startup reconciliation service to rebuild scheduler state from job files."""
+
 from __future__ import annotations
 
 import json
@@ -22,7 +23,13 @@ _STARTUP_LOCK = __import__("threading").Lock()
 _STARTUP_STATUS: dict = {"ran": False, "degraded": False}
 
 
-def ensure_startup_reconciliation(*, uploads_root: str | None = None, fail_closed: bool | None = None, enabled: bool | None = None, policy: rp.ResourcePolicy | None = None) -> dict:
+def ensure_startup_reconciliation(
+    *,
+    uploads_root: str | None = None,
+    fail_closed: bool | None = None,
+    enabled: bool | None = None,
+    policy: rp.ResourcePolicy | None = None,
+) -> dict:
     """Ensure reconciliation runs once per process and return structured status.
 
     Parameters override environment when provided. Reads env vars:
@@ -32,11 +39,19 @@ def ensure_startup_reconciliation(*, uploads_root: str | None = None, fail_close
     """
     env = __import__("os").environ
     if enabled is None:
-        enabled = env.get("ATLAS_STARTUP_RECONCILIATION_ENABLED", "1") not in {"0", "false", "False"}
+        enabled = env.get("ATLAS_STARTUP_RECONCILIATION_ENABLED", "1") not in {
+            "0",
+            "false",
+            "False",
+        }
     if uploads_root is None:
         uploads_root = env.get("ATLAS_RECONCILIATION_ROOT", "outputs/uploads")
     if fail_closed is None:
-        fail_closed = env.get("ATLAS_RECONCILIATION_FAIL_CLOSED", "0") in {"1", "true", "True"}
+        fail_closed = env.get("ATLAS_RECONCILIATION_FAIL_CLOSED", "0") in {
+            "1",
+            "true",
+            "True",
+        }
 
     # Mark as running under lock so other threads/processes skip doing work.
     from atlas_core.services.job_scheduler import get_global_scheduler as _get_sched
@@ -57,7 +72,9 @@ def ensure_startup_reconciliation(*, uploads_root: str | None = None, fail_close
         # run reconciliation; service.run sets scheduler blocking to queue then allow
         result = service.run()
         with _STARTUP_LOCK:
-            _STARTUP_STATUS.update({"ran": True, "in_progress": False, "degraded": False, **result})
+            _STARTUP_STATUS.update(
+                {"ran": True, "in_progress": False, "degraded": False, **result}
+            )
         return {"ran": True, "status": "ok", **result}
     except Exception as exc:
         # on failure, honor fail_closed: block admissions (reject) or allow (fail-open)
@@ -76,7 +93,9 @@ def ensure_startup_reconciliation(*, uploads_root: str | None = None, fail_close
         except Exception:
             pass
         with _STARTUP_LOCK:
-            _STARTUP_STATUS.update({"ran": True, "in_progress": False, "degraded": True, "error": str(exc)})
+            _STARTUP_STATUS.update(
+                {"ran": True, "in_progress": False, "degraded": True, "error": str(exc)}
+            )
         logger.exception("startup reconciliation failed")
         return {"ran": True, "status": "failed", "error": str(exc), "degraded": True}
 
@@ -88,7 +107,6 @@ def reset_startup_reconciliation() -> None:
         _STARTUP_STATUS.update({"ran": False, "degraded": False})
 
 
-
 class ReconciliationService:
     """Scans uploads root for .jobs and rebuilds scheduler queues and actives.
 
@@ -96,12 +114,17 @@ class ReconciliationService:
     reconciliation metadata fields and emits structured log events.
     """
 
-    def __init__(self, uploads_root: Path | str = "outputs/uploads", policy: rp.ResourcePolicy | None = None):
+    def __init__(
+        self,
+        uploads_root: Path | str = "outputs/uploads",
+        policy: rp.ResourcePolicy | None = None,
+    ):
         self.uploads_root = Path(uploads_root)
         self.policy = policy or rp.DEFAULT_POLICY
         self.scheduler = get_global_scheduler()
         # startup guard
-        import threading, os
+        import threading
+
         self._lock = threading.Lock()
         self._ran = False
         self._degraded = False
@@ -135,7 +158,14 @@ class ReconciliationService:
         self.scheduler.set_reconciliation_blocking("queue")
         start = time.time()
         self.scheduler.reset()
-        logger.info({"event": "reconciliation_startup_begin", "uploads_root": str(self.uploads_root), "pid": __import__("os").getpid(), "scheduler_generation": self.scheduler.get_generation()})
+        logger.info(
+            {
+                "event": "reconciliation_startup_begin",
+                "uploads_root": str(self.uploads_root),
+                "pid": __import__("os").getpid(),
+                "scheduler_generation": self.scheduler.get_generation(),
+            }
+        )
         job_files = self._iter_job_files()
         jobs_scanned = 0
         jobs_requeued = 0
@@ -150,14 +180,28 @@ class ReconciliationService:
                 # annotate file and continue
                 now = time.time()
                 try:
-                    jf.write_text(json.dumps({"reconciled_at": now, "reconciliation_reason": "malformed_json", "reconciliation_action": "ignored"}), encoding="utf-8")
+                    jf.write_text(
+                        json.dumps(
+                            {
+                                "reconciled_at": now,
+                                "reconciliation_reason": "malformed_json",
+                                "reconciliation_action": "ignored",
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
                 except Exception:
                     pass
                 continue
 
             job_id = payload.get("job_id")
             stage = payload.get("stage")
-            policy_tier = payload.get("policy_tier") or payload.get("classification_policy") or payload.get("processing_class") or "standard"
+            policy_tier = (
+                payload.get("policy_tier")
+                or payload.get("classification_policy")
+                or payload.get("processing_class")
+                or "standard"
+            )
             updated_at = payload.get("updated_at") or payload.get("started_at") or 0
             now = time.time()
 
@@ -165,7 +209,15 @@ class ReconciliationService:
             if stage in {"completed", "failed", "rejected", "cancelled"}:
                 logger.info({"event": "job_ignored", "job_id": job_id, "stage": stage})
                 # annotate
-                payload.update({"reconciled_at": now, "reconciliation_reason": "terminal_state", "reconciliation_action": "ignored", "previous_scheduler_state": stage, "scheduler_generation": self.scheduler._generation})
+                payload.update(
+                    {
+                        "reconciled_at": now,
+                        "reconciliation_reason": "terminal_state",
+                        "reconciliation_action": "ignored",
+                        "previous_scheduler_state": stage,
+                        "scheduler_generation": self.scheduler._generation,
+                    }
+                )
                 try:
                     jf.write_text(json.dumps(payload), encoding="utf-8")
                 except Exception:
@@ -181,12 +233,26 @@ class ReconciliationService:
                 next_retry = payload.get("next_retry_at")
                 if next_retry and next_retry > now:
                     # annotate as pending retry and skip
-                    payload.update({"reconciled_at": now, "reconciliation_reason": "retry_pending", "reconciliation_action": "deferred", "previous_scheduler_state": stage, "scheduler_generation": self.scheduler._generation})
+                    payload.update(
+                        {
+                            "reconciled_at": now,
+                            "reconciliation_reason": "retry_pending",
+                            "reconciliation_action": "deferred",
+                            "previous_scheduler_state": stage,
+                            "scheduler_generation": self.scheduler._generation,
+                        }
+                    )
                     try:
                         jf.write_text(json.dumps(payload), encoding="utf-8")
                     except Exception:
                         pass
-                    logger.info({"event": "job_deferred_retry", "job_id": job_id, "next_retry_at": next_retry})
+                    logger.info(
+                        {
+                            "event": "job_deferred_retry",
+                            "job_id": job_id,
+                            "next_retry_at": next_retry,
+                        }
+                    )
                     continue
                 entered = payload.get("queue_entered_at") or updated_at or now
                 age = now - entered
@@ -196,13 +262,15 @@ class ReconciliationService:
                 else:
                     reason = "queued_at_startup"
                     action = "requeued"
-                payload.update({
-                    "reconciled_at": now,
-                    "reconciliation_reason": reason,
-                    "reconciliation_action": action,
-                    "previous_scheduler_state": stage,
-                    "scheduler_generation": self.scheduler._generation,
-                })
+                payload.update(
+                    {
+                        "reconciled_at": now,
+                        "reconciliation_reason": reason,
+                        "reconciliation_action": action,
+                        "previous_scheduler_state": stage,
+                        "scheduler_generation": self.scheduler._generation,
+                    }
+                )
                 try:
                     jf.write_text(json.dumps(payload), encoding="utf-8")
                 except Exception:
@@ -214,7 +282,15 @@ class ReconciliationService:
                         jobs_requeued += 1
                 except Exception:
                     pass
-                logger.info({"event": "job_requeued", "job_id": job_id, "policy_tier": policy_tier, "reason": reason, "age": age})
+                logger.info(
+                    {
+                        "event": "job_requeued",
+                        "job_id": job_id,
+                        "policy_tier": policy_tier,
+                        "reason": reason,
+                        "age": age,
+                    }
+                )
                 continue
 
             # admitted/spawning/running/terminating
@@ -239,35 +315,79 @@ class ReconciliationService:
 
                 if worker_pid and pid_alive:
                     # verify and register active
-                    registered = self.scheduler.register_active(job_id, policy_tier, int(worker_pid))
+                    registered = self.scheduler.register_active(
+                        job_id, policy_tier, int(worker_pid)
+                    )
                     reason = "active_pid_verified"
                     action = "verified" if registered else "queued"
-                    payload.update({"reconciled_at": now, "reconciliation_reason": reason, "reconciliation_action": action, "previous_scheduler_state": stage, "scheduler_generation": self.scheduler._generation})
+                    payload.update(
+                        {
+                            "reconciled_at": now,
+                            "reconciliation_reason": reason,
+                            "reconciliation_action": action,
+                            "previous_scheduler_state": stage,
+                            "scheduler_generation": self.scheduler._generation,
+                        }
+                    )
                     try:
                         jf.write_text(json.dumps(payload), encoding="utf-8")
                     except Exception:
                         pass
                     jobs_verified += 1
-                    logger.info({"event": "job_verified", "job_id": job_id, "policy_tier": policy_tier, "age": age, "action": action})
+                    logger.info(
+                        {
+                            "event": "job_verified",
+                            "job_id": job_id,
+                            "policy_tier": policy_tier,
+                            "age": age,
+                            "action": action,
+                        }
+                    )
                     continue
 
                 # worker PID not alive or missing
                 if age > self.policy.reconciliation_stale_running_seconds:
                     reason = "orphaned_or_stale_running"
                     action = "failed"
-                    payload.update({"reconciled_at": now, "reconciliation_reason": reason, "reconciliation_action": action, "previous_scheduler_state": stage, "scheduler_generation": self.scheduler._generation, "stage": "failed", "failure_reason": "orphaned_worker"})
+                    payload.update(
+                        {
+                            "reconciled_at": now,
+                            "reconciliation_reason": reason,
+                            "reconciliation_action": action,
+                            "previous_scheduler_state": stage,
+                            "scheduler_generation": self.scheduler._generation,
+                            "stage": "failed",
+                            "failure_reason": "orphaned_worker",
+                        }
+                    )
                     try:
                         jf.write_text(json.dumps(payload), encoding="utf-8")
                     except Exception:
                         pass
                     jobs_failed += 1
-                    logger.info({"event": "job_failed", "job_id": job_id, "policy_tier": policy_tier, "reason": reason, "age": age})
+                    logger.info(
+                        {
+                            "event": "job_failed",
+                            "job_id": job_id,
+                            "policy_tier": policy_tier,
+                            "reason": reason,
+                            "age": age,
+                        }
+                    )
                     continue
                 else:
                     # recent; requeue to be safe
                     reason = "recent_incomplete"
                     action = "requeued"
-                    payload.update({"reconciled_at": now, "reconciliation_reason": reason, "reconciliation_action": action, "previous_scheduler_state": stage, "scheduler_generation": self.scheduler._generation})
+                    payload.update(
+                        {
+                            "reconciled_at": now,
+                            "reconciliation_reason": reason,
+                            "reconciliation_action": action,
+                            "previous_scheduler_state": stage,
+                            "scheduler_generation": self.scheduler._generation,
+                        }
+                    )
                     try:
                         jf.write_text(json.dumps(payload), encoding="utf-8")
                     except Exception:
@@ -278,11 +398,27 @@ class ReconciliationService:
                             jobs_requeued += 1
                     except Exception:
                         pass
-                    logger.info({"event": "job_requeued", "job_id": job_id, "policy_tier": policy_tier, "reason": reason, "age": age})
+                    logger.info(
+                        {
+                            "event": "job_requeued",
+                            "job_id": job_id,
+                            "policy_tier": policy_tier,
+                            "reason": reason,
+                            "age": age,
+                        }
+                    )
                     continue
 
             # fallback: requeue
-            payload.update({"reconciled_at": now, "reconciliation_reason": "unknown_state", "reconciliation_action": "requeued", "previous_scheduler_state": stage, "scheduler_generation": self.scheduler._generation})
+            payload.update(
+                {
+                    "reconciled_at": now,
+                    "reconciliation_reason": "unknown_state",
+                    "reconciliation_action": "requeued",
+                    "previous_scheduler_state": stage,
+                    "scheduler_generation": self.scheduler._generation,
+                }
+            )
             try:
                 jf.write_text(json.dumps(payload), encoding="utf-8")
             except Exception:
@@ -293,10 +429,35 @@ class ReconciliationService:
                     jobs_requeued += 1
             except Exception:
                 pass
-            logger.info({"event": "job_requeued", "job_id": job_id, "policy_tier": policy_tier, "reason": "fallback"})
+            logger.info(
+                {
+                    "event": "job_requeued",
+                    "job_id": job_id,
+                    "policy_tier": policy_tier,
+                    "reason": "fallback",
+                }
+            )
 
         elapsed = time.time() - start
         # allow admissions after rebuild
         self.scheduler.set_reconciliation_blocking("allow")
-        logger.info({"event": "reconciliation_startup_complete", "pid": __import__("os").getpid(), "scheduler_generation": self.scheduler.get_generation(), "jobs_scanned": jobs_scanned, "jobs_requeued": jobs_requeued, "jobs_failed": jobs_failed, "jobs_verified": jobs_verified, "elapsed_seconds": elapsed})
-        return {"ran": True, "jobs_scanned": jobs_scanned, "jobs_requeued": jobs_requeued, "jobs_failed": jobs_failed, "jobs_verified": jobs_verified, "elapsed_seconds": elapsed}
+        logger.info(
+            {
+                "event": "reconciliation_startup_complete",
+                "pid": __import__("os").getpid(),
+                "scheduler_generation": self.scheduler.get_generation(),
+                "jobs_scanned": jobs_scanned,
+                "jobs_requeued": jobs_requeued,
+                "jobs_failed": jobs_failed,
+                "jobs_verified": jobs_verified,
+                "elapsed_seconds": elapsed,
+            }
+        )
+        return {
+            "ran": True,
+            "jobs_scanned": jobs_scanned,
+            "jobs_requeued": jobs_requeued,
+            "jobs_failed": jobs_failed,
+            "jobs_verified": jobs_verified,
+            "elapsed_seconds": elapsed,
+        }

@@ -12,7 +12,11 @@ def _make_job_file(tmp_path: Path, job_id: str, tier: str) -> Path:
         "job_id": job_id,
         "intake_identity": job_id,
         "filename": f"{job_id}.pdf",
-        "processing_class": tier if tier in {"standard","large","very_large","pathological"} else "standard",
+        "processing_class": (
+            tier
+            if tier in {"standard", "large", "very_large", "pathological"}
+            else "standard"
+        ),
         "stage": "queued",
     }
     jf.write_text(json.dumps(payload), encoding="utf-8")
@@ -60,7 +64,9 @@ def test_large_concurrency(tmp_path):
 
 
 def test_very_large_serialization(tmp_path):
-    policy = rp.ResourcePolicy(standard_job_concurrency=2, max_concurrent_large_documents=1)
+    policy = rp.ResourcePolicy(
+        standard_job_concurrency=2, max_concurrent_large_documents=1
+    )
     sched = get_global_scheduler()
     sched.policy = policy
     sched.reset()

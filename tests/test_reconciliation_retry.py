@@ -1,8 +1,6 @@
 import json
 import time
-from pathlib import Path
 from atlas_core.services.reconciliation import ReconciliationService
-from atlas_core.services.job_scheduler import get_global_scheduler
 
 
 def test_reconciliation_defers_future_retry(tmp_path):

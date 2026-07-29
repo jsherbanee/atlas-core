@@ -55,11 +55,15 @@ def load_policy_from_env() -> ResourcePolicy:
             )
         # worker memory limit in MiB
         if env.get("ATLAS_WORKER_MEMORY_LIMIT_MIB"):
-            policy.worker_memory_limit_bytes = int(env["ATLAS_WORKER_MEMORY_LIMIT_MIB"]) * 1024 * 1024
+            policy.worker_memory_limit_bytes = (
+                int(env["ATLAS_WORKER_MEMORY_LIMIT_MIB"]) * 1024 * 1024
+            )
         if env.get("ATLAS_WORKER_TIMEOUT_SECONDS"):
             policy.worker_timeout_seconds = int(env["ATLAS_WORKER_TIMEOUT_SECONDS"])
         if env.get("ATLAS_WORKER_SOFT_RSS_WARNING_MIB"):
-            policy.worker_soft_rss_warning_bytes = int(env["ATLAS_WORKER_SOFT_RSS_WARNING_MIB"]) * 1024 * 1024
+            policy.worker_soft_rss_warning_bytes = (
+                int(env["ATLAS_WORKER_SOFT_RSS_WARNING_MIB"]) * 1024 * 1024
+            )
         if env.get("ATLAS_MAX_RETRY_COUNT"):
             policy.max_retry_count = int(env["ATLAS_MAX_RETRY_COUNT"])
         if env.get("ATLAS_RETRY_BACKOFF_SECONDS"):

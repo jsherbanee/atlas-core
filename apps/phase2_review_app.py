@@ -10962,7 +10962,7 @@ def _format_recent_opened_at(timestamp: str | None) -> str:
     except Exception:
         return normalized
     if parsed.tzinfo is not None:
-        parsed = parsed.astimezone()
+        parsed = parsed.astimezone(UTC)
     return parsed.strftime("%b %d, %Y %H:%M")
 
 

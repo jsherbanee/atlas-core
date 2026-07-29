@@ -1,5 +1,3 @@
-import pytest
-
 from atlas_core.services.extraction_errors import (
     map_exception_to_extraction_failure,
     ExtractionFailureCode,
@@ -16,8 +14,13 @@ def test_declared_stream_length_mapping():
 def test_malformed_pdf_mapping():
     exc = Exception("Malformed PDF: xref table corrupt")
     ef = map_exception_to_extraction_failure(exc=exc)
-    assert ef.code in {ExtractionFailureCode.MALFORMED_PDF, ExtractionFailureCode.UNKNOWN_EXTRACTION_ERROR}
-    assert ef.retryable is False or ef.retryable is True  # accept both until parser provides typed exceptions
+    assert ef.code in {
+        ExtractionFailureCode.MALFORMED_PDF,
+        ExtractionFailureCode.UNKNOWN_EXTRACTION_ERROR,
+    }
+    assert (
+        ef.retryable is False or ef.retryable is True
+    )  # accept both until parser provides typed exceptions
 
 
 def test_missing_canonical_mapping():

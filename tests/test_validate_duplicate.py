@@ -39,7 +39,11 @@ def test_duplicate_fixture_handling(tmp_path: Path):
     # ensure checksum matches
     from atlas_core.utils.streaming import incremental_sha1_from_file
 
-    assert incremental_sha1_from_file(dest) == incremental_sha1_from_file(copy_path) if copy_path.exists() else incremental_sha1_from_file(dest) == incremental_sha1_from_file(orig)
+    assert (
+        incremental_sha1_from_file(dest) == incremental_sha1_from_file(copy_path)
+        if copy_path.exists()
+        else incremental_sha1_from_file(dest) == incremental_sha1_from_file(orig)
+    )
 
     # canonical destination should exist
     dest = session_root / "drawings" / "large.pdf"
@@ -50,7 +54,10 @@ def test_duplicate_fixture_handling(tmp_path: Path):
     assert meas.exists()
     found_dedupe = False
     for line in meas.read_text(encoding="utf-8").splitlines():
-        if '"stage": "deduplication"' in line and '"note": "duplicate_submission"' in line:
+        if (
+            '"stage": "deduplication"' in line
+            and '"note": "duplicate_submission"' in line
+        ):
             found_dedupe = True
             break
     assert found_dedupe, "Expected deduplication measurement not found"

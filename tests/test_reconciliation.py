@@ -35,9 +35,17 @@ def test_orphaned_worker(tmp_path, monkeypatch):
     session = uploads / "s2"
     jobs = session / ".jobs"
     jf = jobs / "job2.json"
-    payload = {"job_id": "job2", "stage": "running", "worker_pid": 999999, "updated_at": time.time() - 3600}
+    payload = {
+        "job_id": "job2",
+        "stage": "running",
+        "worker_pid": 999999,
+        "updated_at": time.time() - 3600,
+    }
     _write_job(jf, payload)
-    service = ReconciliationService(uploads_root=uploads, policy=rp.ResourcePolicy(reconciliation_stale_running_seconds=60))
+    service = ReconciliationService(
+        uploads_root=uploads,
+        policy=rp.ResourcePolicy(reconciliation_stale_running_seconds=60),
+    )
     sched = get_global_scheduler()
     sched.reset()
     service.run()
@@ -53,7 +61,12 @@ def test_active_pid_alive(tmp_path, monkeypatch):
     session = uploads / "s3"
     jobs = session / ".jobs"
     jf = jobs / "job3.json"
-    payload = {"job_id": "job3", "stage": "running", "worker_pid": pid, "updated_at": time.time()}
+    payload = {
+        "job_id": "job3",
+        "stage": "running",
+        "worker_pid": pid,
+        "updated_at": time.time(),
+    }
     _write_job(jf, payload)
     service = ReconciliationService(uploads_root=uploads, policy=rp.DEFAULT_POLICY)
     sched = get_global_scheduler()

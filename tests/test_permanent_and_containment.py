@@ -1,15 +1,11 @@
 import json
-import tempfile
 import time
 from pathlib import Path
 import os
 
-import pytest
 
 from atlas_core.services import extraction_worker
-from atlas_core.services.retry_dispatcher import start_retry_dispatcher, stop_retry_dispatcher, reset_retry_dispatcher
 from atlas_core.services.reconciliation import ReconciliationService
-from atlas_core.services.job_scheduler import get_global_scheduler
 
 
 def write_job_file(tmp_path: Path, dest_path: Path, extra: dict = None) -> Path:
@@ -51,7 +47,26 @@ def test_declared_stream_length_permanent(tmp_path, monkeypatch):
 
     # stub worker_main to simulate declared stream length error
     def fake_worker_main(pdf_path, out_json, policy=None):
-        payload = {"status": "error", "error": "Declared stream length of 178257872 exceeds maximum allowed length.", "failure": {"failure_code": "DECLARED_STREAM_LENGTH_EXCEEDED", "failure_category": "parsing", "retryable": False, "operator_message": "Declared stream length exceeds parser limits", "exception_type": None, "original_message": "Declared stream length of 178257872 exceeds maximum allowed length."}, "pages": [], "metrics": {"pid": os.getpid(), "start_ts": time.time(), "end_ts": time.time(), "elapsed_seconds": 0.1, "containment": {"applied": False}}}
+        payload = {
+            "status": "error",
+            "error": "Declared stream length of 178257872 exceeds maximum allowed length.",
+            "failure": {
+                "failure_code": "DECLARED_STREAM_LENGTH_EXCEEDED",
+                "failure_category": "parsing",
+                "retryable": False,
+                "operator_message": "Declared stream length exceeds parser limits",
+                "exception_type": None,
+                "original_message": "Declared stream length of 178257872 exceeds maximum allowed length.",
+            },
+            "pages": [],
+            "metrics": {
+                "pid": os.getpid(),
+                "start_ts": time.time(),
+                "end_ts": time.time(),
+                "elapsed_seconds": 0.1,
+                "containment": {"applied": False},
+            },
+        }
         Path(out_json).write_text(json.dumps(payload), encoding="utf-8")
 
     monkeypatch.setattr(extraction_worker, "worker_main", fake_worker_main)
@@ -72,8 +87,14 @@ def test_dispatcher_ignores_permanent(tmp_path, monkeypatch):
     session = tmp_path / "sess"
     jobs_dir = session / ".jobs"
     jobs_dir.mkdir(parents=True, exist_ok=True)
-    sched_job = write_job_file(jobs_dir, jobs_dir / "a.pdf", extra={"retry_state": "scheduled", "next_retry_at": now - 1})
-    perm_job = write_job_file(jobs_dir, jobs_dir / "b.pdf", extra={"retry_state": "permanent"})
+    sched_job = write_job_file(
+        jobs_dir,
+        jobs_dir / "a.pdf",
+        extra={"retry_state": "scheduled", "next_retry_at": now - 1},
+    )
+    perm_job = write_job_file(
+        jobs_dir, jobs_dir / "b.pdf", extra={"retry_state": "permanent"}
+    )
 
     calls = []
 
@@ -104,10 +125,19 @@ def test_reconciliation_ignores_permanent(tmp_path):
     jobs.mkdir()
     dest = tmp_path / "d.pdf"
     dest.write_bytes(b"%%PDF-1.4\nminimal")
-    jf = write_job_file(jobs, dest, extra={"stage": "failed", "retry_state": "permanent", "final_failure_reason": "bad"})
+    jf = write_job_file(
+        jobs,
+        dest,
+        extra={
+            "stage": "failed",
+            "retry_state": "permanent",
+            "final_failure_reason": "bad",
+        },
+    )
 
     svc = ReconciliationService(uploads_root=str(tmp_path))
-    res = svc.run()
+    # run reconciliation (result unused for this assertion)
+    svc.run()
     # ensure job file still has permanent state and was not requeued
     data = json.loads(jf.read_text(encoding="utf-8"))
     assert data.get("retry_state") == "permanent"
@@ -116,19 +146,39 @@ def test_reconciliation_ignores_permanent(tmp_path):
 def test_worker_receives_policy_from_jobfile(tmp_path, monkeypatch):
     dest = tmp_path / "d2.pdf"
     dest.write_bytes(b"%%PDF-1.4\nminimal")
-    jf = write_job_file(tmp_path, dest, extra={"worker_memory_limit_bytes": 12345, "worker_soft_rss_warning_bytes": 2222, "worker_timeout_seconds": 11})
+    jf = write_job_file(
+        tmp_path,
+        dest,
+        extra={
+            "worker_memory_limit_bytes": 12345,
+            "worker_soft_rss_warning_bytes": 2222,
+            "worker_timeout_seconds": 11,
+        },
+    )
 
     captured = {}
 
     def fake_worker_main(pdf_path, out_json, policy=None):
-        captured['policy'] = policy
-        payload = {"status": "ok", "error": None, "pages": [], "metrics": {"pid": os.getpid(), "start_ts": time.time(), "end_ts": time.time(), "elapsed_seconds": 0.01, "containment": {"applied": False}}, "failure": None}
+        captured["policy"] = policy
+        payload = {
+            "status": "ok",
+            "error": None,
+            "pages": [],
+            "metrics": {
+                "pid": os.getpid(),
+                "start_ts": time.time(),
+                "end_ts": time.time(),
+                "elapsed_seconds": 0.01,
+                "containment": {"applied": False},
+            },
+            "failure": None,
+        }
         Path(out_json).write_text(json.dumps(payload), encoding="utf-8")
 
     monkeypatch.setattr(extraction_worker, "worker_main", fake_worker_main)
     extraction_worker.run_job_from_jobfile(str(jf))
-    assert captured.get('policy') is not None
-    assert captured['policy'].get('worker_memory_limit_bytes') == 12345
+    assert captured.get("policy") is not None
+    assert captured["policy"].get("worker_memory_limit_bytes") == 12345
 
 
 def test_disabled_containment_records_reason(tmp_path, monkeypatch):
@@ -138,7 +188,18 @@ def test_disabled_containment_records_reason(tmp_path, monkeypatch):
     jf = write_job_file(tmp_path, dest, extra={})
 
     def fake_worker_main(pdf_path, out_json, policy=None):
-        payload = {"status": "error", "error": "some parse error", "pages": [], "metrics": {"pid": os.getpid(), "start_ts": time.time(), "end_ts": time.time(), "elapsed_seconds": 0.1, "containment": {"applied": False}}}
+        payload = {
+            "status": "error",
+            "error": "some parse error",
+            "pages": [],
+            "metrics": {
+                "pid": os.getpid(),
+                "start_ts": time.time(),
+                "end_ts": time.time(),
+                "elapsed_seconds": 0.1,
+                "containment": {"applied": False},
+            },
+        }
         Path(out_json).write_text(json.dumps(payload), encoding="utf-8")
 
     monkeypatch.setattr(extraction_worker, "worker_main", fake_worker_main)

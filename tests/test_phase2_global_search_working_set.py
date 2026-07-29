@@ -3911,7 +3911,7 @@ def test_mission_control_activity_section_groups_similar_events() -> None:
             "Source": "Transaction",
             "Project": "Project A",
             "Count": 2,
-            "Latest": "Jul 20, 2026 05:00",
+            "Latest": "Jul 20, 2026 12:00",
             "Details": "",
         }
     ]
