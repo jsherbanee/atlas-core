@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from hashlib import sha1
 from typing import Any
+from pathlib import Path
+import json
 
 from atlas_core.domain.commercial_document import (
     ApprovalState,
@@ -157,6 +159,80 @@ class TransactionsWorkspaceService:
         ):
             return False
         return True
+
+    @classmethod
+    def load_serialized_documents_from_project(
+        cls, project_id: str, project_workspace_service: "ProjectWorkspaceService"
+    ) -> list[dict[str, Any]]:
+        """Load persisted transaction documents for a project via its review repository."""
+        try:
+            manager = project_workspace_service.manager
+            docs = manager.review_repository.load_transaction_documents(project_id)
+            if not isinstance(docs, list):
+                return []
+            return [dict(item) for item in docs if isinstance(item, dict)]
+        except Exception:
+            return []
+
+    def persist_documents_to_project(
+        self,
+        project_id: str,
+        project_workspace_service: "ProjectWorkspaceService",
+        actor: str = "atlas-ui",
+    ) -> None:
+        """Persist current in-memory documents to project review/transactions and record audit events.
+
+        Idempotent: unchanged documents do not re-record audit events.
+        """
+        manager = project_workspace_service.manager
+        review_repo = manager.review_repository
+        record = project_workspace_service.load_record(project_id)
+
+        current_docs = [dict(item) for item in self.to_payload()]
+        project_dir = Path(manager.project_repository.project_location(project_id))
+        tx_dir = project_dir / "review" / "transactions"
+        tx_dir.mkdir(parents=True, exist_ok=True)
+
+        for doc in current_docs:
+            doc_id = str(doc.get("document_id") or "").strip()
+            if not doc_id:
+                continue
+            canonical = json.dumps(doc, sort_keys=True, separators=(",", ":"))
+            sha = sha1(canonical.encode("utf-8")).hexdigest()[:20]
+
+            # check existing on-disk file for idempotency
+            file_path = tx_dir / (f"{doc_id}.json")
+            existing_sha = None
+            if not file_path.exists():
+                # try slugified filename
+                file_path = tx_dir / (f"{doc_id}".lower().replace(' ', '-') + ".json")
+            if file_path.exists():
+                try:
+                    with file_path.open(encoding="utf-8") as f:
+                        existing_payload = json.load(f)
+                    existing_canonical = json.dumps(existing_payload, sort_keys=True, separators=(",", ":"))
+                    existing_sha = sha1(existing_canonical.encode("utf-8")).hexdigest()[:20]
+                except Exception:
+                    existing_sha = None
+
+            if existing_sha == sha:
+                continue
+
+            # save using repository adapter and record audit
+            review_repo.save_transaction_document(project_id, doc)
+            try:
+                project_workspace_service._record_audit(
+                    record=record,
+                    action="transaction.persisted",
+                    actor=actor,
+                    target_type="commercial_document",
+                    target_id=doc_id,
+                    before=None,
+                    after=doc,
+                    context={"source": "transactions.workspace"},
+                )
+            except Exception:
+                pass
 
     def _assert_scope_allowed(self, *, tenant_id: str, organization_id: str) -> None:
         if self._enforce_active_scope and (

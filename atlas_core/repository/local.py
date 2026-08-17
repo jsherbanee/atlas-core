@@ -825,6 +825,98 @@ class LocalReviewRepository(ReviewRepository):
                 return payload
             return None
 
+    # Transactions persistence: per-document JSON files and a manifest
+    def save_transaction_document(self, project_id: str, document_payload: JsonDict) -> None:
+        if not isinstance(document_payload, dict):
+            raise ValueError("document_payload must be a dict")
+        document_id = str(document_payload.get("document_id") or "").strip()
+        if not document_id:
+            raise ValueError("document_id is required in document_payload")
+
+        _, _, _, location = self.project_repository.load(project_id)
+        project_dir = Path(location)
+        tx_dir = project_dir / "review" / "transactions"
+        tx_dir.mkdir(parents=True, exist_ok=True)
+
+        # write canonical document file
+        doc_path = tx_dir / f"{_slugify(document_id)}.json"
+        with doc_path.open("w", encoding="utf-8") as file:
+            json.dump(document_payload, file, indent=2, sort_keys=True)
+
+        # update manifest
+        manifest_path = project_dir / "review" / "transactions.manifest.json"
+        manifest: dict[str, Any] = {}
+        if manifest_path.exists():
+            try:
+                with manifest_path.open(encoding="utf-8") as mf:
+                    manifest = json.load(mf) or {}
+            except Exception:
+                manifest = {}
+
+        docs: dict[str, Any] = dict(manifest.get("documents") or {})
+        # compute simple checksum
+        canonical = json.dumps(document_payload, sort_keys=True, separators=(",", ":"))
+        sha = hashlib.sha1(canonical.encode("utf-8")).hexdigest()[:20]
+        entry = {
+            "document_id": document_id,
+            "document_type": str(document_payload.get("document_type") or ""),
+            "persisted_at": _utc_now(),
+            "sha1": sha,
+            "file": str(doc_path.relative_to(project_dir)),
+        }
+        docs[document_id] = entry
+        manifest["schema_version"] = "transactions.v1"
+        manifest["documents"] = docs
+        # write manifest
+        with manifest_path.open("w", encoding="utf-8") as mf:
+            json.dump(manifest, mf, indent=2, sort_keys=True)
+
+        # refresh project manifest
+        self.project_repository.refresh_manifest(project_id)
+
+    def load_transaction_documents(self, project_id: str) -> list[JsonDict]:
+        _, _, _, location = self.project_repository.load(project_id)
+        project_dir = Path(location)
+        tx_dir = project_dir / "review" / "transactions"
+        manifest_path = project_dir / "review" / "transactions.manifest.json"
+        docs: list[JsonDict] = []
+        if not tx_dir.exists():
+            return []
+        # attempt to read manifest order first
+        ordered: list[str] = []
+        if manifest_path.exists():
+            try:
+                with manifest_path.open(encoding="utf-8") as mf:
+                    manifest = json.load(mf) or {}
+                    documents_map = dict(manifest.get("documents") or {})
+                    ordered = [str(k) for k in documents_map.keys()]
+            except Exception:
+                ordered = []
+
+        # load files; prefer manifest ordering
+        loaded: dict[str, JsonDict] = {}
+        for path in sorted(tx_dir.glob("*.json")):
+            try:
+                with path.open(encoding="utf-8") as file:
+                    payload = json.load(file)
+            except Exception:
+                continue
+            if isinstance(payload, dict):
+                loaded[str(payload.get("document_id") or path.stem)] = payload
+
+        if ordered:
+            for did in ordered:
+                if did in loaded:
+                    docs.append(dict(loaded[did]))
+            # append any extras
+            for did, payload in loaded.items():
+                if did not in ordered:
+                    docs.append(dict(payload))
+        else:
+            docs = [dict(v) for _, v in sorted(loaded.items())]
+
+        return docs
+
 
 class LocalKnowledgeRepository(KnowledgeRepository):
     """Knowledge persistence under project review/ folder."""

@@ -7861,8 +7861,24 @@ def _transactions_workspace_service(st: Any) -> TransactionsWorkspaceService:
     settings_service = _settings_workspace_service(st)
     tenant_id = _safe_text(state.get("tenant_id"), "local")
     organization_id = _safe_text(state.get("organization_id"), "atlas")
+    # If there are no session documents, attempt to rehydrate from
+    # persisted project review artifacts when project scope is present.
+    documents = list(state.get("documents") or [])
+    project_scope = dict(state.get("project_scope") or {})
+    workspace_id = _safe_text(project_scope.get("workspace_id"), "")
+    if not documents and workspace_id:
+        try:
+            psvc = _build_workspace_service()
+            docs = TransactionsWorkspaceService.load_serialized_documents_from_project(
+                workspace_id, psvc
+            )
+            if docs:
+                documents = docs
+        except Exception:
+            documents = list(state.get("documents") or [])
+
     return TransactionsWorkspaceService(
-        serialized_documents=list(state.get("documents") or []),
+        serialized_documents=documents,
         serialized_numbering_policies=settings_service.export_numbering_policies(
             tenant_id=tenant_id,
             organization_id=organization_id,
