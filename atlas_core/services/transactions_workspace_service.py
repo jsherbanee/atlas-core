@@ -253,7 +253,10 @@ class TransactionsWorkspaceService:
                     )
 
                 # Business lifecycle: estimate created
-                if prev is None and str(curr.get("document_type") or "").lower() == "estimate":
+                if (
+                    prev is None
+                    and str(curr.get("document_type") or "").lower() == "estimate"
+                ):
                     project_workspace_service._record_audit(
                         record=record,
                         action="estimate_created",
@@ -268,25 +271,40 @@ class TransactionsWorkspaceService:
                 # Business lifecycle: estimate approved (state change)
                 prev_approval = (prev or {}).get("approval_state") if prev else None
                 curr_approval = curr.get("approval_state")
-                if prev_approval != ApprovalState.APPROVED.value and curr_approval == ApprovalState.APPROVED.value:
+                if (
+                    prev_approval != ApprovalState.APPROVED.value
+                    and curr_approval == ApprovalState.APPROVED.value
+                ):
                     project_workspace_service._record_audit(
                         record=record,
                         action="estimate_approved",
                         actor=actor,
                         target_type="commercial_document",
                         target_id=doc_id,
-                        before={"approval_state": prev_approval} if prev is not None else None,
+                        before=(
+                            {"approval_state": prev_approval}
+                            if prev is not None
+                            else None
+                        ),
                         after={"approval_state": curr_approval},
                         context={"source": "transactions.workspace"},
                     )
 
                 # Business lifecycle: sales order created from estimate
-                if prev is None and str(curr.get("document_type") or "").lower() == "sales_order":
+                if (
+                    prev is None
+                    and str(curr.get("document_type") or "").lower() == "sales_order"
+                ):
                     # detect derived-from-estimate via relationships or diagnostics
                     rels = list(curr.get("relationships") or [])
                     diags = list(curr.get("diagnostics") or [])
-                    derived = any(r.get("relationship_type") == "derived_from_estimate" for r in rels)
-                    diag_flag = any(d.get("code") == "estimate_source_revision" for d in diags)
+                    derived = any(
+                        r.get("relationship_type") == "derived_from_estimate"
+                        for r in rels
+                    )
+                    diag_flag = any(
+                        d.get("code") == "estimate_source_revision" for d in diags
+                    )
                     if derived or diag_flag:
                         project_workspace_service._record_audit(
                             record=record,
@@ -1578,12 +1596,30 @@ class TransactionsWorkspaceService:
             # prefer document-level snapshot, fall back to current revision snapshot
             snapshot_source = (
                 estimate.terms_and_conditions_snapshot
-                or (next((r.terms_and_conditions_snapshot for r in estimate.revisions if getattr(r, "is_current", False)), None))
+                or (
+                    next(
+                        (
+                            r.terms_and_conditions_snapshot
+                            for r in estimate.revisions
+                            if getattr(r, "is_current", False)
+                        ),
+                        None,
+                    )
+                )
                 or {}
             )
             reference_source = (
                 estimate.terms_and_conditions_reference
-                or (next((r.terms_and_conditions_reference for r in estimate.revisions if getattr(r, "is_current", False)), None))
+                or (
+                    next(
+                        (
+                            r.terms_and_conditions_reference
+                            for r in estimate.revisions
+                            if getattr(r, "is_current", False)
+                        ),
+                        None,
+                    )
+                )
                 or {}
             )
             inherited_reference = dict(reference_source or {})

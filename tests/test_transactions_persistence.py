@@ -112,11 +112,19 @@ def test_serialization_round_trip_and_persistence(tmp_path):
 
     # ensure derived relationship exists at document level
     relationships = list(reloaded_so.get("relationships") or [])
-    assert any(r.get("relationship_type") == "derived_from_estimate" and r.get("related_document_id") == est.document_id for r in relationships)
+    assert any(
+        r.get("relationship_type") == "derived_from_estimate"
+        and r.get("related_document_id") == est.document_id
+        for r in relationships
+    )
 
     # ensure diagnostic metadata capturing source estimate revision survived
     diagnostics = list(reloaded_so.get("diagnostics") or [])
-    assert any(d.get("code") == "estimate_source_revision" and d.get("details", {}).get("source_estimate_id") == est.document_id for d in diagnostics)
+    assert any(
+        d.get("code") == "estimate_source_revision"
+        and d.get("details", {}).get("source_estimate_id") == est.document_id
+        for d in diagnostics
+    )
 
     # ensure terms survived on rehydrated sales order
     assert reloaded_so.get("terms_and_conditions_reference") is not None
