@@ -1068,6 +1068,22 @@ def test_resolve_active_workspace_prefers_user_selection_over_query_params() -> 
     assert st.query_params["atlas_workspace_id"] == selected.workspace_id
 
 
+def test_resolve_active_workspace_clears_stale_persisted_state() -> None:
+    # persisted atlas_loaded_workspace_state_for referring to an unknown workspace
+    # should be cleared and not activated
+    st = _FakeStreamlit(
+        session_state={"atlas_loaded_workspace_state_for": "missing-project"}
+    )
+    st.query_params = {}
+    service = _FakeWorkspaceService([_project_record("maw-demo", "MAW")])
+
+    resolved = app._resolve_active_workspace_record(st, service)
+
+    # resolver falls back to recent and does not activate the missing id
+    assert resolved is not None
+    assert "atlas_loaded_workspace_state_for" not in st.session_state
+
+
 def test_resolve_active_workspace_uses_query_params_before_recent_projects() -> None:
     recent = _project_record("BID-2026-0002", "Music Academy of the West")
     persisted = _project_record("BID-2026-0003", "Reference Workspace")

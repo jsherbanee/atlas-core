@@ -136,9 +136,17 @@ class LocalProjectRepository(ProjectRepository):
         for child in sorted(self.root.iterdir()):
             if not child.is_dir():
                 continue
+            # Require the authoritative project payloads to be present
+            # A filesystem folder should not be considered a project unless
+            # it contains the required repository files. This prevents
+            # stray directories (for example a top-level `documents` folder)
+            # from being enumerated as Atlas projects merely because they
+            # exist beneath the projects root.
             if (
                 not (child / _PROJECT_FILE).exists()
                 or not (child / _WORKSPACE_FILE).exists()
+                or not (child / _METADATA_FILE).exists()
+                or not (child / _MANIFEST_FILE).exists()
             ):
                 continue
             try:

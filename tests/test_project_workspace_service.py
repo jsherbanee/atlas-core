@@ -186,6 +186,27 @@ def test_workspace_service_excludes_placeholder_project_roots(
     ]
 
 
+def test_filesystem_contamination_does_not_create_project_records(
+    tmp_path: Path,
+) -> None:
+    """A plain filesystem folder named 'documents' must not be treated as a project."""
+    service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
+
+    valid = ProjectWorkspaceRecord(
+        workspace_id="project-valid",
+        project=Project(project_id="project-valid", name="Valid", client="Client"),
+    )
+    service.save_record(valid)
+
+    # create a stray directory named 'documents' without any project files
+    stray = tmp_path / "AtlasProjects" / "documents"
+    stray.mkdir(parents=True, exist_ok=True)
+
+    records = service.list_workspaces(include_archived=True)
+    assert any(r.workspace_id == "project-valid" for r in records)
+    assert all(r.workspace_id != "documents" for r in records)
+
+
 def test_workspace_service_project_manager_actions(tmp_path: Path) -> None:
     service = ProjectWorkspaceService(tmp_path / "AtlasProjects")
     record = service.create_manual_record(

@@ -10149,10 +10149,17 @@ def _resolve_active_workspace_record(
         st.session_state.get("atlas_loaded_workspace_state_for"),
         "",
     )
-    if persisted_id and persisted_id in records:
-        st.session_state["atlas_active_workspace_id"] = persisted_id
-        _set_workspace_query_param(st, persisted_id)
-        return records[persisted_id]
+    if persisted_id:
+        if persisted_id in records:
+            st.session_state["atlas_active_workspace_id"] = persisted_id
+            _set_workspace_query_param(st, persisted_id)
+            return records[persisted_id]
+        # persisted marker refers to a workspace that no longer exists;
+        # clear the stale marker so it does not silently become active later.
+        try:
+            st.session_state.pop("atlas_loaded_workspace_state_for", None)
+        except Exception:
+            st.session_state["atlas_loaded_workspace_state_for"] = None
 
     recent = workspace_service.list_recent_workspaces(limit=1)
     if recent:
