@@ -206,6 +206,7 @@ class TransactionsWorkspaceService:
             # check existing on-disk file for idempotency
             file_path = tx_dir / (f"{doc_id}.json")
             existing_sha = None
+            existing_payload = None
             if not file_path.exists():
                 # try slugified filename
                 file_path = tx_dir / (f"{doc_id}".lower().replace(" ", "-") + ".json")
@@ -1573,14 +1574,25 @@ class TransactionsWorkspaceService:
             ),
         )
 
-        if inherit_terms_from_estimate and estimate.terms_and_conditions_snapshot:
-            inherited_reference = dict(estimate.terms_and_conditions_reference or {})
+        if inherit_terms_from_estimate:
+            # prefer document-level snapshot, fall back to current revision snapshot
+            snapshot_source = (
+                estimate.terms_and_conditions_snapshot
+                or (next((r.terms_and_conditions_snapshot for r in estimate.revisions if getattr(r, "is_current", False)), None))
+                or {}
+            )
+            reference_source = (
+                estimate.terms_and_conditions_reference
+                or (next((r.terms_and_conditions_reference for r in estimate.revisions if getattr(r, "is_current", False)), None))
+                or {}
+            )
+            inherited_reference = dict(reference_source or {})
             inherited_reference["source"] = "inherited_from_estimate"
             inherited_reference["inherited_from_document_id"] = estimate.document_id
             self._commercial_service.assign_terms_and_conditions(
                 sales_order,
                 reference=inherited_reference,
-                snapshot=deepcopy(dict(estimate.terms_and_conditions_snapshot)),
+                snapshot=deepcopy(dict(snapshot_source)),
             )
         else:
             payload = self._terms_reference_and_snapshot(
