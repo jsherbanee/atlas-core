@@ -826,7 +826,9 @@ class LocalReviewRepository(ReviewRepository):
             return None
 
     # Transactions persistence: per-document JSON files and a manifest
-    def save_transaction_document(self, project_id: str, document_payload: JsonDict) -> None:
+    def save_transaction_document(
+        self, project_id: str, document_payload: JsonDict
+    ) -> None:
         if not isinstance(document_payload, dict):
             raise ValueError("document_payload must be a dict")
         document_id = str(document_payload.get("document_id") or "").strip()

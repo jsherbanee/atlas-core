@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from hashlib import sha1
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from pathlib import Path
 import json
 
@@ -33,6 +33,9 @@ from atlas_core.services.commercial_document_pdf_export_service import (
 )
 from atlas_core.services.document_generation_service import DocumentGenerationService
 from atlas_core.services.commercial_knowledge_service import CommercialKnowledgeService
+
+if TYPE_CHECKING:
+    from atlas_core.services.project_workspace_service import ProjectWorkspaceService
 
 
 def _utc_now() -> str:
@@ -205,13 +208,17 @@ class TransactionsWorkspaceService:
             existing_sha = None
             if not file_path.exists():
                 # try slugified filename
-                file_path = tx_dir / (f"{doc_id}".lower().replace(' ', '-') + ".json")
+                file_path = tx_dir / (f"{doc_id}".lower().replace(" ", "-") + ".json")
             if file_path.exists():
                 try:
                     with file_path.open(encoding="utf-8") as f:
                         existing_payload = json.load(f)
-                    existing_canonical = json.dumps(existing_payload, sort_keys=True, separators=(",", ":"))
-                    existing_sha = sha1(existing_canonical.encode("utf-8")).hexdigest()[:20]
+                    existing_canonical = json.dumps(
+                        existing_payload, sort_keys=True, separators=(",", ":")
+                    )
+                    existing_sha = sha1(existing_canonical.encode("utf-8")).hexdigest()[
+                        :20
+                    ]
                 except Exception:
                     existing_sha = None
 

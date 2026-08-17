@@ -70,7 +70,13 @@ def _sanitize_line_payload(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("line payload must be a dict")
     cleaned = dict(payload)
-    for key in ("extended_amount", "tax_amount", "total_amount", "display_sequence", "presentation_metadata"):
+    for key in (
+        "extended_amount",
+        "tax_amount",
+        "total_amount",
+        "display_sequence",
+        "presentation_metadata",
+    ):
         cleaned.pop(key, None)
     return cleaned
 
