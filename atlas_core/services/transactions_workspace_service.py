@@ -225,19 +225,78 @@ class TransactionsWorkspaceService:
             if existing_sha == sha:
                 continue
 
-            # save using repository adapter and record audit
+            # save using repository adapter
             review_repo.save_transaction_document(project_id, doc)
+
+            # After saving, emit deterministic audit events for first-time
+            # creation and for notable lifecycle transitions (e.g. approval)
+            # by comparing the previous on-disk payload (existing_payload)
+            # to the new payload. This ensures business lifecycle events are
+            # recorded exactly once per transition while avoiding repeated
+            # audit churn on benign persistence updates.
             try:
-                project_workspace_service._record_audit(
-                    record=record,
-                    action="transaction.persisted",
-                    actor=actor,
-                    target_type="commercial_document",
-                    target_id=doc_id,
-                    before=None,
-                    after=doc,
-                    context={"source": "transactions.workspace"},
-                )
+                prev = existing_payload if isinstance(existing_payload, dict) else None
+                curr = dict(doc)
+
+                # Transaction persisted (operational) - only for initial create
+                if prev is None:
+                    project_workspace_service._record_audit(
+                        record=record,
+                        action="transaction.persisted",
+                        actor=actor,
+                        target_type="commercial_document",
+                        target_id=doc_id,
+                        before=None,
+                        after=curr,
+                        context={"source": "transactions.workspace"},
+                    )
+
+                # Business lifecycle: estimate created
+                if prev is None and str(curr.get("document_type") or "").lower() == "estimate":
+                    project_workspace_service._record_audit(
+                        record=record,
+                        action="estimate_created",
+                        actor=actor,
+                        target_type="commercial_document",
+                        target_id=doc_id,
+                        before=None,
+                        after=curr,
+                        context={"source": "transactions.workspace"},
+                    )
+
+                # Business lifecycle: estimate approved (state change)
+                prev_approval = (prev or {}).get("approval_state") if prev else None
+                curr_approval = curr.get("approval_state")
+                if prev_approval != ApprovalState.APPROVED.value and curr_approval == ApprovalState.APPROVED.value:
+                    project_workspace_service._record_audit(
+                        record=record,
+                        action="estimate_approved",
+                        actor=actor,
+                        target_type="commercial_document",
+                        target_id=doc_id,
+                        before={"approval_state": prev_approval} if prev is not None else None,
+                        after={"approval_state": curr_approval},
+                        context={"source": "transactions.workspace"},
+                    )
+
+                # Business lifecycle: sales order created from estimate
+                if prev is None and str(curr.get("document_type") or "").lower() == "sales_order":
+                    # detect derived-from-estimate via relationships or diagnostics
+                    rels = list(curr.get("relationships") or [])
+                    diags = list(curr.get("diagnostics") or [])
+                    derived = any(r.get("relationship_type") == "derived_from_estimate" for r in rels)
+                    diag_flag = any(d.get("code") == "estimate_source_revision" for d in diags)
+                    if derived or diag_flag:
+                        project_workspace_service._record_audit(
+                            record=record,
+                            action="sales_order_created_from_estimate",
+                            actor=actor,
+                            target_type="commercial_document",
+                            target_id=doc_id,
+                            before=None,
+                            after=curr,
+                            context={"source": "transactions.workspace"},
+                        )
             except Exception:
                 pass
 

@@ -107,6 +107,20 @@ def test_serialization_round_trip_and_persistence(tmp_path):
     reloaded_so = next(d for d in docs if d.get("document_id") == so.document_id)
     lines = list(reloaded_so.get("lines") or [])
     assert any(li.get("source_document_id") == est.document_id for li in lines)
+    # ensure source_line_id survived for at least one line
+    assert any(li.get("source_line_id") for li in lines)
+
+    # ensure derived relationship exists at document level
+    relationships = list(reloaded_so.get("relationships") or [])
+    assert any(r.get("relationship_type") == "derived_from_estimate" and r.get("related_document_id") == est.document_id for r in relationships)
+
+    # ensure diagnostic metadata capturing source estimate revision survived
+    diagnostics = list(reloaded_so.get("diagnostics") or [])
+    assert any(d.get("code") == "estimate_source_revision" and d.get("details", {}).get("source_estimate_id") == est.document_id for d in diagnostics)
+
+    # ensure terms survived on rehydrated sales order
+    assert reloaded_so.get("terms_and_conditions_reference") is not None
+    assert reloaded_so.get("terms_and_conditions_snapshot") is not None
 
     # check audit events written once (use manager audit listing)
     events = psvc.list_audit_history(project_id)
