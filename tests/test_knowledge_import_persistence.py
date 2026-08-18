@@ -85,13 +85,16 @@ def test_field_fidelity_and_updates_and_archive(tmp_path: Path) -> None:
     artifact = svc.manager.review_repository.load_artifact(
         "proj-c", "commercial_products"
     )
+    assert artifact is not None
     reopened = CommercialProductService(state=artifact)
 
     # Field fidelity
     v = reopened.get_vendor("vendor-x")
+    assert v is not None
     assert v["canonical_name"] == "Vendor X"
 
     p = reopened.get_product(product["atlas_product_uuid"])
+    assert p is not None
     assert p["manufacturer_part_number"] == "PX-1"
 
     # Update durability
@@ -101,8 +104,11 @@ def test_field_fidelity_and_updates_and_archive(tmp_path: Path) -> None:
     artifact2 = svc.manager.review_repository.load_artifact(
         "proj-c", "commercial_products"
     )
+    assert artifact2 is not None
     reopened2 = CommercialProductService(state=artifact2)
-    assert reopened2.get_vendor("vendor-x")["display_name"] == "Vendor X Updated"
+    v2 = reopened2.get_vendor("vendor-x")
+    assert v2 is not None
+    assert v2["display_name"] == "Vendor X Updated"
 
     # Archive/restore durability
     reopened2.set_vendor_active("vendor-x", False)
@@ -110,8 +116,11 @@ def test_field_fidelity_and_updates_and_archive(tmp_path: Path) -> None:
     artifact3 = svc.manager.review_repository.load_artifact(
         "proj-c", "commercial_products"
     )
+    assert artifact3 is not None
     reopened3 = CommercialProductService(state=artifact3)
-    assert reopened3.get_vendor("vendor-x")["active"] is False
+    v3 = reopened3.get_vendor("vendor-x")
+    assert v3 is not None
+    assert v3["active"] is False
 
     # restore
     reopened3.set_vendor_active("vendor-x", True)
@@ -119,8 +128,11 @@ def test_field_fidelity_and_updates_and_archive(tmp_path: Path) -> None:
     artifact4 = svc.manager.review_repository.load_artifact(
         "proj-c", "commercial_products"
     )
+    assert artifact4 is not None
     reopened4 = CommercialProductService(state=artifact4)
-    assert reopened4.get_vendor("vendor-x")["active"] is True
+    v4 = reopened4.get_vendor("vendor-x")
+    assert v4 is not None
+    assert v4["active"] is True
 
 
 def test_empty_project_compatibility(tmp_path: Path) -> None:
@@ -149,4 +161,5 @@ def test_idempotent_persistence(tmp_path: Path) -> None:
     artifact = svc.manager.review_repository.load_artifact(
         "proj-idempotent", "commercial_products"
     )
+    assert artifact is not None
     assert artifact == payload
