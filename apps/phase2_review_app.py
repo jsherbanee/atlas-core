@@ -19619,7 +19619,9 @@ def _render_commercial_transaction_workbench(
                         == "derived_from_estimate"
                     ]
                     if rels:
-                        src_id = _safe_text(getattr(rels[0], "related_document_id", None), "")
+                        src_id = _safe_text(
+                            getattr(rels[0], "related_document_id", None), ""
+                        )
                         src_doc = next(
                             (
                                 d
@@ -19637,7 +19639,10 @@ def _render_commercial_transaction_workbench(
                         rev = None
                         for diag in list(document.diagnostics or []):
                             try:
-                                if _safe_text(getattr(diag, "code", None), "") == "estimate_source_revision":
+                                if (
+                                    _safe_text(getattr(diag, "code", None), "")
+                                    == "estimate_source_revision"
+                                ):
                                     rev = (getattr(diag, "details", {}) or {}).get(
                                         "source_estimate_revision_number"
                                     )
