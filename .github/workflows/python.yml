@@ -39,16 +39,18 @@ jobs:
           BASELINE_DIR=$(mktemp -d)
           git worktree add --detach "$BASELINE_DIR" origin/main
           # Run mypy in the baseline worktree and normalize diagnostics
+          # Run mypy in the baseline worktree and normalize ONLY real diagnostic lines
           (cd "$BASELINE_DIR" && python -m mypy --show-error-codes > /tmp/mypy_origin_raw.txt 2>&1) || true
-          sed -E 's/^(.*):[0-9]+: (.*)$/\1: \2/' /tmp/mypy_origin_raw.txt | sort -u > /tmp/mypy_origin_norm.txt || true
+          # Filter lines shaped like: path/to/file.py:<line>: error: ... then normalize
+          grep -E '^[^:]+:[0-9]+: error:' /tmp/mypy_origin_raw.txt | sed -E 's/^(.*):[0-9]+: (.*)$/\1: \2/' | sort -u > /tmp/mypy_origin_norm.txt || true
 
           # Clean up baseline worktree
           git worktree remove --force "$BASELINE_DIR" || true
           rm -rf "$BASELINE_DIR" || true
 
-          # Run mypy in the PR workspace (current checkout)
+          # Run mypy in the PR workspace (current checkout) and normalize diagnostics only
           python -m mypy --show-error-codes > /tmp/mypy_pr_raw.txt 2>&1 || true
-          sed -E 's/^(.*):[0-9]+: (.*)$/\1: \2/' /tmp/mypy_pr_raw.txt | sort -u > /tmp/mypy_pr_norm.txt || true
+          grep -E '^[^:]+:[0-9]+: error:' /tmp/mypy_pr_raw.txt | sed -E 's/^(.*):[0-9]+: (.*)$/\1: \2/' | sort -u > /tmp/mypy_pr_norm.txt || true
 
           # Compare normalized diagnostics: file + message
           comm -23 /tmp/mypy_pr_norm.txt /tmp/mypy_origin_norm.txt > /tmp/mypy_new.txt || true

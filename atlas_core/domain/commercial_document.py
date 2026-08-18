@@ -61,6 +61,26 @@ def _decimal_non_negative(field_name: str, value: Any) -> Decimal:
     return parsed
 
 
+def _sanitize_line_payload(payload: Any) -> dict[str, Any]:
+    """Return a cleaned dict for constructing CommercialDocumentLineItem.
+
+    This strips computed/presentation-only fields that may appear in
+    serialized payloads so dataclass construction remains stable.
+    """
+    if not isinstance(payload, dict):
+        raise ValueError("line payload must be a dict")
+    cleaned = dict(payload)
+    for key in (
+        "extended_amount",
+        "tax_amount",
+        "total_amount",
+        "display_sequence",
+        "presentation_metadata",
+    ):
+        cleaned.pop(key, None)
+    return cleaned
+
+
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -587,7 +607,7 @@ class CommercialDocumentRevision:
             (
                 line
                 if isinstance(line, CommercialDocumentLineItem)
-                else CommercialDocumentLineItem(**line)
+                else CommercialDocumentLineItem(**_sanitize_line_payload(line))
             )
             for line in self.lines
         ]
@@ -880,7 +900,7 @@ class CommercialDocument:
             (
                 line
                 if isinstance(line, CommercialDocumentLineItem)
-                else CommercialDocumentLineItem(**line)
+                else CommercialDocumentLineItem(**_sanitize_line_payload(line))
             )
             for line in self.lines
         ]

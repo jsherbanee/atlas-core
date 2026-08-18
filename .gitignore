@@ -36,3 +36,13 @@ dist/
 build/
 *.egg-info/
 .patches/
+# Ignore generated durable_check project artifacts
+/AtlasProjects/durable_check/metadata.json
+/AtlasProjects/durable_check/project.json
+/AtlasProjects/durable_check/project_manifest.json
+/AtlasProjects/durable_check/workspace.json
+# Ignore generated durable_check project artifacts
+/AtlasProjects/durable_check/metadata.json
+/AtlasProjects/durable_check/project.json
+/AtlasProjects/durable_check/project_manifest.json
+/AtlasProjects/durable_check/workspace.json

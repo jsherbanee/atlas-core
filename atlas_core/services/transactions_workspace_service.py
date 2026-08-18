@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from hashlib import sha1
-from typing import Any
+from typing import Any, TYPE_CHECKING
+from pathlib import Path
+import json
 
 from atlas_core.domain.commercial_document import (
     ApprovalState,
@@ -31,6 +33,9 @@ from atlas_core.services.commercial_document_pdf_export_service import (
 )
 from atlas_core.services.document_generation_service import DocumentGenerationService
 from atlas_core.services.commercial_knowledge_service import CommercialKnowledgeService
+
+if TYPE_CHECKING:
+    from atlas_core.services.project_workspace_service import ProjectWorkspaceService
 
 
 def _utc_now() -> str:
@@ -157,6 +162,162 @@ class TransactionsWorkspaceService:
         ):
             return False
         return True
+
+    @classmethod
+    def load_serialized_documents_from_project(
+        cls, project_id: str, project_workspace_service: "ProjectWorkspaceService"
+    ) -> list[dict[str, Any]]:
+        """Load persisted transaction documents for a project via its review repository."""
+        try:
+            manager = project_workspace_service.manager
+            docs = manager.review_repository.load_transaction_documents(project_id)
+            if not isinstance(docs, list):
+                return []
+            return [dict(item) for item in docs if isinstance(item, dict)]
+        except Exception:
+            return []
+
+    def persist_documents_to_project(
+        self,
+        project_id: str,
+        project_workspace_service: "ProjectWorkspaceService",
+        actor: str = "atlas-ui",
+    ) -> None:
+        """Persist current in-memory documents to project review/transactions and record audit events.
+
+        Idempotent: unchanged documents do not re-record audit events.
+        """
+        manager = project_workspace_service.manager
+        review_repo = manager.review_repository
+        record = project_workspace_service.load_record(project_id)
+
+        current_docs = [dict(item) for item in self.to_payload()]
+        project_dir = Path(manager.project_repository.project_location(project_id))
+        tx_dir = project_dir / "review" / "transactions"
+        tx_dir.mkdir(parents=True, exist_ok=True)
+
+        for doc in current_docs:
+            doc_id = str(doc.get("document_id") or "").strip()
+            if not doc_id:
+                continue
+            canonical = json.dumps(doc, sort_keys=True, separators=(",", ":"))
+            sha = sha1(canonical.encode("utf-8")).hexdigest()[:20]
+
+            # check existing on-disk file for idempotency
+            file_path = tx_dir / (f"{doc_id}.json")
+            existing_sha = None
+            existing_payload = None
+            if not file_path.exists():
+                # try slugified filename
+                file_path = tx_dir / (f"{doc_id}".lower().replace(" ", "-") + ".json")
+            if file_path.exists():
+                try:
+                    with file_path.open(encoding="utf-8") as f:
+                        existing_payload = json.load(f)
+                    existing_canonical = json.dumps(
+                        existing_payload, sort_keys=True, separators=(",", ":")
+                    )
+                    existing_sha = sha1(existing_canonical.encode("utf-8")).hexdigest()[
+                        :20
+                    ]
+                except Exception:
+                    existing_sha = None
+
+            if existing_sha == sha:
+                continue
+
+            # save using repository adapter
+            review_repo.save_transaction_document(project_id, doc)
+
+            # After saving, emit deterministic audit events for first-time
+            # creation and for notable lifecycle transitions (e.g. approval)
+            # by comparing the previous on-disk payload (existing_payload)
+            # to the new payload. This ensures business lifecycle events are
+            # recorded exactly once per transition while avoiding repeated
+            # audit churn on benign persistence updates.
+            try:
+                prev = existing_payload if isinstance(existing_payload, dict) else None
+                curr = dict(doc)
+
+                # Transaction persisted (operational) - only for initial create
+                if prev is None:
+                    project_workspace_service._record_audit(
+                        record=record,
+                        action="transaction.persisted",
+                        actor=actor,
+                        target_type="commercial_document",
+                        target_id=doc_id,
+                        before=None,
+                        after=curr,
+                        context={"source": "transactions.workspace"},
+                    )
+
+                # Business lifecycle: estimate created
+                if (
+                    prev is None
+                    and str(curr.get("document_type") or "").lower() == "estimate"
+                ):
+                    project_workspace_service._record_audit(
+                        record=record,
+                        action="estimate_created",
+                        actor=actor,
+                        target_type="commercial_document",
+                        target_id=doc_id,
+                        before=None,
+                        after=curr,
+                        context={"source": "transactions.workspace"},
+                    )
+
+                # Business lifecycle: estimate approved (state change)
+                prev_approval = (prev or {}).get("approval_state") if prev else None
+                curr_approval = curr.get("approval_state")
+                if (
+                    prev_approval != ApprovalState.APPROVED.value
+                    and curr_approval == ApprovalState.APPROVED.value
+                ):
+                    project_workspace_service._record_audit(
+                        record=record,
+                        action="estimate_approved",
+                        actor=actor,
+                        target_type="commercial_document",
+                        target_id=doc_id,
+                        before=(
+                            {"approval_state": prev_approval}
+                            if prev is not None
+                            else None
+                        ),
+                        after={"approval_state": curr_approval},
+                        context={"source": "transactions.workspace"},
+                    )
+
+                # Business lifecycle: sales order created from estimate
+                if (
+                    prev is None
+                    and str(curr.get("document_type") or "").lower() == "sales_order"
+                ):
+                    # detect derived-from-estimate via relationships or diagnostics
+                    rels = list(curr.get("relationships") or [])
+                    diags = list(curr.get("diagnostics") or [])
+                    derived = any(
+                        r.get("relationship_type") == "derived_from_estimate"
+                        for r in rels
+                    )
+                    diag_flag = any(
+                        d.get("code") == "estimate_source_revision" for d in diags
+                    )
+                    if derived or diag_flag:
+                        project_workspace_service._record_audit(
+                            record=record,
+                            action="sales_order_created_from_estimate",
+                            actor=actor,
+                            target_type="commercial_document",
+                            target_id=doc_id,
+                            before=None,
+                            after=curr,
+                            context={"source": "transactions.workspace"},
+                        )
+            except Exception:
+                pass
 
     def _assert_scope_allowed(self, *, tenant_id: str, organization_id: str) -> None:
         if self._enforce_active_scope and (
@@ -1431,14 +1592,43 @@ class TransactionsWorkspaceService:
             ),
         )
 
-        if inherit_terms_from_estimate and estimate.terms_and_conditions_snapshot:
-            inherited_reference = dict(estimate.terms_and_conditions_reference or {})
+        if inherit_terms_from_estimate:
+            # prefer document-level snapshot, fall back to current revision snapshot
+            snapshot_source = (
+                estimate.terms_and_conditions_snapshot
+                or (
+                    next(
+                        (
+                            r.terms_and_conditions_snapshot
+                            for r in estimate.revisions
+                            if getattr(r, "is_current", False)
+                        ),
+                        None,
+                    )
+                )
+                or {}
+            )
+            reference_source = (
+                estimate.terms_and_conditions_reference
+                or (
+                    next(
+                        (
+                            r.terms_and_conditions_reference
+                            for r in estimate.revisions
+                            if getattr(r, "is_current", False)
+                        ),
+                        None,
+                    )
+                )
+                or {}
+            )
+            inherited_reference = dict(reference_source or {})
             inherited_reference["source"] = "inherited_from_estimate"
             inherited_reference["inherited_from_document_id"] = estimate.document_id
             self._commercial_service.assign_terms_and_conditions(
                 sales_order,
                 reference=inherited_reference,
-                snapshot=deepcopy(dict(estimate.terms_and_conditions_snapshot)),
+                snapshot=deepcopy(dict(snapshot_source)),
             )
         else:
             payload = self._terms_reference_and_snapshot(
