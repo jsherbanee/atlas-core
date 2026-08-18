@@ -15753,6 +15753,18 @@ def _restore_workspace_state(
     if isinstance(price_list_library, dict):
         st.session_state["atlas_price_list_library"] = dict(price_list_library)
 
+    # Always prefer canonical commercial_products review artifact when present
+    try:
+        artifact = workspace_service.manager.review_repository.load_artifact(
+            record.workspace_id, "commercial_products"
+        )
+    except Exception:
+        artifact = None
+    if isinstance(artifact, dict):
+        lib = dict(st.session_state.get("atlas_price_list_library") or {})
+        lib["commercial_products"] = dict(artifact)
+        st.session_state["atlas_price_list_library"] = lib
+
     transactions_workspace = state.get("transactions_workspace")
     if isinstance(transactions_workspace, dict):
         st.session_state["atlas_transactions_workspace"] = dict(transactions_workspace)
@@ -15977,6 +15989,20 @@ def _persist_repository_artifacts(
             record.workspace_id,
             intelligence.to_dict(),
         )
+    # Persist commercial products canonical payload (project-scoped review artifact)
+    try:
+        price_list_library = context.get("price_list_library") if context else None
+        if isinstance(price_list_library, dict):
+            commercial_products = price_list_library.get("commercial_products")
+            if isinstance(commercial_products, dict):
+                workspace_service.save_review_artifact(
+                    record.workspace_id,
+                    "commercial_products",
+                    dict(commercial_products),
+                )
+    except Exception:
+        # non-fatal: do not block overall artifact persistence
+        pass
 
 
 def _metric_card(st: Any, title: str, value: str) -> None:
