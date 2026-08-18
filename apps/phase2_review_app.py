@@ -7920,6 +7920,36 @@ def _save_transactions_workspace_state(
     _save_settings_workspace_state(st, settings_service)
 
 
+def _persist_and_save_transactions_workspace_state(
+    st: Any, service: TransactionsWorkspaceService, *, actor: str = "atlas-ui"
+) -> bool:
+    """Attempt to persist canonical transactions to the active project, then
+    update session state.
+
+    Returns True if persistence succeeded, False otherwise. On failure the
+    in-memory/session state is still saved so the user's edits are not lost.
+    """
+    scope = _transactions_project_scope(st)
+    workspace_id = _safe_text(scope.get("workspace_id"), "")
+
+    # Always attempt persistence when a project scope is available
+    if workspace_id:
+        psvc = _build_workspace_service()
+        try:
+            service.persist_documents_to_project(workspace_id, psvc, actor=actor)
+        except Exception as exc:  # preserve in-memory state and show error
+            _save_transactions_workspace_state(st, service)
+            st.error(f"Unable to persist transactions to project: {exc}")
+            return False
+        # persisted successfully; update session state
+        _save_transactions_workspace_state(st, service)
+        return True
+
+    # No project scope: only save in-session working state
+    _save_transactions_workspace_state(st, service)
+    return False
+
+
 def _transactions_project_scope(st: Any) -> dict[str, Any]:
     state = _transactions_workspace_state(st)
     scope = state.get("project_scope")
@@ -8945,8 +8975,15 @@ def _render_estimate_add_workspace(
                 st.session_state["atlas_transactions_selected_document_id"] = (
                     created.document_id
                 )
-                _save_transactions_workspace_state(st, service)
-                st.success("Draft estimate created. Continue by adding line items.")
+                persisted = _persist_and_save_transactions_workspace_state(
+                    st, service, actor="atlas-ui"
+                )
+                if persisted:
+                    st.success("Draft estimate created. Continue by adding line items.")
+                else:
+                    st.warning(
+                        "Draft saved to session but could not be persisted to project."
+                    )
                 st.rerun()
             except Exception as exc:
                 st.error(f"Unable to create estimate draft: {exc}")
@@ -9106,7 +9143,13 @@ def _render_estimate_add_workspace(
                         or None,
                         assembly_mode=assembly_mode,
                     )
-                _save_transactions_workspace_state(st, service)
+                persisted = _persist_and_save_transactions_workspace_state(
+                    st, service, actor="atlas-ui"
+                )
+                if not persisted:
+                    st.warning(
+                        "Changes saved to session but could not be persisted to project."
+                    )
                 st.rerun()
             except Exception as exc:
                 st.error(f"Unable to add catalog items: {exc}")
@@ -9127,7 +9170,13 @@ def _render_estimate_add_workspace(
                     "catalog": {"manual_entry": True},
                 },
             )
-            _save_transactions_workspace_state(st, service)
+            persisted = _persist_and_save_transactions_workspace_state(
+                st, service, actor="atlas-ui"
+            )
+            if not persisted:
+                st.warning(
+                    "Changes saved to session but could not be persisted to project."
+                )
             st.rerun()
         except Exception as exc:
             st.error(f"Unable to add service line: {exc}")
@@ -19560,6 +19609,54 @@ def _render_commercial_transaction_workbench(
                     ]
                 )
             )
+            # Lineage: surface source Estimate for Sales Orders when available
+            try:
+                if document.document_type == CommercialDocumentType.SALES_ORDER:
+                    rels = [
+                        r
+                        for r in list(document.relationships or [])
+                        if _safe_text(getattr(r, "relationship_type", None), "")
+                        == "derived_from_estimate"
+                    ]
+                    if rels:
+                        src_id = _safe_text(
+                            getattr(rels[0], "related_document_id", None), ""
+                        )
+                        src_doc = next(
+                            (
+                                d
+                                for d in all_documents
+                                if _safe_text(d.document_id, "") == src_id
+                            ),
+                            None,
+                        )
+                        src_number = (
+                            _safe_text(src_doc.document_number, "")
+                            if src_doc
+                            else src_id
+                        )
+                        # look for revision metadata in diagnostics
+                        rev = None
+                        for diag in list(document.diagnostics or []):
+                            try:
+                                if (
+                                    _safe_text(getattr(diag, "code", None), "")
+                                    == "estimate_source_revision"
+                                ):
+                                    rev = (getattr(diag, "details", {}) or {}).get(
+                                        "source_estimate_revision_number"
+                                    )
+                                    break
+                            except Exception:
+                                continue
+                        if rev:
+                            st.caption(
+                                f"Created from Estimate: {src_number} · Revision: R{rev}"
+                            )
+                        else:
+                            st.caption(f"Created from Estimate: {src_number}")
+            except Exception:
+                pass
             st.caption(
                 " · ".join(
                     [
@@ -19684,6 +19781,71 @@ def _render_commercial_transaction_workbench(
                 },
             ],
         )
+        # Transactions lifecycle/history (compact)
+        try:
+            project_id = _safe_text(
+                document.project_id or document.project_code or "", ""
+            )
+            if project_id:
+                psvc = _build_workspace_service()
+                events = psvc.list_audit_history(project_id, limit=200)
+                if isinstance(events, list):
+                    tx_actions = {
+                        "transaction.persisted",
+                        "estimate_created",
+                        "estimate_approved",
+                        "estimate_issued",
+                        "sales_order_created_from_estimate",
+                    }
+                    rows: list[dict[str, Any]] = []
+                    label_map = {
+                        "transaction.persisted": "Persisted",
+                        "estimate_created": "Estimate Created",
+                        "estimate_approved": "Estimate Approved",
+                        "estimate_issued": "Estimate Issued",
+                        "sales_order_created_from_estimate": "Sales Order Created",
+                    }
+                    for ev in events:
+                        try:
+                            action = str(ev.get("action") or "")
+                            if action not in tx_actions:
+                                continue
+                            ts = _safe_text(
+                                ev.get("created_at") or ev.get("timestamp"), ""
+                            )
+                            actor = _safe_text(ev.get("actor") or ev.get("user_id"), "")
+                            target_id = _safe_text(ev.get("target_id"), "")
+                            after = ev.get("after") or {}
+                            doc_number = _safe_text(
+                                (
+                                    after.get("document_number")
+                                    if isinstance(after, dict)
+                                    else None
+                                ),
+                                "",
+                            )
+                            src = ""
+                            # attempt to surface source estimate when present in context
+                            context = ev.get("context") or {}
+                            if isinstance(context, dict):
+                                src = _safe_text(context.get("source_document"), "")
+                            rows.append(
+                                {
+                                    "Timestamp": ts,
+                                    "Action": label_map.get(action, action),
+                                    "Actor": actor,
+                                    "Document": doc_number or target_id,
+                                    "Source": src,
+                                }
+                            )
+                        except Exception:
+                            continue
+                    if rows:
+                        st.markdown("#### Lifecycle History")
+                        st.dataframe(rows, width="stretch", hide_index=True)
+        except Exception:
+            # non-fatal: history is an auxiliary surface
+            pass
 
 
 def _render_transaction_line_presentation_controls(
@@ -20460,10 +20622,17 @@ def _render_transactions_workspace_page(
                     st.session_state["atlas_transactions_selected_document_id"] = (
                         created.document_id
                     )
-                    _save_transactions_workspace_state(st, service)
-                    st.success(
-                        f"Draft created: {_safe_text(created.document_number, created.document_id)}"
+                    persisted = _persist_and_save_transactions_workspace_state(
+                        st, service, actor="atlas-ui"
                     )
+                    if persisted:
+                        st.success(
+                            f"Draft created: {_safe_text(created.document_number, created.document_id)}"
+                        )
+                    else:
+                        st.warning(
+                            f"Draft created in session but could not be persisted to project: {_safe_text(created.document_number, created.document_id)}"
+                        )
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to create draft: {exc}")
@@ -20640,14 +20809,27 @@ def _render_transactions_workspace_page(
             service.restore_document(selected_document.document_id)
         else:
             service.archive_document(selected_document.document_id)
-        _save_transactions_workspace_state(st, service)
+        persisted = _persist_and_save_transactions_workspace_state(
+            st, service, actor="atlas-ui"
+        )
+        if not persisted:
+            st.warning(
+                "Archive/restore saved to session but could not be persisted to project."
+            )
         st.rerun()
 
     def _refresh_terms_snapshot() -> None:
         try:
             service.refresh_draft_terms(document_id=selected_document.document_id)
-            _save_transactions_workspace_state(st, service)
-            st.success("Terms snapshot refreshed from active defaults/overrides.")
+            persisted = _persist_and_save_transactions_workspace_state(
+                st, service, actor="atlas-ui"
+            )
+            if persisted:
+                st.success("Terms snapshot refreshed from active defaults/overrides.")
+            else:
+                st.warning(
+                    "Terms snapshot refreshed locally but could not be persisted to project."
+                )
             st.rerun()
         except Exception as exc:
             st.error(f"Unable to refresh terms snapshot: {exc}")
@@ -20666,8 +20848,15 @@ def _render_transactions_workspace_page(
             )
             st.session_state[_navigation_secondary_state_key()] = "sales_orders"
             st.session_state[_navigation_tertiary_state_key()] = "edit"
-            _save_transactions_workspace_state(st, service)
-            st.success("Sales order draft created from estimate.")
+            persisted = _persist_and_save_transactions_workspace_state(
+                st, service, actor="atlas-ui"
+            )
+            if persisted:
+                st.success("Sales order draft created from estimate.")
+            else:
+                st.warning(
+                    "Sales order created in session but could not be persisted to project."
+                )
             st.rerun()
         except Exception as exc:
             st.error(f"Unable to create sales order from estimate: {exc}")
@@ -20813,8 +21002,15 @@ def _render_transactions_workspace_page(
                     actor="atlas-ui",
                     revision_label=create_revision_label,
                 )
-                _save_transactions_workspace_state(st, service)
-                st.success("Revision created.")
+                persisted = _persist_and_save_transactions_workspace_state(
+                    st, service, actor="atlas-ui"
+                )
+                if persisted:
+                    st.success("Revision created.")
+                else:
+                    st.warning(
+                        "Revision created in session but could not be persisted to project."
+                    )
                 st.rerun()
             except Exception as exc:
                 st.error(f"Unable to create revision: {exc}")
@@ -21598,12 +21794,18 @@ def _render_transactions_workspace_page(
                                 document_id=selected_document.document_id,
                                 reason=issue_reason,
                             )
-                            _save_transactions_workspace_state(st, service)
+                            persisted = _persist_and_save_transactions_workspace_state(
+                                st, service, actor="atlas-ui"
+                            )
                             _save_transaction_estimate_engine_service(
                                 st,
                                 document_id=selected_document.document_id,
                                 service=estimate_engine,
                             )
+                            if not persisted:
+                                st.warning(
+                                    "Issued estimate updated in session but could not be persisted to project."
+                                )
                             st.rerun()
                         except Exception as exc:
                             st.error(f"Unable to issue estimate: {exc}")
@@ -21623,12 +21825,18 @@ def _render_transactions_workspace_page(
                         created_by="atlas-ui",
                         reason="Post-issue estimate revision",
                     )
-                    _save_transactions_workspace_state(st, service)
+                    persisted = _persist_and_save_transactions_workspace_state(
+                        st, service, actor="atlas-ui"
+                    )
                     _save_transaction_estimate_engine_service(
                         st,
                         document_id=selected_document.document_id,
                         service=estimate_engine,
                     )
+                    if not persisted:
+                        st.warning(
+                            "Draft revision created in session but could not be persisted to project."
+                        )
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to create draft revision: {exc}")
@@ -21655,8 +21863,15 @@ def _render_transactions_workspace_page(
                         document_id=selected_document.document_id,
                         reason=issue_reason,
                     )
-                    _save_transactions_workspace_state(st, service)
-                    st.success("Customer invoice issued.")
+                    persisted = _persist_and_save_transactions_workspace_state(
+                        st, service, actor="atlas-ui"
+                    )
+                    if persisted:
+                        st.success("Customer invoice issued.")
+                    else:
+                        st.warning(
+                            "Customer invoice updated in session but could not be persisted to project."
+                        )
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to issue customer invoice: {exc}")
@@ -21702,8 +21917,15 @@ def _render_transactions_workspace_page(
                         document_id=selected_document.document_id,
                         reason=issue_reason,
                     )
-                    _save_transactions_workspace_state(st, service)
-                    st.success("Document issued.")
+                    persisted = _persist_and_save_transactions_workspace_state(
+                        st, service, actor="atlas-ui"
+                    )
+                    if persisted:
+                        st.success("Document issued.")
+                    else:
+                        st.warning(
+                            "Document issued in session but could not be persisted to project."
+                        )
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Unable to issue document: {exc}")
@@ -21875,8 +22097,15 @@ def _render_transactions_workspace_page(
                 ),
                 approval_state=ApprovalState.APPROVED,
             )
-            _save_transactions_workspace_state(st, service)
-            st.success("Estimate marked as accepted.")
+            persisted = _persist_and_save_transactions_workspace_state(
+                st, service, actor="atlas-ui"
+            )
+            if persisted:
+                st.success("Estimate marked as accepted.")
+            else:
+                st.warning(
+                    "Estimate accepted in session but could not be persisted to project."
+                )
             st.rerun()
 
     if (
@@ -21898,8 +22127,15 @@ def _render_transactions_workspace_page(
                 ),
                 approval_state=ApprovalState.REJECTED,
             )
-            _save_transactions_workspace_state(st, service)
-            st.success("Estimate marked as declined.")
+            persisted = _persist_and_save_transactions_workspace_state(
+                st, service, actor="atlas-ui"
+            )
+            if persisted:
+                st.success("Estimate marked as declined.")
+            else:
+                st.warning(
+                    "Estimate declined in session but could not be persisted to project."
+                )
             st.rerun()
 
     if selected_document.document_type == CommercialDocumentType.ESTIMATE:
@@ -22187,7 +22423,13 @@ def _render_transactions_workspace_page(
                     document_id=selected_document.document_id,
                     reason="Approved from Transactions workspace",
                 )
-                _save_transactions_workspace_state(st, service)
+                persisted = _persist_and_save_transactions_workspace_state(
+                    st, service, actor="atlas-ui"
+                )
+                if not persisted:
+                    st.warning(
+                        "Approve action saved to session but could not be persisted to project."
+                    )
                 st.rerun()
             if approval_cols[2].button(
                 "Reject Return",
@@ -22198,7 +22440,13 @@ def _render_transactions_workspace_page(
                     document_id=selected_document.document_id,
                     approval_state=ApprovalState.REJECTED,
                 )
-                _save_transactions_workspace_state(st, service)
+                persisted = _persist_and_save_transactions_workspace_state(
+                    st, service, actor="atlas-ui"
+                )
+                if not persisted:
+                    st.warning(
+                        "Approval change saved to session but could not be persisted to project."
+                    )
                 st.rerun()
         else:
             selected_approval = st.selectbox(
@@ -22216,7 +22464,13 @@ def _render_transactions_workspace_page(
                     document_id=selected_document.document_id,
                     approval_state=ApprovalState(selected_approval),
                 )
-                _save_transactions_workspace_state(st, service)
+                persisted = _persist_and_save_transactions_workspace_state(
+                    st, service, actor="atlas-ui"
+                )
+                if not persisted:
+                    st.warning(
+                        "Approval change saved to session but could not be persisted to project."
+                    )
                 st.rerun()
 
     if (
