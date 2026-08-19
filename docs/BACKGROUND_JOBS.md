@@ -97,6 +97,10 @@ Representative workflow migration:
 - document upload now executes through background jobs
 - export bundle action now executes through background jobs
 
+Processing Console (project-level)
+- The Processing page is the canonical operator surface for viewing project-scoped background jobs. It reads persisted job state from the project repository and exposes read-only listing and diagnostic inspection for operators granted `jobs.view`.
+- Mutation controls (`retry`, `cancel`) are only shown to principals granted `jobs.manage` and are executed through existing `ProjectWorkspaceService` wrappers (`retry_background_job`, `cancel_background_job`). Passive rendering does not emit audit events.
+
 ## Security and Multi-Tenant Notes
 Job operations require consistent `tenant_id` and `organization_id` scope.
 Cross-scope job access fails by design.
