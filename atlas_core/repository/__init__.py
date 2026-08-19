@@ -6,6 +6,7 @@ from atlas_core.repository.contracts import (
     HistoryRepository,
     JobRepository,
     KnowledgeRepository,
+    RepositoryBundle,
     ProjectRepository,
     ReviewRepository,
     WorkspaceRepository,
@@ -19,6 +20,7 @@ from atlas_core.repository.local import (
     LocalProjectRepository,
     LocalReviewRepository,
     LocalWorkspaceRepository,
+    build_local_repository_bundle,
 )
 from atlas_core.repository.models import ProjectManifest, RepositoryHealthReport
 from atlas_core.repository.project_manager import AtlasProjectManager
@@ -29,6 +31,7 @@ __all__ = [
     "HistoryRepository",
     "JobRepository",
     "KnowledgeRepository",
+    "RepositoryBundle",
     "ProjectRepository",
     "ReviewRepository",
     "WorkspaceRepository",
@@ -40,6 +43,7 @@ __all__ = [
     "LocalProjectRepository",
     "LocalReviewRepository",
     "LocalWorkspaceRepository",
+    "build_local_repository_bundle",
     "ProjectManifest",
     "RepositoryHealthReport",
     "AtlasProjectManager",

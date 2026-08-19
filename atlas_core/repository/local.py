@@ -20,6 +20,7 @@ from atlas_core.repository.contracts import (
     JobRepository,
     JsonDict,
     KnowledgeRepository,
+    RepositoryBundle,
     ProjectRepository,
     ReviewRepository,
     WorkspaceRepository,
@@ -1438,6 +1439,24 @@ def _utc_stamp() -> str:
 def _slugify(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return normalized or "project"
+
+
+def build_local_repository_bundle(
+    root: str | Path = "AtlasProjects",
+) -> RepositoryBundle:
+    """Construct the default local repository composition for a project runtime."""
+
+    project_repository = LocalProjectRepository(root)
+    return RepositoryBundle(
+        project_repository=project_repository,
+        workspace_repository=LocalWorkspaceRepository(project_repository),
+        document_repository=LocalDocumentRepository(project_repository),
+        review_repository=LocalReviewRepository(project_repository),
+        knowledge_repository=LocalKnowledgeRepository(project_repository),
+        history_repository=LocalHistoryRepository(project_repository),
+        job_repository=LocalJobRepository(project_repository),
+        attachment_repository=LocalAttachmentRepository(project_repository),
+    )
 
 
 def _sha1_file(path: Path) -> str:

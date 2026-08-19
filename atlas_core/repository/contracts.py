@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any
 
 JsonDict = dict[str, Any]
@@ -321,3 +322,17 @@ class AttachmentRepository(ABC):
         limit: int = 200,
     ) -> list[JsonDict]:
         raise NotImplementedError
+
+
+@dataclass(frozen=True, slots=True)
+class RepositoryBundle:
+    """Complete repository composition for a project runtime."""
+
+    project_repository: ProjectRepository
+    workspace_repository: WorkspaceRepository
+    document_repository: DocumentRepository
+    review_repository: ReviewRepository
+    knowledge_repository: KnowledgeRepository
+    history_repository: HistoryRepository
+    job_repository: JobRepository
+    attachment_repository: AttachmentRepository
