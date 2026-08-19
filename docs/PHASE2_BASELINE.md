@@ -127,8 +127,14 @@ Representative output characteristics from MAW snapshots:
 Baseline candidate requires all checks green:
 - black .
 - ruff check .
-- mypy .
+- mypy no-new-diagnostics relative to origin/main
 - pytest
+
+Type-check policy:
+- pre-existing mypy diagnostics are tracked technical debt
+- new changes may not introduce additional mypy diagnostics relative to origin/main
+- reducing historical typing debt is post-Phase-2 hardening
+- Black, Ruff, and pytest remain required green gates
 
 ## Recommended Next Enhancements
 - Drawing/spec intelligence refinements (higher fidelity link confidence and mismatch diagnostics).

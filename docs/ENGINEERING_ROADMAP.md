@@ -37,7 +37,11 @@ It does not activate work by itself; sprint selection is governed by approved ro
 Use this document when planning engineering dependencies, infrastructure work, refactoring, migrations, test strategy, release engineering, and production-readiness gates.
 
 ## Current Position
-Phase 2 Bid Intelligence remains active.
+Phase 2 Bid Intelligence core implementation is closed.
+
+Remaining work is hardening and enhancement, not closure-blocking.
+
+Deferred post-Phase-2 items include attachment derived-artifact preview/index/thumbnail work, broader search/index improvements, richer object-graph traversal, and historical mypy debt cleanup under the no-new-diagnostics policy.
 
 No new feature sprint is activated by the G-01 governance pass.
 
@@ -60,6 +64,11 @@ A-01 Final Alpha Readiness Audit and Release Candidate is complete with blocker-
 Epic E remains the next candidate epic only after architecture review and explicit sprint approval.
 
 Epic E must not be started from this roadmap.
+
+Phase 2 closure guidance:
+- preserve Black, Ruff, pytest, and no-new-mypy-diagnostics gates
+- keep historical typing debt tracked as technical debt
+- do not treat deferred attachment/search/object-graph enhancements as closure blockers
 
 ## Engineering Sequence
 

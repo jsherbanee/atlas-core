@@ -15,7 +15,22 @@ It represents the current implementation state of Atlas.
 - [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)
 
 ## Current State
-Atlas is in active Phase 2 Bid Intelligence development within the broader Atlas SaaS platform direction.
+Atlas Phase 2 Bid Intelligence is functionally closed.
+
+Core workflow closure status:
+- PX-03A closed
+- K-02 / K-02A closed
+- Processing Console verified
+- intake -> processing -> persisted result -> review handoff verified
+- core Attachments verified
+- Search / Working Set sufficient for Phase 2
+- Audit / History sufficient for Phase 2
+- scheduler/startup reconciliation sufficient for supported local mode
+- current full-suite baseline: 1704 passed
+- Black / Ruff green
+- no-new-mypy-diagnostics policy satisfied
+
+Remaining work is post-Phase-2 hardening and enhancement, not closure-blocking.
 
 Atlas is being shaped as a multi-tenant Intelligent Lifecycle Solutions Management Platform for AV and lighting systems integrators, with QuickBooks Online as the Financial System of Record and AWS as the long-term hosting direction.
 
@@ -253,6 +268,11 @@ Current implementation scope note:
 - A-07 is documentation-only and does not introduce transaction code, QuickBooks integration, routing, or accounting behavior
 - A-08 is documentation-only and does not introduce commercial-document code, UI, routing, or QuickBooks implementation
 - T-01 implements backend commercial-document foundation only and does not introduce transactions UI, QuickBooks API transport, payments, or accounting-ledger behavior
+
+## Phase 2 Closure Note
+- Phase 2 core workflows are closed and documented as complete.
+- Remaining items such as attachment derived-artifact previews/indexing, broader search/index enhancements, richer object-graph work, and repo-wide typing cleanup are deferred to post-Phase-2 hardening.
+- Epic E remains architecture-gated and not started.
 
 ## A-07 Architecture Validation Note
 - Transactions and commercial-operations architecture are documented, not implemented

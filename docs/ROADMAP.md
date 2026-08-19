@@ -33,7 +33,9 @@ Atlas milestones describe customer-visible capability horizons rather than sprin
 
 ## Current Status
 
-Phase 2 Bid Intelligence remains the active implementation target.
+Phase 2 Bid Intelligence core implementation is closed.
+
+Remaining work is post-Phase-2 hardening and enhancement.
 
 Epic X is completed and formally closed.
 
