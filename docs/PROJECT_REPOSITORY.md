@@ -15,6 +15,10 @@ Sprint 10 hardens the repository interfaces to prepare for cloud-ready storage a
 
 Atlas's long-term hosting direction is AWS-backed multi-tenant SaaS storage, but the current repository layer remains local and deterministic for development.
 
+CM-01 commercial models depend on this repository boundary remaining tenant-scoped. The repository composition root must isolate each tenant in its own local root before commercial persistence grows beyond the current skeleton.
+
+CM-02 extends that same tenant root with commercial JSONL storage under `commercial/` so record persistence stays deterministic during local development.
+
 Goals:
 - Persist projects independently of the running session.
 - Keep storage deterministic and portable.
@@ -48,6 +52,9 @@ Contracts:
 - JobRepository
 - AttachmentRepository
 
+Commercial contracts:
+- CommercialRepository
+
 Project identity contract notes (X-02):
 - `allocate_bid_id(year=None)` reserves the next available deterministic Atlas Bid ID.
 - `peek_next_bid_id(year=None)` previews the next available deterministic Atlas Bid ID without advancing sequence state.
@@ -68,6 +75,12 @@ Current adapter implementation:
 - LocalAttachmentRepository
 
 The local adapters are the development-time stand-in for future cloud-hosted tenant-scoped storage adapters.
+
+Local tenant mapping uses a standalone repository root per tenant, for example `AtlasProjects/tenants/<tenant_id>/...`. That root is where projects, manifests, workspace state, review artifacts, history, jobs, and attachments are isolated for a specific tenant during local development.
+
+Future AWS mappings are expected to keep the same composition boundary while swapping the backing adapters to S3, Postgres or Aurora, SQS, and ECS/Fargate or Lambda.
+
+Local and AWS adapters must coexist during migration so the composition root can switch by tenant without changing caller behavior.
 
 The service layer consumes an orchestrator (AtlasProjectManager in atlas_core/repository/project_manager.py) that composes all adapters.
 

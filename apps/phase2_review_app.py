@@ -118,6 +118,9 @@ from atlas_core.contracts.upload_policy import (
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
+from atlas_core.ui.commercial_workspace import (
+    render_commercial_workspace_page as _render_commercial_workspace_page,
+)
 from atlas_core.ui.design_system import (
     atlas_stylesheet,
     render_empty_state_html,
@@ -309,11 +312,12 @@ REPORT_PAGES = [
 ]
 SETTINGS_PAGES = ["Project Settings", "Application Settings"]
 
-HEADER_NAV_COLUMN_SPEC = [0.95, 1.1, 0.9, 0.95, 0.9, 0.9, 2.35]
+HEADER_NAV_COLUMN_SPEC = [0.95, 1.0, 0.9, 0.95, 0.9, 0.9, 0.9, 2.2]
 BODY_SHELL_COLUMN_SPEC = [1.35, 4.65]
 COMPACT_TERTIARY_COLUMNS = 4
 PRIMARY_HEADER_NAV_ITEMS: list[tuple[str, str]] = [
     ("Transactions", "Transactions"),
+    ("Commercial", "Commercial Workspace"),
     ("Projects", "Projects"),
     ("Knowledge", "Knowledge"),
     ("Reports", "Reports"),
@@ -371,6 +375,7 @@ ALL_ACTIVE_PAGES = (
         "Object Workspace",
         "Knowledge",
         "Transactions",
+        "Commercial Workspace",
         "Administration",
         "Product Resolution",
         "Estimate",
@@ -428,6 +433,7 @@ APPLICATION_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
         [
             ("Home", "Mission Control"),
             ("Projects", "Projects"),
+            ("Commercial", "Commercial Workspace"),
             ("Knowledge", "Knowledge"),
             ("Transactions", "Transactions"),
             ("Reports", "Reports"),
@@ -12900,6 +12906,8 @@ def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
     if primary != "Projects":
         if primary == "Transactions":
             return "estimates" if page == "Transactions" else None
+        if primary == "Commercial":
+            return None
         if primary == "Settings":
             if page == "Administration":
                 return "organization_settings"
@@ -12954,6 +12962,8 @@ def _active_primary_workspace(page: str, record: ProjectWorkspaceRecord | None) 
         return "Knowledge"
     if page == "Transactions":
         return "Transactions"
+    if page == "Commercial Workspace":
+        return "Commercial"
     if page in PROJECTS_LIBRARY_PAGES or page in PROJECTS_ACTIVE_PAGES:
         return "Projects"
     if record is not None and page not in {"Mission Control", "Administration"}:
@@ -12969,6 +12979,8 @@ def _active_workspace_mode(page: str, record: ProjectWorkspaceRecord | None) -> 
     if page == "Knowledge":
         return "application"
     if page == "Transactions":
+        return "application"
+    if page == "Commercial Workspace":
         return "application"
     if page in PROJECTS_LIBRARY_PAGES:
         return "library"
@@ -13389,6 +13401,8 @@ def _primary_navigation_is_active(
         return True
     if label == "Reports" and active_page in REPORT_PAGES:
         return True
+    if label == "Commercial" and active_page == "Commercial Workspace":
+        return True
     if label == "Settings" and (
         active_page in SETTINGS_PAGES
         or active_page in {"Administration", "Workspace Settings"}
@@ -13416,8 +13430,8 @@ def _render_header(
         type="primary" if current_page == "Mission Control" else "secondary",
     ):
         _open_page(st, "Mission Control")
-    _render_top_navigation(st, header_cols[1:6], record)
-    _render_global_search_control(st, header_cols[6])
+    _render_top_navigation(st, header_cols[1:7], record)
+    _render_global_search_control(st, header_cols[7])
 
     if record is None or current_page == "Mission Control":
         st.session_state["atlas_active_project_name"] = ""
@@ -43818,6 +43832,10 @@ def _render_main_content(
 
     if page == "Transactions":
         _render_transactions_workspace_page(st, workspace_service)
+        return
+
+    if page == "Commercial Workspace":
+        _render_commercial_workspace_page(st, workspace_service)
         return
 
     if page == "Object Workspace":

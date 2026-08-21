@@ -29,6 +29,17 @@ Reporting should support:
 - service reports
 - audit reports
 
+## Commercial Operational Read Models
+
+REP-01 adds tenant-scoped commercial reporting read models on top of the
+operational spine defined by CM-03, CM-04, INV-01, and FIN-01. These read
+models stay deterministic and read-only: they summarize counts, totals, and
+sync readiness from existing commercial repository records without creating a
+separate reporting store.
+
+Supported commercial summaries are documented in
+[COMMERCIAL_REPORTING_READ_MODELS.md](COMMERCIAL_REPORTING_READ_MODELS.md).
+
 ## Deterministic Exports
 Reports should be reproducible and versioned where practical.
 
@@ -51,6 +62,12 @@ Templates should support:
 Atlas operational reports should remain distinct from QuickBooks-derived financial summaries.
 
 QuickBooks-derived summaries may be included where appropriate, but they should be labeled as financial data sourced from accounting systems rather than Atlas operational truth.
+
+Commercial reporting read models should surface QuickBooks sync readiness and
+invoice/vendor-bill operational status, not accounting-ledger truth.
+
+The sync states and idempotency metadata summarized here are defined in
+[QB_01_QUICKBOOKS_SYNC_ARCHITECTURE.md](QB_01_QUICKBOOKS_SYNC_ARCHITECTURE.md).
 
 ## Scheduling And Delivery
 Reporting architecture should eventually support scheduled delivery and on-demand generation.

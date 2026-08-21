@@ -37,7 +37,11 @@ It does not activate work by itself; sprint selection is governed by approved ro
 Use this document when planning engineering dependencies, infrastructure work, refactoring, migrations, test strategy, release engineering, and production-readiness gates.
 
 ## Current Position
-Phase 2 Bid Intelligence remains active.
+Phase 2 Bid Intelligence core implementation is closed.
+
+Phase 2 delivered the local project and persistence foundation, but not the full Atlas commercial product.
+
+The next strategic goal is Commercial MVP readiness, not AWS migration alone and not deeper engineering intelligence first.
 
 No new feature sprint is activated by the G-01 governance pass.
 
@@ -60,6 +64,15 @@ A-01 Final Alpha Readiness Audit and Release Candidate is complete with blocker-
 Epic E remains the next candidate epic only after architecture review and explicit sprint approval.
 
 Epic E must not be started from this roadmap.
+
+Commercial MVP architecture guidance:
+- introduce tenant isolation as a repository boundary before major new product modules depend on persistence
+- keep local and future AWS adapters able to coexist behind the same composition root
+- treat AWS migration as staged and adapter-based, not a rewrite
+- define Atlas as the operational system of record for estimates, sales workflow, project/job status, and inventory planning
+- define QuickBooks as the likely accounting system of record for ledger, payments, tax, formal invoices, and financial statements
+- prioritize customer/account foundation, opportunity tracking, estimating, proposal workflow, sales order management, change order basics, project/job conversion, item/catalog foundation, inventory availability/reservation/allocation/receiving basics, vendor/manufacturer registry maturation, procurement/RFQ workflow, commercial reporting, QuickBooks connector architecture and sync planning, Atlas API layering, AWS adapter migration, and commercial tenant/account administration
+- defer deeper engineering intelligence until the commercial operating spine is established, except for narrow estimating-support design slices
 
 ## Engineering Sequence
 

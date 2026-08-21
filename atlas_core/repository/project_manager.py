@@ -15,6 +15,7 @@ from atlas_core.repository.local import (
     LocalReviewRepository,
     LocalWorkspaceRepository,
     build_local_repository_bundle,
+    build_local_tenant_repository_bundle,
 )
 from atlas_core.services.background_job_service import BackgroundJobService
 from atlas_core.services.attachment_service import AttachmentService
@@ -27,12 +28,19 @@ class AtlasProjectManager:
     def __init__(
         self,
         root: str | Path = "AtlasProjects",
+        tenant_id: str | None = None,
         project_repository: ProjectRepository | None = None,
         repositories: RepositoryBundle | None = None,
     ) -> None:
         if repositories is None:
             if project_repository is None:
-                repositories = build_local_repository_bundle(root)
+                if tenant_id is None:
+                    repositories = build_local_repository_bundle(root)
+                else:
+                    repositories = build_local_tenant_repository_bundle(
+                        tenant_id,
+                        root,
+                    )
             else:
                 repositories = RepositoryBundle(
                     project_repository=project_repository,
@@ -43,9 +51,13 @@ class AtlasProjectManager:
                     history_repository=LocalHistoryRepository(project_repository),
                     job_repository=LocalJobRepository(project_repository),
                     attachment_repository=LocalAttachmentRepository(project_repository),
+                    tenant_id=tenant_id,
+                    tenant_root=getattr(project_repository, "root", None),
                 )
 
         self.repositories = repositories
+        self.tenant_id = repositories.tenant_id
+        self.tenant_root = repositories.tenant_root
         self.project_repository = repositories.project_repository
         self.workspace_repository = repositories.workspace_repository
         self.document_repository = repositories.document_repository
@@ -54,6 +66,7 @@ class AtlasProjectManager:
         self.history_repository = repositories.history_repository
         self.job_repository = repositories.job_repository
         self.attachment_repository = repositories.attachment_repository
+        self.commercial_repository = repositories.commercial_repository
         self.audit_service = ImmutableAuditService(self.history_repository)
         self.background_job_service = BackgroundJobService(
             repository=self.job_repository,

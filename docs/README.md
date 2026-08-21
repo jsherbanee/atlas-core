@@ -122,6 +122,71 @@ Future releases should follow this structure.
 - Audience: Product, architecture, integrations, commercial-operations, and platform contributors.
 - When to reference: When planning any commercial document family or shared transaction-document behavior.
 
+### [COMMERCIAL_MVP_OPERATING_SPINE.md](COMMERCIAL_MVP_OPERATING_SPINE.md)
+- Purpose: Defines the minimal commercial operating spine, workflow sequence, and Atlas versus QuickBooks system-of-record boundaries.
+- Audience: Product, architecture, commercial-operations, and platform contributors.
+- When to reference: When planning the Commercial MVP data model and post-Phase-2 commercial roadmap.
+
+### [COMMERCIAL_REPOSITORY.md](COMMERCIAL_REPOSITORY.md)
+- Purpose: Defines tenant-scoped commercial persistence layout, record boundaries, and CM-02 repository behavior.
+- Audience: Architecture, platform, commercial-operations, and repository contributors.
+- When to reference: When wiring CM-01 models into tenant-scoped local persistence.
+
+### [COMMERCIAL_CUSTOMER_OPPORTUNITY_ESTIMATE_SERVICE.md](COMMERCIAL_CUSTOMER_OPPORTUNITY_ESTIMATE_SERVICE.md)
+- Purpose: Defines CM-03 service responsibilities for customer, opportunity, and estimate management on top of CM-02 persistence.
+- Audience: Architecture, platform, and commercial-operations contributors.
+- When to reference: When implementing the front half of the commercial workflow before proposals and sales orders.
+
+### [COMMERCIAL_PROPOSAL_SALES_ORDER_WORKFLOW_SERVICE.md](COMMERCIAL_PROPOSAL_SALES_ORDER_WORKFLOW_SERVICE.md)
+- Purpose: Defines CM-04 workflow responsibilities for proposal lifecycle management and accepted-estimate-to-sales-order conversion.
+- Audience: Architecture, platform, and commercial-operations contributors.
+- When to reference: When implementing the proposal and sales-order workflow layer on top of CM-03.
+
+### [INV_01_INVENTORY_SERVICE.md](INV_01_INVENTORY_SERVICE.md)
+- Purpose: Defines INV-01 inventory service responsibilities for catalog, availability, reservation, and allocation behavior.
+- Audience: Architecture, platform, and commercial-operations contributors.
+- When to reference: When implementing deterministic inventory state on top of CM-04.
+
+### [FIN_01_INVOICE_VENDOR_BILL_SERVICE.md](FIN_01_INVOICE_VENDOR_BILL_SERVICE.md)
+- Purpose: Defines FIN-01 service responsibilities for customer invoices, vendor bills, totals, and QuickBooks sync references.
+- Audience: Architecture, platform, commercial-operations, and accounting contributors.
+- When to reference: When implementing Atlas-owned invoice and vendor-bill workflow on top of INV-01.
+
+### [QB_01_QUICKBOOKS_SYNC_ARCHITECTURE.md](QB_01_QUICKBOOKS_SYNC_ARCHITECTURE.md)
+- Purpose: Defines QB-01 sync lifecycle, idempotency, retry handling, and tenant-scoped QuickBooks sync state for invoices and vendor bills.
+- Audience: Architecture, platform, commercial-operations, and accounting contributors.
+- When to reference: When implementing internal QuickBooks sync coordination without live transport.
+
+### [APP_01_COMMERCIAL_MVP_APPLICATION_FACADE.md](APP_01_COMMERCIAL_MVP_APPLICATION_FACADE.md)
+- Purpose: Defines APP-01 as the tenant-scoped Commercial MVP application facade for future UI/API surfaces.
+- Audience: Architecture, platform, commercial-operations, and product-surface contributors.
+- When to reference: When wiring the first commercial UI or API layer to the existing service stack.
+
+### [API_01_COMMERCIAL_MVP_API_BOUNDARY.md](API_01_COMMERCIAL_MVP_API_BOUNDARY.md)
+- Purpose: Defines API-01 request/response contracts and the tenant-scoped Commercial MVP API boundary on top of APP-01.
+- Audience: Architecture, platform, commercial-operations, and future client-surface contributors.
+- When to reference: When defining stable API contracts for Desktop or Web clients.
+
+### [UI_01_COMMERCIAL_WORKSPACE_MVP.md](UI_01_COMMERCIAL_WORKSPACE_MVP.md)
+- Purpose: Defines UI-01 as the first user-facing Commercial Workspace surface on top of APP-01 and API-01.
+- Audience: Architecture, platform, commercial-operations, and product-surface contributors.
+- When to reference: When wiring the Streamlit commercial workspace, snapshot panels, inventory checks, sync readiness, and workflow actions.
+
+### [UI_02_ESTIMATE_SALES_ORDER_WORKFLOW.md](UI_02_ESTIMATE_SALES_ORDER_WORKFLOW.md)
+- Purpose: Defines UI-02 as the revenue workflow slice for customers, opportunities, estimates, proposal state, and sales-order conversion.
+- Audience: Architecture, platform, commercial-operations, and product-surface contributors.
+- When to reference: When wiring the customer/opportunity/estimate path and its boundary-driven state transitions.
+
+### [COMMERCIAL_MVP_FULL_FIDELITY_CHECKPOINT.md](COMMERCIAL_MVP_FULL_FIDELITY_CHECKPOINT.md)
+- Purpose: Records the end-to-end validation of the current Commercial MVP and the housekeeping findings from the checkpoint pass.
+- Audience: Architecture, platform, commercial-operations, and product-surface contributors.
+- When to reference: When confirming whether the current Commercial MVP path is coherent enough to proceed with additional workflow slices.
+
+### [COMMERCIAL_REPORTING_READ_MODELS.md](COMMERCIAL_REPORTING_READ_MODELS.md)
+- Purpose: Defines REP-01 tenant-scoped commercial reporting read models and supported operational summaries.
+- Audience: Architecture, platform, commercial-operations, and reporting contributors.
+- When to reference: When implementing deterministic commercial summary views on top of FIN-01.
+
 ### [DOCUMENT_GENERATION.md](DOCUMENT_GENERATION.md)
 - Purpose: Defines deterministic template resolution, template-version snapshot behavior, and document rendering/output artifact guarantees.
 - Audience: Product, architecture, transactions, settings, and platform contributors.

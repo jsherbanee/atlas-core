@@ -9,6 +9,26 @@ from atlas_core.services.commercial_document_service import (
     CommercialNumberingService,
     NumberPreview,
 )
+from atlas_core.services.commercial_customer_opportunity_estimate_service import (
+    CommercialCustomerOpportunityEstimateService,
+)
+from atlas_core.services.commercial_proposal_sales_order_service import (
+    CommercialProposalSalesOrderWorkflowService,
+)
+from atlas_core.services.commercial_invoice_vendor_bill_service import (
+    CommercialInvoiceVendorBillService,
+)
+from atlas_core.services.commercial_quickbooks_sync_service import (
+    CommercialQuickBooksSyncService,
+)
+from atlas_core.services.commercial_mvp_application_facade import (
+    CommercialMvpApplicationFacade,
+    CommercialSalesOrderInventoryAvailability,
+)
+from atlas_core.services.commercial_reporting_service import (
+    CommercialReportingService,
+)
+from atlas_core.services.inventory_service import InventoryService
 
 from atlas_core.services.equipment_matrix_service import (
     EquipmentMatrixRow,
@@ -266,6 +286,14 @@ __all__ = [
     "CommercialDocumentService",
     "CommercialNumberingService",
     "NumberPreview",
+    "CommercialCustomerOpportunityEstimateService",
+    "CommercialProposalSalesOrderWorkflowService",
+    "CommercialInvoiceVendorBillService",
+    "CommercialQuickBooksSyncService",
+    "CommercialMvpApplicationFacade",
+    "CommercialSalesOrderInventoryAvailability",
+    "CommercialReportingService",
+    "InventoryService",
     "PERMISSION_CATALOG",
     "SYSTEM_ROLES",
     "PermissionsService",
