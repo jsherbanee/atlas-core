@@ -33,7 +33,11 @@ Atlas milestones describe customer-visible capability horizons rather than sprin
 
 ## Current Status
 
-Phase 2 Bid Intelligence remains the active implementation target.
+Phase 2 Bid Intelligence is closed.
+
+Phase 2 completed Atlas's local project and persistence foundation, not the full Atlas commercial product.
+
+Current planning has moved to Commercial MVP readiness, with staged AWS readiness as enabling architecture rather than the immediate product goal.
 
 Epic X is completed and formally closed.
 
@@ -41,11 +45,37 @@ X-01 through X-11 are closed.
 
 No Epic X sprint is active.
 
-Current focus is Epic K Sprint K-02 implementation (Core Knowledge Entities and Operational Workflows).
+Current focus is Commercial MVP readiness.
 
 Epic E remains the next candidate epic pending architecture review and sprint approval.
 
 Epic E has not started.
+
+## Commercial MVP Roadmap
+
+Commercial MVP readiness is the near-term goal. It is the operating spine Atlas must establish before deeper engineering-intelligence work.
+
+This roadmap is staged and adapter-based, not a rewrite. Local and future AWS adapters must coexist behind the same repository boundary.
+
+- Tenant-scoped repository boundary: each tenant's data must remain isolated as a standalone Atlas repository boundary before major new product modules depend on persistence.
+- Customer/account foundation: represent customers and commercial accounts as first-class operational records.
+- Opportunity tracking: track pipeline opportunities and commercial progression.
+- Estimating: support deterministic estimating as the core commercial entry point.
+- Proposal workflow: generate and manage proposal-facing commercial workflows.
+- Sales order management: manage sales orders as the operational system of record.
+- Change order basics: support the minimum change-order flow needed for commercial operations.
+- Project/job conversion: convert accepted commercial work into project/job execution state.
+- Item/catalog foundation: maintain a strong item, catalog, and pricing foundation.
+- Inventory availability, reservation, allocation, and receiving basics: introduce inventory-aware fulfillment behaviors.
+- Vendor/manufacturer registry maturation: mature registry, lifecycle, and relationship workflows.
+- Procurement/RFQ workflow: add procurement and RFQ capability after the core data boundary is in place.
+- Commercial reporting: develop reporting that reflects the commercial operating spine.
+- QuickBooks connector planning: define the connector boundary and sync ownership model before any transport work.
+- Atlas API layer: introduce a durable API layer for future clients and adapters.
+- AWS adapter migration: move staged, adapter-by-adapter, with local and AWS implementations able to coexist.
+- Commercial tenant/account administration: add tenant and account administration capabilities for commercial operations.
+
+Deep engineering intelligence remains deferred until the commercial operating spine is established, except for narrow design slices required to support estimating.
 
 ## Historical Context
 

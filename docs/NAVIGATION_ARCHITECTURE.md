@@ -39,6 +39,9 @@ This document defines the reusable navigation contract used by the shell and wor
   project or workspace state exists in the current session
 - Project workspace opens persist `atlas_workspace_id` alongside `atlas_page` so
   browser refreshes and validation links can restore the selected project context
+- Persisted project selection is visible only on Projects-owned routes. Transactions,
+  Knowledge, Reports, Settings, and Home do not render the global project selector,
+  project header/actions, project breadcrumbs, or project status context.
 - Persisted workspace state restore is best-effort; malformed state is ignored,
   logged with an error reference, and does not replace the root-route contract
 - Project workspace opens use a lightweight bootstrap contract and must not
@@ -97,6 +100,10 @@ Transactions tertiary actions should remain action-oriented, for example:
 This sprint defines the contract only.
 
 No routes or production navigation implementation are introduced here.
+
+## Platform Administration Direction
+
+The future Platform Admin Console is a separate application boundary, not a tenant-facing primary workspace. It must not add an Admin item to this navigation contract. See [PLATFORM_ADMIN_CONSOLE.md](PLATFORM_ADMIN_CONSOLE.md).
 
 ## Transactions Navigation Implementation (T-02)
 

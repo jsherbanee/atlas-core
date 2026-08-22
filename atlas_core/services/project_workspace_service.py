@@ -31,7 +31,6 @@ from atlas_core.contracts.background_job_contracts import (
     JobStatus,
 )
 from atlas_core.contracts.attachment_contracts import AttachmentAccessDecision
-from atlas_core.repository import AtlasProjectManager
 from atlas_core.services.background_job_service import JobExecutionContext
 from atlas_core.services.document_intake_service import (
     DocumentIntakeService,
@@ -274,6 +273,8 @@ def _cached_json_dict(
 class ProjectWorkspaceService:
     def __init__(self, workspace_root: str | Path = "AtlasProjects") -> None:
         self.workspace_root = Path(workspace_root)
+        from atlas_core.repository import AtlasProjectManager
+
         self.manager = AtlasProjectManager(str(self.workspace_root))
         self.organization_directory = OrganizationDirectoryService(self.workspace_root)
         self.lifecycle_engine = AVLifecycleEngine.default()

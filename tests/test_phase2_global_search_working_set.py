@@ -1133,7 +1133,7 @@ def test_atlas_button_routes_back_home() -> None:
 def test_top_navigation_renders_primary_header_buttons() -> None:
     st = _HomeContractStreamlit()
 
-    app._render_top_navigation(st, st.columns(5))
+    app._render_top_navigation(st, st.columns(6))
 
     assert [call["label"] for call in st.button_calls] == [
         "Transactions",
@@ -1150,7 +1150,7 @@ def test_top_navigation_hides_public_home_button() -> None:
     st = _HomeContractStreamlit()
     st.session_state["atlas_active_page"] = "Projects"
 
-    app._render_top_navigation(st, st.columns(5))
+    app._render_top_navigation(st, st.columns(6))
 
     assert [call["label"] for call in st.button_calls] == [
         "Transactions",
@@ -2515,7 +2515,7 @@ def test_top_navigation_order_places_transactions_first() -> None:
     st = _HomeContractStreamlit()
     st.session_state["atlas_active_page"] = "Transactions"
 
-    app._render_top_navigation(st, st.columns(5), None)
+    app._render_top_navigation(st, st.columns(6), None)
 
     assert [call["label"] for call in st.button_calls] == [
         "Transactions",
@@ -2530,7 +2530,7 @@ def test_top_navigation_highlights_settings_workspace() -> None:
     st = _HomeContractStreamlit()
     st.session_state["atlas_active_page"] = "Administration"
 
-    app._render_top_navigation(st, st.columns(5))
+    app._render_top_navigation(st, st.columns(6))
 
     settings_call = next(
         call for call in st.button_calls if call["label"] == "Settings"

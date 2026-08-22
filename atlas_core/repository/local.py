@@ -15,14 +15,32 @@ import zipfile
 from atlas_core import __version__
 from atlas_core.repository.contracts import (
     AttachmentRepository,
+    CommercialRepository,
     DocumentRepository,
     HistoryRepository,
     JobRepository,
     JsonDict,
     KnowledgeRepository,
+    RepositoryBundle,
     ProjectRepository,
     ReviewRepository,
     WorkspaceRepository,
+)
+from atlas_core.contracts.commercial_spine_contracts import (
+    CatalogItem,
+    ChangeOrder,
+    CustomerAccount,
+    CustomerInvoice,
+    Estimate,
+    InventoryLocation,
+    InventoryPosition,
+    InventoryReservation,
+    Opportunity,
+    ProcurementNeed,
+    Proposal,
+    QuickBooksSyncReference,
+    SalesOrder,
+    VendorBill,
 )
 from atlas_core.repository.models import ProjectManifest, RepositoryHealthReport
 from atlas_core.services.document_intake_service import (
@@ -1358,6 +1376,31 @@ class LocalAttachmentRepository(AttachmentRepository):
         )
         return filtered[: max(1, int(limit))]
 
+    @staticmethod
+    def _read_jsonl(path: Path) -> list[JsonDict]:
+        if not path.exists() or not path.is_file():
+            return []
+        rows: list[JsonDict] = []
+        with path.open(encoding="utf-8") as file:
+            for line in file:
+                value = line.strip()
+                if not value:
+                    continue
+                try:
+                    parsed = json.loads(value)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict):
+                    rows.append(parsed)
+        return rows
+
+    @staticmethod
+    def _write_jsonl(path: Path, rows: list[JsonDict]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as file:
+            for item in rows:
+                file.write(json.dumps(dict(item), sort_keys=True) + "\n")
+
     def _scope_dir(self, tenant_id: str, organization_id: str) -> Path:
         tenant = self._safe_path_segment(tenant_id)
         organization = self._safe_path_segment(organization_id)
@@ -1401,6 +1444,266 @@ class LocalAttachmentRepository(AttachmentRepository):
         normalized = value.strip()
         return normalized or default
 
+
+class LocalCommercialRepository(CommercialRepository):
+    """Tenant-scoped commercial record persistence using JSONL files."""
+
+    _FILES = {
+        "customer_accounts": "customer_accounts.jsonl",
+        "opportunities": "opportunities.jsonl",
+        "proposals": "proposals.jsonl",
+        "estimates": "estimates.jsonl",
+        "sales_orders": "sales_orders.jsonl",
+        "change_orders": "change_orders.jsonl",
+        "catalog_items": "catalog_items.jsonl",
+        "inventory_locations": "inventory_locations.jsonl",
+        "inventory_positions": "inventory_positions.jsonl",
+        "inventory_reservations": "inventory_reservations.jsonl",
+        "procurement_needs": "procurement_needs.jsonl",
+        "customer_invoices": "customer_invoices.jsonl",
+        "vendor_bills": "vendor_bills.jsonl",
+        "quickbooks_sync_references": "quickbooks_sync_references.jsonl",
+    }
+
+    def __init__(self, project_repository: ProjectRepository) -> None:
+        self.project_repository = project_repository
+        self.tenant_root = Path(
+            getattr(project_repository, "root", Path("AtlasProjects"))
+        )
+        self.root = self.tenant_root / "commercial"
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def save_customer_account(self, record: CustomerAccount) -> None:
+        self._save_model("customer_accounts", record, "customer_id")
+
+    def load_customer_account(self, customer_id: str) -> CustomerAccount | None:
+        return self._load_model(
+            "customer_accounts", CustomerAccount, "customer_id", customer_id
+        )
+
+    def list_customer_accounts(self) -> list[CustomerAccount]:
+        return self._list_models("customer_accounts", CustomerAccount, "customer_id")
+
+    def save_opportunity(self, record: Opportunity) -> None:
+        self._save_model("opportunities", record, "opportunity_id")
+
+    def load_opportunity(self, opportunity_id: str) -> Opportunity | None:
+        return self._load_model(
+            "opportunities", Opportunity, "opportunity_id", opportunity_id
+        )
+
+    def list_opportunities(self) -> list[Opportunity]:
+        return self._list_models("opportunities", Opportunity, "opportunity_id")
+
+    def save_proposal(self, record: Proposal) -> None:
+        self._save_model("proposals", record, "proposal_id")
+
+    def load_proposal(self, proposal_id: str) -> Proposal | None:
+        return self._load_model("proposals", Proposal, "proposal_id", proposal_id)
+
+    def list_proposals(self) -> list[Proposal]:
+        return self._list_models("proposals", Proposal, "proposal_id")
+
+    def save_estimate(self, record: Estimate) -> None:
+        self._save_model("estimates", record, "estimate_id")
+
+    def load_estimate(self, estimate_id: str) -> Estimate | None:
+        return self._load_model("estimates", Estimate, "estimate_id", estimate_id)
+
+    def list_estimates(self) -> list[Estimate]:
+        return self._list_models("estimates", Estimate, "estimate_id")
+
+    def save_sales_order(self, record: SalesOrder) -> None:
+        self._save_model("sales_orders", record, "sales_order_id")
+
+    def load_sales_order(self, sales_order_id: str) -> SalesOrder | None:
+        return self._load_model(
+            "sales_orders", SalesOrder, "sales_order_id", sales_order_id
+        )
+
+    def list_sales_orders(self) -> list[SalesOrder]:
+        return self._list_models("sales_orders", SalesOrder, "sales_order_id")
+
+    def save_change_order(self, record: ChangeOrder) -> None:
+        self._save_model("change_orders", record, "change_order_id")
+
+    def load_change_order(self, change_order_id: str) -> ChangeOrder | None:
+        return self._load_model(
+            "change_orders", ChangeOrder, "change_order_id", change_order_id
+        )
+
+    def list_change_orders(self) -> list[ChangeOrder]:
+        return self._list_models("change_orders", ChangeOrder, "change_order_id")
+
+    def save_catalog_item(self, record: CatalogItem) -> None:
+        self._save_model("catalog_items", record, "catalog_item_id")
+
+    def load_catalog_item(self, catalog_item_id: str) -> CatalogItem | None:
+        return self._load_model(
+            "catalog_items", CatalogItem, "catalog_item_id", catalog_item_id
+        )
+
+    def list_catalog_items(self) -> list[CatalogItem]:
+        return self._list_models("catalog_items", CatalogItem, "catalog_item_id")
+
+    def save_inventory_location(self, record: InventoryLocation) -> None:
+        self._save_model("inventory_locations", record, "location_id")
+
+    def load_inventory_location(self, location_id: str) -> InventoryLocation | None:
+        return self._load_model(
+            "inventory_locations", InventoryLocation, "location_id", location_id
+        )
+
+    def list_inventory_locations(self) -> list[InventoryLocation]:
+        return self._list_models(
+            "inventory_locations", InventoryLocation, "location_id"
+        )
+
+    def save_inventory_position(self, record: InventoryPosition) -> None:
+        self._save_model("inventory_positions", record, "position_id")
+
+    def load_inventory_position(self, position_id: str) -> InventoryPosition | None:
+        return self._load_model(
+            "inventory_positions", InventoryPosition, "position_id", position_id
+        )
+
+    def list_inventory_positions(self) -> list[InventoryPosition]:
+        return self._list_models(
+            "inventory_positions", InventoryPosition, "position_id"
+        )
+
+    def save_inventory_reservation(self, record: InventoryReservation) -> None:
+        self._save_model("inventory_reservations", record, "reservation_id")
+
+    def load_inventory_reservation(
+        self, reservation_id: str
+    ) -> InventoryReservation | None:
+        return self._load_model(
+            "inventory_reservations",
+            InventoryReservation,
+            "reservation_id",
+            reservation_id,
+        )
+
+    def list_inventory_reservations(self) -> list[InventoryReservation]:
+        return self._list_models(
+            "inventory_reservations", InventoryReservation, "reservation_id"
+        )
+
+    def save_procurement_need(self, record: ProcurementNeed) -> None:
+        self._save_model("procurement_needs", record, "procurement_need_id")
+
+    def load_procurement_need(self, procurement_need_id: str) -> ProcurementNeed | None:
+        return self._load_model(
+            "procurement_needs",
+            ProcurementNeed,
+            "procurement_need_id",
+            procurement_need_id,
+        )
+
+    def list_procurement_needs(self) -> list[ProcurementNeed]:
+        return self._list_models(
+            "procurement_needs", ProcurementNeed, "procurement_need_id"
+        )
+
+    def save_customer_invoice(self, record: CustomerInvoice) -> None:
+        self._save_model("customer_invoices", record, "customer_invoice_id")
+
+    def load_customer_invoice(self, customer_invoice_id: str) -> CustomerInvoice | None:
+        return self._load_model(
+            "customer_invoices",
+            CustomerInvoice,
+            "customer_invoice_id",
+            customer_invoice_id,
+        )
+
+    def list_customer_invoices(self) -> list[CustomerInvoice]:
+        return self._list_models(
+            "customer_invoices", CustomerInvoice, "customer_invoice_id"
+        )
+
+    def save_vendor_bill(self, record: VendorBill) -> None:
+        self._save_model("vendor_bills", record, "vendor_bill_id")
+
+    def load_vendor_bill(self, vendor_bill_id: str) -> VendorBill | None:
+        return self._load_model(
+            "vendor_bills", VendorBill, "vendor_bill_id", vendor_bill_id
+        )
+
+    def list_vendor_bills(self) -> list[VendorBill]:
+        return self._list_models("vendor_bills", VendorBill, "vendor_bill_id")
+
+    def save_quickbooks_sync_reference(self, record: QuickBooksSyncReference) -> None:
+        self._save_model("quickbooks_sync_references", record, "sync_reference_id")
+
+    def load_quickbooks_sync_reference(
+        self, sync_reference_id: str
+    ) -> QuickBooksSyncReference | None:
+        return self._load_model(
+            "quickbooks_sync_references",
+            QuickBooksSyncReference,
+            "sync_reference_id",
+            sync_reference_id,
+        )
+
+    def list_quickbooks_sync_references(self) -> list[QuickBooksSyncReference]:
+        return self._list_models(
+            "quickbooks_sync_references",
+            QuickBooksSyncReference,
+            "sync_reference_id",
+        )
+
+    def _save_model(self, family: str, record: Any, id_field: str) -> None:
+        payload = self._record_to_payload(record)
+        record_id = str(payload.get(id_field) or "").strip()
+        if not record_id:
+            raise ValueError(f"{id_field} is required")
+        rows = self._read_jsonl(self._family_path(family))
+        retained = [
+            item for item in rows if str(item.get(id_field) or "").strip() != record_id
+        ]
+        retained.append(payload)
+        retained.sort(key=lambda item: str(item.get(id_field) or ""))
+        self._write_jsonl(self._family_path(family), retained)
+
+    def _load_model(
+        self,
+        family: str,
+        model_cls: Any,
+        id_field: str,
+        record_id: str,
+    ) -> Any | None:
+        target = str(record_id or "").strip()
+        if not target:
+            return None
+        for item in self._read_jsonl(self._family_path(family)):
+            if str(item.get(id_field) or "").strip() == target:
+                return model_cls(**dict(item))
+        return None
+
+    def _list_models(self, family: str, model_cls: Any, id_field: str) -> list[Any]:
+        rows = self._read_jsonl(self._family_path(family))
+        rows.sort(key=lambda item: str(item.get(id_field) or ""))
+        return [model_cls(**dict(item)) for item in rows]
+
+    def _family_path(self, family: str) -> Path:
+        filename = self._FILES[family]
+        path = self.root / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @staticmethod
+    def _record_to_payload(record: Any) -> JsonDict:
+        if hasattr(record, "to_dict"):
+            payload = record.to_dict()
+        elif isinstance(record, dict):
+            payload = dict(record)
+        else:
+            raise ValueError("record must be a model or dict")
+        if not isinstance(payload, dict):
+            raise ValueError("record payload must be a dict")
+        return payload
+
     @staticmethod
     def _read_jsonl(path: Path) -> list[JsonDict]:
         if not path.exists() or not path.is_file():
@@ -1426,6 +1729,49 @@ class LocalAttachmentRepository(AttachmentRepository):
             for item in rows:
                 file.write(json.dumps(dict(item), sort_keys=True) + "\n")
 
+    def _scope_dir(self, tenant_id: str, organization_id: str) -> Path:
+        tenant = self._safe_path_segment(tenant_id)
+        organization = self._safe_path_segment(organization_id)
+        path = self.root / _ATTACHMENTS_ROOT / tenant / organization
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @staticmethod
+    def _safe_path_segment(value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise ValueError("path segment cannot be blank")
+        cleaned = re.sub(r"[^a-zA-Z0-9_.-]+", "_", normalized)
+        cleaned = cleaned.strip("._")
+        if not cleaned:
+            raise ValueError("path segment cannot be blank")
+        return cleaned
+
+    @staticmethod
+    def _safe_blob_filename(filename: str) -> str:
+        normalized = str(filename or "").strip()
+        if not normalized:
+            raise ValueError("filename is required")
+        if "/" in normalized or "\\" in normalized or ".." in normalized:
+            raise ValueError("unsafe filename")
+        return normalized
+
+    @staticmethod
+    def _required_text(field_name: str, value: Any) -> str:
+        normalized = LocalAttachmentRepository._safe_text(value)
+        if not normalized:
+            raise ValueError(f"{field_name} is required")
+        return normalized
+
+    @staticmethod
+    def _safe_text(value: Any, default: str = "") -> str:
+        if value is None:
+            return default
+        if not isinstance(value, str):
+            value = str(value)
+        normalized = value.strip()
+        return normalized or default
+
 
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat()
@@ -1438,6 +1784,54 @@ def _utc_stamp() -> str:
 def _slugify(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return normalized or "project"
+
+
+def build_local_repository_bundle(
+    root: str | Path = "AtlasProjects",
+) -> RepositoryBundle:
+    """Construct the legacy local repository composition for a project runtime."""
+
+    project_root = Path(root)
+    project_repository = LocalProjectRepository(project_root)
+    return RepositoryBundle(
+        project_repository=project_repository,
+        workspace_repository=LocalWorkspaceRepository(project_repository),
+        document_repository=LocalDocumentRepository(project_repository),
+        review_repository=LocalReviewRepository(project_repository),
+        knowledge_repository=LocalKnowledgeRepository(project_repository),
+        history_repository=LocalHistoryRepository(project_repository),
+        job_repository=LocalJobRepository(project_repository),
+        attachment_repository=LocalAttachmentRepository(project_repository),
+        commercial_repository=None,
+        tenant_root=project_root,
+    )
+
+
+def build_local_tenant_repository_bundle(
+    tenant_id: str,
+    root: str | Path = "AtlasProjects",
+) -> RepositoryBundle:
+    """Construct a tenant-scoped local repository composition."""
+
+    normalized_tenant_id = str(tenant_id).strip()
+    if not normalized_tenant_id:
+        raise ValueError("tenant_id cannot be blank")
+
+    tenant_root = Path(root) / "tenants" / _slugify(normalized_tenant_id)
+    project_repository = LocalProjectRepository(tenant_root)
+    return RepositoryBundle(
+        project_repository=project_repository,
+        workspace_repository=LocalWorkspaceRepository(project_repository),
+        document_repository=LocalDocumentRepository(project_repository),
+        review_repository=LocalReviewRepository(project_repository),
+        knowledge_repository=LocalKnowledgeRepository(project_repository),
+        history_repository=LocalHistoryRepository(project_repository),
+        job_repository=LocalJobRepository(project_repository),
+        attachment_repository=LocalAttachmentRepository(project_repository),
+        commercial_repository=LocalCommercialRepository(project_repository),
+        tenant_id=normalized_tenant_id,
+        tenant_root=tenant_root,
+    )
 
 
 def _sha1_file(path: Path) -> str:

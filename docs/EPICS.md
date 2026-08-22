@@ -14,7 +14,9 @@ Use [ROADMAP.md](ROADMAP.md) for executive milestone communication.
 - Preserve architecture boundaries from [ARCHITECTURE.md](ARCHITECTURE.md) and [DOMAIN_MODEL.md](DOMAIN_MODEL.md).
 - First-column secondary/tertiary navigation is an application-shell capability; sprint work must reuse the shared controlled accordion and must not introduce page-specific navigation expanders or independent open-state booleans.
 
-Atlas's long-term product direction is a complete lifecycle platform for AV and lighting systems integrators. Current implementation remains centered on Phase 2 Bid Intelligence, with Epic E not started.
+Atlas's long-term product direction is a complete lifecycle platform for AV and lighting systems integrators. Phase 2 Bid Intelligence core workflows are closed; the next strategic goal is Commercial MVP readiness. Epic E is not started.
+
+Post-Phase-2 work is expected to preserve a tenant-scoped repository boundary, support local and future AWS adapters coexisting behind the same composition root, stage AWS migration as adapter-based evolution rather than a rewrite, and defer deeper engineering intelligence until the commercial operating spine is established.
 
 For executive milestone framing, see [ROADMAP.md](ROADMAP.md) and [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md).
 For engineering sequencing and readiness gates, see [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md).

@@ -15,13 +15,32 @@ It represents the current implementation state of Atlas.
 - [PROJECT_REPOSITORY.md](PROJECT_REPOSITORY.md)
 
 ## Current State
-Atlas is in active Phase 2 Bid Intelligence development within the broader Atlas SaaS platform direction.
+Atlas Phase 2 Bid Intelligence is closed.
+
+Phase 2 completed the local project and persistence foundation, not the full Atlas commercial product.
+
+The current post-Phase-2 focus is Commercial MVP readiness, with tenant isolation required before major new product modules depend on persistence.
 
 Atlas is being shaped as a multi-tenant Intelligent Lifecycle Solutions Management Platform for AV and lighting systems integrators, with QuickBooks Online as the Financial System of Record and AWS as the long-term hosting direction.
 
 The AI assistant and broader lifecycle-platform capabilities are documented as future strategic direction rather than current implementation.
 
 The current stabilization baseline candidate includes a project-specific Atlas workspace shell and the supporting bid-intelligence workspace surfaces.
+
+## Post-Phase-2 Direction
+- Commercial MVP readiness now leads the roadmap: customer/account foundation, opportunity tracking, estimating, proposal workflow, sales order management, change order basics, project/job conversion, item/catalog foundation, inventory availability/reservation/allocation/receiving basics, vendor/manufacturer registry maturation, procurement/RFQ workflow, commercial reporting, QuickBooks connector planning, Atlas API layering, AWS adapter migration, and commercial tenant/account administration.
+- UI-FIX-01 removes the Commercial/Sales primary navigation item, standalone Commercial Workspace route, and combined page after manual review of PR #10 found that the surface duplicated existing product areas and confused tenant workflows.
+- Commercial UI ownership is now explicit: Transactions owns commercial documents and workflows; Knowledge owns customers, vendors, manufacturers, and catalog; Reports owns commercial read models; Settings owns appropriate tenant-facing configuration.
+- UI-FIX-01 also prevents a selected project from rendering global project selectors, headers, actions, breadcrumbs, or project status context outside Projects. No new primary navigation item was introduced.
+- The commercial backend spine, APP-01/API-01 boundaries, repository services, and tenant isolation remain intact. Focused follow-up work is still required within existing product areas, and this remediation does not claim broad UI readiness.
+- A future Platform Admin Console is documented as a separate application boundary and is not part of the tenant-facing navigation or this implementation slice.
+- MVP-CHK-01 previously validated the Commercial MVP backend end to end across boundary, facade, services, repositories, tenant isolation, reporting, and QuickBooks sync readiness. UI-FIX-01 replaces the removed page tests with route-removal, primary-nav exclusivity, non-Projects context-isolation, and existing-workspace navigation regressions while preserving backend coverage.
+- UI-03 Inventory and Invoice Workflow is the next recommended commercial slice.
+- Atlas is the operational system of record for estimates, sales workflow, project/job status, and inventory planning.
+- QuickBooks is the likely accounting system of record for ledger, payments, tax, formal invoices, and financial statements.
+- Local and future AWS adapters should coexist behind the same repository boundary.
+- AWS migration remains staged and adapter-based, not a rewrite.
+- Deeper engineering intelligence is deferred until the commercial operating spine is established, except for narrow estimating-support design slices.
 Sprint 3 UX delivery added guided project review progression, explicit review status modeling, checklist visibility, and a concise project summary report center with deterministic exports.
 Sprint 4 UI refinement adds repository-backed Open Existing Project, a stronger Projects library workflow, application-wide Knowledge scope, compact active-project identity, concise breadcrumbs, and a two-column Project Workspace layout (no persistent third context column).
 Sprint X-14 migrates the Projects library onto the shared Universal Workspace Framework with common page headers, metrics, selected-project inspectors, and maintenance controls while preserving repository-backed actions and active-project workflows.

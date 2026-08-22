@@ -50,6 +50,14 @@ Atlas must synchronize customers, vendors, purchase orders, and invoices where a
 
 Long-term hosting direction is AWS, with target services such as Amazon S3, CloudFront, Amazon RDS or Aurora, Amazon Cognito, and ECS/Fargate or Lambda where appropriate.
 
+Repository composition is tenant-scoped even in local mode. Each tenant should be mapped to its own standalone repository root, with local development using a deterministic filesystem path such as `AtlasProjects/tenants/<tenant_id>/...`.
+
+The current local repository composition root is the bridge between the platform data boundary and CM-01 commercial models. CM-01 introduces the lightweight commercial operating spine, while the repository boundary keeps per-tenant persistence isolated before deeper commercial persistence is added.
+
+During migration, local and future AWS adapters must coexist behind the same composition boundary. The intended AWS mapping is tenant-partitioned object storage in S3, relational persistence in Postgres or Aurora, queueing through SQS, and worker execution through ECS/Fargate or Lambda.
+
+Epic E work is not included in this slice.
+
 Future subscription operations are expected to use Stripe for plan, seat, and billing management.
 
 ## AI Architecture Direction
@@ -71,6 +79,8 @@ Atlas is the deterministic engine layer for the platform.
 Application surfaces, future API layers, and cloud adapters should call Atlas services and contracts rather than duplicating business logic in separate code paths.
 
 Platform behavior should remain deterministic, tenant-scoped, and backward compatible.
+
+Repository composition should treat tenant isolation as the first boundary, then compose local or future cloud adapters behind that boundary.
 
 Governance note:
 - architecture direction does not activate implementation work by itself
