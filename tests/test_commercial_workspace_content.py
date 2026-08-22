@@ -363,19 +363,35 @@ def test_commercial_workspace_renders_all_minimal_panels(monkeypatch) -> None:
 
     assert page_headers == [
         (
-            "Commercial Workspace",
-            "Tenant-scoped commercial MVP surface for customers, opportunities, estimates, proposals, sales orders, invoices, vendor bills, and QuickBooks sync state.",
+            "Sales",
+            "Manage the path from opportunity and estimate through sales order, inventory, invoice, and vendor bill.",
         )
     ]
     assert [title for title, _ in section_cards] == [
-        "Commercial Snapshot",
-        "Customer / Account Creation and Listing",
-        "Opportunity Creation and Listing",
-        "Estimate Creation, Listing, and Line Items",
-        "Inventory Availability and Reservation",
-        "Proposal, Sales Order, and Invoice Workflow",
-        "Vendor Bills and QuickBooks Sync Readiness",
+        "Needs Attention",
+        "Sales Pipeline",
+        "Estimates",
+        "Sales Orders and Invoices",
+        "Inventory",
+        "Vendor Bills and QuickBooks Status",
+        "Customers",
     ]
+
+    visible_copy = " ".join(
+        [
+            *(text for header in page_headers for text in header),
+            *(text for section in section_cards for text in section),
+            *fake_st.captions,
+            *fake_st.markdowns,
+        ]
+    ).lower()
+    for internal_phrase in (
+        "tenant-scoped",
+        "organization atlas",
+        "quickbooks sync state",
+        "commercial mvp",
+    ):
+        assert internal_phrase not in visible_copy
 
     assert any(title == "list_customer_accounts" for title, _ in fake_facade.calls)
     assert any(title == "list_opportunities" for title, _ in fake_facade.calls)
@@ -383,6 +399,26 @@ def test_commercial_workspace_renders_all_minimal_panels(monkeypatch) -> None:
     assert any(title == "list_sales_orders" for title, _ in fake_facade.calls)
     assert any(title == "list_customer_invoices" for title, _ in fake_facade.calls)
     assert any(title == "list_vendor_bills" for title, _ in fake_facade.calls)
+    assert {
+        name: sum(call_name == name for call_name, _ in fake_facade.calls)
+        for name in {
+            "list_customer_accounts",
+            "list_opportunities",
+            "list_estimates",
+            "list_proposals",
+            "list_sales_orders",
+            "list_customer_invoices",
+            "list_vendor_bills",
+        }
+    } == {
+        "list_customer_accounts": 1,
+        "list_opportunities": 1,
+        "list_estimates": 1,
+        "list_proposals": 1,
+        "list_sales_orders": 1,
+        "list_customer_invoices": 1,
+        "list_vendor_bills": 1,
+    }
 
     inventory_call = next(
         request
@@ -394,9 +430,17 @@ def test_commercial_workspace_renders_all_minimal_panels(monkeypatch) -> None:
     snapshot_rows = next(
         rows
         for rows in report_tables
-        if rows and rows[0].get("Summary") == "Estimate Pipeline"
+        if rows and rows[0].get("Summary") == "Estimates in Progress"
     )
-    assert snapshot_rows[0]["Summary"] == "Estimate Pipeline"
+    assert {row["Summary"] for row in snapshot_rows} == {
+        "Estimates in Progress",
+        "Proposals",
+        "Sales Orders",
+        "Invoices",
+        "Vendor Bills",
+        "Inventory",
+        "QuickBooks Status",
+    }
     assert any(
         row.get("Customer ID") == "customer-1"
         for table in report_tables

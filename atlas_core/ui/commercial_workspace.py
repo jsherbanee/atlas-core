@@ -1,4 +1,4 @@
-"""Commercial Workspace MVP UI surface."""
+"""Sales workspace UI surface."""
 
 from __future__ import annotations
 
@@ -54,6 +54,17 @@ class CommercialWorkspaceServices:
     tenant_context: CommercialMvpTenantContext
 
 
+@dataclass(frozen=True)
+class CommercialWorkspaceData:
+    customers: list[Any]
+    opportunities: list[Any]
+    estimates: list[Any]
+    proposals: list[Any]
+    sales_orders: list[Any]
+    customer_invoices: list[Any]
+    vendor_bills: list[Any]
+
+
 def _safe_text(value: Any, default: str = "") -> str:
     if value is None:
         return default
@@ -86,6 +97,27 @@ def _commercial_services(
         facade=facade,
         boundary=boundary,
         tenant_context=tenant_context,
+    )
+
+
+def _commercial_workspace_data(
+    services: CommercialWorkspaceServices,
+) -> CommercialWorkspaceData:
+    organization_id = services.tenant_context.organization_id
+    return CommercialWorkspaceData(
+        customers=services.facade.list_customer_accounts(
+            organization_id=organization_id
+        ),
+        opportunities=services.facade.list_opportunities(
+            organization_id=organization_id
+        ),
+        estimates=services.facade.list_estimates(organization_id=organization_id),
+        proposals=services.facade.list_proposals(organization_id=organization_id),
+        sales_orders=services.facade.list_sales_orders(organization_id=organization_id),
+        customer_invoices=services.facade.list_customer_invoices(
+            organization_id=organization_id
+        ),
+        vendor_bills=services.facade.list_vendor_bills(organization_id=organization_id),
     )
 
 
@@ -158,7 +190,7 @@ def _render_response_message(
 def _snapshot_rows(snapshot: dict[str, Any]) -> list[dict[str, str]]:
     return [
         {
-            "Summary": "Estimate Pipeline",
+            "Summary": "Estimates in Progress",
             "Total": _safe_text(
                 snapshot.get("estimate_pipeline", {}).get("total_estimates"), "0"
             ),
@@ -177,7 +209,7 @@ def _snapshot_rows(snapshot: dict[str, Any]) -> list[dict[str, str]]:
             ),
         },
         {
-            "Summary": "Proposal Status",
+            "Summary": "Proposals",
             "Total": _safe_text(
                 snapshot.get("proposal_statuses", {}).get("total_count"), "0"
             ),
@@ -194,7 +226,7 @@ def _snapshot_rows(snapshot: dict[str, Any]) -> list[dict[str, str]]:
             "Value": "-",
         },
         {
-            "Summary": "Sales Order Backlog",
+            "Summary": "Sales Orders",
             "Total": _safe_text(
                 snapshot.get("sales_order_backlog", {}).get("total_count"), "0"
             ),
@@ -204,7 +236,7 @@ def _snapshot_rows(snapshot: dict[str, Any]) -> list[dict[str, str]]:
             ),
         },
         {
-            "Summary": "Invoice Status",
+            "Summary": "Invoices",
             "Total": _safe_text(
                 snapshot.get("invoice_statuses", {}).get("total_count"), "0"
             ),
@@ -223,7 +255,7 @@ def _snapshot_rows(snapshot: dict[str, Any]) -> list[dict[str, str]]:
             ),
         },
         {
-            "Summary": "Vendor Bill Status",
+            "Summary": "Vendor Bills",
             "Total": _safe_text(
                 snapshot.get("vendor_bill_statuses", {}).get("total_count"), "0"
             ),
@@ -242,7 +274,7 @@ def _snapshot_rows(snapshot: dict[str, Any]) -> list[dict[str, str]]:
             ),
         },
         {
-            "Summary": "Inventory Availability",
+            "Summary": "Inventory",
             "Total": _safe_text(
                 snapshot.get("inventory_availability", {}).get("total_positions"), "0"
             ),
@@ -259,7 +291,7 @@ def _snapshot_rows(snapshot: dict[str, Any]) -> list[dict[str, str]]:
             ),
         },
         {
-            "Summary": "QuickBooks Sync",
+            "Summary": "QuickBooks Status",
             "Total": _safe_text(
                 snapshot.get("quickbooks_sync", {}).get("total_references"), "0"
             ),
@@ -283,18 +315,15 @@ def _render_snapshot_section(st: Any, services: CommercialWorkspaceServices) -> 
         GetCommercialReportingSnapshotRequest(context=services.tenant_context)
     )
     if not response.ok or response.payload is None:
-        _render_response_message(st, response, "Commercial snapshot loaded.")
+        _render_response_message(st, response, "Sales overview loaded.")
         return
 
     snapshot = dict(response.payload.get("snapshot") or {})
     with _shared_render_section_card(
         st,
-        "Commercial Snapshot",
-        subtitle="Tenant-scoped pipeline, backlog, inventory, and QuickBooks sync summaries.",
+        "Needs Attention",
+        subtitle="Review sales activity, order backlog, inventory, and accounting sync status.",
     ):
-        st.caption(
-            f"Tenant {services.tenant_context.tenant_id} · Organization {services.tenant_context.organization_id or 'n/a'}"
-        )
         st.columns(1)
         _shared_render_report_table(st, _snapshot_rows(snapshot))
 
@@ -445,11 +474,15 @@ def _select_or_blank(options: list[str]) -> list[str]:
     return options if options else [""]
 
 
-def _render_customer_section(st: Any, services: CommercialWorkspaceServices) -> None:
+def _render_customer_section(
+    st: Any,
+    services: CommercialWorkspaceServices,
+    data: CommercialWorkspaceData,
+) -> None:
     with _shared_render_section_card(
         st,
-        "Customer / Account Creation and Listing",
-        subtitle="Create customer records and review the tenant-scoped account list.",
+        "Customers",
+        subtitle="Create customer accounts and review existing customers.",
     ):
         cols = st.columns([1, 1])
         with cols[0]:
@@ -482,36 +515,32 @@ def _render_customer_section(st: Any, services: CommercialWorkspaceServices) -> 
                 except Exception as exc:
                     st.error(str(exc))
         with cols[1]:
-            rows = _customer_rows(
-                services.facade.list_customer_accounts(
-                    organization_id=services.tenant_context.organization_id,
-                )
-            )
+            rows = _customer_rows(data.customers)
             if rows:
                 _shared_render_report_table(st, rows)
             else:
                 _shared_render_guided_empty_state(
                     st,
-                    why_empty="No customer accounts exist for this tenant yet.",
+                    why_empty="No customer accounts exist yet.",
                     action_to_populate="Create a customer account from the form on the left.",
                     next_location="Customer / Account Creation and Listing.",
                 )
 
 
-def _render_opportunity_section(st: Any, services: CommercialWorkspaceServices) -> None:
+def _render_opportunity_section(
+    st: Any,
+    services: CommercialWorkspaceServices,
+    data: CommercialWorkspaceData,
+) -> None:
     with _shared_render_section_card(
         st,
-        "Opportunity Creation and Listing",
-        subtitle="Track opportunities against existing customer accounts.",
+        "Sales Pipeline",
+        subtitle="Track opportunities for existing customer accounts.",
     ):
         cols = st.columns([1, 1])
         customer_options = [
             _safe_text(row.get("Customer ID"), "")
-            for row in _customer_rows(
-                services.facade.list_customer_accounts(
-                    organization_id=services.tenant_context.organization_id,
-                )
-            )
+            for row in _customer_rows(data.customers)
         ]
         with cols[0]:
             with st.form("atlas_commercial_opportunity_form"):
@@ -545,44 +574,36 @@ def _render_opportunity_section(st: Any, services: CommercialWorkspaceServices) 
                 except Exception as exc:
                     st.error(str(exc))
         with cols[1]:
-            rows = _opportunity_rows(
-                services.facade.list_opportunities(
-                    organization_id=services.tenant_context.organization_id,
-                )
-            )
+            rows = _opportunity_rows(data.opportunities)
             if rows:
                 _shared_render_report_table(st, rows)
             else:
                 _shared_render_guided_empty_state(
                     st,
-                    why_empty="No opportunities exist for this tenant yet.",
+                    why_empty="No sales opportunities exist yet.",
                     action_to_populate="Create an opportunity from the form on the left.",
                     next_location="Opportunity Creation and Listing.",
                 )
 
 
-def _render_estimate_section(st: Any, services: CommercialWorkspaceServices) -> None:
+def _render_estimate_section(
+    st: Any,
+    services: CommercialWorkspaceServices,
+    data: CommercialWorkspaceData,
+) -> None:
     with _shared_render_section_card(
         st,
-        "Estimate Creation, Listing, and Line Items",
-        subtitle="Create estimates, add or remove line items, and inspect current estimate drafts.",
+        "Estimates",
+        subtitle="Create estimates, manage line items, and review work in progress.",
     ):
         cols = st.columns([1, 1])
         opportunity_options = [
             _safe_text(row.get("Opportunity ID"), "")
-            for row in _opportunity_rows(
-                services.facade.list_opportunities(
-                    organization_id=services.tenant_context.organization_id,
-                )
-            )
+            for row in _opportunity_rows(data.opportunities)
         ]
         customer_options = [
             _safe_text(row.get("Customer ID"), "")
-            for row in _customer_rows(
-                services.facade.list_customer_accounts(
-                    organization_id=services.tenant_context.organization_id,
-                )
-            )
+            for row in _customer_rows(data.customers)
         ]
         with cols[0]:
             with st.form("atlas_commercial_estimate_form"):
@@ -618,16 +639,14 @@ def _render_estimate_section(st: Any, services: CommercialWorkspaceServices) -> 
                 except Exception as exc:
                     st.error(str(exc))
 
-        estimate_records = services.facade.list_estimates(
-            organization_id=services.tenant_context.organization_id,
-        )
+        estimate_records = data.estimates
         estimate_rows = _estimate_rows(estimate_records)
         if estimate_rows:
             _shared_render_report_table(st, estimate_rows)
         else:
             _shared_render_guided_empty_state(
                 st,
-                why_empty="No estimates exist for this tenant yet.",
+                why_empty="No estimates exist yet.",
                 action_to_populate="Create an estimate from the form on the left.",
                 next_location="Estimate Creation, Listing, and Line Items.",
             )
@@ -722,19 +741,21 @@ def _render_estimate_section(st: Any, services: CommercialWorkspaceServices) -> 
                 st.caption("Selected estimate has no line items yet.")
 
 
-def _render_inventory_section(st: Any, services: CommercialWorkspaceServices) -> None:
+def _render_inventory_section(
+    st: Any,
+    services: CommercialWorkspaceServices,
+    data: CommercialWorkspaceData,
+) -> None:
     with _shared_render_section_card(
         st,
-        "Inventory Availability and Reservation",
-        subtitle="Check sales-order availability and reserve stock from the tenant-scoped inventory service.",
+        "Inventory",
+        subtitle="Check availability for sales orders and reserve stock.",
     ):
-        sales_order_records = services.facade.list_sales_orders(
-            organization_id=services.tenant_context.organization_id,
-        )
+        sales_order_records = data.sales_orders
         if not sales_order_records:
             _shared_render_guided_empty_state(
                 st,
-                why_empty="No sales orders exist for this tenant yet.",
+                why_empty="No sales orders exist yet.",
                 action_to_populate="Create and accept an estimate before checking inventory.",
                 next_location="Inventory Availability and Reservation.",
             )
@@ -786,24 +807,20 @@ def _render_inventory_section(st: Any, services: CommercialWorkspaceServices) ->
                 st.rerun()
 
 
-def _render_workflow_section(st: Any, services: CommercialWorkspaceServices) -> None:
+def _render_workflow_section(
+    st: Any,
+    services: CommercialWorkspaceServices,
+    data: CommercialWorkspaceData,
+) -> None:
     with _shared_render_section_card(
         st,
-        "Proposal, Sales Order, and Invoice Workflow",
-        subtitle="Move accepted estimates through proposal, order, and invoice states.",
+        "Sales Orders and Invoices",
+        subtitle="Move accepted estimates through proposals, sales orders, and invoices.",
     ):
-        estimate_records = services.facade.list_estimates(
-            organization_id=services.tenant_context.organization_id,
-        )
-        proposal_records = services.facade.list_proposals(
-            organization_id=services.tenant_context.organization_id,
-        )
-        sales_order_records = services.facade.list_sales_orders(
-            organization_id=services.tenant_context.organization_id,
-        )
-        invoice_records = services.facade.list_customer_invoices(
-            organization_id=services.tenant_context.organization_id,
-        )
+        estimate_records = data.estimates
+        proposal_records = data.proposals
+        sales_order_records = data.sales_orders
+        invoice_records = data.customer_invoices
 
         cols = st.columns([1, 1])
         with cols[0]:
@@ -996,12 +1013,14 @@ def _render_workflow_section(st: Any, services: CommercialWorkspaceServices) -> 
 
 
 def _render_vendor_bill_and_sync_section(
-    st: Any, services: CommercialWorkspaceServices
+    st: Any,
+    services: CommercialWorkspaceServices,
+    data: CommercialWorkspaceData,
 ) -> None:
     with _shared_render_section_card(
         st,
-        "Vendor Bills and QuickBooks Sync Readiness",
-        subtitle="Create vendor bills manually and mark invoice / bill records for sync readiness.",
+        "Vendor Bills and QuickBooks Status",
+        subtitle="Create vendor bills and review invoice and bill sync status.",
     ):
         cols = st.columns([1, 1])
         with cols[0]:
@@ -1049,9 +1068,7 @@ def _render_vendor_bill_and_sync_section(
                 except Exception as exc:
                     st.error(str(exc))
         with cols[1]:
-            vendor_bill_records = services.facade.list_vendor_bills(
-                organization_id=services.tenant_context.organization_id,
-            )
+            vendor_bill_records = data.vendor_bills
             if vendor_bill_records:
                 _shared_render_report_table(st, _vendor_bill_rows(vendor_bill_records))
                 vendor_bill_id = st.selectbox(
@@ -1079,7 +1096,7 @@ def _render_vendor_bill_and_sync_section(
             else:
                 _shared_render_guided_empty_state(
                     st,
-                    why_empty="No vendor bills exist for this tenant yet.",
+                    why_empty="No vendor bills exist yet.",
                     action_to_populate="Create a vendor bill from the form on the left.",
                     next_location="Vendor Bills and QuickBooks Sync.",
                 )
@@ -1098,18 +1115,19 @@ def render_commercial_workspace_page(
         tenant_id=_safe_text(tenant_id, "local"),
         organization_id=_safe_text(organization_id, "atlas"),
     )
+    data = _commercial_workspace_data(resolved_services)
     _shared_render_page_header(
         st,
-        "Commercial Workspace",
-        "Tenant-scoped commercial MVP surface for customers, opportunities, estimates, proposals, sales orders, invoices, vendor bills, and QuickBooks sync state.",
+        "Sales",
+        "Manage the path from opportunity and estimate through sales order, inventory, invoice, and vendor bill.",
     )
     _render_snapshot_section(st, resolved_services)
-    _render_customer_section(st, resolved_services)
-    _render_opportunity_section(st, resolved_services)
-    _render_estimate_section(st, resolved_services)
-    _render_inventory_section(st, resolved_services)
-    _render_workflow_section(st, resolved_services)
-    _render_vendor_bill_and_sync_section(st, resolved_services)
+    _render_opportunity_section(st, resolved_services, data)
+    _render_estimate_section(st, resolved_services, data)
+    _render_workflow_section(st, resolved_services, data)
+    _render_inventory_section(st, resolved_services, data)
+    _render_vendor_bill_and_sync_section(st, resolved_services, data)
+    _render_customer_section(st, resolved_services, data)
 
 
 __all__ = ["CommercialWorkspaceServices", "render_commercial_workspace_page"]

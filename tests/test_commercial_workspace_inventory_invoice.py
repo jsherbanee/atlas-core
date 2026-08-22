@@ -457,10 +457,10 @@ def test_inventory_invoice_and_vendor_bill_controls_call_boundary_and_render_suc
 
     assert [name for name, _ in boundary.calls] == [
         "get_commercial_reporting_snapshot",
-        "check_inventory_availability",
-        "reserve_inventory",
         "generate_customer_invoice_from_sales_order",
         "mark_customer_invoice_sync_pending",
+        "check_inventory_availability",
+        "reserve_inventory",
         "create_vendor_bill",
         "mark_vendor_bill_sync_pending",
     ]
@@ -471,7 +471,9 @@ def test_inventory_invoice_and_vendor_bill_controls_call_boundary_and_render_suc
     assert "Vendor bill marked sync pending." in st.successes
 
     inventory_rows = _find_table(
-        st, lambda rows: rows[0].get("Sales Order ID") == "so-1"
+        st,
+        lambda rows: rows[0].get("Sales Order ID") == "so-1"
+        and "Catalog Item ID" in rows[0],
     )
     assert inventory_rows[0]["Catalog Item ID"] == "cat-1"
     assert inventory_rows[0]["Location"] == "loc-1"
@@ -490,13 +492,14 @@ def test_inventory_invoice_and_vendor_bill_controls_call_boundary_and_render_suc
     assert vendor_bill_rows[0]["Bill Value"] == "$625.00"
 
     quickbooks_rows = _find_table(
-        st, lambda rows: any(row.get("Summary") == "QuickBooks Sync" for row in rows)
+        st,
+        lambda rows: any(row.get("Summary") == "QuickBooks Status" for row in rows),
     )
     assert (
         next(
             row["Total"]
             for row in quickbooks_rows
-            if row["Summary"] == "QuickBooks Sync"
+            if row["Summary"] == "QuickBooks Status"
         )
         == "2"
     )
@@ -525,9 +528,9 @@ def test_inventory_invoice_and_vendor_bill_validation_errors_render_deterministi
 
     assert [name for name, _ in boundary.calls] == [
         "get_commercial_reporting_snapshot",
+        "generate_customer_invoice_from_sales_order",
         "check_inventory_availability",
         "reserve_inventory",
-        "generate_customer_invoice_from_sales_order",
         "create_vendor_bill",
     ]
     assert "Inventory reserved." in st.successes

@@ -29,9 +29,10 @@ The current stabilization baseline candidate includes a project-specific Atlas w
 
 ## Post-Phase-2 Direction
 - Commercial MVP readiness now leads the roadmap: customer/account foundation, opportunity tracking, estimating, proposal workflow, sales order management, change order basics, project/job conversion, item/catalog foundation, inventory availability/reservation/allocation/receiving basics, vendor/manufacturer registry maturation, procurement/RFQ workflow, commercial reporting, QuickBooks connector planning, Atlas API layering, AWS adapter migration, and commercial tenant/account administration.
-- UI-01 now exposes the first Commercial Workspace surface in the Streamlit shell, with snapshot reporting and minimal commercial workflow panels on top of APP-01 and API-01.
+- UI-01 now exposes the first Sales workspace surface in the Streamlit shell, with attention reporting and minimal commercial workflow panels on top of APP-01 and API-01.
 - UI-01 now also includes a compact inventory availability/reservation panel and QuickBooks sync readiness/status panel, both still tenant-scoped.
-- UI-02 now extends the Commercial Workspace with the core revenue workflow: customer/account, opportunity, estimate, proposal-state, and sales-order conversion actions.
+- UI-02 now extends the Sales workspace with the core revenue workflow: customer/account, opportunity, estimate, proposal-state, and sales-order conversion actions.
+- UI-FIX-01 remediates navigation active-state overlap, Sales content leakage risk, internal UI copy, workflow ordering, eager commercial UI imports, and repeated facade reads found during manual review of PR #10. The internal route remains `Commercial Workspace`, tenant isolation and APP-01/API-01 boundaries remain intact, and the remediation does not claim broad UI or production readiness.
 - MVP-CHK-01 validates the current Commercial MVP end to end across boundary, facade, services, repositories, tenant isolation, reporting, and QuickBooks sync readiness, and the final checkpoint validation passed `black --check`, `ruff check`, the full checkpoint test, the existing Commercial Workspace UI tests, the relevant Phase 2 navigation regressions, full `pytest`, and a repo-wide `mypy` comparison with no new diagnostics versus `origin/main`.
 - UI-03 Inventory and Invoice Workflow is the next recommended commercial slice.
 - Atlas is the operational system of record for estimates, sales workflow, project/job status, and inventory planning.

@@ -1,7 +1,7 @@
 # UI-02 Estimate and Sales Order Workflow
 
 ## Purpose
-UI-02 makes the Commercial Workspace usable for the core revenue workflow: create a customer/account, create an opportunity, create an estimate, manage estimate line items, advance proposal status, and convert the accepted revenue path into a sales order.
+UI-02 makes the Sales workspace usable for the core revenue workflow: create a customer/account, create an opportunity, create an estimate, manage estimate line items, advance proposal status, and convert the accepted revenue path into a sales order.
 
 ## Scope
 - Customer/account creation through APP-01 and API-01.
@@ -17,10 +17,10 @@ UI-02 makes the Commercial Workspace usable for the core revenue workflow: creat
 - Customer, opportunity, estimate, proposal, and sales-order controls render and call the facade/boundary seam.
 - Estimate subtotal renders deterministically from the selected estimate line items.
 - Proposal and sales-order workflow actions surface deterministic success and validation/error states.
-- UI-01 commercial content and navigation regressions remain intact.
+- UI-01 Sales content, exclusive navigation state, and route-isolation regressions remain intact.
 
 ## Out Of Scope
-- Final visual polish.
+- Broad visual redesign and final production polish.
 - Proposal PDF generation.
 - E-signature.
 - Inventory allocation beyond the existing availability readout.
@@ -33,4 +33,4 @@ UI-02 makes the Commercial Workspace usable for the core revenue workflow: creat
 Add a minimal record drilldown for estimates and sales orders, keeping the same tenant-scoped boundary pattern.
 
 ## Entry Point
-The workspace remains rendered from [apps/phase2_review_app.py](../apps/phase2_review_app.py) and uses APP-01 and API-01 as the only commercial mutation/read seams.
+The workspace remains rendered from [apps/phase2_review_app.py](../apps/phase2_review_app.py) and uses APP-01 and API-01 as the only commercial mutation/read seams. The user-facing label is Sales; `Commercial Workspace` remains only as an internal compatibility route.

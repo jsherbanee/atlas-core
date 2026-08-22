@@ -118,9 +118,6 @@ from atlas_core.contracts.upload_policy import (
 from atlas_core.registry import ManufacturerRegistry
 from atlas_core.sample_data.manufacturer_seed import build_manufacturer_seed_data
 from atlas_core.sample_data.vendor_seed import build_vendor_seed_data
-from atlas_core.ui.commercial_workspace import (
-    render_commercial_workspace_page as _render_commercial_workspace_page,
-)
 from atlas_core.ui.design_system import (
     atlas_stylesheet,
     render_empty_state_html,
@@ -317,7 +314,7 @@ BODY_SHELL_COLUMN_SPEC = [1.35, 4.65]
 COMPACT_TERTIARY_COLUMNS = 4
 PRIMARY_HEADER_NAV_ITEMS: list[tuple[str, str]] = [
     ("Transactions", "Transactions"),
-    ("Commercial", "Commercial Workspace"),
+    ("Sales", "Commercial Workspace"),
     ("Projects", "Projects"),
     ("Knowledge", "Knowledge"),
     ("Reports", "Reports"),
@@ -433,7 +430,7 @@ APPLICATION_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
         [
             ("Home", "Mission Control"),
             ("Projects", "Projects"),
-            ("Commercial", "Commercial Workspace"),
+            ("Sales", "Commercial Workspace"),
             ("Knowledge", "Knowledge"),
             ("Transactions", "Transactions"),
             ("Reports", "Reports"),
@@ -12958,20 +12955,20 @@ def _secondary_key_for_page(primary: str, mode: str, page: str) -> str | None:
 
 
 def _active_primary_workspace(page: str, record: ProjectWorkspaceRecord | None) -> str:
-    if page == "Knowledge":
+    if page == "Knowledge" or page in KNOWLEDGE_PAGES:
         return "Knowledge"
     if page == "Transactions":
         return "Transactions"
     if page == "Commercial Workspace":
-        return "Commercial"
-    if page in PROJECTS_LIBRARY_PAGES or page in PROJECTS_ACTIVE_PAGES:
-        return "Projects"
-    if record is not None and page not in {"Mission Control", "Administration"}:
-        return "Projects"
+        return "Sales"
     if page in REPORT_PAGES:
         return "Reports"
-    if page == "Administration":
+    if page in SETTINGS_PAGES or page in {"Administration", "Workspace Settings"}:
         return "Settings"
+    if page in PROJECTS_LIBRARY_PAGES or page in PROJECTS_ACTIVE_PAGES:
+        return "Projects"
+    if record is not None and page != "Mission Control":
+        return "Projects"
     return "Atlas"
 
 
@@ -13393,24 +13390,8 @@ def _primary_navigation_is_active(
     active_page: str,
     record: ProjectWorkspaceRecord | None,
 ) -> bool:
-    if active_page == label:
-        return True
-    if label == "Projects" and record is not None and active_page != "Mission Control":
-        return True
-    if label == "Knowledge" and active_page in KNOWLEDGE_PAGES:
-        return True
-    if label == "Reports" and active_page in REPORT_PAGES:
-        return True
-    if label == "Commercial" and active_page == "Commercial Workspace":
-        return True
-    if label == "Settings" and (
-        active_page in SETTINGS_PAGES
-        or active_page in {"Administration", "Workspace Settings"}
-    ):
-        return True
-    if label in {"Atlas", "Home"}:
-        return active_page == "Mission Control"
-    return label == "Transactions" and active_page == "Transactions"
+    expected_workspace = "Atlas" if label in {"Atlas", "Home"} else label
+    return expected_workspace == _active_primary_workspace(active_page, record)
 
 
 def _render_header(
@@ -43804,6 +43785,15 @@ def _render_status_bar(
         )
     else:
         cols[1].caption("")
+
+
+def _render_commercial_workspace_page(
+    st: Any,
+    workspace_service: ProjectWorkspaceService,
+) -> None:
+    from atlas_core.ui.commercial_workspace import render_commercial_workspace_page
+
+    render_commercial_workspace_page(st, workspace_service)
 
 
 def _render_main_content(

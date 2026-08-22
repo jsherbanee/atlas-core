@@ -1137,7 +1137,7 @@ def test_top_navigation_renders_primary_header_buttons() -> None:
 
     assert [call["label"] for call in st.button_calls] == [
         "Transactions",
-        "Commercial",
+        "Sales",
         "Projects",
         "Knowledge",
         "Reports",
@@ -1155,7 +1155,7 @@ def test_top_navigation_hides_public_home_button() -> None:
 
     assert [call["label"] for call in st.button_calls] == [
         "Transactions",
-        "Commercial",
+        "Sales",
         "Projects",
         "Knowledge",
         "Reports",
@@ -2521,7 +2521,7 @@ def test_top_navigation_order_places_transactions_first() -> None:
 
     assert [call["label"] for call in st.button_calls] == [
         "Transactions",
-        "Commercial",
+        "Sales",
         "Projects",
         "Knowledge",
         "Reports",
