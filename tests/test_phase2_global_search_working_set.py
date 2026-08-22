@@ -1137,7 +1137,6 @@ def test_top_navigation_renders_primary_header_buttons() -> None:
 
     assert [call["label"] for call in st.button_calls] == [
         "Transactions",
-        "Sales",
         "Projects",
         "Knowledge",
         "Reports",
@@ -1155,7 +1154,6 @@ def test_top_navigation_hides_public_home_button() -> None:
 
     assert [call["label"] for call in st.button_calls] == [
         "Transactions",
-        "Sales",
         "Projects",
         "Knowledge",
         "Reports",
@@ -1221,7 +1219,7 @@ def test_header_omits_burger_menu_and_keeps_primary_row_fixed() -> None:
     app._render_header(st, _FakeWorkspaceService([]), None, None)
 
     assert st.button_calls[0]["label"] == "Atlas"
-    assert len(st.button_calls) == 7
+    assert len(st.button_calls) == 6
     assert all(call["label"] != "☰" for call in st.button_calls)
     assert st.popover_labels == []
 
@@ -2521,7 +2519,6 @@ def test_top_navigation_order_places_transactions_first() -> None:
 
     assert [call["label"] for call in st.button_calls] == [
         "Transactions",
-        "Sales",
         "Projects",
         "Knowledge",
         "Reports",

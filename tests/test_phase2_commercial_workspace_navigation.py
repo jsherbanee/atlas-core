@@ -19,24 +19,23 @@ _SPEC.loader.exec_module(app)
 
 
 class _FakeStreamlit:
-    def __init__(self) -> None:
-        self.session_state: dict[str, object] = {
-            "atlas_active_page": "Commercial Workspace"
-        }
+    def __init__(self, active_page: str = "Transactions") -> None:
+        self.session_state: dict[str, object] = {"atlas_active_page": active_page}
 
 
-def test_commercial_workspace_is_registered_as_an_active_page() -> None:
-    assert "Commercial Workspace" in app.ALL_ACTIVE_PAGES
-    assert app._active_primary_workspace("Commercial Workspace", None) == "Sales"
-    assert app._active_workspace_mode("Commercial Workspace", None) == "application"
+def test_commercial_workspace_is_removed_from_primary_navigation_and_routes() -> None:
+    primary_labels = [label for label, _ in app.PRIMARY_HEADER_NAV_ITEMS]
+    primary_routes = [route for _, route in app.PRIMARY_HEADER_NAV_ITEMS]
+    application_routes = [
+        route for _, entries in app.APPLICATION_NAV_GROUPS for _, route in entries
+    ]
 
-
-def test_commercial_workspace_top_navigation_is_primary_active() -> None:
-    assert app._primary_navigation_is_active(
-        "Sales",
-        active_page="Commercial Workspace",
-        record=None,
-    )
+    assert "Sales" not in primary_labels
+    assert "Commercial" not in primary_labels
+    assert "Commercial Workspace" not in primary_routes
+    assert "Commercial Workspace" not in application_routes
+    assert "Commercial Workspace" not in app.ALL_ACTIVE_PAGES
+    assert not hasattr(app, "_render_commercial_workspace_page")
 
 
 @pytest.mark.parametrize(
@@ -44,7 +43,6 @@ def test_commercial_workspace_top_navigation_is_primary_active() -> None:
     [
         ("Mission Control", "Atlas"),
         ("Transactions", "Transactions"),
-        ("Commercial Workspace", "Sales"),
         ("Projects", "Projects"),
         ("Knowledge", "Knowledge"),
         ("Reports", "Reports"),
@@ -69,50 +67,71 @@ def test_primary_navigation_has_exactly_one_active_item(
     assert active_labels == [expected_label]
 
 
-def test_main_content_dispatches_commercial_workspace_page(monkeypatch) -> None:
-    rendered: list[str] = []
-
-    monkeypatch.setattr(app, "_render_project_action_feedback", lambda _st: None)
-    monkeypatch.setattr(
-        app,
-        "_render_commercial_workspace_page",
-        lambda _st, _service: rendered.append("commercial"),
-    )
-
-    fake_st = _FakeStreamlit()
-    app._render_main_content(fake_st, SimpleNamespace(), None, None)
-
-    assert rendered == ["commercial"]
-
-
 @pytest.mark.parametrize(
-    ("active_page", "renderer_name"),
+    "active_page",
     [
-        ("Mission Control", "_render_home_page"),
-        ("Projects", "_render_projects_page"),
-        ("Knowledge", "_render_application_knowledge_page"),
-        ("Reports", "_render_application_reports_page"),
-        ("Administration", "_render_application_administration_page"),
-        ("Transactions", "_render_transactions_workspace_page"),
+        "Mission Control",
+        "Transactions",
+        "Knowledge",
+        "Reports",
+        "Administration",
     ],
 )
-def test_non_commercial_pages_do_not_render_commercial_workspace(
-    monkeypatch,
+def test_non_projects_shell_drops_stale_project_context(
+    monkeypatch: pytest.MonkeyPatch,
     active_page: str,
-    renderer_name: str,
 ) -> None:
-    rendered: list[str] = []
-    fake_st = _FakeStreamlit()
-    fake_st.session_state["atlas_active_page"] = active_page
+    fake_st = _FakeStreamlit(active_page)
+    stale_record = SimpleNamespace(workspace_id="project-1")
+    stale_context = {"project": "context"}
+    records_seen: list[object | None] = []
+    contexts_seen: list[object | None] = []
 
-    monkeypatch.setattr(app, "_render_project_action_feedback", lambda _st: None)
+    def record_project_context(
+        _st: object,
+        _service: object,
+        record: object | None,
+        context: object | None,
+    ) -> None:
+        records_seen.append(record)
+        contexts_seen.append(context)
+
+    def record_status_context(
+        _st: object,
+        record: object | None,
+        context: object | None,
+    ) -> None:
+        records_seen.append(record)
+        contexts_seen.append(context)
+
     monkeypatch.setattr(
         app,
-        "_render_commercial_workspace_page",
-        lambda _st, _service: rendered.append("commercial"),
+        "_render_header",
+        record_project_context,
     )
-    monkeypatch.setattr(app, renderer_name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(app, "_sync_notebook_state_to_context", lambda *_args: None)
+    monkeypatch.setattr(app, "_active_global_search_query", lambda _st: "")
+    monkeypatch.setattr(app, "_should_render_shell_breadcrumb", lambda *_args: False)
+    monkeypatch.setattr(app, "_collect_workspace_signals", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(app, "_render_return_context_action", lambda *_args: None)
+    monkeypatch.setattr(app, "_sync_workspace_navigation_state", lambda *_args: None)
+    monkeypatch.setattr(
+        app,
+        "_render_workspace_navigation",
+        lambda _st, record, content_renderer=None: records_seen.append(record),
+    )
+    monkeypatch.setattr(
+        app,
+        "_render_status_bar",
+        record_status_context,
+    )
 
-    app._render_main_content(fake_st, SimpleNamespace(), None, None)
+    app._render_shell(
+        fake_st,
+        SimpleNamespace(),
+        stale_record,
+        stale_context,
+    )
 
-    assert rendered == []
+    assert records_seen and all(record is None for record in records_seen)
+    assert contexts_seen and all(context is None for context in contexts_seen)

@@ -1,7 +1,9 @@
 # UI-02 Estimate and Sales Order Workflow
 
 ## Purpose
-UI-02 makes the Sales workspace usable for the core revenue workflow: create a customer/account, create an opportunity, create an estimate, manage estimate line items, advance proposal status, and convert the accepted revenue path into a sales order.
+UI-02 originally exercised the core revenue workflow through a standalone commercial page. UI-FIX-01 removes that page because it duplicated responsibilities now owned by existing tenant-facing areas.
+
+Estimate, proposal, sales-order, invoice, and vendor-bill workflows belong in Transactions. Customer and catalog selection belong in Knowledge-backed controls. Reporting belongs in Reports.
 
 ## Scope
 - Customer/account creation through APP-01 and API-01.
@@ -14,10 +16,9 @@ UI-02 makes the Sales workspace usable for the core revenue workflow: create a c
 - Resulting sales-order status display.
 
 ## Test Coverage
-- Customer, opportunity, estimate, proposal, and sales-order controls render and call the facade/boundary seam.
-- Estimate subtotal renders deterministically from the selected estimate line items.
-- Proposal and sales-order workflow actions surface deterministic success and validation/error states.
-- UI-01 Sales content, exclusive navigation state, and route-isolation regressions remain intact.
+- Commercial backend, facade, API boundary, service, repository, and tenant-isolation tests remain intact.
+- Transactions and related Phase 2 navigation tests cover the retained user-facing ownership boundaries.
+- UI-FIX-01 tests prove the removed page cannot appear through primary navigation or shared-shell dispatch.
 
 ## Out Of Scope
 - Broad visual redesign and final production polish.
@@ -30,7 +31,7 @@ UI-02 makes the Sales workspace usable for the core revenue workflow: create a c
 - OAuth, AWS adapters, auth/billing, tenant administration, Epic E, and engineering intelligence.
 
 ## Next Slice
-Add a minimal record drilldown for estimates and sales orders, keeping the same tenant-scoped boundary pattern.
+Address individual Transactions workflow gaps as focused slices. Do not recreate a combined commercial workspace.
 
 ## Entry Point
-The workspace remains rendered from [apps/phase2_review_app.py](../apps/phase2_review_app.py) and uses APP-01 and API-01 as the only commercial mutation/read seams. The user-facing label is Sales; `Commercial Workspace` remains only as an internal compatibility route.
+There is no standalone UI-02 entry point after UI-FIX-01. Retained and future user-facing commercial actions must use APP-01 and API-01 rather than repositories directly.

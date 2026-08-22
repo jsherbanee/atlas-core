@@ -309,12 +309,11 @@ REPORT_PAGES = [
 ]
 SETTINGS_PAGES = ["Project Settings", "Application Settings"]
 
-HEADER_NAV_COLUMN_SPEC = [0.95, 1.0, 0.9, 0.95, 0.9, 0.9, 0.9, 2.2]
+HEADER_NAV_COLUMN_SPEC = [0.95, 1.0, 0.95, 0.9, 0.9, 0.9, 2.2]
 BODY_SHELL_COLUMN_SPEC = [1.35, 4.65]
 COMPACT_TERTIARY_COLUMNS = 4
 PRIMARY_HEADER_NAV_ITEMS: list[tuple[str, str]] = [
     ("Transactions", "Transactions"),
-    ("Sales", "Commercial Workspace"),
     ("Projects", "Projects"),
     ("Knowledge", "Knowledge"),
     ("Reports", "Reports"),
@@ -372,7 +371,6 @@ ALL_ACTIVE_PAGES = (
         "Object Workspace",
         "Knowledge",
         "Transactions",
-        "Commercial Workspace",
         "Administration",
         "Product Resolution",
         "Estimate",
@@ -430,7 +428,6 @@ APPLICATION_NAV_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
         [
             ("Home", "Mission Control"),
             ("Projects", "Projects"),
-            ("Sales", "Commercial Workspace"),
             ("Knowledge", "Knowledge"),
             ("Transactions", "Transactions"),
             ("Reports", "Reports"),
@@ -12959,8 +12956,6 @@ def _active_primary_workspace(page: str, record: ProjectWorkspaceRecord | None) 
         return "Knowledge"
     if page == "Transactions":
         return "Transactions"
-    if page == "Commercial Workspace":
-        return "Sales"
     if page in REPORT_PAGES:
         return "Reports"
     if page in SETTINGS_PAGES or page in {"Administration", "Workspace Settings"}:
@@ -12976,8 +12971,6 @@ def _active_workspace_mode(page: str, record: ProjectWorkspaceRecord | None) -> 
     if page == "Knowledge":
         return "application"
     if page == "Transactions":
-        return "application"
-    if page == "Commercial Workspace":
         return "application"
     if page in PROJECTS_LIBRARY_PAGES:
         return "library"
@@ -13411,8 +13404,8 @@ def _render_header(
         type="primary" if current_page == "Mission Control" else "secondary",
     ):
         _open_page(st, "Mission Control")
-    _render_top_navigation(st, header_cols[1:7], record)
-    _render_global_search_control(st, header_cols[7])
+    _render_top_navigation(st, header_cols[1:6], record)
+    _render_global_search_control(st, header_cols[6])
 
     if record is None or current_page == "Mission Control":
         st.session_state["atlas_active_project_name"] = ""
@@ -43787,15 +43780,6 @@ def _render_status_bar(
         cols[1].caption("")
 
 
-def _render_commercial_workspace_page(
-    st: Any,
-    workspace_service: ProjectWorkspaceService,
-) -> None:
-    from atlas_core.ui.commercial_workspace import render_commercial_workspace_page
-
-    render_commercial_workspace_page(st, workspace_service)
-
-
 def _render_main_content(
     st: Any,
     workspace_service: ProjectWorkspaceService,
@@ -43822,10 +43806,6 @@ def _render_main_content(
 
     if page == "Transactions":
         _render_transactions_workspace_page(st, workspace_service)
-        return
-
-    if page == "Commercial Workspace":
-        _render_commercial_workspace_page(st, workspace_service)
         return
 
     if page == "Object Workspace":
@@ -43945,13 +43925,20 @@ def _render_shell(
     record: ProjectWorkspaceRecord | None,
     context: dict[str, Any] | None,
 ) -> None:
-    _render_header(st, workspace_service, record, context)
-    _sync_notebook_state_to_context(st, context)
+    current_page = st.session_state.get("atlas_active_page", "Mission Control")
+    project_record = (
+        record
+        if _active_primary_workspace(current_page, record) == "Projects"
+        else None
+    )
+    project_context = context if project_record is not None else None
+
+    _render_header(st, workspace_service, project_record, project_context)
+    _sync_notebook_state_to_context(st, project_context)
     global_search_query = _active_global_search_query(st)
 
-    current_page = st.session_state.get("atlas_active_page", "Mission Control")
     if _should_render_shell_breadcrumb(st, current_page):
-        st.caption(_breadcrumb(record, current_page))
+        st.caption(_breadcrumb(project_record, current_page))
     bootstrap_notice = dict(st.session_state.get(_bootstrap_notice_key()) or {})
     if bootstrap_notice:
         message = _safe_text(
@@ -43963,11 +43950,11 @@ def _render_shell(
         st.session_state[_bootstrap_notice_key()] = {}
     mission_control_payload = None
     if current_page == "Mission Control":
-        if record is not None:
+        if project_record is not None:
             mission_control_payload = _build_mission_control_payload(
                 workspace_service,
-                record,
-                context,
+                project_record,
+                project_context,
             )
         else:
             mission_control_payload = {
@@ -43977,7 +43964,7 @@ def _render_shell(
                 "pending_timeline": [],
             }
 
-    if record is not None and current_page != "Mission Control":
+    if project_record is not None:
         project_cols = st.columns([3.8, 1.2])
         selector_options = {
             f"{item.project.name} · {item.workspace_id}": item
@@ -43991,7 +43978,7 @@ def _render_shell(
                 (
                     label
                     for label, item in selector_options.items()
-                    if item.workspace_id == record.workspace_id
+                    if item.workspace_id == project_record.workspace_id
                 ),
                 None,
             )
@@ -44008,25 +43995,27 @@ def _render_shell(
             selected_record = selector_options.get(selected_label)
             if (
                 selected_record is not None
-                and selected_record.workspace_id != record.workspace_id
+                and selected_record.workspace_id != project_record.workspace_id
             ):
                 _open_project_record(st, selected_record, workspace_service)
         else:
             project_cols[0].caption("Project selector unavailable.")
 
-        summary = _build_project_analysis_summary(record, context)
-        next_action = _next_review_action(_review_step_status_rows(st, record, context))
-        review = context.get("review") if context else None
+        summary = _build_project_analysis_summary(project_record, project_context)
+        next_action = _next_review_action(
+            _review_step_status_rows(st, project_record, project_context)
+        )
+        review = project_context.get("review") if project_context else None
         confidence = getattr(review, "confidence", None)
         confidence_text = "n/a"
         if isinstance(confidence, (int, float)):
             confidence_text = f"{int(confidence * 100)}%"
         elif confidence is not None:
             confidence_text = _safe_text(confidence, "n/a")
-        estimate_action_state = _project_estimate_action_state(st, record)
+        estimate_action_state = _project_estimate_action_state(st, project_record)
 
         project_header = _build_project_context_header(
-            record,
+            project_record,
             customer=_safe_text(summary.get("customer"), "Not available"),
             confidence=confidence_text,
             estimate_status=_safe_text(
@@ -44036,7 +44025,7 @@ def _render_shell(
                 next_action.get("step"),
                 "Review project overview",
             ),
-            context=context,
+            context=project_context,
         )
         _render_project_context_header(st, project_header)
 
@@ -44052,7 +44041,7 @@ def _render_shell(
         estimate_action_state = _render_project_estimate_action_button(
             st,
             header_action_cols[1],
-            record,
+            project_record,
             key="atlas_project_header_open_estimate",
             source_label="Project Header",
         )
@@ -44073,11 +44062,11 @@ def _render_shell(
         _render_global_search_panel(
             st,
             workspace_service,
-            record,
-            context,
+            project_record,
+            project_context,
         )
     else:
-        _sync_workspace_navigation_state(st, record)
+        _sync_workspace_navigation_state(st, project_record)
 
         def _render_content_with_boundary() -> None:
             route = _safe_text(
@@ -44089,8 +44078,8 @@ def _render_shell(
                 _render_main_content(
                     st,
                     workspace_service,
-                    record,
-                    context,
+                    project_record,
+                    project_context,
                     mission_control_payload,
                 )
             except Exception as exc:
@@ -44112,21 +44101,30 @@ def _render_shell(
                     ),
                     route=route,
                     related_object_id=(
-                        record.workspace_id if record is not None else None
+                        project_record.workspace_id
+                        if project_record is not None
+                        else None
                     ),
-                    related_object_type="project" if record is not None else None,
+                    related_object_type=(
+                        "project" if project_record is not None else None
+                    ),
                     request_or_session_ref=(
-                        record.workspace_id if record is not None else None
+                        project_record.workspace_id
+                        if project_record is not None
+                        else None
                     ),
                     active_page=route,
-                    hydration_mode=_context_hydration_mode(context),
+                    hydration_mode=_context_hydration_mode(project_context),
                     section=_safe_text(
                         st.session_state.get(_navigation_secondary_state_key()), ""
                     ),
                     recent_action=_safe_text(
                         st.session_state.get("atlas_workspace_action"), "render"
                     ),
-                    diagnostic_context=_bootstrap_diagnostic_context(st, record=record),
+                    diagnostic_context=_bootstrap_diagnostic_context(
+                        st,
+                        record=project_record,
+                    ),
                 )
                 st.error(f"{route} could not be loaded. Reference Error ID: {error_id}")
                 recovery_cols = st.columns(2)
@@ -44155,11 +44153,11 @@ def _render_shell(
 
         _render_workspace_navigation(
             st,
-            record,
+            project_record,
             content_renderer=_render_content_with_boundary,
         )
 
-    _render_status_bar(st, record, context)
+    _render_status_bar(st, project_record, project_context)
 
 
 def _render_bootstrap_failure_surface(
